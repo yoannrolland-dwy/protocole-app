@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+html, body, #root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: #050505;
+  color: #f5f5f0;
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+}
+input, button, textarea { font-family: inherit; }
+/* champs date/time lisibles sur fond sombre */
+input[type="date"], input[type="time"] { color-scheme: dark; }
