@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { store, exportData, importData } from "./store.js";
 
-const APP_VERSION = "3.4.0";
+const APP_VERSION = "3.4.1";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -796,11 +796,11 @@ function Dashboard({ weight, sleep, knee, macros, targets, training, phase, setP
   const wData = lastN(weight, 30).map((w) => ({ date: fmt(w.date), kg: w.kg }));
 
   const tiles = [
-    { label: "Sommeil", val: sleep7 != null ? fmtHM(sleep7) : "—", unit: "",
-      note: `7j · ${sleep7arr.length} nuit${sleep7arr.length > 1 ? "s" : ""}`, color: C.text },
+    { label: "Calories", val: kcalToday ?? "—", unit: "", note: "aujourd'hui", color: C.text },
     { label: "Genou", val: kLast ? kLast.pain : "—", unit: "/10", note: kLast ? fmt(kLast.date) : "—",
       color: kLast && (kLast.baseline === false || kLast.pain >= 6) ? C.danger : C.accent },
-    { label: "Calories", val: kcalToday ?? "—", unit: "", note: "aujourd'hui", color: C.text },
+    { label: "Sommeil", val: sleep7 != null ? fmtHM(sleep7) : "—", unit: "",
+      note: `7j · ${sleep7arr.length} nuit${sleep7arr.length > 1 ? "s" : ""}`, color: C.text },
   ];
 
   return (
