@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { store, exportData, importData } from "./store.js";
 
-const APP_VERSION = "3.3.0";
+const APP_VERSION = "3.4.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -1441,7 +1441,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek }) {
    ============================================================ */
 function KneeTab({ knee, save, hsrWeek }) {
   const [date, setDate] = useState(today());
-  const [pain, setPain] = useState(5);
+  const [pain, setPain] = useState(4);
   const [baseline, setBaseline] = useState(true);
   const [routine, setRoutine] = useState(null);
   const pickDate = (d) => { setDate(d); const e = knee.find((k) => k.date === d); if (e) { setPain(e.pain); setBaseline(e.baseline !== false); } };
@@ -1586,32 +1586,31 @@ function MacroTab({ macros, targets, save, training }) {
     kcal: Math.round((m.protein ?? 0) * 4 + (m.carbs ?? 0) * 4 + (m.fat ?? 0) * 9),
   }));
   const kcalTarget = Math.round(targets.protein * 4 + targets.carbs * 4 + targets.fat * 9);
-  const pct = Math.min(100, (p / targets.protein) * 100);
+  const kcalPct = Math.min(100, (kcal / kcalTarget) * 100);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <ScreenHeader title="Macros" subtitle={date === today() ? "aujourd'hui" : fmt(date)} />
 
-      {/* Protéines — héro */}
+      {/* Calories — héro */}
       <Card style={{ padding: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <Label style={{ fontSize: 10, letterSpacing: 1.5 }}>Protéines</Label>
-          <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>cible {targets.protein} g</span>
+          <Label style={{ fontSize: 10, letterSpacing: 1.5 }}>Calories</Label>
+          <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>cible {kcalTarget} kcal</span>
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 10px" }}>
-          <span style={{ fontFamily: C.mono, fontSize: 38, fontWeight: 800, color: C.text }}>{p}</span>
-          <span style={{ fontSize: 15, color: C.muted, fontWeight: 700 }}>/{targets.protein}g</span>
-          <span style={{ fontSize: 11, color: C.muted, marginLeft: "auto", fontFamily: C.mono }}>{Math.round(kcal)} kcal</span>
+          <span style={{ fontFamily: C.mono, fontSize: 38, fontWeight: 800, color: C.text }}>{Math.round(kcal)}</span>
+          <span style={{ fontSize: 15, color: C.muted, fontWeight: 700 }}>/{kcalTarget} kcal</span>
         </div>
         <div style={{ background: C.bg, borderRadius: 6, height: 8, overflow: "hidden" }}>
-          <div style={{ background: C.accent, width: `${pct}%`, height: "100%" }} />
+          <div style={{ background: C.accent, width: `${kcalPct}%`, height: "100%" }} />
         </div>
       </Card>
 
-      {/* Glucides / lipides / fibres */}
-      <div style={{ display: "flex", gap: 8 }}>
-        {[{ l: "Glucides", v: c, t: targets.carbs }, { l: "Lipides", v: f, t: targets.fat }, { l: "Fibres", v: fib, t: targets.fiber }].map((x) => (
-          <div key={x.l} style={{ flex: 1, background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+      {/* Protéines / glucides / lipides / fibres */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {[{ l: "Protéines", v: p, t: targets.protein }, { l: "Glucides", v: c, t: targets.carbs }, { l: "Lipides", v: f, t: targets.fat }, { l: "Fibres", v: fib, t: targets.fiber }].map((x) => (
+          <div key={x.l} style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
             <Label>{x.l}</Label>
             <div style={{ fontFamily: C.mono, fontSize: 18, fontWeight: 800, color: C.text, marginTop: 3 }}>{x.v}g</div>
             <div style={{ fontSize: 9.5, color: C.dim, marginTop: 1, fontFamily: C.mono }}>/ {x.t}g</div>
@@ -1803,7 +1802,7 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose }) {
 /* ============================================================
    APP
    ============================================================ */
-const DEFAULT_TARGETS = { protein: 215, carbs: 210, fat: 100, fiber: 30, water: 3000, weightMaintenance: 96 };
+const DEFAULT_TARGETS = { protein: 215, carbs: 205, fat: 80, fiber: 30, water: 3000, weightMaintenance: 96 };
 
 export default function App() {
   const [tab, setTab] = useState("dash");
