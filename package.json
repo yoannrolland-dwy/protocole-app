@@ -1,7 +1,7 @@
 {
   "name": "protocole-pwa",
   "private": true,
-  "version": "3.5.0",
+  "version": "3.6.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,12 +9,16 @@
     "preview": "vite preview --host"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/core": "^8.4.2",
+    "@capgo/capacitor-health": "^8.10.0",
     "lucide-react": "^1.25.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "recharts": "^3.10.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.4.2",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.0.3",
     "tailwindcss": "^4.3.3",

@@ -10,8 +10,9 @@ import {
   ChevronRight, ChevronDown, Zap, Settings, Download, Upload, X,
 } from "lucide-react";
 import { store, exportData, importData } from "./store.js";
+import { syncHealthConnect } from "./healthSync.js";
 
-const APP_VERSION = "3.5.0";
+const APP_VERSION = "3.6.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -786,7 +787,7 @@ function CoachIA({ coach, todayNote, saveNote }) {
 /* ============================================================
    TAB — DASHBOARD
    ============================================================ */
-function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, save, setTab }) {
+function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, setTab }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast ? round(wLast.kg - tgtW) : null;
@@ -805,14 +806,15 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
   const wData = lastN(weight, 30).map((w) => ({ date: fmt(w.date), kg: w.kg }));
 
   const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
-  const addSteps = (n) => save.steps(upsert(steps, { date: today(), count: Math.max(0, stepsToday + n) }));
 
-  const tiles = [
+  const tilesTop = [
     { label: "Calories", val: kcalToday ?? "—", unit: "", note: "aujourd'hui", color: C.text },
-    { label: "Genou", val: kLast ? kLast.pain : "—", unit: "/10", note: kLast ? fmt(kLast.date) : "—",
-      color: kLast && (kLast.baseline === false || kLast.pain >= 6) ? C.danger : C.accent },
+  ];
+  const tilesBottom = [
     { label: "Sommeil", val: sleep7 != null ? fmtHM(sleep7) : "—", unit: "",
       note: `7j · ${sleep7arr.length} nuit${sleep7arr.length > 1 ? "s" : ""}`, color: C.text },
+    { label: "Genou", val: kLast ? kLast.pain : "—", unit: "/10", note: kLast ? fmt(kLast.date) : "—",
+      color: kLast && (kLast.baseline === false || kLast.pain >= 6) ? C.danger : C.accent },
   ];
 
   return (
@@ -845,9 +847,9 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
         ) : <Body style={{ fontSize: 11, color: C.dim }}>Ajoute des pesées pour voir la tendance.</Body>}
       </Card>
 
-      {/* Tuiles : calories · genou · sommeil · pas */}
+      {/* Tuiles : calories · pas · sommeil · genou */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        {tiles.map((t) => (
+        {tilesTop.map((t) => (
           <div key={t.label} style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 11 }}>
             <Label>{t.label}</Label>
             <div style={{ fontFamily: C.mono, fontSize: 19, fontWeight: 800, color: t.color, marginTop: 3 }}>
@@ -857,15 +859,9 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
           </div>
         ))}
 
-        {/* Pas — tuile cliquable (→ onglet Pas) + ajout rapide inline */}
-        <div onClick={() => setTab("steps")} style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 11, cursor: "pointer", position: "relative" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <Label>Pas</Label>
-            <button onClick={(e) => { e.stopPropagation(); addSteps(1000); }} style={{
-              background: C.accentRow, border: `1.5px solid ${C.accent}`, borderRadius: 6, color: C.accent,
-              width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0, lineHeight: 1,
-            }}><Plus size={12} /></button>
-          </div>
+        {/* Pas — tuile cliquable (→ onglet Pas) */}
+        <div onClick={() => setTab("steps")} style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 11, cursor: "pointer" }}>
+          <Label>Pas</Label>
           <div style={{ fontFamily: C.mono, fontSize: 19, fontWeight: 800, color: C.text, marginTop: 3 }}>
             {stepsToday.toLocaleString("fr-FR")}
           </div>
@@ -874,6 +870,16 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
             <div style={{ background: C.accent, width: `${Math.min(100, (stepsToday / STEPS_TARGET) * 100)}%`, height: "100%" }} />
           </div>
         </div>
+
+        {tilesBottom.map((t) => (
+          <div key={t.label} style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 11 }}>
+            <Label>{t.label}</Label>
+            <div style={{ fontFamily: C.mono, fontSize: 19, fontWeight: 800, color: t.color, marginTop: 3 }}>
+              {t.val}<span style={{ fontSize: 11, color: C.muted }}>{t.unit}</span>
+            </div>
+            <div style={{ fontSize: 8.5, color: C.dim, marginTop: 2, textTransform: "uppercase", letterSpacing: 0.5 }}>{t.note}</div>
+          </div>
+        ))}
       </div>
 
       {/* Coach IA */}
@@ -1964,6 +1970,32 @@ export default function App() {
     })();
   }, []);
 
+  // Synchro Health Connect (app native uniquement, no-op sur la PWA) — pas + sommeil,
+  // 14 derniers jours, écrase toujours la valeur locale du jour concerné.
+  useEffect(() => {
+    if (loading) return;
+    (async () => {
+      const result = await syncHealthConnect();
+      if (result.status !== "ok") return;
+      if (Object.keys(result.stepsByDate).length) {
+        setSteps((prev) => {
+          let next = prev;
+          Object.entries(result.stepsByDate).forEach(([date, count]) => { next = upsert(next, { date, count }); });
+          store.set("stepsLog", next);
+          return next;
+        });
+      }
+      if (Object.keys(result.sleepByDate).length) {
+        setSleep((prev) => {
+          let next = prev;
+          Object.entries(result.sleepByDate).forEach(([date, hours]) => { next = upsert(next, { date, hours: round(hours, 2) }); });
+          store.set("sleepLog", next);
+          return next;
+        });
+      }
+    })();
+  }, [loading]);
+
   const save = {
     weight: (v) => { setWeight(v); store.set("weightLog", v); },
     sleep: (v) => { setSleep(v); store.set("sleepLog", v); },
@@ -2129,7 +2161,7 @@ Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reci
           <SettingsPanel {...{ apiKey, setApiKey, model, setModel }} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, save, setTab }} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, setTab }} />}
             {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
             {tab === "sleep" && <SleepTab {...{ sleep, save }} />}
             {tab === "steps" && <StepsTab {...{ steps, save }} />}
