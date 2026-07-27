@@ -172,7 +172,22 @@ class HealthNutritionPlugin : Plugin() {
                 fun dayOf(instant: Instant) =
                     instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString()
 
-                hc.readRecords(ReadRecordsRequest(NutritionRecord::class, range)).records.forEach { r ->
+                // Déduplication indispensable : réinstaller MyFitnessPal lui fait réécrire tout
+                // son historique dans Health Connect sans supprimer l'ancien. On se retrouve avec
+                // plusieurs enregistrements de MÊME source et MÊME instant de début pour un repas
+                // donné — les additionner doublait les macros des jours passés (constaté le
+                // 27/07/2026). On ne garde donc que le plus récemment écrit de chaque groupe
+                // (source + instant de début), ce qui préserve les vrais repas distincts d'une
+                // même journée puisqu'ils ont des instants de début différents.
+                fun <T> dedupe(records: List<T>, key: (T) -> String, modifiedAt: (T) -> Instant) =
+                    records.groupBy(key).values.map { grp -> grp.maxByOrNull(modifiedAt)!! }
+
+                val nutriRecords = dedupe(
+                    hc.readRecords(ReadRecordsRequest(NutritionRecord::class, range)).records,
+                    { "${it.metadata.dataOrigin.packageName}|${it.startTime}" },
+                    { it.metadata.lastModifiedTime },
+                )
+                nutriRecords.forEach { r ->
                     val d = days.getOrPut(dayOf(r.startTime)) { DayTotals() }
                     r.energy?.inKilocalories?.let { d.kcal += it; d.hasNutrition = true }
                     r.protein?.inGrams?.let { d.protein += it; d.hasNutrition = true }
@@ -181,7 +196,12 @@ class HealthNutritionPlugin : Plugin() {
                     r.dietaryFiber?.inGrams?.let { d.fiber += it; d.hasNutrition = true }
                 }
 
-                hc.readRecords(ReadRecordsRequest(HydrationRecord::class, range)).records.forEach { r ->
+                val hydrRecords = dedupe(
+                    hc.readRecords(ReadRecordsRequest(HydrationRecord::class, range)).records,
+                    { "${it.metadata.dataOrigin.packageName}|${it.startTime}" },
+                    { it.metadata.lastModifiedTime },
+                )
+                hydrRecords.forEach { r ->
                     val d = days.getOrPut(dayOf(r.startTime)) { DayTotals() }
                     d.waterMl += r.volume.inMilliliters
                     d.hasWater = true

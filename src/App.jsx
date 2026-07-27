@@ -13,7 +13,7 @@ import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
 import { store, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
-import { scheduleRestAlarm, cancelRestAlarm } from "./timerNotify.js";
+import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 
 const APP_VERSION = "3.9.0";
 
@@ -1242,14 +1242,20 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel }
     tRef.current = setInterval(() => setTRem((r) => { if (r <= 1) { clearInterval(tRef.current); setTRun(false); return 0; } return r - 1; }), 1000);
     return () => clearInterval(tRef.current);
   }, [tRun]);
-  useEffect(() => { if (prevRem.current > 0 && tRem === 0) beep(); prevRem.current = tRem; }, [tRem]);
+  useEffect(() => {
+    if (prevRem.current > 0 && tRem === 0) { beep(); hideRestCountdown(); }
+    prevRem.current = tRem;
+  }, [tRem]);
   // Filet de sécurité : pas d'alarme fantôme si on quitte le carnet minuteur en route.
   useEffect(() => () => { clearInterval(tRef.current); cancelRestAlarm(); }, []);
-  // L'alarme système double le décompte JS : elle seule est fiable écran verrouillé.
+
+  // Les notifications système doublent le décompte JS : elles seules sont fiables
+  // écran verrouillé. `openName` sert à afficher l'exercice concerné dans la notif.
+  const openName = () => (open >= 0 ? exos[open]?.nom ?? "" : "");
   const fireTimer = (s) => {
     ensureAudio(); clearInterval(tRef.current);
     setTSecs(s); setTRem(s); setTRun(true);
-    scheduleRestAlarm(s);
+    scheduleRestAlarm(s, openName());
   };
   const setTimer = (s) => {
     clearInterval(tRef.current); setTRun(false); setTSecs(s); setTRem(s);
@@ -1259,7 +1265,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel }
     ensureAudio();
     setTRun((r) => {
       const next = !r;
-      if (next) scheduleRestAlarm(tRem); else cancelRestAlarm();
+      if (next) scheduleRestAlarm(tRem, openName()); else cancelRestAlarm();
       return next;
     });
   };
