@@ -9,10 +9,12 @@ import {
   Play, Pause, SkipForward, RotateCcw, Timer, Droplet,
   ChevronRight, ChevronDown, Zap, Settings, Download, Upload, X,
 } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
+import { App as CapacitorApp } from "@capacitor/app";
 import { store, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
 
-const APP_VERSION = "3.6.0";
+const APP_VERSION = "3.6.1";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -595,6 +597,8 @@ const ScreenHeader = ({ title, subtitle, right }) => (
 
 const chartAxis = { fontSize: 10, fill: C.muted };
 const tooltipStyle = { background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 8, fontSize: 12, color: C.text };
+// recharts met la valeur en noir par défaut (invisible sur fond sombre) sans itemStyle explicite
+const tooltipItemStyle = { color: C.text, fontWeight: 700 };
 
 /* ============================================================
    ROUTINE PLAYER
@@ -840,7 +844,7 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
                 <YAxis domain={["dataMin - 0.7", "dataMax + 0.7"]} hide />
                 <ReferenceLine y={tgtW} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
                 <Line type="monotone" dataKey="kg" stroke={C.text} strokeWidth={2} dot={false} />
-                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} />
+                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -955,7 +959,7 @@ function WeightTab({ weight, targets, save, phase }) {
                 <CartesianGrid stroke={C.divider} vertical={false} />
                 <XAxis dataKey="date" tick={chartAxis} interval="preserveEnd" />
                 <YAxis domain={["dataMin - 1", "dataMax + 1"]} tick={chartAxis} />
-                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} />
+                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle} />
                 <ReferenceLine y={tgtW} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
                 <Line type="monotone" dataKey="kg" stroke={C.text} strokeWidth={2} dot={{ r: 2, fill: C.text }} />
               </LineChart>
@@ -1069,7 +1073,7 @@ function SleepTab({ sleep, save }) {
                 <CartesianGrid stroke={C.divider} vertical={false} />
                 <XAxis dataKey="date" tick={chartAxis} interval="preserveEnd" />
                 <YAxis tick={chartAxis} />
-                <Tooltip formatter={(v) => [fmtHM(v), "Sommeil"]} contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} />
+                <Tooltip formatter={(v) => [fmtHM(v), "Sommeil"]} contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle} />
                 <ReferenceLine y={7} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
                 <Bar dataKey="hours" radius={[3, 3, 0, 0]}>
                   {data.map((d, i) => <Cell key={i} fill={d.hours >= 7 ? C.accent : C.border} />)}
@@ -1142,7 +1146,7 @@ function StepsTab({ steps, save }) {
                 <CartesianGrid stroke={C.divider} vertical={false} />
                 <XAxis dataKey="date" tick={chartAxis} interval="preserveEnd" />
                 <YAxis tick={chartAxis} />
-                <Tooltip formatter={(v) => [v.toLocaleString("fr-FR"), "Pas"]} contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} />
+                <Tooltip formatter={(v) => [v.toLocaleString("fr-FR"), "Pas"]} contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle} />
                 <ReferenceLine y={STEPS_TARGET} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
                 <Bar dataKey="count" radius={[3, 3, 0, 0]}>
                   {data.map((d, i) => <Cell key={i} fill={d.count >= STEPS_TARGET ? C.accent : C.border} />)}
@@ -1425,7 +1429,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel }
       {/* Pastille flottante pendant le décompte */}
       {tRun && (
         <button onClick={toggleRun} style={{
-          position: "fixed", right: 12, bottom: 76, zIndex: 40,
+          position: "fixed", right: 12, bottom: "calc(76px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))", zIndex: 40,
           display: "flex", alignItems: "center", gap: 7,
           background: C.accent, color: "#000", border: "none", borderRadius: 999,
           padding: "9px 14px", fontFamily: C.mono, fontSize: 14, fontWeight: 800,
@@ -1586,7 +1590,7 @@ function KneeTab({ knee, save, hsrWeek }) {
                 <CartesianGrid stroke={C.divider} vertical={false} />
                 <XAxis dataKey="date" tick={chartAxis} interval="preserveEnd" />
                 <YAxis domain={[0, 10]} tick={chartAxis} />
-                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} />
+                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle} />
                 <ReferenceLine y={5} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1} />
                 <Line type="monotone" dataKey="pain" stroke={C.danger} strokeWidth={2.5}
                   dot={(p) => {
@@ -1796,7 +1800,7 @@ function MacroTab({ macros, targets, save, training }) {
                 <CartesianGrid stroke={C.divider} vertical={false} />
                 <XAxis dataKey="date" tick={chartAxis} interval="preserveEnd" />
                 <YAxis tick={chartAxis} />
-                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} />
+                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle} />
                 <ReferenceLine y={kcalTarget} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
                 <Bar dataKey="kcal" radius={[3, 3, 0, 0]}>
                   {kcalTrend.map((d, i) => <Cell key={i} fill={Math.abs(d.kcal - kcalTarget) <= kcalTarget * 0.1 ? C.accent : C.border} />)}
@@ -1859,7 +1863,7 @@ function MacroTab({ macros, targets, save, training }) {
 /* ============================================================
    RÉGLAGES
    ============================================================ */
-function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose }) {
+function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync, onHealthSync }) {
   const [k, setK] = useState(apiKey);
   const [m, setM] = useState(model);
   const [msg, setMsg] = useState("");
@@ -1915,6 +1919,26 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose }) {
           Exporte régulièrement : c'est ta seule sauvegarde. Vider les données du navigateur effacerait l'app.
         </Body>
       </Card>
+
+      {Capacitor.isNativePlatform() && (
+        <Card>
+          <Label style={{ marginBottom: 8 }}>Health Connect · pas & sommeil</Label>
+          <Body style={{ fontSize: 12, color: C.text2, marginBottom: 10 }}>
+            {healthSync.status === "running" && "Synchronisation en cours…"}
+            {healthSync.status === "ok" && `À jour · dernière synchro ${new Date(healthSync.at).toLocaleTimeString("fr-FR")}`}
+            {healthSync.status === "unavailable" && "Health Connect indisponible sur cet appareil."}
+            {healthSync.status === "denied" && "Accès refusé — autorise « Pas » et « Sommeil » dans Health Connect."}
+            {healthSync.status === "error" && `Erreur : ${healthSync.message}`}
+            {healthSync.status === "idle" && "Pas encore synchronisé."}
+          </Body>
+          <Btn variant="outline" onClick={onHealthSync} style={{ width: "100%" }} disabled={healthSync.status === "running"}>
+            Synchroniser maintenant
+          </Btn>
+          <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
+            Synchronise automatiquement au lancement et à chaque retour au premier plan. Écrase toujours la valeur locale du jour concerné.
+          </Body>
+        </Card>
+      )}
 
       {msg && <Body style={{ color: C.accent, fontSize: 12 }}>{msg}</Body>}
       <Body style={{ fontSize: 10, color: C.dim, textAlign: "center", fontFamily: C.mono }}>PROTOCOLE v{APP_VERSION}</Body>
@@ -1972,29 +1996,44 @@ export default function App() {
 
   // Synchro Health Connect (app native uniquement, no-op sur la PWA) — pas + sommeil,
   // 14 derniers jours, écrase toujours la valeur locale du jour concerné.
+  const [healthSync, setHealthSync] = useState({ status: "idle", at: null });
+  const runHealthSync = async () => {
+    setHealthSync((s) => ({ ...s, status: "running" }));
+    const result = await syncHealthConnect();
+    if (result.status !== "ok") {
+      setHealthSync({ status: result.status, message: result.message || result.reason, at: new Date().toISOString() });
+      return;
+    }
+    if (Object.keys(result.stepsByDate).length) {
+      setSteps((prev) => {
+        let next = prev;
+        Object.entries(result.stepsByDate).forEach(([date, count]) => { next = upsert(next, { date, count }); });
+        store.set("stepsLog", next);
+        return next;
+      });
+    }
+    if (Object.keys(result.sleepByDate).length) {
+      setSleep((prev) => {
+        let next = prev;
+        Object.entries(result.sleepByDate).forEach(([date, hours]) => { next = upsert(next, { date, hours: round(hours, 2) }); });
+        store.set("sleepLog", next);
+        return next;
+      });
+    }
+    setHealthSync({ status: "ok", at: new Date().toISOString() });
+  };
+
   useEffect(() => {
     if (loading) return;
-    (async () => {
-      const result = await syncHealthConnect();
-      if (result.status !== "ok") return;
-      if (Object.keys(result.stepsByDate).length) {
-        setSteps((prev) => {
-          let next = prev;
-          Object.entries(result.stepsByDate).forEach(([date, count]) => { next = upsert(next, { date, count }); });
-          store.set("stepsLog", next);
-          return next;
-        });
-      }
-      if (Object.keys(result.sleepByDate).length) {
-        setSleep((prev) => {
-          let next = prev;
-          Object.entries(result.sleepByDate).forEach(([date, hours]) => { next = upsert(next, { date, hours: round(hours, 2) }); });
-          store.set("sleepLog", next);
-          return next;
-        });
-      }
-    })();
+    runHealthSync();
   }, [loading]);
+
+  // Resynchro à chaque retour au premier plan (pas seulement au lancement à froid)
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const handle = CapacitorApp.addListener("resume", () => runHealthSync());
+    return () => { handle.then((h) => h.remove()); };
+  }, []);
 
   const save = {
     weight: (v) => { setWeight(v); store.set("weightLog", v); },
@@ -2137,6 +2176,7 @@ Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reci
       {/* En-tête */}
       <header style={{
         flexShrink: 0, padding: "14px 16px 12px",
+        paddingTop: "calc(14px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))",
         borderBottom: `1.5px solid ${C.divider}`,
         display: "flex", justifyContent: "space-between", alignItems: "flex-start",
       }}>
@@ -2158,7 +2198,7 @@ Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reci
       {/* Contenu */}
       <main style={{ flex: 1, overflowY: "auto", padding: "14px 16px 24px" }}>
         {loading ? <Empty>Chargement…</Empty> : showSettings ? (
-          <SettingsPanel {...{ apiKey, setApiKey, model, setModel }} onClose={() => setShowSettings(false)} />
+          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync }} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
             {tab === "dash" && <Dashboard {...{ weight, sleep, knee, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, setTab }} />}
@@ -2175,7 +2215,8 @@ Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reci
       {/* Navigation */}
       <nav style={{
         flexShrink: 0, display: "flex", justifyContent: "space-around",
-        padding: "9px 4px 12px", borderTop: `1.5px solid ${C.divider}`, background: C.bg,
+        padding: "9px 4px 12px", paddingBottom: "calc(12px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))",
+        borderTop: `1.5px solid ${C.divider}`, background: C.bg,
       }}>
         {NAV.map(({ key, label, icon: Icon }) => {
           const on = tab === key && !showSettings;
