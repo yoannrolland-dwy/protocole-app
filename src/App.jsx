@@ -13,8 +13,9 @@ import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
 import { store, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
+import { scheduleRestAlarm, cancelRestAlarm } from "./timerNotify.js";
 
-const APP_VERSION = "3.8.1";
+const APP_VERSION = "3.9.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -819,90 +820,63 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
     : null;
 
   const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee }), [training, knee]);
-  const wData = lastN(weight, 30).map((w) => ({ date: fmt(w.date), kg: w.kg }));
 
   const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
+  const waterToday = mToday?.water ?? 0;
+  const basketToday = training.some((t) => t.type === "Basket" && t.date === today());
+  const waterTgt = targets.water + (basketToday ? 1000 : 0);
+  const kcalTgt = (() => { const a = targetsForDate(today(), targets); return Math.round(a.protein * 4 + a.carbs * 4 + a.fat * 9); })();
 
-  const tilesTop = [
-    { label: "Calories", val: kcalToday ?? "—", unit: "", note: "aujourd'hui", color: C.text },
-  ];
-  const tilesBottom = [
-    { label: "Sommeil", val: sleep7 != null ? fmtHM(sleep7) : "—", unit: "",
+  // 3 paires, toutes cliquables vers l'onglet correspondant.
+  const tiles = [
+    { label: "Poids", tab: "weight", val: wLast ? wLast.kg : "—", unit: "kg",
+      note: `cible ${tgtW}`, color: C.text,
+      extra: wDelta != null ? { txt: `${wDelta > 0 ? "▲" : "▼"}${Math.abs(wDelta)}`, col: wDelta > 0 ? C.danger : C.accent } : null },
+    { label: "Pas", tab: "steps", val: stepsToday.toLocaleString("fr-FR"), unit: "",
+      note: `/ ${STEPS_TARGET.toLocaleString("fr-FR")}`, color: C.text,
+      bar: Math.min(100, (stepsToday / STEPS_TARGET) * 100) },
+    { label: "Calories", tab: "macro", val: kcalToday ?? "—", unit: "",
+      note: `/ ${kcalTgt} kcal`, color: C.text,
+      bar: kcalToday != null ? Math.min(100, (kcalToday / kcalTgt) * 100) : null },
+    { label: "Eau", tab: "macro", val: (waterToday / 1000).toFixed(2), unit: "L",
+      note: `/ ${(waterTgt / 1000).toFixed(1)} L${basketToday ? " · basket" : ""}`, color: C.text,
+      bar: Math.min(100, (waterToday / waterTgt) * 100) },
+    { label: "Sommeil", tab: "sleep", val: sleep7 != null ? fmtHM(sleep7) : "—", unit: "",
       note: `7j · ${sleep7arr.length} nuit${sleep7arr.length > 1 ? "s" : ""}`, color: C.text },
-    { label: "Genou", val: kLast ? kLast.pain : "—", unit: "/10", note: kLast ? fmt(kLast.date) : "—",
+    { label: "Genou", tab: "knee", val: kLast ? kLast.pain : "—", unit: "/10", note: kLast ? fmt(kLast.date) : "—",
       color: kLast && (kLast.baseline === false || kLast.pain >= 6) ? C.danger : C.accent },
   ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {/* Poids — héro */}
-      <Card style={{ padding: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <Label style={{ fontSize: 10, letterSpacing: 1.5 }}>Poids</Label>
-          <span style={{ fontSize: 11, color: C.accent, fontWeight: 700 }}>cible {tgtW}</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "6px 0 12px" }}>
-          <Big value={wLast ? wLast.kg : "—"} unit="kg" />
-          {wDelta != null && (
-            <span style={{ fontSize: 12, color: wDelta > 0 ? C.danger : C.accent, marginLeft: "auto", fontWeight: 700 }}>
-              {wDelta > 0 ? "▲" : "▼"}{Math.abs(wDelta)}
-            </span>
-          )}
-        </div>
-        {wData.length > 1 ? (
-          <div style={{ height: 60 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={wData} margin={{ top: 4, right: 2, left: 2, bottom: 0 }}>
-                <YAxis domain={["dataMin - 0.7", "dataMax + 0.7"]} hide />
-                <ReferenceLine y={tgtW} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
-                <Line type="monotone" dataKey="kg" stroke={C.text} strokeWidth={2} dot={false} />
-                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        ) : <Body style={{ fontSize: 11, color: C.dim }}>Ajoute des pesées pour voir la tendance.</Body>}
-      </Card>
-
-      {/* Tuiles : calories · pas · sommeil · genou */}
+      {/* Tuiles : poids/pas · calories/eau · sommeil/genou — toutes cliquables */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        {tilesTop.map((t) => (
-          <div key={t.label} style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 11 }}>
+        {tiles.map((t) => (
+          <div key={t.label} onClick={() => setTab(t.tab)} style={{
+            background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10,
+            padding: 11, cursor: "pointer",
+          }}>
             <Label>{t.label}</Label>
-            <div style={{ fontFamily: C.mono, fontSize: 19, fontWeight: 800, color: t.color, marginTop: 3 }}>
-              {t.val}<span style={{ fontSize: 11, color: C.muted }}>{t.unit}</span>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 3 }}>
+              <span style={{ fontFamily: C.mono, fontSize: 19, fontWeight: 800, color: t.color }}>
+                {t.val}<span style={{ fontSize: 11, color: C.muted }}>{t.unit}</span>
+              </span>
+              {t.extra && (
+                <span style={{ fontSize: 11, color: t.extra.col, fontWeight: 700, marginLeft: "auto" }}>{t.extra.txt}</span>
+              )}
             </div>
             <div style={{ fontSize: 8.5, color: C.dim, marginTop: 2, textTransform: "uppercase", letterSpacing: 0.5 }}>{t.note}</div>
-          </div>
-        ))}
-
-        {/* Pas — tuile cliquable (→ onglet Pas) */}
-        <div onClick={() => setTab("steps")} style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 11, cursor: "pointer" }}>
-          <Label>Pas</Label>
-          <div style={{ fontFamily: C.mono, fontSize: 19, fontWeight: 800, color: C.text, marginTop: 3 }}>
-            {stepsToday.toLocaleString("fr-FR")}
-          </div>
-          <div style={{ fontSize: 8.5, color: C.dim, marginTop: 2, textTransform: "uppercase", letterSpacing: 0.5 }}>/ {STEPS_TARGET.toLocaleString("fr-FR")}</div>
-          <div style={{ background: C.bg, borderRadius: 6, height: 4, overflow: "hidden", marginTop: 5 }}>
-            <div style={{ background: C.accent, width: `${Math.min(100, (stepsToday / STEPS_TARGET) * 100)}%`, height: "100%" }} />
-          </div>
-        </div>
-
-        {tilesBottom.map((t) => (
-          <div key={t.label} style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 11 }}>
-            <Label>{t.label}</Label>
-            <div style={{ fontFamily: C.mono, fontSize: 19, fontWeight: 800, color: t.color, marginTop: 3 }}>
-              {t.val}<span style={{ fontSize: 11, color: C.muted }}>{t.unit}</span>
-            </div>
-            <div style={{ fontSize: 8.5, color: C.dim, marginTop: 2, textTransform: "uppercase", letterSpacing: 0.5 }}>{t.note}</div>
+            {t.bar != null && (
+              <div style={{ background: C.bg, borderRadius: 6, height: 4, overflow: "hidden", marginTop: 5 }}>
+                <div style={{ background: C.accent, width: `${t.bar}%`, height: "100%" }} />
+              </div>
+            )}
           </div>
         ))}
       </div>
 
-      {/* Coach IA */}
-      <CoachIA coach={coach} todayNote={todayNote} saveNote={saveNote} />
-
       {/* Prochaine séance */}
-      <Card accentLeft style={{ padding: "13px 14px" }}>
+      <Card accentLeft onClick={() => setTab("train")} style={{ padding: "13px 14px", cursor: "pointer" }}>
         <Label style={{ letterSpacing: 1.5, marginBottom: 5 }}>Prochaine séance</Label>
         <div style={{ fontSize: 16, color: C.text, fontWeight: 800, marginBottom: 3 }}>{suggestions[0]?.type}</div>
         <Body>{suggestions[0]?.reason}</Body>
@@ -927,6 +901,9 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
           </div>
         )}
       </Card>
+
+      {/* Coach IA */}
+      <CoachIA coach={coach} todayNote={todayNote} saveNote={saveNote} />
 
       {/* Phase */}
       <Card>
@@ -1266,9 +1243,26 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel }
     return () => clearInterval(tRef.current);
   }, [tRun]);
   useEffect(() => { if (prevRem.current > 0 && tRem === 0) beep(); prevRem.current = tRem; }, [tRem]);
-  const fireTimer = (s) => { ensureAudio(); clearInterval(tRef.current); setTSecs(s); setTRem(s); setTRun(true); };
-  const setTimer = (s) => { clearInterval(tRef.current); setTRun(false); setTSecs(s); setTRem(s); };
-  const toggleRun = () => { ensureAudio(); setTRun((r) => !r); };
+  // Filet de sécurité : pas d'alarme fantôme si on quitte le carnet minuteur en route.
+  useEffect(() => () => { clearInterval(tRef.current); cancelRestAlarm(); }, []);
+  // L'alarme système double le décompte JS : elle seule est fiable écran verrouillé.
+  const fireTimer = (s) => {
+    ensureAudio(); clearInterval(tRef.current);
+    setTSecs(s); setTRem(s); setTRun(true);
+    scheduleRestAlarm(s);
+  };
+  const setTimer = (s) => {
+    clearInterval(tRef.current); setTRun(false); setTSecs(s); setTRem(s);
+    cancelRestAlarm();
+  };
+  const toggleRun = () => {
+    ensureAudio();
+    setTRun((r) => {
+      const next = !r;
+      if (next) scheduleRestAlarm(tRem); else cancelRestAlarm();
+      return next;
+    });
+  };
   const recordLast = (ei, s) => setLastTimerByExo((p) => ({ ...p, [ei]: s }));
   // changement d'exercice → minuteur réinitialisé sur le dernier temps utilisé pour cet exercice, ou son repos par défaut
   const openExo = (ei) => {
@@ -1909,11 +1903,28 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
   const [k, setK] = useState(apiKey);
   const [m, setM] = useState(model);
   const [msg, setMsg] = useState("");
-  const doExport = () => {
-    const blob = new Blob([JSON.stringify(exportData(), null, 2)], { type: "application/json" });
+  const doExport = async () => {
+    const json = JSON.stringify(exportData(), null, 2);
+    const name = `protocole-${today()}.json`;
+    // Le téléchargement via <a download> ne fonctionne pas dans la WebView native :
+    // on écrit le fichier puis on ouvre le partage Android (Drive, mail, Fichiers…).
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { Filesystem, Directory, Encoding } = await import("@capacitor/filesystem");
+        const { Share } = await import("@capacitor/share");
+        await Filesystem.writeFile({ path: name, data: json, directory: Directory.Cache, encoding: Encoding.UTF8 });
+        const { uri } = await Filesystem.getUri({ path: name, directory: Directory.Cache });
+        await Share.share({ title: name, files: [uri] });
+        setMsg("Export prêt — choisis où l'enregistrer.");
+      } catch (e) {
+        setMsg(`Export impossible : ${e?.message || e}`);
+      }
+      return;
+    }
+    const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `protocole-${today()}.json`; a.click();
+    a.href = url; a.download = name; a.click();
     URL.revokeObjectURL(url);
   };
   const doImport = (e) => {
