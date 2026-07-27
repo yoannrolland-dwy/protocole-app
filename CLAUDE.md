@@ -21,10 +21,22 @@ cosmétiques) :
 
 ## Ce qu'est l'app
 
-**PROTOCOLE** : PWA (Progressive Web App) personnelle de suivi sport/
-nutrition/récupération. Un seul utilisateur (moi), pas de compte, pas de
-backend — toutes les données vivent dans le `localStorage` du navigateur,
-sur mon téléphone (Samsung S25).
+**PROTOCOLE** : app personnelle de suivi sport/nutrition/récupération. Un
+seul utilisateur (moi), pas de compte, pas de backend — toutes les données
+vivent dans le `localStorage`, sur mon téléphone (Samsung S25).
+
+**Deux cibles de build depuis le même code** (chantier Capacitor terminé,
+voir plus bas) :
+- **PWA** : déployée sur Netlify, ouverte au navigateur ou épinglée à
+  l'écran d'accueil. Déploiement continu via `git push`. Aucune donnée de
+  santé synchronisée (saisie 100% manuelle).
+- **App Android native** (dossier `android/`, appId
+  `com.yoannrolland.protocole`) : installée à la main sur le téléphone via
+  USB/adb (pas de store, pas de mise à jour automatique). C'est la seule
+  des deux à avoir accès à Health Connect (pas, sommeil, macros, eau
+  automatiques — voir section dédiée plus bas). Les deux icônes coexistent
+  sur le téléphone ; c'est la version native qu'il faut utiliser pour
+  profiter de la synchro.
 
 ### Stack technique (versions figées au dernier build réussi — ne pas
 changer sans raison explicite, et surtout ne pas "corriger" vers des
@@ -36,19 +48,31 @@ versions plus anciennes que Claude connaîtrait mieux par défaut) :
 - recharts 3.10.0 (graphiques)
 - lucide-react 1.25.0 (icônes)
 - vite-plugin-pwa 1.3.0 (manifeste + service worker)
+- @capacitor/core, @capacitor/android, @capacitor/app 8.4.x/8.1.x (app native)
+- @capgo/capacitor-health 8.10.0 (lecture Health Connect : pas, sommeil,
+  énergie, hydratation — PAS le détail des macros, voir plus bas)
 
 ### Structure des fichiers
 ```
 protocole-app/
   index.html
   vite.config.js        # React + Tailwind v4 + PWA
+  capacitor.config.json # config app native (SystemBars insetsHandling: css)
   package.json / package-lock.json
   public/                # icônes PWA (icon-192, icon-512, maskable, apple-touch)
+                         # + privacypolicy.html (exigée par Health Connect)
   src/
     main.jsx             # point d'entrée + enregistrement service worker
-    App.jsx              # TOUT le code applicatif (~1900 lignes, un seul fichier)
+    App.jsx              # TOUT le code applicatif (~2100 lignes, un seul fichier)
     store.js             # persistance localStorage + export/import JSON
+    healthSync.js        # synchro Health Connect (pas/sommeil/macros/eau)
     index.css            # @import "tailwindcss" + resets minimaux
+  android/               # projet natif Capacitor — build/déploiement séparé
+                         # de la PWA, voir "Mise à jour de l'app native"
+    app/src/main/java/com/yoannrolland/protocole/
+      MainActivity.java
+      HealthNutritionPlugin.kt  # lecteur natif maison (macros complètes,
+                                 # voir section Health Connect)
 ```
 
 ### Design system — "Affirmée" (à respecter strictement pour toute nouvelle UI)
@@ -68,7 +92,7 @@ protocole-app/
 
 ## Fonctionnalités en place (ne pas régresser sans le signaler)
 
-- **6 onglets** : Tableau de bord, Poids, Sommeil, Séances, Genou, Macros
+- **7 onglets** : Tableau de bord, Poids, Sommeil, Pas, Séances, Genou, Macros
 - **Carnet de musculation série par série** (`MuscuLogger`) : grille
   kg × reps (ou secondes pour les exos en mode "temps"), mémoire de la
   dernière perf **par série** (pas juste par exercice — si la 3e série était
@@ -87,7 +111,7 @@ protocole-app/
   sonore (Web Audio, 3 impulsions) + vibration en fin de décompte, pastille
   flottante visible **seulement pendant le décompte** (jamais épinglée en
   permanence — ça gênait le scroll, corrigé exprès).
-- **Genou** : log douleur 0-10 (défaut pré-sélectionné = **5**, pas 2) +
+- **Genou** : log douleur 0-10 (défaut pré-sélectionné = **4**, pas 2) +
   règle de Silbernagel (retour à la base sous 24h), table HSR, deux
   routines guidées avec minuteur (rééduc autonome, échauffement basket
   sécurisé).
@@ -101,11 +125,21 @@ protocole-app/
   zone déjà travaillée le jour même) — logique validée, ne pas simplifier
   sans retester ces cas.
 - **Macros** : protéines/glucides/lipides/fibres, cibles par défaut
-  **215/210/100/30 g**, graphique 14 jours en **calories** (pas protéines —
-  changé exprès). Eau en boutons rapides (+250/+500 ml, PAS de saisie
-  manuelle pour l'eau — décision explicite). Cible eau **+1 L automatique
-  les jours où une séance Basket est loggée** (je transpire beaucoup au
-  basket).
+  **215/205/80/30 g** (~2400 kcal), graphique 14 jours en **calories** (pas
+  protéines — changé exprès). Une bascule temporaire par date existe
+  (`targetsForDate` dans `App.jsx`) pour des périodes ponctuelles (ex.
+  sèche intensive avant vacances) — revient automatiquement aux cibles par
+  défaut après la période, ne pas la confondre avec un changement
+  permanent. Eau en boutons rapides (+250/+500 ml, PAS de saisie manuelle
+  pour l'eau — décision explicite). Cible eau **+1 L automatique les jours
+  où une séance Basket est loggée** (je transpire beaucoup au basket).
+  **Sur l'app native**, macros et eau du jour sont écrasées par la synchro
+  Health Connect si elle a des données ce jour-là (voir section dédiée) —
+  les boutons rapides restent utiles pour corriger/compléter entre deux
+  synchros.
+- **Pas** : onglet dédié (historique, saisie manuelle, graphique 21 jours)
+  + tuile sur le tableau de bord. Cible 10 000 pas/jour. Sur l'app native,
+  rempli automatiquement par Health Connect.
 - **Fiche péri-training** (`PERI` + `BASKET_PROTOCOLS`) : whey seule
   (30 g) avant une séance de muscu ≤ 1h (plus de glucides rapides avant —
   le glycogène de la veille suffit) ; 25-30 g de glucides gardés entre
@@ -119,7 +153,7 @@ protocole-app/
   7 dernières nuits saisies — bug corrigé, ne pas régresser).
 - **Phase** (Sèche/Maintenance/Prise) pilote le poids cible partout (93 en
   sèche, 95 en prise, éditable en maintenance).
-- **Dates + suppression** sur les 5 onglets de saisie (Poids, Sommeil,
+- **Dates + suppression** sur les 6 onglets de saisie (Poids, Sommeil, Pas,
   Séances, Genou, Macros) — sélecteur de date avec pré-remplissage si la
   date a déjà une entrée, bouton Supprimer conditionnel.
 - **Réglages (⚙)** : export/import JSON (Réglages → Exporter/Importer),
@@ -153,11 +187,45 @@ protocole-app/
   crédit sur console.anthropic.com. Ne pas suggérer d'augmenter les coûts
   sans raison.
 
+## Synchro Health Connect (app native uniquement — voir `src/healthSync.js`)
+
+- **Fonctionne** : pas, sommeil, macros complètes (kcal + protéines +
+  glucides + lipides + fibres), eau. Lus automatiquement au lancement, à
+  chaque retour au premier plan, et via le bouton "Synchroniser maintenant"
+  (Réglages). Toujours **écrase** la valeur locale du jour concerné si
+  Health Connect a une donnée ce jour-là (règle explicitement validée) —
+  sauf si le jour n'a rien à donner, dans ce cas la saisie locale existante
+  est préservée.
+- **Fait vérifié important** : sur mon installation, **MyFitnessPal écrit
+  directement dans Health Connect** (nutrition ET hydratation, source
+  `com.myfitnesspal.android`) — ça ne passe pas par Samsung Health. Ne pas
+  chercher à lire les macros depuis Samsung Health, ce serait un
+  intermédiaire inutile.
+- **Lecteur natif maison** (`HealthNutritionPlugin.kt`) : nécessaire parce
+  que `@capgo/capacitor-health` ne lit que l'énergie du `NutritionRecord`
+  de Health Connect, pas le détail protéines/glucides/lipides/fibres — ce
+  plugin maison va chercher ces champs en plus. Réutilise le même
+  consentement Health Connect que `@capgo/capacitor-health` (mêmes
+  permissions `READ_NUTRITION`/`READ_HYDRATION`), donc un seul écran de
+  consentement pour tout.
+- **Limite connue et acceptée pour les pas** : Health Connect n'est qu'une
+  copie retardée de ce que Samsung Health lui transmet — décalage constaté
+  face au compteur temps réel Samsung Health/montre. Décision prise : ne
+  pas contourner via le Samsung Health Data SDK (accès direct plus frais,
+  mais mode développeur documenté par Samsung comme *"non destiné aux
+  utilisateurs finaux"*, cassable à une mise à jour de Samsung Health). Pas
+  de projet de correction ici, c'est un choix assumé.
+- **Poids : testé, ne fonctionne PAS actuellement.** Ni MyFitnessPal ni
+  Samsung Health n'écrivent le poids dans Health Connect sur cet appareil
+  (0 échantillon lu, permission pourtant accordée) — reste en saisie
+  manuelle. À retester si un jour l'un de ces réglages change côté source.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
-   `trainingLog`, `kneeLog`, `macroLog`, `noteLog`, `targets`, `phase`,
-   `hsrWeek`, `apiKey`, `model` — préfixées `protocole:` dans `store.js`)
+   `trainingLog`, `kneeLog`, `macroLog`, `noteLog`, `stepsLog`, `targets`,
+   `phase`, `hsrWeek`, `apiKey`, `model` — préfixées `protocole:` dans
+   `store.js`)
    sans écrire une migration. Casser une clé = perdre l'historique de
    l'utilisateur, ce qui est la pire chose possible ici.
 2. **Toujours vérifier que le build passe** (`npm run build`) avant de
@@ -172,10 +240,11 @@ protocole-app/
    du recommandeur, contrat du Coach IA), demander confirmation — ce sont
    des décisions prises après plusieurs itérations, pas des choix
    arbitraires.
-6. **Pas d'import "coller depuis MyFitnessPal"** ni d'automatisation
-   partielle des macros — proposé puis explicitement refusé. La seule voie
-   de synchro macro/santé validée est l'objectif Capacitor + Health Connect
-   ci-dessous, pas d'étape intermédiaire de ce type.
+6. **Pas d'import "coller depuis MyFitnessPal"** ni d'automatisation par
+   demi-mesure des macros — proposé puis explicitement refusé. La seule
+   voie validée est la synchro Health Connect complète (voir section
+   dédiée), **désormais en place et fonctionnelle**. Ne pas resimplifier
+   vers un import partiel (ex. calories seules sans le détail macro).
 
 ## Workflow de déploiement (déjà en place, ne pas en proposer un autre)
 
@@ -193,30 +262,38 @@ protocole-app/
   Exporter), à ne jamais oublier de rappeler avant une mise à jour
   importante — GitHub ne contient que le code, jamais les données perso.
 
-## Objectif futur (prochain gros chantier, pas urgent)
+## Objectif futur restant (pas urgent)
 
-**Passer à Capacitor** pour deux raisons combinées :
-1. **Minuteur fiable en toutes circonstances** — actuellement en PWA pure,
-   le minuteur du carnet de muscu n'est fiable que si l'app reste ouverte à
-   l'écran ; écran verrouillé/app en arrière-plan, le décompte et le bip ne
-   sont pas garantis (limite du web, pas un bug). Capacitor + notifications
-   locales natives réglerait ça (Android 12+ nécessite la permission
-   SCHEDULE_EXACT_ALARM).
-2. **Lecture automatique de Health Connect** pour macros, fibres, sommeil,
-   etc. — MyFitnessPal écrit officiellement ses résumés de repas dans
-   Health Connect (Android, activé dans l'app MFP), et Samsung Health y lit/
-   écrit aussi. Mais Health Connect est une API Android **native**,
-   totalement inaccessible depuis un navigateur/PWA. Il faut que l'app
-   devienne une vraie app Android (via Capacitor) pour pouvoir demander la
-   permission de lecture Health Connect et pré-remplir automatiquement les
-   onglets Macros/Sommeil.
+**Minuteur fiable en toutes circonstances** — sur l'app native comme sur la
+PWA, le minuteur du carnet de muscu n'est fiable que si l'app reste ouverte
+à l'écran ; écran verrouillé/app en arrière-plan, le décompte et le bip ne
+sont pas garantis (limite du web/WebView, pas un bug). Des notifications
+locales natives régleraient ça (plugin `@capacitor/local-notifications`,
+Android 12+ nécessite la permission `SCHEDULE_EXACT_ALARM`). Pas encore
+fait — l'infra Capacitor existe déjà, donc c'est maintenant un chantier
+isolé et contenu, pas un prérequis à autre chose.
 
-Les deux objectifs pointent vers la même solution technique (Capacitor),
-donc ça vaut le coup de les traiter ensemble le jour où on s'y attaque.
-Prérequis déjà remplis : Node.js installé sur le Mac, Xcode/Android Studio
-restent à installer le moment venu. Le plugin Capacitor exact pour Health
-Connect n'a pas encore été choisi/vérifié — à rechercher sérieusement au
-moment de démarrer ce chantier plutôt que de supposer un nom de paquet.
+## Mise à jour de l'app Android native (différent du déploiement PWA)
+
+Le `git push` sur `main` ne redéploie **que la PWA** (Netlify, automatique).
+L'app native installée sur le téléphone ne se met JAMAIS à jour seule — il
+faut rebuild + réinstaller à la main à chaque changement de code qui la
+concerne :
+```
+npm run build
+npx cap sync android
+cd android && ./gradlew assembleDebug
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+```
+Téléphone branché en USB, débogage USB activé et autorisé sur l'appareil.
+Variables d'environnement requises (déjà ajoutées à `~/.zshrc`) :
+`ANDROID_HOME=/opt/homebrew/share/android-commandlinetools`,
+`JAVA_HOME=/opt/homebrew/opt/openjdk@21`.
+
+Après un `adb install -r`, l'app peut afficher "Nouvelle version
+disponible, recharger ?" au premier lancement (le service worker de la PWA
+tourne aussi dans l'app native) — c'est normal, accepter le rechargement
+pour être sûr d'avoir le code à jour.
 
 ## Comment je veux qu'on travaille
 
