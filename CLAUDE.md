@@ -196,6 +196,14 @@ protocole-app/
   Health Connect a une donnée ce jour-là (règle explicitement validée) —
   sauf si le jour n'a rien à donner, dans ce cas la saisie locale existante
   est préservée.
+- **Marqueur `source`** (`"healthconnect"` | `"manual"`) sur chaque entrée
+  steps/sleep/macros. Sur l'app native, les onglets Pas/Sommeil/Macros
+  passent en **lecture seule** (bandeau "Synchronisé depuis Health
+  Connect" + bouton "Corriger manuellement") quand l'entrée du jour affiché
+  a `source: "healthconnect"`. Le bouton révèle le formulaire de saisie
+  classique ; sauvegarder ré-étiquette l'entrée en `"manual"` jusqu'à la
+  prochaine synchro qui reprend la main. Sur la PWA, `source` n'est jamais
+  "healthconnect", donc la saisie reste toujours visible directement.
 - **Fait vérifié important** : sur mon installation, **MyFitnessPal écrit
   directement dans Health Connect** (nutrition ET hydratation, source
   `com.myfitnesspal.android`) — ça ne passe pas par Samsung Health. Ne pas
