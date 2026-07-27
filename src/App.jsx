@@ -14,7 +14,7 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { store, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
 
-const APP_VERSION = "3.6.1";
+const APP_VERSION = "3.7.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -1922,12 +1922,12 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
 
       {Capacitor.isNativePlatform() && (
         <Card>
-          <Label style={{ marginBottom: 8 }}>Health Connect · pas & sommeil</Label>
+          <Label style={{ marginBottom: 8 }}>Health Connect · pas, sommeil & macros</Label>
           <Body style={{ fontSize: 12, color: C.text2, marginBottom: 10 }}>
             {healthSync.status === "running" && "Synchronisation en cours…"}
             {healthSync.status === "ok" && `À jour · dernière synchro ${new Date(healthSync.at).toLocaleTimeString("fr-FR")}`}
             {healthSync.status === "unavailable" && "Health Connect indisponible sur cet appareil."}
-            {healthSync.status === "denied" && "Accès refusé — autorise « Pas » et « Sommeil » dans Health Connect."}
+            {healthSync.status === "denied" && "Accès refusé — autorise pas, sommeil, nutrition et hydratation dans Health Connect."}
             {healthSync.status === "error" && `Erreur : ${healthSync.message}`}
             {healthSync.status === "idle" && "Pas encore synchronisé."}
           </Body>
@@ -2017,6 +2017,15 @@ export default function App() {
         let next = prev;
         Object.entries(result.sleepByDate).forEach(([date, hours]) => { next = upsert(next, { date, hours: round(hours, 2) }); });
         store.set("sleepLog", next);
+        return next;
+      });
+    }
+    if (Object.keys(result.macrosByDate || {}).length) {
+      setMacros((prev) => {
+        let next = prev;
+        // upsert fusionne : les champs absents (jour sans eau, p. ex.) gardent leur valeur locale.
+        Object.entries(result.macrosByDate).forEach(([date, m]) => { next = upsert(next, { date, ...m }); });
+        store.set("macroLog", next);
         return next;
       });
     }
