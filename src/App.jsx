@@ -14,7 +14,7 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { store, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
 
-const APP_VERSION = "3.8.0";
+const APP_VERSION = "3.8.1";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA

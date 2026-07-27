@@ -4,6 +4,8 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.HydrationRecord
 import androidx.health.connect.client.records.NutritionRecord
+import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import com.getcapacitor.JSArray
@@ -38,6 +40,86 @@ class HealthNutritionPlugin : Plugin() {
         if (HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE)
             HealthConnectClient.getOrCreate(context)
         else null
+
+    /**
+     * Outil de diagnostic (non utilisé par la synchro normale) — dump brut du contenu de
+     * Health Connect : nutrition, hydratation, poids, pas, avec pour chaque enregistrement
+     * la source (`dataOrigin`) et l'horodatage de dernière écriture (`lastModifiedTime`).
+     *
+     * Sert à trancher la question « l'app lit-elle mal, ou Health Connect est-il périmé ? » :
+     * comparer `modif` à l'heure courante montre immédiatement si l'app source (MyFitnessPal,
+     * Samsung Health) a cessé de pousser ses données. À appeler ponctuellement depuis
+     * healthSync.js avec un console.log, puis retirer l'appel.
+     */
+    @PluginMethod
+    fun diagnose(call: PluginCall) {
+        val hc = client() ?: run { call.reject("Health Connect indisponible"); return }
+        val start = call.getString("startDate") ?: run { call.reject("startDate requis"); return }
+        val end = call.getString("endDate") ?: run { call.reject("endDate requis"); return }
+
+        scope.launch {
+            try {
+                val range = TimeRangeFilter.between(Instant.parse(start), Instant.parse(end))
+                val out = JSObject()
+
+                val nutri = JSArray()
+                hc.readRecords(ReadRecordsRequest(NutritionRecord::class, range)).records.forEach { r ->
+                    nutri.put(JSObject()
+                        .put("start", r.startTime.toString())
+                        .put("kcal", r.energy?.inKilocalories)
+                        .put("protein", r.protein?.inGrams)
+                        .put("carbs", r.totalCarbohydrate?.inGrams)
+                        .put("fat", r.totalFat?.inGrams)
+                        .put("fiber", r.dietaryFiber?.inGrams)
+                        .put("src", r.metadata.dataOrigin.packageName)
+                        .put("modif", r.metadata.lastModifiedTime.toString()))
+                }
+                out.put("nutrition", nutri)
+
+                val hydr = JSArray()
+                hc.readRecords(ReadRecordsRequest(HydrationRecord::class, range)).records.forEach { r ->
+                    hydr.put(JSObject()
+                        .put("start", r.startTime.toString())
+                        .put("ml", r.volume.inMilliliters)
+                        .put("src", r.metadata.dataOrigin.packageName)
+                        .put("modif", r.metadata.lastModifiedTime.toString()))
+                }
+                out.put("hydration", hydr)
+
+                val weights = JSArray()
+                try {
+                    hc.readRecords(ReadRecordsRequest(WeightRecord::class, range)).records.forEach { r ->
+                        weights.put(JSObject()
+                            .put("time", r.time.toString())
+                            .put("kg", r.weight.inKilograms)
+                            .put("src", r.metadata.dataOrigin.packageName)
+                            .put("modif", r.metadata.lastModifiedTime.toString()))
+                    }
+                    out.put("weight", weights)
+                } catch (e: Exception) {
+                    out.put("weightError", e.message ?: "inconnue")
+                }
+
+                // Pas : agrégés par source pour voir qui écrit quoi
+                val stepsBySrc = HashMap<String, Long>()
+                var stepsLatest = ""
+                hc.readRecords(ReadRecordsRequest(StepsRecord::class, range)).records.forEach { r ->
+                    val k = r.metadata.dataOrigin.packageName
+                    stepsBySrc[k] = (stepsBySrc[k] ?: 0L) + r.count
+                    val m = r.metadata.lastModifiedTime.toString()
+                    if (m > stepsLatest) stepsLatest = m
+                }
+                val steps = JSObject()
+                stepsBySrc.forEach { (k, v) -> steps.put(k, v) }
+                out.put("stepsBySource", steps)
+                out.put("stepsLastModified", stepsLatest)
+
+                call.resolve(out)
+            } catch (e: Exception) {
+                call.reject("Diagnostic impossible : ${e.message}")
+            }
+        }
+    }
 
     @PluginMethod
     fun hasPermissions(call: PluginCall) {

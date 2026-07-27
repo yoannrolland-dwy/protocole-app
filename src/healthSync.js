@@ -12,6 +12,9 @@ const HealthNutrition = registerPlugin("HealthNutrition");
 // Types demandés au plugin @capgo : il gère l'écran de consentement Health Connect.
 // dietaryEnergyConsumed → READ_NUTRITION, dietaryWater → READ_HYDRATION : ce sont
 // exactement les permissions dont le lecteur natif a besoin, d'où un seul consentement.
+// Pas de "weight" : MyFitnessPal ne déclare même pas WRITE_WEIGHT dans son manifeste
+// (vérifié le 27/07/2026), et Samsung Health n'en écrit pas non plus → 0 enregistrement
+// dans Health Connect. Le poids reste en saisie manuelle.
 const READ_TYPES = ["steps", "sleep", "dietaryEnergyConsumed", "dietaryWater"];
 
 export async function syncHealthConnect() {
