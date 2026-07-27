@@ -279,12 +279,17 @@ D'où l'organisation suivante, à respecter par défaut :
   tout le cumul des commits accumulés.
 
 Ne jamais pousser directement sur `main` sans que Yoann l'ait demandé.
-Prérequis : les "branch deploys" doivent rester désactivés côté Netlify
-(réglage par défaut) — sinon `dev` déclencherait aussi des builds.
+Prérequis vérifié le 27/07/2026 : côté Netlify, *Branch deploys* est bien sur
+**"None"** — `dev` ne déclenche donc aucun build. À revérifier si ce réglage
+venait à changer.
 
 Un `netlify.toml` complète ce dispositif : il annule le build quand un commit
 poussé sur `main` ne touche aucun fichier de la PWA (cas d'un commit purement
-`android/` ou documentaire).
+`android/` ou documentaire). **Vérifié empiriquement le 27/07/2026** : un build
+annulé par cette règle **ne consomme aucun crédit** et n'incrémente pas le
+compteur "Production deploys" (resté à 15 après un push ne touchant que
+`netlify.toml`). La documentation Netlify ne le précise pas — ne pas remettre
+ce point en doute sans nouveau test.
 - Client Git utilisé par l'utilisateur : **GitHub Desktop** (interface
   graphique, pas de ligne de commande Git manuelle) — mais si Claude Code
   gère lui-même git add/commit/push directement, c'est very bien aussi et
