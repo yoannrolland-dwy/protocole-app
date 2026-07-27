@@ -14,7 +14,7 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { store, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
 
-const APP_VERSION = "3.7.0";
+const APP_VERSION = "3.8.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -502,6 +502,18 @@ function Btn({ children, onClick, variant = "outline", style = {}, disabled }) {
     }}>{children}</button>
   );
 }
+
+// Bandeau affiché à la place de la saisie quand la donnée du jour vient de Health Connect —
+// avec un accès de secours pour corriger manuellement (jour manquant, valeur fausse).
+const SyncedBanner = ({ onCorrect }) => (
+  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+    <Body style={{ fontSize: 11, color: C.dim }}>
+      <Zap size={11} style={{ display: "inline", marginRight: 4, verticalAlign: -1 }} color={C.accent} />
+      Synchronisé depuis Health Connect
+    </Body>
+    <Btn variant="ghost" onClick={onCorrect} style={{ padding: "4px 8px", fontSize: 10 }}>Corriger manuellement</Btn>
+  </div>
+);
 
 const inputStyle = (focused = false) => ({
   background: C.bg, border: `1.5px solid ${focused ? C.accent : C.border}`,
@@ -997,13 +1009,16 @@ function WeightTab({ weight, targets, save, phase }) {
    ============================================================ */
 function SleepTab({ sleep, save }) {
   const [date, setDate] = useState(today());
+  const cur = sleep.find((s) => s.date === date);
   const initH = lastN(sleep, 1)[0]?.hours ?? 7.5;
   const [h, setH] = useState(Math.floor(initH));
   const [min, setMin] = useState(Math.round((initH - Math.floor(initH)) * 60));
   const [quality, setQuality] = useState(3);
+  const [forceManual, setForceManual] = useState(false);
   const loadHM = (dec) => { setH(Math.floor(dec)); setMin(Math.round((dec - Math.floor(dec)) * 60)); };
-  const pickDate = (d) => { setDate(d); const e = sleep.find((s) => s.date === d); if (e) { loadHM(e.hours); setQuality(e.quality ?? 3); } };
-  const add = () => save.sleep(upsert(sleep, { date, hours: round(h + min / 60, 2), quality }));
+  const pickDate = (d) => { setDate(d); const e = sleep.find((s) => s.date === d); if (e) { loadHM(e.hours); setQuality(e.quality ?? 3); } setForceManual(false); };
+  const add = () => save.sleep(upsert(sleep, { date, hours: round(h + min / 60, 2), quality, source: "manual" }));
+  const isSynced = cur?.source === "healthconnect" && !forceManual;
 
   const last7 = lastN(sleep, 7);
   const maxH = Math.max(9, ...last7.map((s) => s.hours));
@@ -1046,22 +1061,28 @@ function SleepTab({ sleep, save }) {
 
       <Card>
         <div style={{ marginBottom: 10 }}><DateField value={date} onChange={pickDate} /></div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <Field label="Heures"><Stepper value={h} set={setH} step={1} min={0} max={16} int /></Field>
-          <Field label="Minutes"><Stepper value={min} set={setMin} step={5} min={0} max={59} int /></Field>
-        </div>
-        <div style={{ textAlign: "center", fontSize: 12, color: C.accent, marginTop: 8, fontWeight: 700, fontFamily: C.mono }}>soit {fmtHM(h + min / 60)}</div>
-        <div style={{ marginTop: 12 }}>
-          <Field label="Qualité">
-            <Pills options={[1, 2, 3, 4, 5].map((n) => ({ key: n, label: "★".repeat(n) }))} value={quality} onChange={setQuality} small />
-          </Field>
-        </div>
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <Btn variant="primary" onClick={add} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
-          {sleep.some((s) => s.date === date) && (
-            <Btn variant="danger" onClick={() => save.sleep(sleep.filter((s) => s.date !== date))}><Trash2 size={14} /></Btn>
-          )}
-        </div>
+        {isSynced ? (
+          <SyncedBanner onCorrect={() => setForceManual(true)} />
+        ) : (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <Field label="Heures"><Stepper value={h} set={setH} step={1} min={0} max={16} int /></Field>
+              <Field label="Minutes"><Stepper value={min} set={setMin} step={5} min={0} max={59} int /></Field>
+            </div>
+            <div style={{ textAlign: "center", fontSize: 12, color: C.accent, marginTop: 8, fontWeight: 700, fontFamily: C.mono }}>soit {fmtHM(h + min / 60)}</div>
+            <div style={{ marginTop: 12 }}>
+              <Field label="Qualité">
+                <Pills options={[1, 2, 3, 4, 5].map((n) => ({ key: n, label: "★".repeat(n) }))} value={quality} onChange={setQuality} small />
+              </Field>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <Btn variant="primary" onClick={add} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
+              {sleep.some((s) => s.date === date) && (
+                <Btn variant="danger" onClick={() => save.sleep(sleep.filter((s) => s.date !== date))}><Trash2 size={14} /></Btn>
+              )}
+            </div>
+          </>
+        )}
       </Card>
 
       <Card>
@@ -1095,8 +1116,10 @@ function StepsTab({ steps, save }) {
   const [date, setDate] = useState(today());
   const cur = steps.find((s) => s.date === date);
   const [n, setN] = useState(cur?.count ?? 0);
-  const pickDate = (d) => { setDate(d); const e = steps.find((s) => s.date === d); setN(e?.count ?? 0); };
-  const add = () => save.steps(upsert(steps, { date, count: Math.round(n) }));
+  const [forceManual, setForceManual] = useState(false);
+  const pickDate = (d) => { setDate(d); const e = steps.find((s) => s.date === d); setN(e?.count ?? 0); setForceManual(false); };
+  const add = () => save.steps(upsert(steps, { date, count: Math.round(n), source: "manual" }));
+  const isSynced = cur?.source === "healthconnect" && !forceManual;
 
   const last7 = lastN(steps, 7);
   const avg7 = avg(last7.map((s) => s.count));
@@ -1128,13 +1151,19 @@ function StepsTab({ steps, save }) {
 
       <Card>
         <div style={{ marginBottom: 10 }}><DateField value={date} onChange={pickDate} /></div>
-        <Field label="Pas"><Stepper value={n} set={setN} step={500} min={0} int /></Field>
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <Btn variant="primary" onClick={add} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
-          {steps.some((s) => s.date === date) && (
-            <Btn variant="danger" onClick={() => save.steps(steps.filter((s) => s.date !== date))}><Trash2 size={14} /></Btn>
-          )}
-        </div>
+        {isSynced ? (
+          <SyncedBanner onCorrect={() => setForceManual(true)} />
+        ) : (
+          <>
+            <Field label="Pas"><Stepper value={n} set={setN} step={500} min={0} int /></Field>
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <Btn variant="primary" onClick={add} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
+              {steps.some((s) => s.date === date) && (
+                <Btn variant="danger" onClick={() => save.steps(steps.filter((s) => s.date !== date))}><Trash2 size={14} /></Btn>
+              )}
+            </div>
+          </>
+        )}
       </Card>
 
       <Card>
@@ -1692,21 +1721,24 @@ function MacroTab({ macros, targets, save, training }) {
   const [fib, setFib] = useState(cur.fiber ?? at.fiber);
   const [showPeri, setShowPeri] = useState(false);
   const [basketProto, setBasketProto] = useState("soir21h");
+  const [forceManual, setForceManual] = useState(false);
   const water = cur.water ?? 0;
   const basketDay = training.some((t) => t.type === "Basket" && t.date === date);
   const waterTgt = targets.water + (basketDay ? 1000 : 0);
+  const isSynced = cur.source === "healthconnect" && !forceManual;
   const pickDate = (d) => {
     setDate(d);
     const atd = targetsForDate(d, targets);
     const e = macros.find((m) => m.date === d);
     setP(e?.protein ?? atd.protein); setC(e?.carbs ?? atd.carbs);
     setF(e?.fat ?? atd.fat); setFib(e?.fiber ?? atd.fiber);
+    setForceManual(false);
   };
   const kcal = p * 4 + c * 4 + f * 9;
-  const saveMacros = () => save.macros(upsert(macros, { date, protein: round(p), carbs: round(c), fat: round(f), fiber: round(fib), water }));
+  const saveMacros = () => save.macros(upsert(macros, { date, protein: round(p), carbs: round(c), fat: round(f), fiber: round(fib), water, source: "manual" }));
   const addWater = (ml) => {
     const next = Math.max(0, (macros.find((m) => m.date === date)?.water ?? 0) + ml);
-    save.macros(upsert(macros, { date, water: next }));
+    save.macros(upsert(macros, { date, water: next, source: "manual" }));
   };
   const kcalTrend = lastN(macros, 14).map((m) => ({
     date: fmt(m.date),
@@ -1760,31 +1792,41 @@ function MacroTab({ macros, targets, save, training }) {
         <div style={{ background: C.bg, borderRadius: 6, height: 8, overflow: "hidden", marginBottom: 10 }}>
           <div style={{ background: C.accent, width: `${Math.min(100, (water / waterTgt) * 100)}%`, height: "100%" }} />
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Btn variant="plain" onClick={() => addWater(250)} style={{ flex: 1 }}>+250 ml</Btn>
-          <Btn variant="plain" onClick={() => addWater(500)} style={{ flex: 1 }}>+500 ml</Btn>
-          <Btn variant="ghost" onClick={() => addWater(-250)}>−250</Btn>
-        </div>
+        {isSynced ? (
+          <SyncedBanner onCorrect={() => setForceManual(true)} />
+        ) : (
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn variant="plain" onClick={() => addWater(250)} style={{ flex: 1 }}>+250 ml</Btn>
+            <Btn variant="plain" onClick={() => addWater(500)} style={{ flex: 1 }}>+500 ml</Btn>
+            <Btn variant="ghost" onClick={() => addWater(-250)}>−250</Btn>
+          </div>
+        )}
       </Card>
 
       {/* Saisie */}
       <Card>
         <div style={{ marginBottom: 10 }}><DateField value={date} onChange={pickDate} /></div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <Field label="Protéines (g)"><Stepper value={p} set={setP} step={5} int /></Field>
-          <Field label="Glucides (g)"><Stepper value={c} set={setC} step={5} int /></Field>
-          <Field label="Lipides (g)"><Stepper value={f} set={setF} step={5} int /></Field>
-          <Field label="Fibres (g)"><Stepper value={fib} set={setFib} step={1} int /></Field>
-        </div>
-        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>Tracker les grammes de macros, pas le total kcal de l'app (décalage fibres).</Body>
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <Btn variant="primary" onClick={saveMacros} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
-          {macros.some((m) => m.date === date) && (
-            <Btn variant="danger" onClick={() => { save.macros(macros.filter((m) => m.date !== date)); setP(at.protein); setC(at.carbs); setF(at.fat); setFib(at.fiber); }}>
-              <Trash2 size={14} />
-            </Btn>
-          )}
-        </div>
+        {isSynced ? (
+          <SyncedBanner onCorrect={() => setForceManual(true)} />
+        ) : (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <Field label="Protéines (g)"><Stepper value={p} set={setP} step={5} int /></Field>
+              <Field label="Glucides (g)"><Stepper value={c} set={setC} step={5} int /></Field>
+              <Field label="Lipides (g)"><Stepper value={f} set={setF} step={5} int /></Field>
+              <Field label="Fibres (g)"><Stepper value={fib} set={setFib} step={1} int /></Field>
+            </div>
+            <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>Tracker les grammes de macros, pas le total kcal de l'app (décalage fibres).</Body>
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <Btn variant="primary" onClick={saveMacros} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
+              {macros.some((m) => m.date === date) && (
+                <Btn variant="danger" onClick={() => { save.macros(macros.filter((m) => m.date !== date)); setP(at.protein); setC(at.carbs); setF(at.fat); setFib(at.fiber); }}>
+                  <Trash2 size={14} />
+                </Btn>
+              )}
+            </div>
+          </>
+        )}
       </Card>
 
       {/* Tendance calories */}
@@ -2007,7 +2049,7 @@ export default function App() {
     if (Object.keys(result.stepsByDate).length) {
       setSteps((prev) => {
         let next = prev;
-        Object.entries(result.stepsByDate).forEach(([date, count]) => { next = upsert(next, { date, count }); });
+        Object.entries(result.stepsByDate).forEach(([date, count]) => { next = upsert(next, { date, count, source: "healthconnect" }); });
         store.set("stepsLog", next);
         return next;
       });
@@ -2015,7 +2057,7 @@ export default function App() {
     if (Object.keys(result.sleepByDate).length) {
       setSleep((prev) => {
         let next = prev;
-        Object.entries(result.sleepByDate).forEach(([date, hours]) => { next = upsert(next, { date, hours: round(hours, 2) }); });
+        Object.entries(result.sleepByDate).forEach(([date, hours]) => { next = upsert(next, { date, hours: round(hours, 2), source: "healthconnect" }); });
         store.set("sleepLog", next);
         return next;
       });
@@ -2024,7 +2066,7 @@ export default function App() {
       setMacros((prev) => {
         let next = prev;
         // upsert fusionne : les champs absents (jour sans eau, p. ex.) gardent leur valeur locale.
-        Object.entries(result.macrosByDate).forEach(([date, m]) => { next = upsert(next, { date, ...m }); });
+        Object.entries(result.macrosByDate).forEach(([date, m]) => { next = upsert(next, { date, ...m, source: "healthconnect" }); });
         store.set("macroLog", next);
         return next;
       });
