@@ -4,14 +4,14 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Cell,
 } from "recharts";
 import {
-  LayoutDashboard, Scale, Moon, Dumbbell, HeartPulse, Utensils,
+  LayoutDashboard, Scale, Moon, Dumbbell, HeartPulse, Utensils, Footprints,
   Plus, AlertTriangle, CheckCircle2, Circle, Sparkles, Trash2,
   Play, Pause, SkipForward, RotateCcw, Timer, Droplet,
   ChevronRight, ChevronDown, Zap, Settings, Download, Upload, X,
 } from "lucide-react";
 import { store, exportData, importData } from "./store.js";
 
-const APP_VERSION = "3.4.1";
+const APP_VERSION = "3.5.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -84,40 +84,40 @@ const phaseTarget = (phase, targets) =>
 
 const TEMPLATES = {
   "Upper A": { kind: "muscu", exos: [
-    { n: "Développé incliné haltères", s: 4, r: "8-12", rest: 120, mode: "reps", c: "ouverture pecs, priorité · 1-2 reps en réserve" },
-    { n: "Rowing barre ou machine", s: 4, r: "8-12", rest: 120, mode: "reps", c: "prise pronation/neutre (coude)" },
-    { n: "Écarté poulie basse", s: 3, r: "10-12", rest: 90, mode: "reps", c: "ligne ascendante (haut des pecs)" },
-    { n: "Extension triceps poulie haute", s: 3, r: "8-12", rest: 90, mode: "reps", c: "" },
-    { n: "Élévations latérales haltères", s: 3, r: "12-15", rest: 60, mode: "reps", c: "variante haltères" },
-    { n: "Face pull", s: 3, r: "12-15", rest: 60, mode: "reps", c: "arrière d'épaule" },
-    { n: "Curl poignets pronation", s: 3, r: "15-20", rest: 45, mode: "reps", c: "léger, avant-bras" },
-    { n: "Core — Planche", s: 4, r: "20-30 s", rest: 30, mode: "temps", c: "finisher · anti-extension · progresser par difficulté" },
+    { n: "Développé incliné haltères", s: 4, r: "8-10", rest: 150, mode: "reps", c: "ouverture pecs, priorité · 1-2 reps en réserve" },
+    { n: "Rowing barre ou machine", s: 4, r: "8-10", rest: 120, mode: "reps", c: "prise pronation/neutre (coude)" },
+    { n: "Écarté poulie basse", s: 3, r: "12-15", rest: 90, mode: "reps", c: "ligne ascendante (haut des pecs)" },
+    { n: "Extension triceps poulie haute", s: 3, r: "10-12", rest: 90, mode: "reps", c: "" },
+    { n: "Élévations latérales haltères", s: 3, r: "12-15", rest: 75, mode: "reps", c: "variante haltères" },
+    { n: "Face pull", s: 3, r: "15", rest: 60, mode: "reps", c: "arrière d'épaule" },
+    { n: "Curl poignets pronation", s: 3, r: "15-20", rest: 60, mode: "reps", c: "léger, avant-bras" },
+    { n: "Core — Planche", s: 3, r: "45-60 s", rest: 60, mode: "temps", c: "finisher · anti-extension · progresser par difficulté" },
   ]},
   "Upper B": { kind: "muscu", exos: [
-    { n: "Développé couché haltères", s: 4, r: "8-12", rest: 120, mode: "reps", c: "ouverture pecs, priorité" },
-    { n: "Tirage vertical prise neutre", s: 4, r: "8-12", rest: 120, mode: "reps", c: "prise neutre (coude)" },
-    { n: "Développé militaire haltères", s: 3, r: "8-12", rest: 90, mode: "reps", c: "" },
-    { n: "Rear delt machine (reverse pec deck)", s: 3, r: "10-12", rest: 60, mode: "reps", c: "arrière d'épaule" },
-    { n: "Élévations latérales poulie", s: 3, r: "12-15", rest: 60, mode: "reps", c: "variante poulie" },
-    { n: "Curl marteau (prise neutre)", s: 3, r: "8-12", rest: 90, mode: "reps", c: "prise neutre (coude)" },
-    { n: "Curl poignets supination", s: 3, r: "15-20", rest: 45, mode: "reps", c: "léger, avant-bras" },
-    { n: "Core — Crunch machine", s: 3, r: "10-15", rest: 60, mode: "reps", c: "finisher · contrôlé, 1-2 reps en réserve" },
+    { n: "Développé couché haltères", s: 4, r: "8-10", rest: 150, mode: "reps", c: "ouverture pecs, priorité" },
+    { n: "Tirage vertical prise neutre", s: 4, r: "8-10", rest: 120, mode: "reps", c: "prise neutre (coude)" },
+    { n: "Développé militaire haltères", s: 3, r: "8-10", rest: 120, mode: "reps", c: "" },
+    { n: "Rear delt machine (reverse pec deck)", s: 3, r: "12-15", rest: 75, mode: "reps", c: "arrière d'épaule" },
+    { n: "Élévations latérales poulie", s: 3, r: "12-15", rest: 75, mode: "reps", c: "variante poulie" },
+    { n: "Curl marteau (prise neutre)", s: 3, r: "10-12", rest: 75, mode: "reps", c: "prise neutre (coude)" },
+    { n: "Curl poignets supination", s: 3, r: "15-20", rest: 60, mode: "reps", c: "léger, avant-bras" },
+    { n: "Core — Crunch machine", s: 3, r: "12-15", rest: 60, mode: "reps", c: "finisher · contrôlé, 1-2 reps en réserve" },
   ]},
   "Lower A": { kind: "muscu", knee: true, hsr: true, exos: [
     { n: "Iso leg extension @60° (si genou raide)", s: 5, r: "45 s", rest: 120, mode: "temps", opt: true, c: "primer antalgique · effort ~70 %" },
-    { n: "Presse à cuisses (HSR)", s: 3, r: "table HSR", rest: 150, mode: "reps", hsr: true, c: "tempo 6 s · amplitude 10-60°" },
-    { n: "Mollets à la presse", s: 3, r: "12-15", rest: 60, mode: "reps", c: "enchaîné" },
-    { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 90, mode: "reps", hsr: true, perLeg: true, c: "tempo 6 s · par jambe" },
-    { n: "Soulevé de terre roumain", s: 3, r: "8-10", rest: 120, mode: "reps", c: "genou peu sollicité" },
-    { n: "Core — Planche", s: 4, r: "20-30 s", rest: 30, mode: "temps", c: "finisher · pas de crunch le jour du RDL" },
+    { n: "Presse à cuisses (HSR)", s: 3, r: "table HSR", rest: 180, mode: "reps", hsr: true, c: "tempo 6 s · amplitude 10-60°" },
+    { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "enchaîné" },
+    { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 120, mode: "reps", hsr: true, perLeg: true, c: "tempo 6 s · par jambe" },
+    { n: "Soulevé de terre roumain", s: 3, r: "8-10", rest: 150, mode: "reps", c: "genou peu sollicité" },
+    { n: "Core — Planche", s: 3, r: "45-60 s", rest: 60, mode: "temps", c: "finisher · pas de crunch le jour du RDL" },
   ]},
   "Lower B": { kind: "muscu", knee: true, exos: [
-    { n: "Presse à cuisses", s: 3, r: "10-12", rest: 120, mode: "reps", c: "contrôlé, reps + hautes" },
-    { n: "Mollets à la presse", s: 3, r: "15-20", rest: 60, mode: "reps", c: "enchaîné" },
-    { n: "Leg extension unilatérale", s: 3, r: "12-15", rest: 90, mode: "reps", perLeg: true, c: "tempo 6 s · par jambe" },
-    { n: "Hip thrust", s: 4, r: "8-10", rest: 90, mode: "reps", c: "genou-safe" },
-    { n: "Leg curl bilatéral", s: 3, r: "12-15", rest: 60, mode: "reps", c: "" },
-    { n: "Core — Crunch machine", s: 3, r: "10-15", rest: 60, mode: "reps", c: "finisher · contrôlé, 1-2 reps en réserve" },
+    { n: "Presse à cuisses", s: 4, r: "8-10", rest: 180, mode: "reps", c: "contrôlé, reps + hautes" },
+    { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "enchaîné" },
+    { n: "Leg extension unilatérale", s: 3, r: "8-10", rest: 120, mode: "reps", perLeg: true, c: "tempo 6 s · par jambe" },
+    { n: "Hip thrust", s: 3, r: "8-10", rest: 120, mode: "reps", c: "genou-safe" },
+    { n: "Leg curl bilatéral", s: 3, r: "10-12", rest: 90, mode: "reps", c: "" },
+    { n: "Core — Crunch machine", s: 3, r: "12-15", rest: 60, mode: "reps", c: "finisher · contrôlé, 1-2 reps en réserve" },
   ]},
   "Basket":   { kind: "sport", knee: true, exos: [] },
   "Escalade": { kind: "sport", climb: true, exos: [] },
@@ -376,6 +376,8 @@ function recommendSessions({ training, knee }) {
   // ce qui est déjà fait aujourd'hui
   const todayTypes = training.filter((t) => t.date === t0).map((t) => t.type);
   const upperToday = todayTypes.some((x) => x.startsWith("Upper"));
+  const lowerToday = todayTypes.some((x) => x.startsWith("Lower"));
+  const climbToday = todayTypes.includes("Escalade");
   const kneeToday = todayTypes.some((x) => TEMPLATES[x]?.knee);
 
   // variante la moins récente
@@ -389,12 +391,16 @@ function recommendSessions({ training, knee }) {
 
   // ---- HAUT DU CORPS : jamais bloqué par le genou ----
   const upV = variant("Upper A", "Upper B");
-  let upScore = 20 + (2 - upper7) * 12 + cap(dUpper);
-  let upReason = `Upper ${upper7}/2 cette semaine · dernier ${ago(dUpper)}.`;
-  if (kneeRed) { upScore += 18; upReason += " Genou à ménager → c'est l'option sûre, jambes au repos."; }
-  if (dClimb <= 1) { upScore -= 8; upReason += " Escalade récente : allège le tirage (coude)."; }
-  if (dUpper === 0) { upScore -= 32; upReason = `Haut du corps déjà fait aujourd'hui (${upper7}/2 cette semaine) — à reprendre après récupération.`; }
-  push(sugg, upV, upScore, upReason);
+  if (climbToday) {
+    push(avoid, "Upper A / B", 0, "Escalade déjà faite aujourd'hui — volume de tirage sur le coude, ne pas empiler un Upper.");
+  } else {
+    let upScore = 20 + (2 - upper7) * 12 + cap(dUpper);
+    let upReason = `Upper ${upper7}/2 cette semaine · dernier ${ago(dUpper)}.`;
+    if (kneeRed) { upScore += 18; upReason += " Genou à ménager → c'est l'option sûre, jambes au repos."; }
+    if (dClimb <= 1) { upScore -= 8; upReason += " Escalade récente : allège le tirage (coude)."; }
+    if (dUpper === 0) { upScore -= 32; upReason = `Haut du corps déjà fait aujourd'hui (${upper7}/2 cette semaine) — à reprendre après récupération.`; }
+    push(sugg, upV, upScore, upReason);
+  }
 
   // ---- BAS DU CORPS ----
   if (kneeRed) {
@@ -416,6 +422,8 @@ function recommendSessions({ training, knee }) {
     push(avoid, "Basket", 0, "Sauts et changements de direction : à proscrire tant que le genou n'est pas revenu à sa base.");
   } else if (dKnee === 0 || kneeToday) {
     push(avoid, "Basket", 0, "Expo genou déjà faite aujourd'hui — deuxième dose déconseillée.");
+  } else if (upperToday) {
+    push(avoid, "Basket", 0, "Musculation (Upper) déjà faite aujourd'hui — basket déconseillé le même jour (fatigue générale).");
   } else {
     let bScore = 10 + cap(dBasket) - (kneeAmber ? 8 : 0) - (dKnee <= 1 ? 6 : 0);
     let bReason = `${basket7}× cette semaine · dernier ${ago(dBasket)}. Passer par l'échauffement guidé.`;
@@ -423,12 +431,13 @@ function recommendSessions({ training, knee }) {
     push(sugg, "Basket", bScore, bReason);
   }
 
-  // ---- ESCALADE ----
+  // ---- ESCALADE ---- (pas de jour attitré : autorisée surtout jours Lower ou off, jamais un jour Upper)
   if (upperToday) {
     push(avoid, "Escalade", 0, "Upper déjà fait aujourd'hui — l'escalade ajoute du volume de tirage (coude).");
   } else {
-    let cScore = 10 + cap(dClimb) - (dClimb <= 1 ? 8 : 0);
+    let cScore = 10 + cap(dClimb) - (dClimb <= 1 ? 8 : 0) + (lowerToday ? 6 : 0);
     let cReason = `${climb7}× cette semaine · dernière ${ago(dClimb)}. Compte comme volume tirage : à placer un jour Lower ou off.`;
+    if (lowerToday) cReason += " Lower déjà fait aujourd'hui : bon jour pour l'escalade (pas de conflit coude).";
     push(sugg, "Escalade", cScore, cReason);
   }
 
@@ -777,7 +786,7 @@ function CoachIA({ coach, todayNote, saveNote }) {
 /* ============================================================
    TAB — DASHBOARD
    ============================================================ */
-function Dashboard({ weight, sleep, knee, macros, targets, training, phase, setPhase, coach, todayNote, saveNote }) {
+function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, save, setTab }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast ? round(wLast.kg - tgtW) : null;
@@ -794,6 +803,9 @@ function Dashboard({ weight, sleep, knee, macros, targets, training, phase, setP
 
   const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee }), [training, knee]);
   const wData = lastN(weight, 30).map((w) => ({ date: fmt(w.date), kg: w.kg }));
+
+  const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
+  const addSteps = (n) => save.steps(upsert(steps, { date: today(), count: Math.max(0, stepsToday + n) }));
 
   const tiles = [
     { label: "Calories", val: kcalToday ?? "—", unit: "", note: "aujourd'hui", color: C.text },
@@ -833,10 +845,10 @@ function Dashboard({ weight, sleep, knee, macros, targets, training, phase, setP
         ) : <Body style={{ fontSize: 11, color: C.dim }}>Ajoute des pesées pour voir la tendance.</Body>}
       </Card>
 
-      {/* Tuiles : sommeil · genou · calories */}
-      <div style={{ display: "flex", gap: 8 }}>
+      {/* Tuiles : calories · genou · sommeil · pas */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         {tiles.map((t) => (
-          <div key={t.label} style={{ flex: 1, background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 11 }}>
+          <div key={t.label} style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 11 }}>
             <Label>{t.label}</Label>
             <div style={{ fontFamily: C.mono, fontSize: 19, fontWeight: 800, color: t.color, marginTop: 3 }}>
               {t.val}<span style={{ fontSize: 11, color: C.muted }}>{t.unit}</span>
@@ -844,6 +856,24 @@ function Dashboard({ weight, sleep, knee, macros, targets, training, phase, setP
             <div style={{ fontSize: 8.5, color: C.dim, marginTop: 2, textTransform: "uppercase", letterSpacing: 0.5 }}>{t.note}</div>
           </div>
         ))}
+
+        {/* Pas — tuile cliquable (→ onglet Pas) + ajout rapide inline */}
+        <div onClick={() => setTab("steps")} style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 11, cursor: "pointer", position: "relative" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <Label>Pas</Label>
+            <button onClick={(e) => { e.stopPropagation(); addSteps(1000); }} style={{
+              background: C.accentRow, border: `1.5px solid ${C.accent}`, borderRadius: 6, color: C.accent,
+              width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0, lineHeight: 1,
+            }}><Plus size={12} /></button>
+          </div>
+          <div style={{ fontFamily: C.mono, fontSize: 19, fontWeight: 800, color: C.text, marginTop: 3 }}>
+            {stepsToday.toLocaleString("fr-FR")}
+          </div>
+          <div style={{ fontSize: 8.5, color: C.dim, marginTop: 2, textTransform: "uppercase", letterSpacing: 0.5 }}>/ {STEPS_TARGET.toLocaleString("fr-FR")}</div>
+          <div style={{ background: C.bg, borderRadius: 6, height: 4, overflow: "hidden", marginTop: 5 }}>
+            <div style={{ background: C.accent, width: `${Math.min(100, (stepsToday / STEPS_TARGET) * 100)}%`, height: "100%" }} />
+          </div>
+        </div>
       </div>
 
       {/* Coach IA */}
@@ -1048,6 +1078,79 @@ function SleepTab({ sleep, save }) {
 }
 
 /* ============================================================
+   TAB — PAS
+   ============================================================ */
+const STEPS_TARGET = 10000;
+function StepsTab({ steps, save }) {
+  const [date, setDate] = useState(today());
+  const cur = steps.find((s) => s.date === date);
+  const [n, setN] = useState(cur?.count ?? 0);
+  const pickDate = (d) => { setDate(d); const e = steps.find((s) => s.date === d); setN(e?.count ?? 0); };
+  const add = () => save.steps(upsert(steps, { date, count: Math.round(n) }));
+
+  const last7 = lastN(steps, 7);
+  const avg7 = avg(last7.map((s) => s.count));
+  const data = lastN(steps, 21).map((s) => ({ date: fmt(s.date), count: s.count }));
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <ScreenHeader title="Pas" subtitle="saisie manuelle · activité quotidienne" />
+
+      <Card style={{ padding: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <Label style={{ fontSize: 10, letterSpacing: 1.5 }}>{date === today() ? "Aujourd'hui" : fmt(date)}</Label>
+          <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>cible {STEPS_TARGET.toLocaleString("fr-FR")}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 10px" }}>
+          <span style={{ fontFamily: C.mono, fontSize: 38, fontWeight: 800, color: C.text }}>{n.toLocaleString("fr-FR")}</span>
+        </div>
+        <div style={{ background: C.bg, borderRadius: 6, height: 8, overflow: "hidden" }}>
+          <div style={{ background: C.accent, width: `${Math.min(100, (n / STEPS_TARGET) * 100)}%`, height: "100%" }} />
+        </div>
+      </Card>
+
+      <div style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+        <Label>Moy. 7j</Label>
+        <div style={{ fontFamily: C.mono, fontSize: 20, fontWeight: 800, color: C.text, marginTop: 3 }}>
+          {avg7 != null ? Math.round(avg7).toLocaleString("fr-FR") : "—"}
+        </div>
+      </div>
+
+      <Card>
+        <div style={{ marginBottom: 10 }}><DateField value={date} onChange={pickDate} /></div>
+        <Field label="Pas"><Stepper value={n} set={setN} step={500} min={0} int /></Field>
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <Btn variant="primary" onClick={add} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
+          {steps.some((s) => s.date === date) && (
+            <Btn variant="danger" onClick={() => save.steps(steps.filter((s) => s.date !== date))}><Trash2 size={14} /></Btn>
+          )}
+        </div>
+      </Card>
+
+      <Card>
+        <Label style={{ marginBottom: 8 }}>Pas · 21 jours</Label>
+        {data.length ? (
+          <div style={{ height: 150 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data} margin={{ top: 4, right: 4, left: -22, bottom: 0 }}>
+                <CartesianGrid stroke={C.divider} vertical={false} />
+                <XAxis dataKey="date" tick={chartAxis} interval="preserveEnd" />
+                <YAxis tick={chartAxis} />
+                <Tooltip formatter={(v) => [v.toLocaleString("fr-FR"), "Pas"]} contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} />
+                <ReferenceLine y={STEPS_TARGET} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
+                <Bar dataKey="count" radius={[3, 3, 0, 0]}>
+                  {data.map((d, i) => <Cell key={i} fill={d.count >= STEPS_TARGET ? C.accent : C.border} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : <Empty>Aucune donnée.</Empty>}
+      </Card>
+    </div>
+  );
+}
+
+/* ============================================================
    CARNET DE MUSCU — série par série
    ============================================================ */
 function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel }) {
@@ -1087,12 +1190,13 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel }
   const [hist, setHist] = useState(null);
 
   // ---- timer (repos + maintien) ----
-  const [tSecs, setTSecs] = useState(90);
-  const [tRem, setTRem] = useState(90);
+  const [tSecs, setTSecs] = useState(120);
+  const [tRem, setTRem] = useState(120);
   const [tRun, setTRun] = useState(false);
+  const [lastTimerByExo, setLastTimerByExo] = useState({});
   const tRef = useRef();
   const audioRef = useRef();
-  const prevRem = useRef(90);
+  const prevRem = useRef(120);
   const ensureAudio = () => {
     try {
       if (!audioRef.current) audioRef.current = new (window.AudioContext || window.webkitAudioContext)();
@@ -1126,10 +1230,21 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel }
   const fireTimer = (s) => { ensureAudio(); clearInterval(tRef.current); setTSecs(s); setTRem(s); setTRun(true); };
   const setTimer = (s) => { clearInterval(tRef.current); setTRun(false); setTSecs(s); setTRem(s); };
   const toggleRun = () => { ensureAudio(); setTRun((r) => !r); };
+  const recordLast = (ei, s) => setLastTimerByExo((p) => ({ ...p, [ei]: s }));
+  // changement d'exercice → minuteur réinitialisé sur le dernier temps utilisé pour cet exercice, ou son repos par défaut
+  const openExo = (ei) => {
+    const next = open === ei ? -1 : ei;
+    setOpen(next);
+    if (next !== -1 && next !== open) setTimer(lastTimerByExo[next] ?? exos[next].rest);
+  };
 
   // ---- mutateurs ----
   const upd = (ei, si, field, value) => setExos((p) => p.map((e, i) => i !== ei ? e : { ...e, series: e.series.map((s, j) => j !== si ? s : { ...s, [field]: value }) }));
-  const toggle = (ei, si) => setExos((p) => p.map((e, i) => i !== ei ? e : { ...e, series: e.series.map((s, j) => j !== si ? s : { ...s, fait: !s.fait }) }));
+  const toggle = (ei, si) => {
+    setExos((p) => p.map((e, i) => i !== ei ? e : { ...e, series: e.series.map((s, j) => j !== si ? s : { ...s, fait: !s.fait }) }));
+    // coche = fin de série → relance le minuteur sur le dernier temps utilisé pour cet exercice (fin de série uniquement, pas décoche)
+    if (!exos[ei].series[si].fait) fireTimer(lastTimerByExo[ei] ?? exos[ei].rest);
+  };
   const addSet = (ei, leg) => setExos((p) => p.map((e, i) => {
     if (i !== ei) return e;
     const sameLeg = e.series.filter((s) => s.leg === leg);
@@ -1207,7 +1322,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel }
             background: C.card, border: `1.5px solid ${isOpen ? C.border : C.borderDim}`,
             borderRadius: 10, padding: isOpen ? 14 : "12px 14px", opacity: isOpen ? 1 : 0.85,
           }}>
-            <div onClick={() => setOpen(isOpen ? -1 : ei)} style={{ cursor: "pointer" }}>
+            <div onClick={() => openExo(ei)} style={{ cursor: "pointer" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
                 <span style={{ fontSize: isOpen ? 14 : 13, color: C.text, fontWeight: isOpen ? 800 : 700 }}>
                   {e.nom}{e.opt && <span style={{ fontSize: 10, color: C.dim, marginLeft: 4 }}>(option)</span>}
@@ -1251,7 +1366,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel }
                 )}
 
                 <div style={{ display: "flex", gap: 12, marginTop: 12, alignItems: "center" }}>
-                  <button onClick={() => (e.mode === "temps" ? fireTimer(parseSecs(e.target)) : fireTimer(e.rest))}
+                  <button onClick={() => { const s = e.mode === "temps" ? parseSecs(e.target) : e.rest; fireTimer(s); recordLast(ei, s); }}
                     style={{ background: "none", border: "none", color: C.accent, fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
                     <Timer size={12} style={{ display: "inline", marginRight: 4 }} />
                     {e.mode === "temps" ? `maintien ${parseSecs(e.target)} s` : `repos ${e.rest} s`}
@@ -1285,7 +1400,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel }
         <Label style={{ marginBottom: 8 }}>Minuteur</Label>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
           {[120, 90, 60, 45, 30].map((s) => (
-            <button key={s} onClick={() => setTimer(s)} style={{
+            <button key={s} onClick={() => { setTimer(s); if (open !== -1) recordLast(open, s); }} style={{
               padding: "6px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
               background: tSecs === s ? C.accentRow : C.card, fontFamily: C.mono,
               color: tSecs === s ? C.accent : C.muted, border: `1.5px solid ${tSecs === s ? C.accent : C.border}`,
@@ -1559,11 +1674,12 @@ function KneeTab({ knee, save, hsrWeek }) {
    ============================================================ */
 function MacroTab({ macros, targets, save, training }) {
   const [date, setDate] = useState(today());
+  const at = targetsForDate(date, targets);
   const cur = macros.find((m) => m.date === date) || {};
-  const [p, setP] = useState(cur.protein ?? targets.protein);
-  const [c, setC] = useState(cur.carbs ?? targets.carbs);
-  const [f, setF] = useState(cur.fat ?? targets.fat);
-  const [fib, setFib] = useState(cur.fiber ?? targets.fiber);
+  const [p, setP] = useState(cur.protein ?? at.protein);
+  const [c, setC] = useState(cur.carbs ?? at.carbs);
+  const [f, setF] = useState(cur.fat ?? at.fat);
+  const [fib, setFib] = useState(cur.fiber ?? at.fiber);
   const [showPeri, setShowPeri] = useState(false);
   const [basketProto, setBasketProto] = useState("soir21h");
   const water = cur.water ?? 0;
@@ -1571,9 +1687,10 @@ function MacroTab({ macros, targets, save, training }) {
   const waterTgt = targets.water + (basketDay ? 1000 : 0);
   const pickDate = (d) => {
     setDate(d);
+    const atd = targetsForDate(d, targets);
     const e = macros.find((m) => m.date === d);
-    setP(e?.protein ?? targets.protein); setC(e?.carbs ?? targets.carbs);
-    setF(e?.fat ?? targets.fat); setFib(e?.fiber ?? targets.fiber);
+    setP(e?.protein ?? atd.protein); setC(e?.carbs ?? atd.carbs);
+    setF(e?.fat ?? atd.fat); setFib(e?.fiber ?? atd.fiber);
   };
   const kcal = p * 4 + c * 4 + f * 9;
   const saveMacros = () => save.macros(upsert(macros, { date, protein: round(p), carbs: round(c), fat: round(f), fiber: round(fib), water }));
@@ -1585,7 +1702,7 @@ function MacroTab({ macros, targets, save, training }) {
     date: fmt(m.date),
     kcal: Math.round((m.protein ?? 0) * 4 + (m.carbs ?? 0) * 4 + (m.fat ?? 0) * 9),
   }));
-  const kcalTarget = Math.round(targets.protein * 4 + targets.carbs * 4 + targets.fat * 9);
+  const kcalTarget = Math.round(at.protein * 4 + at.carbs * 4 + at.fat * 9);
   const kcalPct = Math.min(100, (kcal / kcalTarget) * 100);
 
   return (
@@ -1609,7 +1726,7 @@ function MacroTab({ macros, targets, save, training }) {
 
       {/* Protéines / glucides / lipides / fibres */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        {[{ l: "Protéines", v: p, t: targets.protein }, { l: "Glucides", v: c, t: targets.carbs }, { l: "Lipides", v: f, t: targets.fat }, { l: "Fibres", v: fib, t: targets.fiber }].map((x) => (
+        {[{ l: "Protéines", v: p, t: at.protein }, { l: "Glucides", v: c, t: at.carbs }, { l: "Lipides", v: f, t: at.fat }, { l: "Fibres", v: fib, t: at.fiber }].map((x) => (
           <div key={x.l} style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
             <Label>{x.l}</Label>
             <div style={{ fontFamily: C.mono, fontSize: 18, fontWeight: 800, color: C.text, marginTop: 3 }}>{x.v}g</div>
@@ -1653,7 +1770,7 @@ function MacroTab({ macros, targets, save, training }) {
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <Btn variant="primary" onClick={saveMacros} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
           {macros.some((m) => m.date === date) && (
-            <Btn variant="danger" onClick={() => { save.macros(macros.filter((m) => m.date !== date)); setP(targets.protein); setC(targets.carbs); setF(targets.fat); setFib(targets.fiber); }}>
+            <Btn variant="danger" onClick={() => { save.macros(macros.filter((m) => m.date !== date)); setP(at.protein); setC(at.carbs); setF(at.fat); setFib(at.fiber); }}>
               <Trash2 size={14} />
             </Btn>
           )}
@@ -1804,6 +1921,13 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose }) {
    ============================================================ */
 const DEFAULT_TARGETS = { protein: 215, carbs: 205, fat: 80, fiber: 30, water: 3000, weightMaintenance: 96 };
 
+// Sèche intensive avant vacances — cibles macro temporaires, réactivation auto de DEFAULT_TARGETS après le 18/08.
+const TEMP_MACROS_WINDOW = { start: "2026-07-27", end: "2026-08-18" };
+const TEMP_MACROS = { protein: 220, carbs: 185, fat: 65, fiber: 30 };
+const isTempMacrosWindow = (d) => d >= TEMP_MACROS_WINDOW.start && d <= TEMP_MACROS_WINDOW.end;
+// eau non concernée : la base + le bonus dynamique basket restent inchangés
+const targetsForDate = (d, base) => (isTempMacrosWindow(d) ? { ...base, ...TEMP_MACROS } : base);
+
 export default function App() {
   const [tab, setTab] = useState("dash");
   const [showSettings, setShowSettings] = useState(false);
@@ -1814,6 +1938,7 @@ export default function App() {
   const [training, setTraining] = useState([]);
   const [knee, setKnee] = useState([]);
   const [macros, setMacros] = useState([]);
+  const [steps, setSteps] = useState([]);
   const [notes, setNotes] = useState([]);
   const [targets, setTargets] = useState(DEFAULT_TARGETS);
   const [phase, setPhaseState] = useState("seche");
@@ -1828,6 +1953,7 @@ export default function App() {
       setTraining(await store.get("trainingLog", []));
       setKnee(await store.get("kneeLog", []));
       setMacros(await store.get("macroLog", []));
+      setSteps(await store.get("stepsLog", []));
       setNotes(await store.get("noteLog", []));
       setTargets(await store.get("targets", DEFAULT_TARGETS));
       setPhaseState(await store.get("phase", "seche"));
@@ -1844,6 +1970,7 @@ export default function App() {
     training: (v) => { setTraining(v); store.set("trainingLog", v); },
     knee: (v) => { setKnee(v); store.set("kneeLog", v); },
     macros: (v) => { setMacros(v); store.set("macroLog", v); },
+    steps: (v) => { setSteps(v); store.set("stepsLog", v); },
     notes: (v) => { setNotes(v); store.set("noteLog", v); },
     targets: (v) => { setTargets(v); store.set("targets", v); },
   };
@@ -1884,6 +2011,9 @@ export default function App() {
       const trYest = training.filter((t) => t.date === y);
       const basketTodayFlag = trToday.some((t) => t.type === "Basket");
       const waterTgtToday = targets.water + (basketTodayFlag ? 1000 : 0);
+      const atToday = targetsForDate(today(), targets);
+      const sToday_steps = findDay(steps, today()), sYest_steps = findDay(steps, y);
+      const steps7 = avgKey(win(steps, 0, 6), "count");
 
       const realtime = {
         hier: y, aujourdhui: today(),
@@ -1893,6 +2023,7 @@ export default function App() {
         sommeil_avant_hier: sYest ? { heures: round(sYest.hours, 2), qualite: sYest.quality ?? null } : null,
         macros_hier: mYest ? { proteines: mYest.protein, glucides: mYest.carbs, lipides: mYest.fat, fibres: mYest.fiber, eau_ml: mYest.water } : null,
         macros_aujourdhui_en_cours: mToday ? { proteines: mToday.protein, glucides: mToday.carbs, lipides: mToday.fat, fibres: mToday.fiber, eau_ml: mToday.water, cible_eau_ml: waterTgtToday } : null,
+        pas_hier: sYest_steps?.count ?? null, pas_aujourdhui: sToday_steps?.count ?? null,
         seances_hier: trYest.map((t) => t.type),
         seances_aujourdhui: trToday.map((t) => t.type),
         douleur_genou_hier: kYest ? { pain: kYest.pain, base_ok: kYest.baseline !== false } : null,
@@ -1903,8 +2034,9 @@ export default function App() {
         phase: PHASES[phase].label, poids_cible: tgtW,
         poids: { dernier: lastN(weight, 1)[0]?.kg ?? null, moy_7j: w7, moy_7j_precedents: w14, tendance_kg_sur_semaine: (w7 != null && w14 != null) ? round(w7 - w14) : null },
         macros_moy_7j: { proteines: avgKey(m7, "protein"), glucides: avgKey(m7, "carbs"), lipides: avgKey(m7, "fat"), fibres: avgKey(m7, "fiber"), eau_ml: avgKey(m7, "water") },
-        cibles: { proteines: targets.protein, glucides: targets.carbs, lipides: targets.fat, fibres: targets.fiber, eau_ml: targets.water },
+        cibles: { proteines: atToday.protein, glucides: atToday.carbs, lipides: atToday.fat, fibres: atToday.fiber, eau_ml: targets.water },
         sommeil: { heures_moy_7j: avgKey(win(sleep, 0, 6), "hours"), qualite_moy_7j: avgKey(win(sleep, 0, 6), "quality") },
+        pas_moy_7j: steps7 != null ? Math.round(steps7) : null,
         seances_7j: sessCount(0, 6), seances_14j: sessCount(0, 13),
         genou: { derniere_douleur: kLast?.pain ?? null, base_ok: kLast ? kLast.baseline !== false : null, jours_hors_base_14j: win(knee, 0, 13).filter((k) => k.baseline === false).length },
       };
@@ -1913,16 +2045,23 @@ export default function App() {
         + ((note || "").trim() && !notes.some((n) => n.date === today() && n.text === note.trim())
             ? `${last14(notes).length ? "\n" : ""}${today()} : ${note.trim()}` : "");
 
-      // dataset fusionné jour par jour (pour corrélation poids ↔ macros/eau/fibres) — remplace les tableaux bruts séparés poids+macros
-      const days14 = [...new Set([...last14(weight), ...last14(macros)].map((e) => e.date))].sort();
+      // dataset fusionné jour par jour (pour corrélation poids ↔ macros/eau/fibres/pas) — remplace les tableaux bruts séparés
+      const days14 = [...new Set([...last14(weight), ...last14(macros), ...last14(steps)].map((e) => e.date))].sort();
       const merged = days14.map((d) => {
         const w = weight.find((e) => e.date === d);
         const m = macros.find((e) => e.date === d);
+        const st = steps.find((e) => e.date === d);
         const kcal = m ? Math.round((m.protein ?? 0) * 4 + (m.carbs ?? 0) * 4 + (m.fat ?? 0) * 9) : null;
-        return { date: d, poids: w?.kg ?? null, kcal, proteines: m?.protein ?? null, glucides: m?.carbs ?? null, lipides: m?.fat ?? null, fibres: m?.fiber ?? null, eau_ml: m?.water ?? null };
+        return { date: d, poids: w?.kg ?? null, kcal, proteines: m?.protein ?? null, glucides: m?.carbs ?? null, lipides: m?.fat ?? null, fibres: m?.fiber ?? null, eau_ml: m?.water ?? null, pas: st?.count ?? null, cible_kcal: Math.round(targetsForDate(d, targets).protein * 4 + targetsForDate(d, targets).carbs * 4 + targetsForDate(d, targets).fat * 9) };
       });
 
-      return `Tu es le coach personnel tout-en-un de Yoann, 43 ans, athlète (muscu/basket/escalade) : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. Phase ${PHASES[phase].label}, poids cible ${tgtW} kg. Deux tendinopathies en rééduc : tendon quadricipital (HSR, tempo 6 s, règle de Silbernagel : douleur ≤ 3-5/10 tolérée si retour à la base sous 24 h) et distale du biceps (prises neutres/pronation privilégiées, supination limitée). Protéines hautes prioritaires. Escalade = volume tirage, jamais empilée le jour d'un Upper ; ne pas cumuler les expositions genou.
+      const inTempWindow = isTempMacrosWindow(today());
+      const tempBlock = inTempWindow ? `
+
+CONTEXTE SPÉCIAL — SÈCHE INTENSIVE AVANT VACANCES (27/07 → 18/08/2026, départ le 18/08) :
+Point de départ 101 kg le 27/07. Projection réaliste : 96-97,5 kg au 18/08 (pas 93 kg — l'objectif est de s'en rapprocher visuellement, pas de l'atteindre sur la balance). Décomposition attendue : environ 3-3,5 kg d'eau/glycogène perdus rapidement sur les 10-14 premiers jours, le reste est de la vraie perte de gras à un rythme plus lent. Règle de lecture stricte : NE PAS commenter la tendance de poids avant le 05/08/2026 (avant cette date les chiffres sont pollués par la perte d'eau/glycogène, pas représentatifs) — au-delà de cette date, utilise toujours la moyenne glissante 7j, jamais un poids isolé. Cibles macros actives pour cette période : ${atToday.protein}P/${atToday.carbs}G/${atToday.fat}L/${atToday.fiber}fibres (~${Math.round(atToday.protein * 4 + atToday.carbs * 4 + atToday.fat * 9)} kcal). Volume d'entraînement : NE JAMAIS suggérer d'ajouter une séance ou du cardio à impact supplémentaire par rapport au basket habituel — contre-indication explicite pour cette période (risque tendineux genou/coude). Escalade : pas de jour attitré, à privilégier les jours Lower ou off, jamais un jour Upper. Prends en compte les pas quotidiens dans l'analyse de tendance (corrélation activité/résultat).` : "";
+
+      return `Tu es le coach personnel tout-en-un de Yoann, 43 ans, athlète (muscu/basket/escalade) : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. Phase ${PHASES[phase].label}, poids cible ${tgtW} kg. Deux tendinopathies en rééduc : tendon quadricipital (HSR, tempo 6 s, règle de Silbernagel : douleur ≤ 3-5/10 tolérée si retour à la base sous 24 h) et distale du biceps (prises neutres/pronation privilégiées, supination limitée). Protéines hautes prioritaires. Escalade = volume tirage, jamais empilée le jour d'un Upper ; ne pas cumuler les expositions genou.${tempBlock}
 
 TEMPS RÉEL — hier vs aujourd'hui (regarde d'abord ça, c'est le plus actionnable) :
 ${JSON.stringify(realtime)}
@@ -1930,7 +2069,7 @@ ${JSON.stringify(realtime)}
 RÉSUMÉ 14 JOURS (moyennes fiables, tendance de fond) :
 ${JSON.stringify(summary)}
 
-JOUR PAR JOUR — poids/kcal/macros/fibres/eau, pour corréler (repère les liens entre apports et variations de poids : rétention d'eau via sodium/glucides vs vraie perte de masse grasse) :
+JOUR PAR JOUR — poids/kcal/macros/fibres/eau/pas, pour corréler (repère les liens entre apports et variations de poids : rétention d'eau via sodium/glucides vs vraie perte de masse grasse) :
 ${JSON.stringify(merged)}
 
 DONNÉES BRUTES 14 jours (JSON, du plus ancien au plus récent). Séances : "s" liste les séries au format "poidsXreps" (suffixe /G ou /D = jambe) :
@@ -1941,7 +2080,7 @@ ${notesTxt ? `\nNOTES DE CONTEXTE écrites par Yoann (14 j, ex. alcool, insomnie
 Structure ta réponse en deux temps :
 1. **Aujourd'hui / les prochaines 24h** : à partir du bloc TEMPS RÉEL, dis-lui concrètement quoi faire (ou éviter) MAINTENANT — séance, nutrition, hydratation, récupération, genou — en te basant sur ce qui s'est passé hier et sur les notes de contexte.
 2. **Tendance de fond (14 jours)** : ce qui se dessine sur la durée et ce qu'il faut ajuster pour la semaine à venir, EN CORRÉLANT explicitement poids, kcal, macros, fibres et eau à partir du dataset JOUR PAR JOUR (ex. un pic de poids coïncide-t-il avec un pic de glucides/sodium la veille plutôt qu'un vrai surplus calorique ? un manque de fibres ou d'eau coïncide-t-il avec une stagnation ?).
-Traite explicitement CHAQUE domaine : poids (bruit quotidien vs moyenne glissante), macros (protéines jour le jour, reste en moyenne 7j), eau (jours de basket +1L), sommeil (impact récup), séances (équilibre Upper/Lower, progressive overload exercice par exercice, respect coude/escalade), genou/douleur (Silbernagel, priorité absolue si ça a flambé).
+Traite explicitement CHAQUE domaine : poids (bruit quotidien vs moyenne glissante), macros (protéines jour le jour, reste en moyenne 7j), eau (jours de basket +1L), sommeil (impact récup), pas quotidiens (corrélation activité/résultat), séances (équilibre Upper/Lower, progressive overload exercice par exercice, respect coude/escalade), genou/douleur (Silbernagel, priorité absolue si ça a flambé).
 Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reciter les données brutes (cite seulement les chiffres qui appuient un conseil) : va droit aux conseils, en bullet points courts. Limite stricte : 500 mots maximum au total — écourte les détails plutôt que de laisser une section inachevée, et termine toujours par une phrase de conclusion complète. Ce n'est pas un avis médical.`;
     },
     apiKey, model,
@@ -1951,6 +2090,7 @@ Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reci
     { key: "dash", label: "Bord", icon: LayoutDashboard },
     { key: "weight", label: "Poids", icon: Scale },
     { key: "sleep", label: "Sommeil", icon: Moon },
+    { key: "steps", label: "Pas", icon: Footprints },
     { key: "train", label: "Séances", icon: Dumbbell },
     { key: "knee", label: "Genou", icon: HeartPulse },
     { key: "macro", label: "Macros", icon: Utensils },
@@ -1989,9 +2129,10 @@ Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reci
           <SettingsPanel {...{ apiKey, setApiKey, model, setModel }} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, macros, targets, training, phase, setPhase, coach, todayNote, saveNote }} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, save, setTab }} />}
             {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
             {tab === "sleep" && <SleepTab {...{ sleep, save }} />}
+            {tab === "steps" && <StepsTab {...{ steps, save }} />}
             {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek }} />}
             {tab === "knee" && <KneeTab {...{ knee, save, hsrWeek }} />}
             {tab === "macro" && <MacroTab {...{ macros, targets, save, training }} />}

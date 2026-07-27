@@ -26,7 +26,7 @@ export const store = {
 
 // Clés de données (hors clé API, qui n'est pas exportée par sécurité).
 export const DATA_KEYS = [
-  "weightLog", "sleepLog", "trainingLog", "kneeLog", "macroLog", "noteLog",
+  "weightLog", "sleepLog", "trainingLog", "kneeLog", "macroLog", "noteLog", "stepsLog",
   "targets", "phase", "hsrWeek", "model",
 ];
 
