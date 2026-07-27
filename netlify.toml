@@ -1,0 +1,23 @@
+# Configuration Netlify — ne concerne QUE la PWA.
+#
+# Contexte : le dépôt contient aussi l'app Android native (dossier `android/`), qui se
+# construit et s'installe séparément (voir CLAUDE.md). Sans ce fichier, chaque `git push`
+# déclenchait un déploiement Netlify complet, y compris quand le commit ne touchait que du
+# code natif ou de la documentation — chaque déploiement consommant des crédits.
+
+[build]
+  # Valeurs identiques aux réglages de l'interface Netlify (explicites pour éviter toute
+  # ambiguïté sur la précédence entre netlify.toml et l'UI).
+  command = "npm run build"
+  publish = "dist"
+
+  # Ne rebuilde que si un fichier qui finit réellement dans la PWA a changé.
+  # `git diff --quiet` sort 0 (= build annulé) si aucune différence, 1 sinon.
+  #
+  # Volontairement absents de cette liste : android/, capacitor.config.json, CLAUDE.md,
+  # et ce fichier lui-même — modifier la config de build ne change pas le contenu publié,
+  # les nouveaux réglages s'appliqueront de toute façon au prochain build déclenché.
+  #
+  # Échappatoire si un déploiement forcé est nécessaire : « Clear cache and deploy site »
+  # dans l'interface Netlify (CACHED_COMMIT_REF vide → la commande échoue → build lancé).
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- src index.html vite.config.js package.json package-lock.json public"
