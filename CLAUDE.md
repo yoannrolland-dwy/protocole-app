@@ -256,12 +256,35 @@ protocole-app/
 
 ## Workflow de déploiement (déjà en place, ne pas en proposer un autre)
 
-- Dépôt GitHub : `yoannrolland-dwy/protocole-app`, branche `main`.
+- Dépôt GitHub : `yoannrolland-dwy/protocole-app`.
 - Dossier local : `/Users/yrolland/Documents/GitHub/protocole-app`.
 - **Netlify est connecté en Continuous Deployment à ce dépôt** : chaque
   `git push` sur `main` déclenche automatiquement un rebuild + redéploiement
   sur le site existant (Build command: `npm run build`, Publish directory:
   `dist`).
+
+### Deux branches — règle importante pour le budget Netlify
+
+Netlify facture **15 crédits par déploiement de production**, sur un quota de
+**300 crédits/mois** (soit 20 déploiements). Or l'app native se met à jour par
+USB **sans aucun `git push`** : seul le déploiement de la PWA coûte.
+
+D'où l'organisation suivante, à respecter par défaut :
+
+- **`dev`** = branche de travail. J'y pousse librement (natif, doc, code
+  partagé) : Netlify ne construit que `main`, donc **pousser sur `dev` ne coûte
+  rien** tout en gardant le code sauvegardé sur GitHub.
+- **`main`** = ce qui est en ligne. On n'y fusionne `dev` **que sur demande
+  explicite de Yoann** ("déploie la PWA"). Un seul déploiement embarque alors
+  tout le cumul des commits accumulés.
+
+Ne jamais pousser directement sur `main` sans que Yoann l'ait demandé.
+Prérequis : les "branch deploys" doivent rester désactivés côté Netlify
+(réglage par défaut) — sinon `dev` déclencherait aussi des builds.
+
+Un `netlify.toml` complète ce dispositif : il annule le build quand un commit
+poussé sur `main` ne touche aucun fichier de la PWA (cas d'un commit purement
+`android/` ou documentaire).
 - Client Git utilisé par l'utilisateur : **GitHub Desktop** (interface
   graphique, pas de ligne de commande Git manuelle) — mais si Claude Code
   gère lui-même git add/commit/push directement, c'est very bien aussi et
