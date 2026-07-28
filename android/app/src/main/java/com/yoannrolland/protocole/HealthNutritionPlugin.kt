@@ -4,6 +4,7 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.HydrationRecord
 import androidx.health.connect.client.records.NutritionRecord
+import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.request.ReadRecordsRequest
@@ -20,11 +21,14 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 
 /**
- * Lecture des macros complètes depuis Health Connect.
+ * Lecteurs natifs Health Connect qui dépassent ce qu'expose @capgo/capacitor-health :
  *
- * Le plugin @capgo/capacitor-health lit bien NutritionRecord mais n'en expose que l'énergie.
- * Ce lecteur récupère en plus protéines / glucides / lipides / fibres, ainsi que l'hydratation,
- * pour alimenter l'onglet Macros sans saisie manuelle.
+ * - Macros complètes : @capgo lit bien NutritionRecord mais n'en expose que l'énergie.
+ *   Ce lecteur récupère aussi protéines / glucides / lipides / fibres, et l'hydratation.
+ * - Sommeil détaillé : @capgo ne rapporte que la période (coucher→réveil). Ce lecteur va
+ *   chercher les phases (SleepSessionRecord.stages) quand Samsung Health les écrit, pour
+ *   calculer une durée réelle de sommeil (période moins éveils) et une note de qualité —
+ *   voir readSleep().
  */
 @CapacitorPlugin(name = "HealthNutrition")
 class HealthNutritionPlugin : Plugin() {
@@ -117,6 +121,79 @@ class HealthNutritionPlugin : Plugin() {
                 call.resolve(out)
             } catch (e: Exception) {
                 call.reject("Diagnostic impossible : ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Renvoie, par date locale de réveil (yyyy-MM-dd), la durée de sommeil et une note de
+     * qualité sur 4 quand Health Connect contient le détail par phase, sinon seulement la
+     * période coucher→réveil (aucune qualité calculée dans ce cas).
+     *
+     * Vérifié le 28/07/2026 sur appareil réel : quand les phases sont présentes, la durée
+     * calculée ici (période moins éveils) tombe à 30 secondes de la "durée réelle" affichée
+     * par Samsung Health (6h56,5 calculé vs 6h57 affiché) — assez fiable pour remplacer la
+     * saisie manuelle. Samsung Health n'a commencé à écrire ce détail dans Health Connect que
+     * récemment sur cet appareil : les nuits plus anciennes n'ont aucune phase, d'où le repli
+     * sur la période seule.
+     *
+     * Health Connect n'a par ailleurs aucun champ "score" — celui de Samsung Health reste
+     * propriétaire, jamais exposé. La qualité ci-dessous est un calcul maison (efficacité +
+     * durée), pas une reproduction de ce score.
+     */
+    @PluginMethod
+    fun readSleep(call: PluginCall) {
+        val hc = client() ?: run { call.reject("Health Connect indisponible"); return }
+        val start = call.getString("startDate") ?: run { call.reject("startDate requis"); return }
+        val end = call.getString("endDate") ?: run { call.reject("endDate requis"); return }
+
+        scope.launch {
+            try {
+                val range = TimeRangeFilter.between(Instant.parse(start), Instant.parse(end))
+
+                // Même précaution que pour les macros : une réinstallation d'app source pourrait
+                // réécrire un historique sans purger l'ancien. On ne garde que l'enregistrement
+                // le plus récemment écrit par (source, instant de début).
+                val records = hc.readRecords(ReadRecordsRequest(SleepSessionRecord::class, range))
+                    .records
+                    .groupBy { "${it.metadata.dataOrigin.packageName}|${it.startTime}" }
+                    .values.map { grp -> grp.maxByOrNull { it.metadata.lastModifiedTime }!! }
+
+                fun dayOf(instant: Instant) =
+                    instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString()
+
+                val out = JSObject()
+                records.forEach { r ->
+                    val periodeMin = (r.endTime.epochSecond - r.startTime.epochSecond) / 60.0
+
+                    // STAGE_TYPE_AWAKE=1, OUT_OF_BED=3, AWAKE_IN_BED=7 (androidx.health.connect) :
+                    // à exclure de la durée de sommeil réelle.
+                    val asleepMin = r.stages
+                        .filter { it.stage !in setOf(1, 3, 7) }
+                        .sumOf { (it.endTime.epochSecond - it.startTime.epochSecond) / 60.0 }
+
+                    val hasStages = r.stages.isNotEmpty()
+                    val hours = if (hasStages) asleepMin / 60.0 else periodeMin / 60.0
+
+                    val quality: Int? = if (!hasStages) null else {
+                        val efficacite = asleepMin / periodeMin
+                        when {
+                            efficacite >= 0.90 && asleepMin >= 420 -> 4  // Excellent
+                            efficacite >= 0.80 && asleepMin >= 360 -> 3  // Bon
+                            efficacite >= 0.65 || asleepMin >= 300 -> 2  // Correct
+                            else -> 1                                    // Attention requise
+                        }
+                    }
+
+                    val entry = JSObject()
+                        .put("hours", hours)
+                        .put("dureeReelle", hasStages)
+                    if (quality != null) entry.put("quality", quality)
+                    out.put(dayOf(r.endTime), entry)
+                }
+                call.resolve(JSObject().put("days", out))
+            } catch (e: Exception) {
+                call.reject("Lecture sommeil impossible : ${e.message}")
             }
         }
     }

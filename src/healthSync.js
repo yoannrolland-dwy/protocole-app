@@ -4,6 +4,7 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 // N'a d'effet que dans l'app native (Capacitor) ; no-op sur la PWA/navigateur.
 const SYNC_DAYS = 14;
 const toKey = (d) => d.toISOString().slice(0, 10);
+const round2 = (x) => Math.round(x * 100) / 100;
 
 // Lecteur natif maison : le plugin @capgo n'expose que l'énergie du NutritionRecord,
 // celui-ci récupère aussi protéines/glucides/lipides/fibres (voir HealthNutritionPlugin.kt).
@@ -72,14 +73,14 @@ export async function syncHealthConnect() {
     }
 
     if (canSleep) {
-      const { samples } = await Health.readSamples({
-        dataType: "sleep",
-        startDate: start.toISOString(),
-        endDate: end.toISOString(),
+      // Lecteur natif plutôt que Health.readSamples("sleep") : ce dernier ne rapporte que la
+      // période (coucher→réveil), jamais le détail par phase — donc jamais de durée réelle ni
+      // de qualité calculable. Voir HealthNutritionPlugin.readSleep().
+      const { days } = await HealthNutrition.readSleep({
+        startDate: start.toISOString(), endDate: end.toISOString(),
       });
-      samples.forEach((s) => {
-        const key = toKey(new Date(s.endDate || s.startDate));
-        sleepByDate[key] = (sleepByDate[key] ?? 0) + (s.value ?? 0) / 60;
+      Object.entries(days || {}).forEach(([date, d]) => {
+        sleepByDate[date] = { hours: round2(d.hours), ...(d.quality != null ? { quality: d.quality } : {}) };
       });
     }
 

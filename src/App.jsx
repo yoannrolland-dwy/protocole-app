@@ -15,7 +15,7 @@ import { store, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 
-const APP_VERSION = "3.10.0";
+const APP_VERSION = "3.11.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -809,9 +809,7 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast ? round(wLast.kg - tgtW) : null;
 
-  // sommeil : vraie fenêtre glissante de 7 jours
-  const sleep7arr = withinDays(sleep, 7);
-  const sleep7 = avg(sleep7arr.map((s) => s.hours));
+  const lastNightDash = lastN(sleep, 1)[0];
 
   const kLast = lastN(knee, 1)[0];
   const mToday = macros.find((m) => m.date === today());
@@ -841,8 +839,9 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
     { label: "Eau", tab: "macro", val: (waterToday / 1000).toFixed(2), unit: "L",
       note: `/ ${(waterTgt / 1000).toFixed(1)} L${basketToday ? " · basket" : ""}`, color: C.text,
       bar: Math.min(100, (waterToday / waterTgt) * 100) },
-    { label: "Sommeil", tab: "sleep", val: sleep7 != null ? fmtHM(sleep7) : "—", unit: "",
-      note: `7j · ${sleep7arr.length} nuit${sleep7arr.length > 1 ? "s" : ""}`, color: C.text },
+    { label: "Sommeil", tab: "sleep", val: lastNightDash ? fmtHM(lastNightDash.hours) : "—", unit: "",
+      note: lastNightDash ? `${fmt(lastNightDash.date)}${lastNightDash.quality != null ? " · " + "★".repeat(lastNightDash.quality) : ""}` : "—",
+      color: C.text },
     { label: "Genou", tab: "knee", val: kLast ? kLast.pain : "—", unit: "/10", note: kLast ? fmt(kLast.date) : "—",
       color: kLast && (kLast.baseline === false || kLast.pain >= 6) ? C.danger : C.accent },
   ];
@@ -1008,7 +1007,12 @@ function SleepTab({ sleep, save }) {
       <ScreenHeader title="Sommeil" subtitle="récupération tendon & muscle" />
 
       <Card style={{ padding: 16 }}>
-        <Label style={{ fontSize: 10, letterSpacing: 1.5 }}>Dernière nuit</Label>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <Label style={{ fontSize: 10, letterSpacing: 1.5 }}>Dernière nuit</Label>
+          {lastNight?.quality != null && (
+            <span style={{ fontSize: 13, color: C.accent, letterSpacing: 1 }}>{"★".repeat(lastNight.quality)}<span style={{ color: C.dim }}>{"★".repeat(4 - lastNight.quality)}</span></span>
+          )}
+        </div>
         <div style={{ margin: "6px 0 14px" }}>
           <span style={{ fontFamily: C.mono, fontSize: 44, fontWeight: 800, color: C.text }}>
             {lastNight ? fmtHM(lastNight.hours) : "—"}
@@ -1025,15 +1029,9 @@ function SleepTab({ sleep, save }) {
         </div>
       </Card>
 
-      <div style={{ display: "flex", gap: 8 }}>
-        <div style={{ flex: 1, background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
-          <Label>Moy. 7j</Label>
-          <div style={{ fontFamily: C.mono, fontSize: 20, fontWeight: 800, color: C.text, marginTop: 3 }}>{avg7 != null ? fmtHM(avg7) : "—"}</div>
-        </div>
-        <div style={{ flex: 1, background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
-          <Label>Cible</Label>
-          <div style={{ fontFamily: C.mono, fontSize: 20, fontWeight: 800, color: C.accent, marginTop: 3 }}>8h</div>
-        </div>
+      <div style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+        <Label>Moy. 7j</Label>
+        <div style={{ fontFamily: C.mono, fontSize: 20, fontWeight: 800, color: C.text, marginTop: 3 }}>{avg7 != null ? fmtHM(avg7) : "—"}</div>
       </div>
 
       <Card>
@@ -1049,8 +1047,9 @@ function SleepTab({ sleep, save }) {
             <div style={{ textAlign: "center", fontSize: 12, color: C.accent, marginTop: 8, fontWeight: 700, fontFamily: C.mono }}>soit {fmtHM(h + min / 60)}</div>
             <div style={{ marginTop: 12 }}>
               <Field label="Qualité">
-                <Pills options={[1, 2, 3, 4, 5].map((n) => ({ key: n, label: "★".repeat(n) }))} value={quality} onChange={setQuality} small />
+                <Pills options={[1, 2, 3, 4].map((n) => ({ key: n, label: "★".repeat(n) }))} value={quality} onChange={setQuality} small />
               </Field>
+              <Body style={{ fontSize: 9.5, color: C.dim, marginTop: 4 }}>★ Attention requise · ★★ Correct · ★★★ Bon · ★★★★ Excellent</Body>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
               <Btn variant="primary" onClick={add} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
@@ -2074,7 +2073,12 @@ export default function App() {
     if (Object.keys(result.sleepByDate).length) {
       setSleep((prev) => {
         let next = prev;
-        Object.entries(result.sleepByDate).forEach(([date, hours]) => { next = upsert(next, { date, hours: round(hours, 2), source: "healthconnect" }); });
+        // quality n'est présent que les nuits où Health Connect a le détail par phase
+        // (voir HealthNutritionPlugin.readSleep) — absent, on ne touche pas à une note
+        // saisie à la main pour ce jour-là.
+        Object.entries(result.sleepByDate).forEach(([date, d]) => {
+          next = upsert(next, { date, hours: round(d.hours, 2), ...(d.quality != null ? { quality: d.quality } : {}), source: "healthconnect" });
+        });
         store.set("sleepLog", next);
         return next;
       });
