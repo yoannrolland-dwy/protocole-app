@@ -11,12 +11,12 @@ const round2 = (x) => Math.round(x * 100) / 100;
 const HealthNutrition = registerPlugin("HealthNutrition");
 
 // Types demandés au plugin @capgo : il gère l'écran de consentement Health Connect.
-// dietaryEnergyConsumed → READ_NUTRITION, dietaryWater → READ_HYDRATION : ce sont
-// exactement les permissions dont le lecteur natif a besoin, d'où un seul consentement.
-// Pas de "weight" : MyFitnessPal ne déclare même pas WRITE_WEIGHT dans son manifeste
-// (vérifié le 27/07/2026), et Samsung Health n'en écrit pas non plus → 0 enregistrement
-// dans Health Connect. Le poids reste en saisie manuelle.
-const READ_TYPES = ["steps", "sleep", "dietaryEnergyConsumed", "dietaryWater"];
+// dietaryEnergyConsumed → READ_NUTRITION, dietaryWater → READ_HYDRATION, weight →
+// READ_WEIGHT : ce sont exactement les permissions dont le lecteur natif a besoin, d'où
+// un seul consentement. "weight" ajouté le 28/07/2026 : une pesée saisie à la main dans
+// Samsung Health (pas MyFitnessPal, qui ne déclare pas WRITE_WEIGHT) apparaît bien dans
+// Health Connect — voir HealthNutritionPlugin.readWeight().
+const READ_TYPES = ["steps", "sleep", "dietaryEnergyConsumed", "dietaryWater", "weight"];
 
 export async function syncHealthConnect() {
   if (!Capacitor.isNativePlatform()) return { status: "web" };
@@ -44,7 +44,8 @@ export async function syncHealthConnect() {
   const canSleep = auth.readAuthorized?.includes("sleep");
   const canNutrition = auth.readAuthorized?.includes("dietaryEnergyConsumed")
     && auth.readAuthorized?.includes("dietaryWater");
-  if (!canSteps && !canSleep && !canNutrition) return { status: "denied" };
+  const canWeight = auth.readAuthorized?.includes("weight");
+  if (!canSteps && !canSleep && !canNutrition && !canWeight) return { status: "denied" };
 
   // Bornes alignées sur minuit UTC (même convention que today() dans App.jsx) pour que
   // les buckets "day" retournés par le plugin correspondent aux vraies dates calendaires,
@@ -56,6 +57,7 @@ export async function syncHealthConnect() {
   const stepsByDate = {};
   const sleepByDate = {};
   const macrosByDate = {};
+  const weightByDate = {};
 
   try {
     if (canSteps) {
@@ -103,9 +105,16 @@ export async function syncHealthConnect() {
         };
       });
     }
+
+    if (canWeight) {
+      const { days } = await HealthNutrition.readWeight({
+        startDate: start.toISOString(), endDate: end.toISOString(),
+      });
+      Object.entries(days || {}).forEach(([date, kg]) => { weightByDate[date] = kg; });
+    }
   } catch (e) {
     return { status: "error", message: String(e) };
   }
 
-  return { status: "ok", stepsByDate, sleepByDate, macrosByDate };
+  return { status: "ok", stepsByDate, sleepByDate, macrosByDate, weightByDate };
 }

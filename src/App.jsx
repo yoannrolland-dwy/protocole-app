@@ -15,7 +15,7 @@ import { store, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 
-const APP_VERSION = "3.12.0";
+const APP_VERSION = "3.13.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -924,11 +924,14 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
 function WeightTab({ weight, targets, save, phase }) {
   const tgtW = phaseTarget(phase, targets);
   const [date, setDate] = useState(today());
+  const cur = weight.find((w) => w.date === date);
   const [kg, setKg] = useState(lastN(weight, 1)[0]?.kg ?? 95);
-  const pickDate = (d) => { setDate(d); const e = weight.find((w) => w.date === d); if (e) setKg(e.kg); };
+  const [forceManual, setForceManual] = useState(false);
+  const pickDate = (d) => { setDate(d); const e = weight.find((w) => w.date === d); if (e) setKg(e.kg); setForceManual(false); };
   const wLast = lastN(weight, 1)[0];
   const data = lastN(weight, 60).map((w) => ({ date: fmt(w.date), kg: w.kg }));
-  const add = () => save.weight(upsert(weight, { date, kg: round(kg) }));
+  const add = () => save.weight(upsert(weight, { date, kg: round(kg), source: "manual" }));
+  const isSynced = cur?.source === "healthconnect" && !forceManual;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -958,13 +961,19 @@ function WeightTab({ weight, targets, save, phase }) {
 
       <Card>
         <div style={{ marginBottom: 10 }}><DateField value={date} onChange={pickDate} /></div>
-        <Field label="Poids (kg)"><Stepper value={kg} set={setKg} step={0.1} unit="kg" min={40} /></Field>
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <Btn variant="primary" onClick={add} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
-          {weight.some((w) => w.date === date) && (
-            <Btn variant="danger" onClick={() => save.weight(weight.filter((w) => w.date !== date))}><Trash2 size={14} /></Btn>
-          )}
-        </div>
+        {isSynced ? (
+          <SyncedBanner onCorrect={() => setForceManual(true)} />
+        ) : (
+          <>
+            <Field label="Poids (kg)"><Stepper value={kg} set={setKg} step={0.1} unit="kg" min={40} /></Field>
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <Btn variant="primary" onClick={add} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
+              {weight.some((w) => w.date === date) && (
+                <Btn variant="danger" onClick={() => save.weight(weight.filter((w) => w.date !== date))}><Trash2 size={14} /></Btn>
+              )}
+            </div>
+          </>
+        )}
       </Card>
 
       <Card style={{ padding: "6px 14px" }}>
@@ -2097,6 +2106,14 @@ export default function App() {
         // upsert fusionne : les champs absents (jour sans eau, p. ex.) gardent leur valeur locale.
         Object.entries(result.macrosByDate).forEach(([date, m]) => { next = upsert(next, { date, ...m, source: "healthconnect" }); });
         store.set("macroLog", next);
+        return next;
+      });
+    }
+    if (Object.keys(result.weightByDate || {}).length) {
+      setWeight((prev) => {
+        let next = prev;
+        Object.entries(result.weightByDate).forEach(([date, kg]) => { next = upsert(next, { date, kg, source: "healthconnect" }); });
+        store.set("weightLog", next);
         return next;
       });
     }

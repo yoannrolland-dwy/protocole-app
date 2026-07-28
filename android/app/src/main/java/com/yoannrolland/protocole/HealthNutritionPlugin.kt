@@ -203,6 +203,49 @@ class HealthNutritionPlugin : Plugin() {
         }
     }
 
+    /**
+     * Renvoie, par date locale (yyyy-MM-dd), la dernière pesée du jour.
+     *
+     * Health Connect n'a du poids que si une app source l'y écrit — vérifié le 27/07/2026 :
+     * ni MyFitnessPal (WRITE_WEIGHT absent de son manifeste) ni Samsung Health n'écrivaient
+     * quoi que ce soit (0 WeightRecord). Retesté le 28/07/2026 après une pesée saisie à la
+     * main **dans Samsung Health lui-même** (pas MyFitnessPal) : cette fois la pesée apparaît
+     * bien dans Health Connect — Samsung Health écrit donc les pesées manuelles, simplement
+     * aucune n'avait jamais été saisie côté Samsung Health avant ce test. Une seule pesée
+     * testée à ce stade : à confirmer sur plusieurs jours avant de s'y fier pleinement.
+     */
+    @PluginMethod
+    fun readWeight(call: PluginCall) {
+        val hc = client() ?: run { call.reject("Health Connect indisponible"); return }
+        val start = call.getString("startDate") ?: run { call.reject("startDate requis"); return }
+        val end = call.getString("endDate") ?: run { call.reject("endDate requis"); return }
+
+        scope.launch {
+            try {
+                val range = TimeRangeFilter.between(Instant.parse(start), Instant.parse(end))
+
+                fun dayOf(instant: Instant) =
+                    instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString()
+
+                // Même précaution que macros/sommeil : dédoublonne par (source, instant),
+                // garde le plus récemment écrit.
+                val records = hc.readRecords(ReadRecordsRequest(WeightRecord::class, range)).records
+                    .groupBy { "${it.metadata.dataOrigin.packageName}|${it.time}" }
+                    .values.map { grp -> grp.maxByOrNull { it.metadata.lastModifiedTime }!! }
+
+                val out = JSObject()
+                records.groupBy { dayOf(it.time) }.forEach { (day, recs) ->
+                    // Plusieurs pesées le même jour : on garde la plus récente dans la journée.
+                    val latest = recs.maxByOrNull { it.time }!!
+                    out.put(day, Math.round(latest.weight.inKilograms * 100) / 100.0)
+                }
+                call.resolve(JSObject().put("days", out))
+            } catch (e: Exception) {
+                call.reject("Lecture poids impossible : ${e.message}")
+            }
+        }
+    }
+
     @PluginMethod
     fun hasPermissions(call: PluginCall) {
         val hc = client() ?: run {

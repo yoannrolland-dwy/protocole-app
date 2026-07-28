@@ -204,15 +204,15 @@ protocole-app/
 ## Synchro Health Connect (app native uniquement — voir `src/healthSync.js`)
 
 - **Fonctionne** : pas, sommeil, macros complètes (kcal + protéines +
-  glucides + lipides + fibres), eau. Lus automatiquement au lancement, à
-  chaque retour au premier plan, et via le bouton "Synchroniser maintenant"
-  (Réglages). Toujours **écrase** la valeur locale du jour concerné si
-  Health Connect a une donnée ce jour-là (règle explicitement validée) —
-  sauf si le jour n'a rien à donner, dans ce cas la saisie locale existante
-  est préservée.
+  glucides + lipides + fibres), eau, poids. Lus automatiquement au
+  lancement, à chaque retour au premier plan, et via le bouton
+  "Synchroniser maintenant" (Réglages). Toujours **écrase** la valeur
+  locale du jour concerné si Health Connect a une donnée ce jour-là (règle
+  explicitement validée) — sauf si le jour n'a rien à donner, dans ce cas
+  la saisie locale existante est préservée.
 - **Marqueur `source`** (`"healthconnect"` | `"manual"`) sur chaque entrée
-  steps/sleep/macros. Sur l'app native, les onglets Pas/Sommeil/Macros
-  passent en **lecture seule** (bandeau "Synchronisé depuis Health
+  steps/sleep/macros/poids. Sur l'app native, les onglets Poids/Pas/Sommeil/
+  Macros passent en **lecture seule** (bandeau "Synchronisé depuis Health
   Connect" + bouton "Corriger manuellement") quand l'entrée du jour affiché
   a `source: "healthconnect"`. Le bouton révèle le formulaire de saisie
   classique ; sauvegarder ré-étiquette l'entrée en `"manual"` jusqu'à la
@@ -237,10 +237,17 @@ protocole-app/
   mais mode développeur documenté par Samsung comme *"non destiné aux
   utilisateurs finaux"*, cassable à une mise à jour de Samsung Health). Pas
   de projet de correction ici, c'est un choix assumé.
-- **Poids : testé, ne fonctionne PAS actuellement.** Ni MyFitnessPal ni
-  Samsung Health n'écrivent le poids dans Health Connect sur cet appareil
-  (0 échantillon lu, permission pourtant accordée) — reste en saisie
-  manuelle. À retester si un jour l'un de ces réglages change côté source.
+- **Poids** (`HealthNutritionPlugin.readWeight()`) : testé le 27/07/2026,
+  ne fonctionnait pas — ni MyFitnessPal (WRITE_WEIGHT absent de son
+  manifeste) ni Samsung Health n'écrivaient de pesée dans Health Connect (0
+  échantillon). Retesté le 28/07/2026 après une pesée saisie **à la main
+  dans Samsung Health lui-même** (pas MyFitnessPal) : cette fois la pesée
+  apparaît bien dans Health Connect et se synchronise dans l'app — Samsung
+  Health écrit donc les pesées manuelles, simplement aucune n'avait jamais
+  été saisie côté Samsung Health avant ce test. Une seule pesée validée à
+  ce stade ; à surveiller sur plusieurs jours. "weight" ajouté à
+  `READ_TYPES` dans `healthSync.js`, réutilise le même écran de consentement
+  @capgo que nutrition/hydratation/sommeil/pas.
 
 ## Règles absolues à ne jamais casser
 
