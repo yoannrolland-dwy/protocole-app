@@ -24,6 +24,12 @@
 
         </activity>
 
+        <!-- Reçoit l'alarme de fin de repos (AlarmManager.setAlarmClock) et joue le son
+             elle-même, indépendamment de tout pipeline de notification. -->
+        <receiver
+            android:name=".RestAlarmReceiver"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -46,4 +52,5 @@
          l'app, et celle-ci n'est pas distribuée sur le Play Store. -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 </manifest>

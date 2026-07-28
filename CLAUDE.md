@@ -106,11 +106,25 @@ protocole-app/
   jours A, crunch machine jours B). Table HSR (`HSR_TABLE`) pilote les
   séries/reps de la presse à cuisses et du leg extension en Lower A selon
   un réglage "semaine HSR" (1 à 12).
-- **Minuteur** dans le carnet : repos réglable (chips 2:00/1:30/1:00/0:45/
-  0:30 — PAS de 2:30, retiré volontairement pour tenir sur une ligne), bip
-  sonore (Web Audio, 3 impulsions) + vibration en fin de décompte, pastille
-  flottante visible **seulement pendant le décompte** (jamais épinglée en
-  permanence — ça gênait le scroll, corrigé exprès).
+- **Minuteur** dans le carnet : se lance automatiquement au temps de repos
+  de l'exercice dès qu'on coche une série, repos réglable en plus (chips
+  2:00/1:30/1:00/0:45/0:30 — PAS de 2:30, retiré volontairement pour tenir
+  sur une ligne), pastille flottante visible **seulement pendant le
+  décompte** (jamais épinglée en permanence — ça gênait le scroll, corrigé
+  exprès). **Sur l'app native**, la fin de repos sonne via un vrai réveil
+  système (`AlarmManager.setAlarmClock()`, `RestTimerPlugin.kt` +
+  `RestAlarmReceiver.kt`), pas une notification programmée — testé le
+  28/07/2026 : une notification, même avec un canal en AudioAttributes
+  USAGE_ALARM, ne sonnait pas téléphone en mode silencieux (le cas
+  permanent de l'utilisateur), alors qu'un vrai réveil traverse le
+  silencieux de façon fiable. Le son (3,2 s, alarm.wav) est joué par
+  `MediaPlayer` directement sur le flux ALARME dans le `BroadcastReceiver`,
+  indépendamment de tout pipeline de notification — vérifié sur appareil,
+  volume alarme non coupé même icône silencieux affichée. Une notification
+  persistante à chronomètre décroissant affiche le décompte dans la barre
+  d'état pendant le repos, remplacée à la fin par "Repos terminé". Sur la
+  PWA (pas d'AlarmManager), c'est le bip Web Audio (3 impulsions) qui reste
+  la seule alarme.
 - **Genou** : log douleur 0-10 (défaut pré-sélectionné = **4**, pas 2) +
   règle de Silbernagel (retour à la base sous 24h), table HSR, deux
   routines guidées avec minuteur (rééduc autonome, échauffement basket
@@ -297,17 +311,6 @@ ce point en doute sans nouveau test.
 - Sauvegarde des données utilisateur = export JSON manuel (Réglages →
   Exporter), à ne jamais oublier de rappeler avant une mise à jour
   importante — GitHub ne contient que le code, jamais les données perso.
-
-## Objectif futur restant (pas urgent)
-
-**Minuteur fiable en toutes circonstances** — sur l'app native comme sur la
-PWA, le minuteur du carnet de muscu n'est fiable que si l'app reste ouverte
-à l'écran ; écran verrouillé/app en arrière-plan, le décompte et le bip ne
-sont pas garantis (limite du web/WebView, pas un bug). Des notifications
-locales natives régleraient ça (plugin `@capacitor/local-notifications`,
-Android 12+ nécessite la permission `SCHEDULE_EXACT_ALARM`). Pas encore
-fait — l'infra Capacitor existe déjà, donc c'est maintenant un chantier
-isolé et contenu, pas un prérequis à autre chose.
 
 ## Mise à jour de l'app Android native (différent du déploiement PWA)
 

@@ -4,15 +4,19 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 //
 // Pourquoi du natif : dans une WebView, le décompte JS et le bip Web Audio ne sont pas
 // garantis quand l'app passe en arrière-plan ou que l'écran se verrouille (les timers JS
-// sont throttlés). Deux notifications système prennent le relais :
-//   - une notification persistante avec chronomètre décroissant, animée par Android ;
-//   - une notification programmée qui sonne à la fin, sur un canal en USAGE_ALARM
-//     (volume alarme, pas volume notification) créé par RestTimerPlugin.kt.
+// sont throttlés).
+//
+// La sonnerie de fin passe par un vrai réveil système (AlarmManager.setAlarmClock, voir
+// RestTimerPlugin.kt / RestAlarmReceiver.kt), pas par une notification programmée : testé
+// le 28/07/2026, une notification — même avec un son en AudioAttributes USAGE_ALARM — ne
+// sonnait pas téléphone en mode silencieux. Un vrai réveil, si, exactement comme l'appli
+// Horloge. @capacitor/local-notifications ne sert plus ici qu'à obtenir la permission
+// d'affichage des notifications (POST_NOTIFICATIONS, Android 13+), pour le décompte et le
+// message "Repos terminé" — plus à programmer la sonnerie elle-même.
 //
 // No-op sur la PWA/navigateur, où seul le bip Web Audio existe.
 
 const RestTimer = registerPlugin("RestTimer");
-const NOTIF_ID = 4201; // id fixe : une seule alarme de repos à la fois
 
 // Attention : ne JAMAIS retourner un objet plugin Capacitor depuis une fonction async.
 // L'`await` du côté appelant cherche une méthode `.then()` sur le proxy natif, qui lève
@@ -20,7 +24,6 @@ const NOTIF_ID = 4201; // id fixe : une seule alarme de repos à la fois
 // ne renvoie rien et laisse les appelants lire la variable de module.
 let LN = null;
 let lnLoaded = false;
-let alarmChannel = null;
 
 async function loadLN() {
   if (lnLoaded) return;
@@ -33,41 +36,23 @@ async function loadLN() {
   }
 }
 
+async function ensureNotificationPermission() {
+  await loadLN();
+  if (!LN) return false;
+  let perm = await LN.checkPermissions();
+  if (perm.display !== "granted") perm = await LN.requestPermissions();
+  return perm.display === "granted";
+}
+
 /** Programme l'alarme de fin de repos et affiche le décompte. `seconds` = durée du repos. */
 export async function scheduleRestAlarm(seconds, exercise = "") {
   if (!Capacitor.isNativePlatform() || !(seconds > 0)) return;
-  await loadLN();
-  if (!LN) return;
 
   try {
-    let perm = await LN.checkPermissions();
-    if (perm.display !== "granted") perm = await LN.requestPermissions();
-    if (perm.display !== "granted") return;
-
-    // Le canal doit exister avant la programmation : c'est lui qui porte le son d'alarme.
-    if (!alarmChannel) {
-      const res = await RestTimer.prepare();
-      alarmChannel = res?.channelId;
-    }
+    if (!(await ensureNotificationPermission())) return;
 
     const endsAt = Date.now() + seconds * 1000;
-
-    await LN.cancel({ notifications: [{ id: NOTIF_ID }] });
-    await LN.schedule({
-      notifications: [{
-        id: NOTIF_ID,
-        channelId: alarmChannel,
-        title: "Repos terminé",
-        body: exercise ? `${exercise} — série suivante.` : "Série suivante.",
-        schedule: {
-          at: new Date(endsAt),
-          allowWhileIdle: true, // sonne même en mode Doze (téléphone posé, écran éteint)
-        },
-        smallIcon: "ic_launcher",
-        autoCancel: true,
-      }],
-    });
-
+    await RestTimer.scheduleAlarm({ endsAt, exercise });
     await RestTimer.showCountdown({ endsAt, exercise });
   } catch (e) {
     console.log("timerNotify: " + (e?.message || e));
@@ -84,7 +69,5 @@ export async function hideRestCountdown() {
 export async function cancelRestAlarm() {
   if (!Capacitor.isNativePlatform()) return;
   try { await RestTimer.hideCountdown(); } catch { /* ignore */ }
-  await loadLN();
-  if (!LN) return;
-  try { await LN.cancel({ notifications: [{ id: NOTIF_ID }] }); } catch { /* ignore */ }
+  try { await RestTimer.cancelAlarm(); } catch { /* ignore */ }
 }
