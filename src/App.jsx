@@ -15,7 +15,7 @@ import { store, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 
-const APP_VERSION = "3.11.0";
+const APP_VERSION = "3.11.1";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -1242,7 +1242,10 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel }
     return () => clearInterval(tRef.current);
   }, [tRun]);
   useEffect(() => {
-    if (prevRem.current > 0 && tRem === 0) { beep(); hideRestCountdown(); }
+    // Sur l'app native, la notification système sonne déjà (plus fort, écran verrouillé
+    // compris) : le bip Web Audio ferait doublon et brouillerait ce qu'on entend vraiment.
+    // Sur la PWA, sans notification système, il reste la seule alarme disponible.
+    if (prevRem.current > 0 && tRem === 0) { if (!Capacitor.isNativePlatform()) beep(); hideRestCountdown(); }
     prevRem.current = tRem;
   }, [tRem]);
   // Filet de sécurité : pas d'alarme fantôme si on quitte le carnet minuteur en route.
@@ -1714,10 +1717,15 @@ function MacroTab({ macros, targets, save, training }) {
   const [date, setDate] = useState(today());
   const at = targetsForDate(date, targets);
   const cur = macros.find((m) => m.date === date) || {};
-  const [p, setP] = useState(cur.protein ?? at.protein);
-  const [c, setC] = useState(cur.carbs ?? at.carbs);
-  const [f, setF] = useState(cur.fat ?? at.fat);
-  const [fib, setFib] = useState(cur.fiber ?? at.fiber);
+  // Sur l'app native, un jour sans entrée signifie "pas encore synchronisé", pas "cible
+  // atteinte" — démarrer les compteurs à la cible y afficherait une journée à 100% qui n'a
+  // pourtant aucune donnée réelle. Sur la PWA (saisie 100% manuelle), la cible reste un
+  // point de départ pratique pour ne pas taper depuis zéro.
+  const emptyMacro = (v) => (Capacitor.isNativePlatform() ? 0 : v);
+  const [p, setP] = useState(cur.protein ?? emptyMacro(at.protein));
+  const [c, setC] = useState(cur.carbs ?? emptyMacro(at.carbs));
+  const [f, setF] = useState(cur.fat ?? emptyMacro(at.fat));
+  const [fib, setFib] = useState(cur.fiber ?? emptyMacro(at.fiber));
   const [showPeri, setShowPeri] = useState(false);
   const [basketProto, setBasketProto] = useState("soir21h");
   const [forceManual, setForceManual] = useState(false);
@@ -1729,8 +1737,8 @@ function MacroTab({ macros, targets, save, training }) {
     setDate(d);
     const atd = targetsForDate(d, targets);
     const e = macros.find((m) => m.date === d);
-    setP(e?.protein ?? atd.protein); setC(e?.carbs ?? atd.carbs);
-    setF(e?.fat ?? atd.fat); setFib(e?.fiber ?? atd.fiber);
+    setP(e?.protein ?? emptyMacro(atd.protein)); setC(e?.carbs ?? emptyMacro(atd.carbs));
+    setF(e?.fat ?? emptyMacro(atd.fat)); setFib(e?.fiber ?? emptyMacro(atd.fiber));
     setForceManual(false);
   };
   const kcal = p * 4 + c * 4 + f * 9;
@@ -1819,7 +1827,7 @@ function MacroTab({ macros, targets, save, training }) {
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
               <Btn variant="primary" onClick={saveMacros} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
               {macros.some((m) => m.date === date) && (
-                <Btn variant="danger" onClick={() => { save.macros(macros.filter((m) => m.date !== date)); setP(at.protein); setC(at.carbs); setF(at.fat); setFib(at.fiber); }}>
+                <Btn variant="danger" onClick={() => { save.macros(macros.filter((m) => m.date !== date)); setP(emptyMacro(at.protein)); setC(emptyMacro(at.carbs)); setF(emptyMacro(at.fat)); setFib(emptyMacro(at.fiber)); }}>
                   <Trash2 size={14} />
                 </Btn>
               )}

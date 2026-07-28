@@ -175,12 +175,17 @@ class HealthNutritionPlugin : Plugin() {
                     val hasStages = r.stages.isNotEmpty()
                     val hours = if (hasStages) asleepMin / 60.0 else periodeMin / 60.0
 
+                    // Grille calibrée sur UN point de référence réel (28/07/2026) : 92,6%
+                    // d'efficacité + 6h56 de sommeil réel → Samsung Health a donné 90/100
+                    // "Excellent". Le seuil de durée initial (7h) était trop strict pour ce
+                    // cas — abaissé de 30 min à chaque palier. Un seul point de calibration :
+                    // à resserrer si de nouveaux scores Samsung Health la contredisent.
                     val quality: Int? = if (!hasStages) null else {
                         val efficacite = asleepMin / periodeMin
                         when {
-                            efficacite >= 0.90 && asleepMin >= 420 -> 4  // Excellent
-                            efficacite >= 0.80 && asleepMin >= 360 -> 3  // Bon
-                            efficacite >= 0.65 || asleepMin >= 300 -> 2  // Correct
+                            efficacite >= 0.90 && asleepMin >= 390 -> 4  // Excellent
+                            efficacite >= 0.80 && asleepMin >= 330 -> 3  // Bon
+                            efficacite >= 0.65 || asleepMin >= 270 -> 2  // Correct
                             else -> 1                                    // Attention requise
                         }
                     }
