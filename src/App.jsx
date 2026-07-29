@@ -15,7 +15,7 @@ import { store, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 
-const APP_VERSION = "3.14.0";
+const APP_VERSION = "3.14.1";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA

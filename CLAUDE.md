@@ -133,15 +133,30 @@ protocole-app/
   persistante à chronomètre décroissant affiche le décompte dans la barre
   d'état pendant le repos, remplacée à la fin par "Repos terminé". Sur la
   PWA (pas d'AlarmManager), c'est le bip Web Audio (3 impulsions) qui reste
-  la seule alarme. **Routage casque** (29/07/2026) : si un casque filaire
-  ou Bluetooth (A2DP/SCO) est connecté au moment où l'alarme sonne, le son
-  y est envoyé exclusivement (`MediaPlayer.setPreferredDevice()` dans
-  `RestAlarmReceiver.kt`) plutôt que sur le haut-parleur — demandé
-  explicitement pour ne plus gêner toute la salle de sport. Reste sur le
-  flux ALARME (le mécanisme anti-silencieux n'est pas affecté), seule la
-  destination physique change. Limite assumée : détecte un casque
-  *connecté*, pas *porté* — un casque Bluetooth resté connecté mais posé
-  rend l'alarme silencieuse pour la pièce, compromis accepté. Vibration
+  la seule alarme. **Routage casque** (29/07/2026, `RestAlarmReceiver.kt`) :
+  si un casque filaire ou Bluetooth est connecté au moment où l'alarme
+  sonne, le son y est envoyé exclusivement plutôt que sur le haut-parleur —
+  demandé explicitement pour ne plus gêner toute la salle de sport. Détecte
+  aussi les casques filaires en USB-C (`TYPE_USB_HEADSET`/`TYPE_USB_DEVICE`)
+  — ce téléphone n'a pas de prise jack, donc `TYPE_WIRED_HEADSET` seul ne
+  suffit jamais. **Piège identifié sur appareil** : rester sur le flux
+  ALARME avec `setPreferredDevice()` ne fonctionne PAS — logs
+  `APM_AudioPolicyManager` à l'appui, Android force ce flux à sonner
+  **simultanément** sur le haut-parleur ET l'appareil connecté (politique
+  de sécurité native pour les alarmes, qu'aucun `setPreferredDevice()` ne
+  peut outrepasser). Le contournement retenu : quand un casque est détecté,
+  le son bascule sur un flux média classique (`USAGE_MEDIA` /
+  `CONTENT_TYPE_MUSIC`) qui, lui, respecte le device préféré et n'est routé
+  que vers lui — reconfirmé par les logs (un seul device sélectionné, plus
+  de doublon haut-parleur), et validé à l'oreille par l'utilisateur en
+  Bluetooth. Le mode silencieux ne coupe pas ce flux média (vérifié : ni
+  STREAM_MUSIC ni STREAM_ALARM ne figurent parmi les flux mis en sourdine
+  par le mode sonnerie), donc le contournement du silencieux reste garanti
+  même sans passer par le flux ALARME dans ce cas précis. Limites
+  assumées : détecte un casque *connecté*, pas *porté* — posé sur un banc,
+  l'alarme resterait silencieuse pour la pièce, compromis accepté ; et si
+  le volume média est baissé à zéro indépendamment du volume alarme, ce cas
+  précis serait silencieux. Vibration
   passée en amplitude explicite maximale (255/255) sur chaque impulsion.
 - **Genou** : log douleur 0-10 (défaut pré-sélectionné = **4**, pas 2) +
   règle de Silbernagel (retour à la base sous 24h), table HSR, deux

@@ -25,10 +25,9 @@ import androidx.core.app.NotificationManagerCompat
 class RestAlarmReceiver : BroadcastReceiver() {
 
     /**
-     * Cherche un casque filaire ou Bluetooth déjà connecté, pour y forcer le son au lieu du
+     * Cherche un casque filaire ou Bluetooth déjà connecté, pour y envoyer le son au lieu du
      * haut-parleur — demandé explicitement : sonner à pleine intensité dans toute la salle de
-     * sport gênait tout le monde autour. Reste sur le flux ALARME (voir plus bas) : seule la
-     * destination physique change, pas le mécanisme qui garantit le son en mode silencieux.
+     * sport gênait tout le monde autour.
      *
      * Limite assumée : ceci détecte un appareil CONNECTÉ, pas porté aux oreilles. Un casque
      * Bluetooth resté connecté mais posé sur un banc rend l'alarme silencieuse pour la pièce —
@@ -38,8 +37,16 @@ class RestAlarmReceiver : BroadcastReceiver() {
     private fun connectedHeadset(context: Context): AudioDeviceInfo? {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return null
         val headsetTypes = setOf(
+            // TYPE_WIRED_HEADSET/HEADPHONES ne concernent que la prise jack 3,5mm analogique —
+            // absente sur ce téléphone (pas de jack). Un casque filaire y est forcément branché
+            // en USB-C, donc vu par Android comme TYPE_USB_HEADSET (voire TYPE_USB_DEVICE selon
+            // le DAC intégré au câble) — constaté le 29/07/2026 : le filtre précédent ne
+            // reconnaissait aucun de ces deux types, d'où le son resté sur haut-parleur malgré
+            // le casque branché.
             AudioDeviceInfo.TYPE_WIRED_HEADSET,
             AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+            AudioDeviceInfo.TYPE_USB_HEADSET,
+            AudioDeviceInfo.TYPE_USB_DEVICE,
             AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
             AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
         )
@@ -55,15 +62,35 @@ class RestAlarmReceiver : BroadcastReceiver() {
 
         try {
             val player = MediaPlayer()
-            player.setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build()
-            )
-            // Casque connecté → le son y est envoyé exclusivement. Sinon, comportement inchangé
-            // (haut-parleur, routage par défaut du flux ALARME).
-            connectedHeadset(context)?.let { player.setPreferredDevice(it) }
+            val headset = connectedHeadset(context)
+            if (headset != null) {
+                // Constaté sur appareil le 29/07/2026, casque filaire USB-C ET Bluetooth : le
+                // flux ALARME force TOUJOURS une diffusion simultanée sur le haut-parleur ET
+                // l'appareil connecté (politique de sécurité d'Android pour les alarmes,
+                // au niveau du gestionnaire audio natif) — setPreferredDevice() n'a aucun effet
+                // dessus, quel que soit le casque. Le flux média, lui, respecte le device
+                // préféré et n'est routé QUE vers lui. Le mode silencieux ne coupe ni l'un ni
+                // l'autre flux (vérifié : ni STREAM_MUSIC ni STREAM_ALARM ne figurent parmi les
+                // flux mis en sourdine par le mode sonnerie) — le contournement du silencieux
+                // n'a donc pas besoin du flux ALARME pour fonctionner ici. Revers assumé :
+                // si le volume média du téléphone est baissé à zéro indépendamment du volume
+                // alarme, ce cas précis serait silencieux.
+                player.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                player.setPreferredDevice(headset)
+            } else {
+                player.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+            }
+            player.setVolume(1f, 1f)
             val afd = context.resources.openRawResourceFd(R.raw.alarm)
             player.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
             afd.close()
