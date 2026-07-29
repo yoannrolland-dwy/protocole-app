@@ -106,6 +106,15 @@ protocole-app/
   jours A, crunch machine jours B). Table HSR (`HSR_TABLE`) pilote les
   séries/reps de la presse à cuisses et du leg extension en Lower A selon
   un réglage "semaine HSR" (1 à 12).
+- **Modification d'une séance déjà enregistrée** : toute ligne de
+  "Dernières séances" (onglet Séances) est cliquable et rouvre le carnet
+  pré-rempli avec les vraies valeurs sauvegardées (pas des suggestions),
+  bouton "Enregistrer les modifications" à la place de "Valider la
+  séance". Sauvegarder met à jour l'entrée existante dans `trainingLog`
+  (comparaison par référence d'objet, comme la suppression) au lieu d'en
+  ajouter une nouvelle — corrige l'absence totale d'édition qui obligeait
+  à supprimer puis resaisir, avec risque de doublon en cas d'oubli.
+  Chaque séance (muscu et non-muscu) porte désormais un `id` stable.
 - **Minuteur** dans le carnet : se lance automatiquement au temps de repos
   de l'exercice dès qu'on coche une série, repos réglable en plus (chips
   2:00/1:30/1:00/0:45/0:30 — PAS de 2:30, retiré volontairement pour tenir
@@ -124,7 +133,16 @@ protocole-app/
   persistante à chronomètre décroissant affiche le décompte dans la barre
   d'état pendant le repos, remplacée à la fin par "Repos terminé". Sur la
   PWA (pas d'AlarmManager), c'est le bip Web Audio (3 impulsions) qui reste
-  la seule alarme.
+  la seule alarme. **Routage casque** (29/07/2026) : si un casque filaire
+  ou Bluetooth (A2DP/SCO) est connecté au moment où l'alarme sonne, le son
+  y est envoyé exclusivement (`MediaPlayer.setPreferredDevice()` dans
+  `RestAlarmReceiver.kt`) plutôt que sur le haut-parleur — demandé
+  explicitement pour ne plus gêner toute la salle de sport. Reste sur le
+  flux ALARME (le mécanisme anti-silencieux n'est pas affecté), seule la
+  destination physique change. Limite assumée : détecte un casque
+  *connecté*, pas *porté* — un casque Bluetooth resté connecté mais posé
+  rend l'alarme silencieuse pour la pièce, compromis accepté. Vibration
+  passée en amplitude explicite maximale (255/255) sur chaque impulsion.
 - **Genou** : log douleur 0-10 (défaut pré-sélectionné = **4**, pas 2) +
   règle de Silbernagel (retour à la base sous 24h), table HSR, deux
   routines guidées avec minuteur (rééduc autonome, échauffement basket

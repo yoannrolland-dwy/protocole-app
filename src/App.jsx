@@ -15,7 +15,7 @@ import { store, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 
-const APP_VERSION = "3.13.0";
+const APP_VERSION = "3.14.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -1177,7 +1177,7 @@ function StepsTab({ steps, save }) {
 /* ============================================================
    CARNET DE MUSCU — série par série
    ============================================================ */
-function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel }) {
+function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, initial }) {
   const template = TEMPLATES[type];
   const hp = hsrParse(hsrForWeek(hsrWeek).scheme);
 
@@ -1188,6 +1188,17 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel }
     const target = ex.hsr ? `${hp.reps}` : ex.r;
     const def = DEFAULT_WEIGHTS[ex.n];
     const medVal = medianTarget(target);
+
+    // Édition d'une séance déjà enregistrée : on réaffiche les séries telles
+    // qu'elles ont été sauvegardées (valeurs réelles), pas des suggestions
+    // basées sur l'historique.
+    const savedEx = initial?.exercices?.find((e) => e.nom === ex.n);
+    if (savedEx) {
+      return { nom: ex.n, mode: ex.mode, perLeg: !!ex.perLeg, opt: !!ex.opt, rest: ex.rest,
+        target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${ex.s} × ${ex.r}`, consigne: ex.c, def, last,
+        series: savedEx.series.map((s) => ({ poids: s.poids, val: s.val, fait: s.fait, leg: s.leg })) };
+    }
+
     const pick = (leg, k) => {
       if (!lastSets) return null;
       const pool = leg == null ? lastSets : lastSets.filter((s) => s.leg === leg);
@@ -1208,7 +1219,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel }
       target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${ex.s} × ${ex.r}`, consigne: ex.c, def, last, series };
   });
 
-  const [start, setStart] = useState(() => new Date().toTimeString().slice(0, 5));
+  const [start, setStart] = useState(() => initial?.start ?? new Date().toTimeString().slice(0, 5));
   const [exos, setExos] = useState(buildExos);
   const [open, setOpen] = useState(0);
   const [hist, setHist] = useState(null);
@@ -1305,7 +1316,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel }
 
   const validate = () => {
     onSave({
-      id: `${date}-${type}-${Date.now()}`,
+      id: initial?.id ?? `${date}-${type}-${Date.now()}`,
       date, type, start,
       exercices: exos.map((e) => ({
         nom: e.nom, mode: e.mode, perLeg: e.perLeg,
@@ -1344,7 +1355,9 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel }
       {/* En-tête séance + timer */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 12, borderBottom: `1.5px solid ${C.divider}` }}>
         <div>
-          <div style={{ fontSize: 16, color: C.text, fontWeight: 800, textTransform: "uppercase" }}>{type}</div>
+          <div style={{ fontSize: 16, color: C.text, fontWeight: 800, textTransform: "uppercase" }}>
+            {type}{initial && <span style={{ color: C.accent, fontSize: 11, textTransform: "none", marginLeft: 6 }}>(modification)</span>}
+          </div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>débuté {start} · {doneCount}/{exos.length} exos</div>
         </div>
         <div onClick={toggleRun} style={{
@@ -1479,7 +1492,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel }
 
       <div style={{ display: "flex", gap: 8 }}>
         <Btn variant="primary" onClick={validate} style={{ flex: 1 }}>
-          <CheckCircle2 size={14} style={{ display: "inline", marginRight: 4 }} />Valider la séance
+          <CheckCircle2 size={14} style={{ display: "inline", marginRight: 4 }} />{initial ? "Enregistrer les modifications" : "Valider la séance"}
         </Btn>
         <Btn variant="ghost" onClick={onCancel}>Annuler</Btn>
       </div>
@@ -1496,20 +1509,46 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek }) {
   const [startTime, setStartTime] = useState(() => new Date().toTimeString().slice(0, 5));
   const [duration, setDuration] = useState(60);
   const [rpe, setRpe] = useState(7);
+  // Séance déjà enregistrée en cours de modification (référence exacte de l'objet
+  // dans `training`) — null quand on démarre une nouvelle séance à blanc.
+  const [editing, setEditing] = useState(null);
+
+  const pickType = (type) => {
+    const sel = open === type;
+    setEditing(null);
+    setDate(today());
+    setStartTime(new Date().toTimeString().slice(0, 5));
+    setDuration(60);
+    setRpe(7);
+    setOpen(sel ? null : type);
+  };
+
+  const editSession = (t) => {
+    setEditing(t);
+    setDate(t.date);
+    setStartTime(t.start ?? new Date().toTimeString().slice(0, 5));
+    setDuration(t.duration ?? 60);
+    setRpe(t.rpe ?? 7);
+    setOpen(t.type);
+  };
 
   const logSession = (type) => {
-    save.training([...training, { date, type, start: startTime, duration: round(duration), rpe }].sort(byDate));
-    setOpen(null);
+    const rec = { id: editing?.id ?? `${date}-${type}-${Date.now()}`, date, type, start: startTime, duration: round(duration), rpe };
+    save.training((editing ? training.map((x) => (x === editing ? rec : x)) : [...training, rec]).sort(byDate));
+    setOpen(null); setEditing(null);
   };
-  const saveMuscu = (rec) => { save.training([...training, rec].sort(byDate)); setOpen(null); };
+  const saveMuscu = (rec) => {
+    save.training((editing ? training.map((x) => (x === editing ? rec : x)) : [...training, rec]).sort(byDate));
+    setOpen(null); setEditing(null);
+  };
 
   const vol = {};
   training.filter((t) => daysBetween(t.date, today()) <= 14).forEach((t) => { vol[t.type] = (vol[t.type] || 0) + 1; });
 
   if (open && TEMPLATES[open]?.kind === "muscu") {
     return (
-      <MuscuLogger type={open} training={training} hsrWeek={hsrWeek} date={date} onDate={setDate}
-        onSave={saveMuscu} onCancel={() => setOpen(null)} />
+      <MuscuLogger key={editing?.id || `new-${open}`} type={open} training={training} hsrWeek={hsrWeek} date={date} onDate={setDate}
+        onSave={saveMuscu} onCancel={() => { setOpen(null); setEditing(null); }} initial={editing} />
     );
   }
 
@@ -1522,7 +1561,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek }) {
         {TYPES.map((type) => {
           const sel = open === type;
           return (
-            <button key={type} onClick={() => setOpen(sel ? null : type)} style={{
+            <button key={type} onClick={() => pickType(type)} style={{
               background: sel ? C.accentRow : C.card, textAlign: "left", cursor: "pointer",
               border: `1.5px solid ${sel ? C.accent : C.border}`, borderRadius: 10, padding: "13px 14px", fontFamily: "inherit",
             }}>
@@ -1541,7 +1580,9 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek }) {
       {/* Séance non-muscu */}
       {open && TEMPLATES[open].kind !== "muscu" && (
         <Card style={{ borderColor: C.accent }}>
-          <div style={{ fontSize: 14, color: C.accent, fontWeight: 800, textTransform: "uppercase", marginBottom: 8 }}>{open}</div>
+          <div style={{ fontSize: 14, color: C.accent, fontWeight: 800, textTransform: "uppercase", marginBottom: 8 }}>
+            {open}{editing && <span style={{ fontSize: 11, textTransform: "none", marginLeft: 6 }}>(modification)</span>}
+          </div>
           <Body style={{ marginBottom: 12 }}>
             {open === "Escalade"
               ? "Compte comme volume tirage — jamais un jour Upper, pour protéger le coude."
@@ -1557,9 +1598,9 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek }) {
           <Field label="RPE"><Stepper value={rpe} set={setRpe} step={1} min={1} max={10} int /></Field>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <Btn variant="primary" onClick={() => logSession(open)} style={{ flex: 1 }}>
-              <CheckCircle2 size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer
+              <CheckCircle2 size={14} style={{ display: "inline", marginRight: 4 }} />{editing ? "Enregistrer les modifications" : "Enregistrer"}
             </Btn>
-            <Btn variant="ghost" onClick={() => setOpen(null)}>Annuler</Btn>
+            <Btn variant="ghost" onClick={() => { setOpen(null); setEditing(null); }}>Annuler</Btn>
           </div>
         </Card>
       )}
@@ -1578,7 +1619,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek }) {
       <Card style={{ padding: "6px 14px" }}>
         <Label style={{ padding: "10px 0 6px", letterSpacing: 1.5 }}>Dernières séances</Label>
         {training.length ? lastN(training, 10).reverse().map((t, i) => (
-          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderTop: `1px solid ${C.divider}` }}>
+          <div key={i} onClick={() => editSession(t)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderTop: `1px solid ${C.divider}`, cursor: "pointer" }}>
             <div>
               <span style={{ fontSize: 12.5, color: C.text, fontWeight: 700 }}>{t.type}</span>
               <span style={{ fontSize: 10.5, color: C.muted, marginLeft: 8, fontFamily: C.mono }}>{fmt(t.date)}{t.start ? ` · ${t.start}` : ""}</span>
@@ -1589,7 +1630,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek }) {
                   ? `${t.exercices.length} exos · ${t.exercices.reduce((a, e) => a + (e.series?.length || 0), 0)} séries`
                   : `${t.duration != null ? t.duration + "′" : ""}${t.rpe != null ? ` · RPE ${t.rpe}` : ""}`}
               </span>
-              <button onClick={() => save.training(training.filter((x) => x !== t))}
+              <button onClick={(ev) => { ev.stopPropagation(); save.training(training.filter((x) => x !== t)); }}
                 style={{ background: "none", border: "none", cursor: "pointer", color: C.dim, padding: 0 }}>
                 <Trash2 size={13} />
               </button>
