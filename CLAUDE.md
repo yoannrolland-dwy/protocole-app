@@ -158,7 +158,13 @@ protocole-app/
   le volume média est baissé à zéro indépendamment du volume alarme, ce cas
   précis serait silencieux. Vibration
   passée en amplitude explicite maximale (255/255) sur chaque impulsion.
-- **Genou** : log douleur 0-10 (défaut pré-sélectionné = **4**, pas 2) +
+- **Genou** : log douleur 0-10 **sans aucune valeur par défaut** (ni 4 ni 5 —
+  changé le 30/07/2026) : rien n'est présélectionné à l'ouverture et le bouton
+  Enregistrer reste désactivé tant qu'un chiffre n'a pas été touché, pour forcer
+  une vraie évaluation de la sensation plutôt qu'un enregistrement réflexe. Si
+  le jour affiché a déjà une entrée, elle est rechargée (à l'ouverture de
+  l'onglet comme au changement de date) ; changer vers un jour sans entrée
+  remet le champ à vide. +
   règle de Silbernagel (retour à la base sous 24h), table HSR, deux
   routines guidées avec minuteur (rééduc autonome, échauffement basket
   sécurisé).
@@ -210,6 +216,35 @@ protocole-app/
 - Appel direct à `https://api.anthropic.com/v1/messages` depuis le
   navigateur avec la clé API saisie par l'utilisateur (stockée en local
   uniquement), header `anthropic-dangerous-direct-browser-access: true`.
+- **Découpage system / user** (30/07/2026) : le rôle + les contraintes
+  permanentes + le bloc sèche vont dans `system` (stable d'un appel à l'autre,
+  donc rendu en préfixe et prêt pour le cache) ; les données et les consignes
+  de sortie restent dans le message utilisateur. `buildPrompt` retourne donc
+  `{ system, user }`, pas une chaîne.
+- **`output_config: { effort: "medium" }`** (30/07/2026) : Sonnet 5 active la
+  réflexion adaptative dès qu'on ne précise rien, et cette réflexion est
+  facturée au tarif de SORTIE tout en consommant `max_tokens` — c'est la cause
+  réelle des "réponses vides"/troncatures historiques. `medium` garde la
+  qualité d'un Sonnet 4.6 en `high` pour bien moins cher. **Ne jamais envoyer
+  `output_config` à Haiku 4.5 : il rejette ce paramètre (400)** — d'où le set
+  `SUPPORTS_EFFORT`.
+- **Reprise automatique** (`callClaude`) : 3 tentatives sur le modèle demandé
+  espacées de 1,2 s puis 4 s en cas d'erreur transitoire (429 / 5xx / réseau),
+  puis bascule sur `claude-haiku-4-5`. Motivé par une saturation réelle le
+  28/07/2026 au soir (Sonnet et Opus en "overloaded", Haiku disponible) alors
+  que l'app ne faisait qu'un seul essai. Les erreurs définitives (clé
+  invalide, requête malformée) ne sont jamais reprises.
+- **Coût réel affiché** après chaque analyse (tokens entrée/sortie + centimes),
+  calculé depuis `usage` via la table `PRICING`. Celle-ci porte le tarif
+  d'intro Sonnet 5 (2 $/10 $ jusqu'au 31/08/2026) ET le tarif normal
+  (3 $/15 $) avec bascule automatique à la date — sans ça l'app
+  sous-estimerait silencieusement le coût à partir du 01/09/2026.
+- **Mesure réelle du 30/07/2026** : ~7 200 tokens en entrée / ~1 700 en sortie
+  = **3,1 ¢ par analyse**. À noter : l'entrée (1,44 ¢) pèse presque autant que
+  la sortie (1,7 ¢) — une estimation à la main basée sur le nombre de
+  caractères donnait 2× moins, donc **toujours se fier au `usage` affiché,
+  jamais à une estimation**. Le plus gros poste d'entrée reste le dump brut
+  14 jours des séances.
 - `max_tokens: 6000` — volontairement haut car le modèle peut consommer du
   budget en amont du texte visible ; on a eu des "réponses vides" et des
   troncatures avec des valeurs plus basses (1000 → 1800 → 4096 → 6000).

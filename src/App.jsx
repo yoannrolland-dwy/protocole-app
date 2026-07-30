@@ -15,7 +15,7 @@ import { store, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 
-const APP_VERSION = "3.14.1";
+const APP_VERSION = "3.15.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -349,7 +349,10 @@ function recommendSessions({ training, knee }) {
   const t0 = today();
   const isUpper = (t) => t.type === "Upper A" || t.type === "Upper B";
   const isLower = (t) => t.type === "Lower A" || t.type === "Lower B";
-  const within = (arr, n) => arr.filter((e) => daysBetween(e.date, t0) <= n);
+  // `d >= 0` indispensable : sans lui, une entrée datée dans le futur (le sélecteur de
+  // date le permet) donne un écart négatif, donc « <= n » est vrai et elle compte dans
+  // la semaine écoulée. Même garde-fou que le helper global `withinDays`.
+  const within = (arr, n) => arr.filter((e) => { const d = daysBetween(e.date, t0); return d >= 0 && d <= n; });
   const daysSince = (pred) => {
     const hits = training.filter(pred);
     return hits.length ? daysBetween(hits[hits.length - 1].date, t0) : Infinity;
@@ -370,12 +373,25 @@ function recommendSessions({ training, knee }) {
   const dClimb = daysSince((t) => t.type === "Escalade");
   const dKnee = daysSince((t) => TEMPLATES[t.type]?.knee); // Lower + Basket
 
-  // état du genou
+  // état du genou — avec péremption. Sans elle, une douleur à 6 notée il y a dix jours
+  // bloquait Lower et Basket indéfiniment, jusqu'à la prochaine saisie : l'état n'était
+  // jamais fenêtré alors que `flagged7` juste en dessous l'était. Devenu critique depuis
+  // que la douleur n'a plus de valeur par défaut (donc moins de saisies, donc des états
+  // plus souvent périmés).
+  const KNEE_FRESH_DAYS = 3;
   const kLast = lastN(knee, 1)[0];
-  const painLast = kLast?.pain ?? null;
+  const kneeAge = kLast ? daysBetween(kLast.date, t0) : Infinity;
+  const kneeFresh = !!kLast && kneeAge >= 0 && kneeAge <= KNEE_FRESH_DAYS;
+  const kneeUnknown = !kneeFresh;
+  const painLast = kneeFresh ? kLast.pain : null;
   const flagged7 = within(knee, 6).filter((k) => k.baseline === false).length;
-  const kneeRed = !!kLast && (kLast.baseline === false || kLast.pain >= 6);
-  const kneeAmber = !kneeRed && (painLast >= 4 || flagged7 >= 1);
+  const kneeRed = kneeFresh && (kLast.baseline === false || kLast.pain >= 6);
+  // État inconnu ≠ feu vert : on reste prudent (comme une douleur modérée) sans bloquer,
+  // et on le dit dans la raison affichée pour inciter à noter la douleur.
+  const kneeAmber = !kneeRed && (kneeUnknown || painLast >= 4 || flagged7 >= 1);
+  const kneeNote = kneeUnknown
+    ? (kLast ? `Douleur genou pas notée depuis ${kneeAge} j — prudence par défaut, note-la pour un vrai conseil.` : "Douleur genou jamais notée — prudence par défaut.")
+    : null;
 
   // ce qui est déjà fait aujourd'hui
   const todayTypes = training.filter((t) => t.date === t0).map((t) => t.type);
@@ -417,7 +433,8 @@ function recommendSessions({ training, knee }) {
     const loV = variant("Lower A", "Lower B");
     let loScore = 20 + (2 - lower7) * 12 + cap(dLower) - (kneeAmber ? 10 : 0);
     let loReason = `Lower ${lower7}/2 cette semaine · dernier ${ago(dLower)}.`;
-    if (kneeAmber) loReason += ` Genou sensible (${painLast}/10${flagged7 ? `, ${flagged7} j hors base` : ""}) → charge prudente, tempo 6 s.`;
+    if (kneeUnknown) loReason += ` ${kneeNote} Charge prudente, tempo 6 s.`;
+    else if (kneeAmber) loReason += ` Genou sensible (${painLast}/10${flagged7 ? `, ${flagged7} j hors base` : ""}) → charge prudente, tempo 6 s.`;
     push(sugg, loV, loScore, loReason);
   }
 
@@ -431,7 +448,8 @@ function recommendSessions({ training, knee }) {
   } else {
     let bScore = 10 + cap(dBasket) - (kneeAmber ? 8 : 0) - (dKnee <= 1 ? 6 : 0);
     let bReason = `${basket7}× cette semaine · dernier ${ago(dBasket)}. Passer par l'échauffement guidé.`;
-    if (kneeAmber) bReason += " Genou sensible : réduire le volume de sauts.";
+    if (kneeUnknown) bReason += ` ${kneeNote}`;
+    else if (kneeAmber) bReason += " Genou sensible : réduire le volume de sauts.";
     push(sugg, "Basket", bScore, bReason);
   }
 
@@ -703,12 +721,110 @@ function RoutinePlayer({ routine, onClose }) {
 /* ============================================================
    COACH IA
    ============================================================ */
+/* ------------------------------------------------------------
+   Coach IA — appel API : tarifs, reprise sur saturation, coût réel
+   ------------------------------------------------------------ */
+
+// Tarifs Anthropic en $ par million de tokens (relevés le 29/07/2026). `intro` est un
+// tarif de lancement à durée limitée : au-delà de `introUntil` on repasse au tarif normal,
+// d'où la date en dur plutôt qu'un simple prix — sinon l'app sous-estimerait le coût à
+// partir du 01/09/2026 sans que rien ne le signale.
+const PRICING = {
+  "claude-sonnet-5": { in: 3, out: 15, intro: { in: 2, out: 10 }, introUntil: "2026-08-31" },
+  "claude-haiku-4-5": { in: 1, out: 5 },
+  "claude-opus-5": { in: 5, out: 25 },
+};
+const PRICING_FALLBACK = { in: 3, out: 15 }; // modèle inconnu : on estime au tarif Sonnet
+
+// Coût en centimes de dollar. `cache_read` est facturé ~10 % du tarif d'entrée ; on le
+// compte séparément pour que l'affichage reste juste si on active le cache un jour.
+const costCents = (model, usage) => {
+  const p = PRICING[model] || PRICING_FALLBACK;
+  const rate = p.intro && today() <= p.introUntil ? p.intro : { in: p.in, out: p.out };
+  const cached = usage?.cache_read_input_tokens || 0;
+  const fresh = (usage?.input_tokens || 0) + (usage?.cache_creation_input_tokens || 0);
+  const out = usage?.output_tokens || 0;
+  return ((fresh * rate.in + cached * rate.in * 0.1 + out * rate.out) / 1e6) * 100;
+};
+
+// Haiku 4.5 REJETTE output_config.effort (paramètre réservé aux modèles récents) : on ne
+// l'envoie donc que pour les modèles qui le supportent, sinon la bascule de secours
+// échouerait avec une erreur 400 au pire moment.
+const SUPPORTS_EFFORT = new Set(["claude-sonnet-5", "claude-opus-5"]);
+const FALLBACK_MODEL = "claude-haiku-4-5";
+
+const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Un appel à l'API Messages, avec reprise automatique.
+ *
+ * Pourquoi : constaté le 28/07/2026 au soir, l'API a renvoyé « overloaded » sur Sonnet et
+ * Opus alors que Haiku répondait encore. L'app ne faisait qu'une seule tentative, donc une
+ * saturation passagère se soldait par une erreur brute affichée à l'utilisateur.
+ * Stratégie : 2 reprises espacées sur les erreurs transitoires (429 / 5xx / réseau), puis
+ * bascule sur Haiku — moins fin, mais disponible et 3× moins cher, ce qui vaut mieux que
+ * pas d'analyse du tout. Les erreurs définitives (clé invalide, requête malformée) ne sont
+ * jamais reprises : ça ne ferait que retarder le vrai message d'erreur.
+ */
+async function callClaude({ apiKey, model, system, user, effort, maxTokens, onRetry }) {
+  const attempt = async (m) => {
+    const body = {
+      model: m,
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: "user", content: user }],
+    };
+    if (effort && SUPPORTS_EFFORT.has(m)) body.output_config = { effort };
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify(body),
+    });
+    let data = null;
+    try { data = await res.json(); } catch { /* réponse non-JSON */ }
+    if (!res.ok || !data || data.type === "error") {
+      const err = new Error(data?.error?.message || `HTTP ${res.status} ${res.statusText}`.trim());
+      err.status = res.status;
+      err.retryable = res.status === 429 || res.status >= 500;
+      throw err;
+    }
+    return { data, usedModel: m };
+  };
+
+  const delays = [1200, 4000];
+  for (let i = 0; i <= delays.length; i++) {
+    try {
+      return await attempt(model);
+    } catch (e) {
+      // Erreur réseau (pas de status) : transitoire aussi, on retente.
+      const transient = e.retryable || e.status == null;
+      if (!transient || i === delays.length) {
+        if (transient && model !== FALLBACK_MODEL) {
+          onRetry?.(`Modèle saturé — bascule sur ${FALLBACK_MODEL}…`);
+          return await attempt(FALLBACK_MODEL);
+        }
+        throw e;
+      }
+      onRetry?.(`Réessai ${i + 1}/${delays.length}…`);
+      await sleepMs(delays[i]);
+    }
+  }
+  throw new Error("Échec inattendu"); // inatteignable, garde-fou
+}
+
 function CoachIA({ coach, todayNote, saveNote }) {
   const [state, setState] = useState("idle");
   const [text, setText] = useState("");
   const [err, setErr] = useState("");
   const [note, setNote] = useState(todayNote || "");
   const [openNote, setOpenNote] = useState(false);
+  const [progress, setProgress] = useState("");   // « réessai 1/2… », « bascule Haiku… »
+  const [meta, setMeta] = useState(null);         // { model, usage, cents } de la dernière analyse
 
   const run = async () => {
     if (!coach.apiKey) {
@@ -716,28 +832,27 @@ function CoachIA({ coach, todayNote, saveNote }) {
       setState("error"); return;
     }
     saveNote(note);
-    setState("loading"); setErr("");
+    setState("loading"); setErr(""); setProgress(""); setMeta(null);
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-api-key": coach.apiKey,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
-        body: JSON.stringify({
-          model: coach.model || "claude-sonnet-5",
-          max_tokens: 6000,
-          messages: [{ role: "user", content: coach.buildPrompt(note) }],
-        }),
+      const { system, user } = coach.buildPrompt(note);
+      const askedModel = coach.model || "claude-sonnet-5";
+      const { data, usedModel } = await callClaude({
+        apiKey: coach.apiKey,
+        model: askedModel,
+        system,
+        user,
+        // « medium » plutôt que le défaut « high » : Sonnet 5 active la réflexion adaptative
+        // dès qu'on ne précise rien, et cette réflexion est facturée au tarif de sortie tout
+        // en consommant max_tokens — c'est la cause des réponses vides/tronquées observées
+        // (budget monté 1000 → 1800 → 4096 → 6000). À « medium » la qualité reste au niveau
+        // de Sonnet 4.6 en « high » pour une fraction du coût.
+        effort: "medium",
+        maxTokens: 6000,
+        onRetry: setProgress,
       });
-      let data = null;
-      try { data = await res.json(); } catch { /* non-JSON */ }
-      if (!res.ok || !data || data.type === "error") {
-        throw new Error(data?.error?.message || `HTTP ${res.status} ${res.statusText}`.trim());
-      }
+      setProgress("");
       const out = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
+      setMeta({ model: usedModel, fellBack: usedModel !== askedModel, usage: data.usage, cents: costCents(usedModel, data.usage) });
       if (!out) {
         console.warn("CoachIA — réponse vide, réponse brute :", data);
         const hasThinking = (data.content || []).some((b) => b.type === "thinking" || b.type === "redacted_thinking");
@@ -754,6 +869,7 @@ function CoachIA({ coach, todayNote, saveNote }) {
       setText(out); setState("done");
     } catch (e) {
       console.error("CoachIA", e);
+      setProgress("");
       setErr(e?.message || "Erreur inconnue"); setState("error");
     }
   };
@@ -771,6 +887,10 @@ function CoachIA({ coach, todayNote, saveNote }) {
           {state === "loading" ? "Analyse…" : "Analyser"}
         </Btn>
       </div>
+
+      {state === "loading" && progress && (
+        <Body style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono, marginBottom: 6 }}>{progress}</Body>
+      )}
 
       <div onClick={() => setOpenNote((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", marginBottom: openNote ? 8 : 0 }}>
         {openNote ? <ChevronDown size={13} color={C.muted} /> : <ChevronRight size={13} color={C.muted} />}
@@ -796,6 +916,17 @@ function CoachIA({ coach, todayNote, saveNote }) {
         </div>
       )}
       {state === "done" && <Body style={{ whiteSpace: "pre-wrap" }}>{text}</Body>}
+      {state === "done" && meta?.usage && (
+        <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.divider}`, display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontFamily: C.mono, fontSize: 10, color: C.dim }}>
+            {(meta.usage.input_tokens ?? 0).toLocaleString("fr-FR")} tok entrée · {(meta.usage.output_tokens ?? 0).toLocaleString("fr-FR")} tok sortie
+            {meta.fellBack && <span style={{ color: C.accent }}> · {meta.model}</span>}
+          </span>
+          <span style={{ fontFamily: C.mono, fontSize: 11, color: C.accent, fontWeight: 700 }}>
+            ≈ {meta.cents < 1 ? meta.cents.toFixed(2) : meta.cents.toFixed(1)} ¢
+          </span>
+        </div>
+      )}
       {state === "idle" && <Body style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Analyse tes 14 derniers jours (poids, macros, eau, séances, sommeil, genou), au jour le jour et sur la semaine glissante. Nécessite ta clé API (Réglages).</Body>}
     </Card>
   );
@@ -1647,14 +1778,37 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek }) {
    ============================================================ */
 function KneeTab({ knee, save, hsrWeek }) {
   const [date, setDate] = useState(today());
-  const [pain, setPain] = useState(4);
-  const [baseline, setBaseline] = useState(true);
+  // Aucune valeur par défaut (ni 4 ni 5) : rien n'est présélectionné à l'ouverture, et
+  // l'enregistrement reste bloqué tant qu'un chiffre n'a pas été touché. Demandé
+  // explicitement pour forcer une vraie évaluation de la sensation plutôt qu'un
+  // enregistrement réflexe — une entrée « par défaut » fausserait l'historique et la
+  // règle de Silbernagel.
+  // ...mais si le jour affiché a DÉJÀ une entrée, on la recharge (exigence explicite) :
+  // sinon l'écran afficherait « rien de noté » alors que la donnée existe, et on risquerait
+  // de croire la journée non renseignée. Les onglets ne sont montés qu'une fois le
+  // localStorage lu (voir le garde `loading` du composant App), donc `knee` est déjà peuplé
+  // ici, et rouvrir l'onglet relance cette initialisation.
+  const existingToday = knee.find((k) => k.date === today());
+  const [pain, setPain] = useState(existingToday ? existingToday.pain : null);
+  const [baseline, setBaseline] = useState(existingToday ? existingToday.baseline !== false : true);
   const [routine, setRoutine] = useState(null);
-  const pickDate = (d) => { setDate(d); const e = knee.find((k) => k.date === d); if (e) { setPain(e.pain); setBaseline(e.baseline !== false); } };
-  const add = () => save.knee(upsert(knee, { date, pain, baseline }));
+  // Changer de date recharge l'entrée existante, ou remet à vide si ce jour n'a rien —
+  // sans ce reset, la douleur d'une autre date resterait affichée et pourrait être
+  // enregistrée par erreur sur le nouveau jour.
+  const pickDate = (d) => {
+    setDate(d);
+    const e = knee.find((k) => k.date === d);
+    setPain(e ? e.pain : null);
+    setBaseline(e ? e.baseline !== false : true);
+  };
+  const add = () => { if (pain == null) return; save.knee(upsert(knee, { date, pain, baseline })); };
 
   const kLast = lastN(knee, 1)[0];
+  // Même logique de péremption que le recommandeur : une alerte vieille de dix jours
+  // n'est plus un signal, c'est une donnée périmée — on affiche son âge pour le dire.
+  const kLastAge = kLast ? daysBetween(kLast.date, today()) : null;
   const alert = kLast && (kLast.baseline === false || kLast.pain >= 6);
+  const alertStale = alert && kLastAge > 3;
   const data = lastN(knee, 30).map((k) => ({ date: fmt(k.date), pain: k.pain, flag: k.baseline === false }));
   const curRow = hsrForWeek(hsrWeek);
 
@@ -1689,14 +1843,23 @@ function KneeTab({ knee, save, hsrWeek }) {
 
       {alert && (
         <Card danger style={{ padding: "13px 14px" }}>
-          <div style={{ fontSize: 12, color: C.danger, fontWeight: 800, marginBottom: 3, textTransform: "uppercase" }}>⚠ Signal de surcharge</div>
-          <Body style={{ color: C.dangerText }}>Décharge : pas de basket ni de Lower tant que la douleur n'est pas revenue à sa base. Réduire charge ou amplitude à la prochaine exposition.</Body>
+          <div style={{ fontSize: 12, color: C.danger, fontWeight: 800, marginBottom: 3, textTransform: "uppercase" }}>
+            ⚠ Signal de surcharge{alertStale ? ` · relevé il y a ${kLastAge} j` : ""}
+          </div>
+          <Body style={{ color: C.dangerText }}>
+            {alertStale
+              ? "Ce signal date : note ta douleur du jour pour savoir où tu en es vraiment."
+              : "Décharge : pas de basket ni de Lower tant que la douleur n'est pas revenue à sa base. Réduire charge ou amplitude à la prochaine exposition."}
+          </Body>
         </Card>
       )}
 
       <Card>
         <div style={{ marginBottom: 10 }}><DateField value={date} onChange={pickDate} /></div>
-        <Label style={{ marginBottom: 6 }}>Douleur (0-10)</Label>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+          <Label>Douleur (0-10)</Label>
+          {pain == null && <span style={{ fontSize: 10, color: C.dim }}>choisis un chiffre pour enregistrer</span>}
+        </div>
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 12 }}>
           {[0,1,2,3,4,5,6,7,8,9,10].map((n) => {
             const on = pain === n;
@@ -1713,7 +1876,7 @@ function KneeTab({ knee, save, hsrWeek }) {
         <Label style={{ marginBottom: 6 }}>Retour à la base sous 24 h ?</Label>
         <Pills options={[{ key: true, label: "Oui" }, { key: false, label: "Non" }]} value={baseline} onChange={setBaseline} small />
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <Btn variant="primary" onClick={add} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
+          <Btn variant="primary" onClick={add} disabled={pain == null} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
           {knee.some((k) => k.date === date) && (
             <Btn variant="danger" onClick={() => save.knee(knee.filter((k) => k.date !== date))}><Trash2 size={14} /></Btn>
           )}
@@ -2270,9 +2433,15 @@ export default function App() {
 CONTEXTE SPÉCIAL — SÈCHE INTENSIVE AVANT VACANCES (27/07 → 18/08/2026, départ le 18/08) :
 Point de départ 101 kg le 27/07. Projection réaliste : 96-97,5 kg au 18/08 (pas 93 kg — l'objectif est de s'en rapprocher visuellement, pas de l'atteindre sur la balance). Décomposition attendue : environ 3-3,5 kg d'eau/glycogène perdus rapidement sur les 10-14 premiers jours, le reste est de la vraie perte de gras à un rythme plus lent. Règle de lecture stricte : NE PAS commenter la tendance de poids avant le 05/08/2026 (avant cette date les chiffres sont pollués par la perte d'eau/glycogène, pas représentatifs) — au-delà de cette date, utilise toujours la moyenne glissante 7j, jamais un poids isolé. Cibles macros actives pour cette période : ${atToday.protein}P/${atToday.carbs}G/${atToday.fat}L/${atToday.fiber}fibres (~${Math.round(atToday.protein * 4 + atToday.carbs * 4 + atToday.fat * 9)} kcal). Volume d'entraînement : NE JAMAIS suggérer d'ajouter une séance ou du cardio à impact supplémentaire par rapport au basket habituel — contre-indication explicite pour cette période (risque tendineux genou/coude). Escalade : pas de jour attitré, à privilégier les jours Lower ou off, jamais un jour Upper. Prends en compte les pas quotidiens dans l'analyse de tendance (corrélation activité/résultat).` : "";
 
-      return `Tu es le coach personnel tout-en-un de Yoann, 43 ans, athlète (muscu/basket/escalade) : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. Phase ${PHASES[phase].label}, poids cible ${tgtW} kg. Deux tendinopathies en rééduc : tendon quadricipital (HSR, tempo 6 s, règle de Silbernagel : douleur ≤ 3-5/10 tolérée si retour à la base sous 24 h) et distale du biceps (prises neutres/pronation privilégiées, supination limitée). Protéines hautes prioritaires. Escalade = volume tirage, jamais empilée le jour d'un Upper ; ne pas cumuler les expositions genou.${tempBlock}
+      // Découpage system / user : le rôle et les contraintes permanentes ne changent pas
+      // d'un appel à l'autre, les données oui. Le champ `system` est rendu avant les
+      // messages, donc cette partie stable formera le préfixe — utile si on active le cache
+      // un jour, et plus propre en attendant. Les consignes de sortie restent en fin de
+      // message utilisateur, là où elles ont fait leurs preuves (l'historique de troncatures
+      // de ce module ne justifie pas de les déplacer maintenant).
+      const system = `Tu es le coach personnel tout-en-un de Yoann, 43 ans, athlète (muscu/basket/escalade) : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. Phase ${PHASES[phase].label}, poids cible ${tgtW} kg. Deux tendinopathies en rééduc : tendon quadricipital (HSR, tempo 6 s, règle de Silbernagel : douleur ≤ 3-5/10 tolérée si retour à la base sous 24 h) et distale du biceps (prises neutres/pronation privilégiées, supination limitée). Protéines hautes prioritaires. Escalade = volume tirage, jamais empilée le jour d'un Upper ; ne pas cumuler les expositions genou.${tempBlock}`;
 
-TEMPS RÉEL — hier vs aujourd'hui (regarde d'abord ça, c'est le plus actionnable) :
+      const user = `TEMPS RÉEL — hier vs aujourd'hui (regarde d'abord ça, c'est le plus actionnable) :
 ${JSON.stringify(realtime)}
 
 RÉSUMÉ 14 JOURS (moyennes fiables, tendance de fond) :
@@ -2291,6 +2460,8 @@ Structure ta réponse en deux temps :
 2. **Tendance de fond (14 jours)** : ce qui se dessine sur la durée et ce qu'il faut ajuster pour la semaine à venir, EN CORRÉLANT explicitement poids, kcal, macros, fibres et eau à partir du dataset JOUR PAR JOUR (ex. un pic de poids coïncide-t-il avec un pic de glucides/sodium la veille plutôt qu'un vrai surplus calorique ? un manque de fibres ou d'eau coïncide-t-il avec une stagnation ?).
 Traite explicitement CHAQUE domaine : poids (bruit quotidien vs moyenne glissante), macros (protéines jour le jour, reste en moyenne 7j), eau (jours de basket +1L), sommeil (impact récup), pas quotidiens (corrélation activité/résultat), séances (équilibre Upper/Lower, progressive overload exercice par exercice, respect coude/escalade), genou/douleur (Silbernagel, priorité absolue si ça a flambé).
 Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reciter les données brutes (cite seulement les chiffres qui appuient un conseil) : va droit aux conseils, en bullet points courts. Limite stricte : 500 mots maximum au total — écourte les détails plutôt que de laisser une section inachevée, et termine toujours par une phrase de conclusion complète. Ce n'est pas un avis médical.`;
+
+      return { system, user };
     },
     apiKey, model,
   };
