@@ -15,7 +15,7 @@ import { store, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 
-const APP_VERSION = "3.15.0";
+const APP_VERSION = "3.16.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -725,6 +725,37 @@ function RoutinePlayer({ routine, onClose }) {
    Coach IA — appel API : tarifs, reprise sur saturation, coût réel
    ------------------------------------------------------------ */
 
+// Le modèle termine sa réponse par ce marqueur suivi du carnet de bord mis à jour. Choisi
+// improbable dans une réponse normale pour éviter une coupure accidentelle. Si le marqueur
+// est absent (le modèle n'a pas suivi la consigne), on garde le carnet précédent et on
+// affiche la réponse entière : jamais de perte de mémoire silencieuse.
+const CARNET_MARK = "---CARNET---";
+const CARNET_MAX_CHARS = 900;
+
+/**
+ * Sépare la réponse affichée du carnet de bord, avec un plafond dur.
+ *
+ * La consigne demande CARNET_MAX_CHARS au modèle, mais il déborde en pratique (1026 car.
+ * mesurés pour 900 demandés le 30/07/2026) : le plafond laisse donc de la marge, et coupe
+ * sur une fin de ligne plutôt qu'en plein milieu d'une phrase — un carnet tronqué net
+ * corromprait la mémoire relue à l'analyse suivante.
+ */
+const CARNET_HARD_LIMIT = CARNET_MAX_CHARS * 2;
+function splitCarnet(raw) {
+  const i = raw.indexOf(CARNET_MARK);
+  if (i < 0) return { advice: raw, journal: null };
+  const advice = raw.slice(0, i).trim();
+  let journal = raw.slice(i + CARNET_MARK.length).trim();
+  if (journal.length > CARNET_HARD_LIMIT) {
+    const cut = journal.slice(0, CARNET_HARD_LIMIT);
+    const brk = Math.max(cut.lastIndexOf("\n"), cut.lastIndexOf(". "));
+    journal = (brk > CARNET_HARD_LIMIT * 0.6 ? cut.slice(0, brk + 1) : cut).trim();
+  }
+  // Un carnet vide ou un conseil vide = découpage raté : on préfère tout afficher.
+  if (!advice || !journal) return { advice: raw, journal: null };
+  return { advice, journal };
+}
+
 // Tarifs Anthropic en $ par million de tokens (relevés le 29/07/2026). `intro` est un
 // tarif de lancement à durée limitée : au-delà de `introUntil` on repasse au tarif normal,
 // d'où la date en dur plutôt qu'un simple prix — sinon l'app sous-estimerait le coût à
@@ -817,7 +848,7 @@ async function callClaude({ apiKey, model, system, user, effort, maxTokens, onRe
   throw new Error("Échec inattendu"); // inatteignable, garde-fou
 }
 
-function CoachIA({ coach, todayNote, saveNote }) {
+function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
   const [state, setState] = useState("idle");
   const [text, setText] = useState("");
   const [err, setErr] = useState("");
@@ -851,8 +882,11 @@ function CoachIA({ coach, todayNote, saveNote }) {
         onRetry: setProgress,
       });
       setProgress("");
-      const out = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
-      setMeta({ model: usedModel, fellBack: usedModel !== askedModel, usage: data.usage, cents: costCents(usedModel, data.usage) });
+      const raw = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
+      const { advice, journal } = splitCarnet(raw);
+      if (journal) saveJournal(journal);
+      const out = advice;
+      setMeta({ model: usedModel, fellBack: usedModel !== askedModel, usage: data.usage, cents: costCents(usedModel, data.usage), carnet: !!journal });
       if (!out) {
         console.warn("CoachIA — réponse vide, réponse brute :", data);
         const hasThinking = (data.content || []).some((b) => b.type === "thinking" || b.type === "redacted_thinking");
@@ -935,7 +969,7 @@ function CoachIA({ coach, todayNote, saveNote }) {
 /* ============================================================
    TAB — DASHBOARD
    ============================================================ */
-function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, setTab }) {
+function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast ? round(wLast.kg - tgtW) : null;
@@ -1033,7 +1067,7 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
       </Card>
 
       {/* Coach IA */}
-      <CoachIA coach={coach} todayNote={todayNote} saveNote={saveNote} />
+      <CoachIA coach={coach} todayNote={todayNote} saveNote={saveNote} saveJournal={saveJournal} />
 
       {/* Phase */}
       <Card>
@@ -2125,10 +2159,17 @@ function MacroTab({ macros, targets, save, training }) {
 /* ============================================================
    RÉGLAGES
    ============================================================ */
-function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync, onHealthSync }) {
+function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync, onHealthSync,
+                         coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, saveTargets }) {
   const [k, setK] = useState(apiKey);
   const [m, setM] = useState(model);
   const [msg, setMsg] = useState("");
+  const [prof, setProf] = useState(coachProfile);
+  const [jour, setJour] = useState(coachJournal);
+  const cut = targets.cut || {};
+  // saveTargets (et non le setter brut) : il écrit AUSSI dans le localStorage. Passer
+  // setTargets ici perdrait silencieusement les réglages au redémarrage.
+  const setCut = (patch) => saveTargets({ ...targets, cut: { ...cut, ...patch } });
   const doExport = async () => {
     const json = JSON.stringify(exportData(), null, 2);
     const name = `protocole-${today()}.json`;
@@ -2176,6 +2217,68 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
         </Btn>
         <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
           Clé stockée uniquement sur cet appareil, envoyée directement à l'API Anthropic. Chaque analyse consomme des crédits.
+        </Body>
+      </Card>
+
+      <Card>
+        <Label style={{ marginBottom: 8 }}>Coach IA · contexte permanent</Label>
+        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 8 }}>
+          Envoyé à chaque analyse comme une contrainte. C'est ici que vit ton objectif en cours —
+          après tes vacances, remplace-le par le suivant.
+        </Body>
+        <textarea rows={10} value={prof} onChange={(e) => setProf(e.target.value)}
+          onBlur={() => setCoachProfile(prof)}
+          style={{ ...inputStyle(false), fontFamily: "inherit", fontSize: 11.5, fontWeight: 400, resize: "vertical", lineHeight: 1.45 }} />
+      </Card>
+
+      <Card>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+          <Label>Coach IA · carnet de bord</Label>
+          <span style={{ fontFamily: C.mono, fontSize: 10, color: C.dim }}>{(jour || "").length} car.</span>
+        </div>
+        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 8 }}>
+          Écrit par le coach à la fin de chaque analyse : c'est sa mémoire d'une fois sur l'autre.
+          Corrige-le s'il note une bêtise, vide-le pour repartir de zéro.
+        </Body>
+        {(jour || "").trim() ? (
+          <>
+            <textarea rows={8} value={jour} onChange={(e) => setJour(e.target.value)}
+              onBlur={() => setCoachJournal(jour)}
+              style={{ ...inputStyle(false), fontFamily: "inherit", fontSize: 11.5, fontWeight: 400, resize: "vertical", lineHeight: 1.45 }} />
+            <Btn variant="danger" onClick={() => { setJour(""); setCoachJournal(""); }} style={{ marginTop: 8, width: "100%" }}>
+              Vider le carnet
+            </Btn>
+          </>
+        ) : (
+          <Body style={{ fontSize: 11, color: C.muted }}>Vide — il se remplira à ta prochaine analyse.</Body>
+        )}
+      </Card>
+
+      <Card>
+        <Label style={{ marginBottom: 8 }}>Objectif temporaire · cibles macros</Label>
+        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
+          Sur cette période, ces cibles remplacent les cibles de base partout dans l'app. En dehors,
+          tout revient automatiquement à la normale.
+        </Body>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <Pills options={[{ key: true, label: "Actif" }, { key: false, label: "Inactif" }]}
+            value={cut.enabled !== false} onChange={(v) => setCut({ enabled: v })} small />
+          {isCutWindow(today(), targets)
+            ? <span style={{ fontSize: 10.5, color: C.accent, fontFamily: C.mono }}>en cours</span>
+            : <span style={{ fontSize: 10.5, color: C.dim, fontFamily: C.mono }}>hors période</span>}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <Field label="Début"><input type="date" value={cut.start || ""} onChange={(e) => setCut({ start: e.target.value })} style={inputStyle(false)} /></Field>
+          <Field label="Fin"><input type="date" value={cut.end || ""} onChange={(e) => setCut({ end: e.target.value })} style={inputStyle(false)} /></Field>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <Field label="Protéines (g)"><Stepper value={cut.protein ?? 0} set={(v) => setCut({ protein: v })} step={5} min={0} int /></Field>
+          <Field label="Glucides (g)"><Stepper value={cut.carbs ?? 0} set={(v) => setCut({ carbs: v })} step={5} min={0} int /></Field>
+          <Field label="Lipides (g)"><Stepper value={cut.fat ?? 0} set={(v) => setCut({ fat: v })} step={5} min={0} int /></Field>
+          <Field label="Fibres (g)"><Stepper value={cut.fiber ?? 0} set={(v) => setCut({ fiber: v })} step={1} min={0} int /></Field>
+        </div>
+        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8, fontFamily: C.mono }}>
+          ≈ {Math.round((cut.protein ?? 0) * 4 + (cut.carbs ?? 0) * 4 + (cut.fat ?? 0) * 9)} kcal
         </Body>
       </Card>
 
@@ -2228,14 +2331,43 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
 /* ============================================================
    APP
    ============================================================ */
-const DEFAULT_TARGETS = { protein: 215, carbs: 205, fat: 80, fiber: 30, water: 3000, weightMaintenance: 96 };
+// `cut` = fenêtre d'objectif temporaire (sèche avant vacances). Rangée DANS `targets`
+// plutôt que dans une constante de module, pour deux raisons : elle devient éditable dans
+// les Réglages (avant, changer une date imposait un rebuild), et elle voyage avec la prop
+// `targets` déjà passée partout — aucune nouvelle prop à faire circuler.
+// `enabled: false` la neutralise sans perdre les valeurs, pour la réactiver plus tard.
+const DEFAULT_TARGETS = {
+  protein: 215, carbs: 205, fat: 80, fiber: 30, water: 3000, weightMaintenance: 96,
+  cut: { enabled: true, start: "2026-07-27", end: "2026-08-18", protein: 220, carbs: 185, fat: 65, fiber: 30 },
+};
 
-// Sèche intensive avant vacances — cibles macro temporaires, réactivation auto de DEFAULT_TARGETS après le 18/08.
-const TEMP_MACROS_WINDOW = { start: "2026-07-27", end: "2026-08-18" };
-const TEMP_MACROS = { protein: 220, carbs: 185, fat: 65, fiber: 30 };
-const isTempMacrosWindow = (d) => d >= TEMP_MACROS_WINDOW.start && d <= TEMP_MACROS_WINDOW.end;
+// Amorçage du profil permanent : reprend mot pour mot les règles de coaching qui étaient
+// codées en dur dans le prompt jusqu'au 30/07/2026. Écrit une seule fois, à la première
+// ouverture, puis c'est Yoann qui l'édite dans les Réglages — donc après les vacances il
+// remplace lui-même l'objectif sans qu'un rebuild soit nécessaire.
+const SEED_COACH_PROFILE = `Sèche avant vacances, départ le 18/08/2026. Point de départ 101 kg le 27/07. Projection réaliste : 96-97,5 kg au 18/08 — l'objectif est de s'en rapprocher visuellement, pas de l'atteindre sur la balance. Attendu : environ 3-3,5 kg d'eau et de glycogène perdus sur les 10-14 premiers jours, le reste est de la vraie perte de gras, plus lente.
+
+Lecture du poids : ne pas commenter la tendance avant le 05/08/2026 (avant, les chiffres sont pollués par la perte d'eau). Au-delà, toujours la moyenne glissante 7 jours, jamais un poids isolé.
+
+Volume d'entraînement : ne jamais suggérer d'ajouter une séance ou du cardio à impact par rapport au basket habituel — contre-indication tendineuse (genou et coude) sur cette période.
+
+Escalade : pas de jour attitré. À privilégier les jours Lower ou off, jamais un jour Upper.
+
+Tenir compte des pas quotidiens dans l'analyse de tendance.`;
+
+// Fenêtre d'objectif temporaire : les cibles macro basculent automatiquement dedans, et
+// reviennent seules aux cibles de base une fois la date de fin passée. Lit `base.cut`, donc
+// les dates comme les cibles sont modifiables depuis les Réglages sans rebuild.
+const isCutWindow = (d, base) => {
+  const c = base?.cut;
+  return !!c && c.enabled !== false && !!c.start && !!c.end && d >= c.start && d <= c.end;
+};
 // eau non concernée : la base + le bonus dynamique basket restent inchangés
-const targetsForDate = (d, base) => (isTempMacrosWindow(d) ? { ...base, ...TEMP_MACROS } : base);
+const targetsForDate = (d, base) => {
+  if (!isCutWindow(d, base)) return base;
+  const { protein, carbs, fat, fiber } = base.cut;
+  return { ...base, protein, carbs, fat, fiber };
+};
 
 export default function App() {
   const [tab, setTab] = useState("dash");
@@ -2254,6 +2386,8 @@ export default function App() {
   const [hsrWeek, setHsrWeekState] = useState(1);
   const [apiKey, setApiKeyState] = useState("");
   const [model, setModelState] = useState("claude-sonnet-5");
+  const [coachProfile, setCoachProfileState] = useState("");
+  const [coachJournal, setCoachJournalState] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -2264,11 +2398,27 @@ export default function App() {
       setMacros(await store.get("macroLog", []));
       setSteps(await store.get("stepsLog", []));
       setNotes(await store.get("noteLog", []));
-      setTargets(await store.get("targets", DEFAULT_TARGETS));
+      // Fusion avec les défauts : un `targets` déjà stocké (sans le sous-objet `cut`, qui
+      // n'existait pas avant le 30/07/2026) écraserait sinon entièrement les défauts et
+      // laisserait `cut` absent. La fusion comble les champs manquants sans toucher aux
+      // valeurs que l'utilisateur a réglées, et couvrira aussi les champs futurs.
+      const storedTargets = await store.get("targets", {});
+      setTargets({ ...DEFAULT_TARGETS, ...storedTargets, cut: { ...DEFAULT_TARGETS.cut, ...(storedTargets.cut || {}) } });
       setPhaseState(await store.get("phase", "seche"));
       setHsrWeekState(await store.get("hsrWeek", 1));
       setApiKeyState(await store.get("apiKey", ""));
       setModelState(await store.get("model", "claude-sonnet-5"));
+      // Profil : amorcé une seule fois avec les règles auparavant codées en dur, pour que
+      // rien ne soit perdu au passage. `null` = jamais initialisé ; une chaîne vide est un
+      // choix délibéré de l'utilisateur et n'est donc jamais réamorcée.
+      const storedProfile = await store.get("coachProfile", null);
+      if (storedProfile == null) {
+        setCoachProfileState(SEED_COACH_PROFILE);
+        store.set("coachProfile", SEED_COACH_PROFILE);
+      } else {
+        setCoachProfileState(storedProfile);
+      }
+      setCoachJournalState(await store.get("coachJournal", ""));
       setLoading(false);
     })();
   }, []);
@@ -2350,6 +2500,8 @@ export default function App() {
   const setHsrWeek = (v) => { setHsrWeekState(v); store.set("hsrWeek", v); };
   const setApiKey = (v) => { setApiKeyState(v); store.set("apiKey", v); };
   const setModel = (v) => { setModelState(v); store.set("model", v); };
+  const setCoachProfile = (v) => { setCoachProfileState(v); store.set("coachProfile", v); };
+  const setCoachJournal = (v) => { setCoachJournalState(v); store.set("coachJournal", v); };
 
   const todayNote = notes.find((n) => n.date === today())?.text || "";
   const saveNote = (text) => {
@@ -2357,9 +2509,12 @@ export default function App() {
     const rest = notes.filter((n) => n.date !== today());
     save.notes(t ? [...rest, { date: today(), text: t }].sort(byDate) : rest);
   };
+  // Écrit par le modèle en fin d'analyse (voir splitCarnet), relisible et corrigeable dans
+  // les Réglages : c'est la mémoire du coach, elle ne doit pas être une boîte noire.
+  const saveJournal = (text) => setCoachJournal((text || "").trim());
 
   const coach = {
-    buildPrompt: (note) => {
+    buildPrompt: (note, { profile = coachProfile, journal = coachJournal } = {}) => {
       const tgtW = phaseTarget(phase, targets);
       const win = (arr, a, b) => arr.filter((e) => { const d = daysBetween(e.date, today()); return d >= a && d <= b; });
       const last14 = (arr) => arr.filter((e) => daysBetween(e.date, today()) <= 14).sort(byDate);
@@ -2427,11 +2582,23 @@ export default function App() {
         return { date: d, poids: w?.kg ?? null, kcal, proteines: m?.protein ?? null, glucides: m?.carbs ?? null, lipides: m?.fat ?? null, fibres: m?.fiber ?? null, eau_ml: m?.water ?? null, pas: st?.count ?? null, cible_kcal: Math.round(targetsForDate(d, targets).protein * 4 + targetsForDate(d, targets).carbs * 4 + targetsForDate(d, targets).fat * 9) };
       });
 
-      const inTempWindow = isTempMacrosWindow(today());
-      const tempBlock = inTempWindow ? `
+      // La fenêtre d'objectif ne produit plus qu'un constat FACTUEL, généré depuis la
+      // config éditable (dates + cibles) : plus de dates en dur, et plus de disparition
+      // silencieuse du bloc le jour où la fenêtre se termine.
+      const cutOn = isCutWindow(today(), targets);
+      const daysToEnd = cutOn ? daysBetween(today(), targets.cut.end) : null;
+      const tempBlock = cutOn ? `
 
-CONTEXTE SPÉCIAL — SÈCHE INTENSIVE AVANT VACANCES (27/07 → 18/08/2026, départ le 18/08) :
-Point de départ 101 kg le 27/07. Projection réaliste : 96-97,5 kg au 18/08 (pas 93 kg — l'objectif est de s'en rapprocher visuellement, pas de l'atteindre sur la balance). Décomposition attendue : environ 3-3,5 kg d'eau/glycogène perdus rapidement sur les 10-14 premiers jours, le reste est de la vraie perte de gras à un rythme plus lent. Règle de lecture stricte : NE PAS commenter la tendance de poids avant le 05/08/2026 (avant cette date les chiffres sont pollués par la perte d'eau/glycogène, pas représentatifs) — au-delà de cette date, utilise toujours la moyenne glissante 7j, jamais un poids isolé. Cibles macros actives pour cette période : ${atToday.protein}P/${atToday.carbs}G/${atToday.fat}L/${atToday.fiber}fibres (~${Math.round(atToday.protein * 4 + atToday.carbs * 4 + atToday.fat * 9)} kcal). Volume d'entraînement : NE JAMAIS suggérer d'ajouter une séance ou du cardio à impact supplémentaire par rapport au basket habituel — contre-indication explicite pour cette période (risque tendineux genou/coude). Escalade : pas de jour attitré, à privilégier les jours Lower ou off, jamais un jour Upper. Prends en compte les pas quotidiens dans l'analyse de tendance (corrélation activité/résultat).` : "";
+OBJECTIF EN COURS — fenêtre du ${targets.cut.start} au ${targets.cut.end} (encore ${daysToEnd} j) : cibles macros actives ${atToday.protein}P/${atToday.carbs}G/${atToday.fat}L/${atToday.fiber}fibres (~${Math.round(atToday.protein * 4 + atToday.carbs * 4 + atToday.fat * 9)} kcal).` : "";
+
+      // Les RÈGLES de l'objectif (projection réaliste, quand lire la balance, interdiction
+      // d'ajouter du volume à impact…) vivent désormais dans le profil permanent, éditable
+      // par Yoann — elles ne sont plus en dur dans ce fichier.
+      const profileBlock = (profile || "").trim()
+        ? `
+
+CONTEXTE PERMANENT écrit par Yoann — à traiter comme des contraintes, pas des suggestions :
+${profile.trim()}` : "";
 
       // Découpage system / user : le rôle et les contraintes permanentes ne changent pas
       // d'un appel à l'autre, les données oui. Le champ `system` est rendu avant les
@@ -2439,7 +2606,7 @@ Point de départ 101 kg le 27/07. Projection réaliste : 96-97,5 kg au 18/08 (pa
       // un jour, et plus propre en attendant. Les consignes de sortie restent en fin de
       // message utilisateur, là où elles ont fait leurs preuves (l'historique de troncatures
       // de ce module ne justifie pas de les déplacer maintenant).
-      const system = `Tu es le coach personnel tout-en-un de Yoann, 43 ans, athlète (muscu/basket/escalade) : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. Phase ${PHASES[phase].label}, poids cible ${tgtW} kg. Deux tendinopathies en rééduc : tendon quadricipital (HSR, tempo 6 s, règle de Silbernagel : douleur ≤ 3-5/10 tolérée si retour à la base sous 24 h) et distale du biceps (prises neutres/pronation privilégiées, supination limitée). Protéines hautes prioritaires. Escalade = volume tirage, jamais empilée le jour d'un Upper ; ne pas cumuler les expositions genou.${tempBlock}`;
+      const system = `Tu es le coach personnel tout-en-un de Yoann, 43 ans, athlète (muscu/basket/escalade) : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. Phase ${PHASES[phase].label}, poids cible ${tgtW} kg. Deux tendinopathies en rééduc : tendon quadricipital (HSR, tempo 6 s, règle de Silbernagel : douleur ≤ 3-5/10 tolérée si retour à la base sous 24 h) et distale du biceps (prises neutres/pronation privilégiées, supination limitée). Protéines hautes prioritaires. Escalade = volume tirage, jamais empilée le jour d'un Upper ; ne pas cumuler les expositions genou.${tempBlock}${profileBlock}`;
 
       const user = `TEMPS RÉEL — hier vs aujourd'hui (regarde d'abord ça, c'est le plus actionnable) :
 ${JSON.stringify(realtime)}
@@ -2455,11 +2622,14 @@ Séances: ${JSON.stringify(last14(training).map(compact))}
 Sommeil: ${JSON.stringify(last14(sleep))}
 Genou: ${JSON.stringify(last14(knee))}
 ${notesTxt ? `\nNOTES DE CONTEXTE écrites par Yoann (14 j, ex. alcool, insomnie, petite blessure) — à prendre en compte activement dans l'analyse :\n${notesTxt}\n` : ""}
+${(journal || "").trim() ? `CARNET DE BORD — état que TU as écrit à la fin de ta dernière analyse. C'est ta mémoire : appuie-toi dessus pour enchaîner (a-t-il appliqué ce que tu avais demandé ? où en est la progression ?) au lieu de repartir de zéro.\n${journal.trim()}\n` : "CARNET DE BORD : vide, c'est ta première analyse. Tu le créeras en fin de réponse.\n"}
 Structure ta réponse en deux temps :
 1. **Aujourd'hui / les prochaines 24h** : à partir du bloc TEMPS RÉEL, dis-lui concrètement quoi faire (ou éviter) MAINTENANT — séance, nutrition, hydratation, récupération, genou — en te basant sur ce qui s'est passé hier et sur les notes de contexte.
 2. **Tendance de fond (14 jours)** : ce qui se dessine sur la durée et ce qu'il faut ajuster pour la semaine à venir, EN CORRÉLANT explicitement poids, kcal, macros, fibres et eau à partir du dataset JOUR PAR JOUR (ex. un pic de poids coïncide-t-il avec un pic de glucides/sodium la veille plutôt qu'un vrai surplus calorique ? un manque de fibres ou d'eau coïncide-t-il avec une stagnation ?).
 Traite explicitement CHAQUE domaine : poids (bruit quotidien vs moyenne glissante), macros (protéines jour le jour, reste en moyenne 7j), eau (jours de basket +1L), sommeil (impact récup), pas quotidiens (corrélation activité/résultat), séances (équilibre Upper/Lower, progressive overload exercice par exercice, respect coude/escalade), genou/douleur (Silbernagel, priorité absolue si ça a flambé).
-Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reciter les données brutes (cite seulement les chiffres qui appuient un conseil) : va droit aux conseils, en bullet points courts. Limite stricte : 500 mots maximum au total — écourte les détails plutôt que de laisser une section inachevée, et termine toujours par une phrase de conclusion complète. Ce n'est pas un avis médical.`;
+Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reciter les données brutes (cite seulement les chiffres qui appuient un conseil) : va droit aux conseils, en bullet points courts. Limite stricte : 500 mots maximum au total — écourte les détails plutôt que de laisser une section inachevée, et termine toujours par une phrase de conclusion complète. Ce n'est pas un avis médical.
+
+Puis, APRÈS ta conclusion, écris la ligne \`${CARNET_MARK}\` seule, et en dessous la version mise à jour du carnet de bord. Règles du carnet : c'est un ÉTAT, pas un journal — tu réécris la version complète à chaque fois, tu élagues ce qui est résolu ou périmé, tu gardes ce qui est en cours. ${CARNET_MAX_CHARS} caractères maximum. Y faire figurer : où en est la progression (chiffrée), ce que tu as demandé de changer et si ça a été appliqué, ce qui a marché ou pas, les points de vigilance en cours. Pas de conseils dedans, pas de redite de la réponse ci-dessus.`;
 
       return { system, user };
     },
@@ -2507,10 +2677,10 @@ Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reci
       {/* Contenu */}
       <main style={{ flex: 1, overflowY: "auto", padding: "14px 16px 24px" }}>
         {loading ? <Empty>Chargement…</Empty> : showSettings ? (
-          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync }} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
+          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets }} saveTargets={save.targets} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, setTab }} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab }} />}
             {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
             {tab === "sleep" && <SleepTab {...{ sleep, save }} />}
             {tab === "steps" && <StepsTab {...{ steps, save }} />}

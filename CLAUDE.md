@@ -210,7 +210,35 @@ protocole-app/
   Séances, Genou, Macros) — sélecteur de date avec pré-remplissage si la
   date a déjà une entrée, bouton Supprimer conditionnel.
 - **Réglages (⚙)** : export/import JSON (Réglages → Exporter/Importer),
-  champ clé API Anthropic + modèle pour le Coach IA.
+  champ clé API Anthropic + modèle pour le Coach IA, **profil permanent du
+  coach**, **carnet de bord** (lisible/corrigeable/videable) et **fenêtre
+  d'objectif temporaire** (dates + cibles macros) — les trois ajoutés le
+  30/07/2026.
+- **Profil permanent du coach** (clé `coachProfile`) : texte libre envoyé dans
+  le `system` à chaque analyse, présenté au modèle comme une contrainte. Amorcé
+  une seule fois (`SEED_COACH_PROFILE`) avec les règles de coaching qui étaient
+  codées en dur jusqu'au 30/07/2026 (projection réaliste de la sèche, quand
+  lire la balance, interdiction d'ajouter du volume à impact, placement de
+  l'escalade). C'est là que vit l'objectif en cours : **après les vacances,
+  Yoann le remplace lui-même, sans rebuild**. `null` en stockage = jamais
+  amorcé ; une chaîne vide est un choix délibéré et n'est jamais réamorcée.
+- **Carnet de bord du coach** (clé `coachJournal`) : la mémoire entre analyses.
+  Le modèle écrit une version complète mise à jour après le marqueur
+  `---CARNET---` en fin de réponse ; l'app la découpe (`splitCarnet`), la stocke
+  et n'affiche que les conseils. C'est un **état**, pas un journal : progression
+  chiffrée, ce qui a été demandé et si c'est appliqué, points de vigilance —
+  réécrit et élagué à chaque fois, donc il ne gonfle pas et le modèle ne se
+  répète pas. **Si le marqueur est absent, l'ancien carnet est conservé et la
+  réponse entière est affichée** : jamais de perte de mémoire silencieuse.
+  Plafond dur à 1800 caractères, coupé sur une fin de phrase (le modèle dépasse
+  la limite de 900 demandée — 1026 mesurés le 30/07/2026).
+- **Fenêtre d'objectif temporaire** : rangée dans `targets.cut`
+  (`{ enabled, start, end, protein, carbs, fat, fiber }`) et non plus dans des
+  constantes de module, donc éditable dans les Réglages. `targetsForDate` lit
+  `base.cut` ; hors fenêtre ou si `enabled: false`, retour automatique aux
+  cibles de base. Le chargement fusionne avec `DEFAULT_TARGETS` (`{ ...defaults,
+  ...stored }`) — indispensable, sinon un `targets` stocké avant cette date
+  écraserait tout et laisserait `cut` absent.
 
 ### Coach IA — contrat exact (ne pas simplifier sans le signaler)
 - Appel direct à `https://api.anthropic.com/v1/messages` depuis le
@@ -321,10 +349,13 @@ protocole-app/
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
    `trainingLog`, `kneeLog`, `macroLog`, `noteLog`, `stepsLog`, `targets`,
-   `phase`, `hsrWeek`, `apiKey`, `model` — préfixées `protocole:` dans
-   `store.js`)
+   `phase`, `hsrWeek`, `apiKey`, `model`, `coachProfile`, `coachJournal` —
+   préfixées `protocole:` dans `store.js`)
    sans écrire une migration. Casser une clé = perdre l'historique de
    l'utilisateur, ce qui est la pire chose possible ici.
+   **Toute nouvelle clé doit être ajoutée à `DATA_KEYS` dans `store.js`**,
+   sinon elle est absente de l'export JSON et silencieusement perdue à la
+   prochaine restauration.
 2. **Toujours vérifier que le build passe** (`npm run build`) avant de
    considérer une modification terminée.
 3. **Bumper `APP_VERSION`** (dans `App.jsx`) et `"version"` (dans

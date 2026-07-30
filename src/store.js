@@ -25,9 +25,14 @@ export const store = {
 };
 
 // Clés de données (hors clé API, qui n'est pas exportée par sécurité).
+// Toute nouvelle clé doit être ajoutée ici, sinon elle serait absente de l'export et
+// silencieusement perdue à la prochaine restauration.
+// `coachProfile` (contexte permanent écrit par l'utilisateur) et `coachJournal` (carnet de
+// bord tenu par le modèle) sont du texte libre, ajoutés le 30/07/2026.
 export const DATA_KEYS = [
   "weightLog", "sleepLog", "trainingLog", "kneeLog", "macroLog", "noteLog", "stepsLog",
   "targets", "phase", "hsrWeek", "model",
+  "coachProfile", "coachJournal",
 ];
 
 export function exportData() {
