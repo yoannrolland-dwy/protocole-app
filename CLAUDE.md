@@ -280,8 +280,30 @@ protocole-app/
   aujourd'hui : poids, sommeil, macros/eau en cours, séances, douleur
   genou), un **résumé 14 jours** (moyennes), un **dataset fusionné jour par
   jour** (poids + kcal + macros + fibres + eau, pour que le modèle corrèle
-  lui-même poids et apports plutôt que de deviner), et les données brutes
-  de séances/sommeil/genou.
+  lui-même poids et apports plutôt que de deviner), et une **progression par
+  exercice pré-calculée**.
+- **Principe adopté le 30/07/2026 : le JS calcule les faits, l'IA les juge.**
+  Les dumps bruts 14 jours (séries de chaque séance, sommeil, genou) ont été
+  remplacés par des agrégats calculés en JS : meilleure série par séance +
+  tendance de volume (`exoProgress`), moyennes glissantes, pire nuit, douleur
+  moyenne 7 j vs 7 j précédents. Mesuré : **entrée 7 457 → 5 845 tokens
+  (−22 %), coût 3,4 → 3,1 ¢, et analyse plus fine** (le modèle repère
+  désormais une baisse de volume sur un exercice précis et compare la douleur
+  d'une semaine à l'autre — impossible depuis le dump brut, où on lui
+  demandait de faire l'arithmétique dans 500 mots). Ne pas revenir aux dumps
+  bruts : c'était plus cher ET moins bon.
+- Le dataset jour par jour utilise des **clés courtes** (`d/p/kc/P/G/L/F/eau/
+  pas/cible_kc`) avec les champs nuls omis, et une légende dans le prompt.
+- **Le coût est désormais dominé par la SORTIE** (1 895 tok ≈ 1,9 ¢ contre
+  1,17 ¢ en entrée) : pour descendre plus bas il faudrait raccourcir la
+  réponse, pas le prompt.
+- **Export vers claude.ai** (`coach.buildBriefing`, Réglages → « Copier le
+  contexte ») : briefing complet dans le presse-papier, volontairement **plus
+  riche** que le prompt API (il garde les séries brutes, le profil et le
+  carnet) puisque la conversation claude.ai est couverte par l'abonnement et
+  ne consomme aucun crédit API. C'est le pendant « suivi de fond » du point du
+  jour. `navigator.clipboard` fonctionne dans la WebView Capacitor (vérifié le
+  30/07/2026) ; en cas d'échec, le texte s'affiche pour copie manuelle.
 - Rôle demandé : coach tout-en-un (sportif + kiné + nutritionniste + coach
   de vie). Réponse structurée en deux temps : 1) quoi faire dans les
   prochaines 24h, 2) tendance de fond 14 jours avec corrélation explicite

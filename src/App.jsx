@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Scale, Moon, Dumbbell, HeartPulse, Utensils, Footprints,
   Plus, AlertTriangle, CheckCircle2, Circle, Sparkles, Trash2,
   Play, Pause, SkipForward, RotateCcw, Timer, Droplet,
-  ChevronRight, ChevronDown, Zap, Settings, Download, Upload, X,
+  ChevronRight, ChevronDown, Zap, Settings, Download, Upload, X, Copy,
 } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
@@ -15,7 +15,7 @@ import { store, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 
-const APP_VERSION = "3.16.0";
+const APP_VERSION = "3.17.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -2160,12 +2160,28 @@ function MacroTab({ macros, targets, save, training }) {
    RÉGLAGES
    ============================================================ */
 function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync, onHealthSync,
-                         coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, saveTargets }) {
+                         coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, saveTargets, buildBriefing }) {
   const [k, setK] = useState(apiKey);
   const [m, setM] = useState(model);
   const [msg, setMsg] = useState("");
   const [prof, setProf] = useState(coachProfile);
   const [jour, setJour] = useState(coachJournal);
+  const [briefing, setBriefing] = useState("");   // rempli seulement si la copie auto échoue
+
+  // navigator.clipboard existe dans la WebView Capacitor (origine sécurisée), mais peut
+  // échouer selon le contexte : on affiche alors le texte pour une copie manuelle plutôt
+  // que de laisser l'utilisateur devant un bouton qui n'a rien fait.
+  const doBriefing = async () => {
+    const txt = buildBriefing();
+    try {
+      await navigator.clipboard.writeText(txt);
+      setBriefing("");
+      setMsg("Contexte copié — colle-le dans une conversation Claude.");
+    } catch {
+      setBriefing(txt);
+      setMsg("");
+    }
+  };
   const cut = targets.cut || {};
   // saveTargets (et non le setter brut) : il écrit AUSSI dans le localStorage. Passer
   // setTargets ici perdrait silencieusement les réglages au redémarrage.
@@ -2280,6 +2296,26 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
         <Body style={{ fontSize: 10, color: C.dim, marginTop: 8, fontFamily: C.mono }}>
           ≈ {Math.round((cut.protein ?? 0) * 4 + (cut.carbs ?? 0) * 4 + (cut.fat ?? 0) * 9)} kcal
         </Body>
+      </Card>
+
+      <Card>
+        <Label style={{ marginBottom: 8 }}>Revue de fond dans claude.ai</Label>
+        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 8 }}>
+          Copie tout ton contexte (profil, carnet, 14 jours de données, séries brutes) pour le coller
+          dans une conversation Claude. Plus complet que l'analyse de l'app, et sans consommer de crédits API.
+        </Body>
+        <Btn variant="outline" onClick={doBriefing} style={{ width: "100%" }}>
+          <Copy size={14} style={{ display: "inline", marginRight: 4 }} />Copier le contexte
+        </Btn>
+        {briefing && (
+          <>
+            <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
+              Copie automatique refusée par le système : sélectionne tout le texte ci-dessous et copie-le à la main.
+            </Body>
+            <textarea rows={6} readOnly value={briefing}
+              style={{ ...inputStyle(false), fontFamily: C.mono, fontSize: 9.5, fontWeight: 400, resize: "vertical", marginTop: 6 }} />
+          </>
+        )}
       </Card>
 
       <Card>
@@ -2513,19 +2549,58 @@ export default function App() {
   // les Réglages : c'est la mémoire du coach, elle ne doit pas être une boîte noire.
   const saveJournal = (text) => setCoachJournal((text || "").trim());
 
+  // Hissé hors de buildPrompt : buildBriefing en a besoin aussi, et le laisser dans la
+  // portée de buildPrompt provoquait un ReferenceError au clic sur « Copier le contexte »
+  // (invisible à la compilation, puisque l'erreur n'existe qu'à l'exécution).
+  const last14 = (arr) => arr.filter((e) => daysBetween(e.date, today()) <= 14).sort(byDate);
+
   const coach = {
     buildPrompt: (note, { profile = coachProfile, journal = coachJournal } = {}) => {
       const tgtW = phaseTarget(phase, targets);
       const win = (arr, a, b) => arr.filter((e) => { const d = daysBetween(e.date, today()); return d >= a && d <= b; });
-      const last14 = (arr) => arr.filter((e) => daysBetween(e.date, today()) <= 14).sort(byDate);
       const avgKey = (arr, k) => { const v = arr.map((e) => e[k]).filter((x) => x != null); return v.length ? round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
       const w7 = avgKey(win(weight, 0, 6), "kg"), w14 = avgKey(win(weight, 7, 13), "kg");
       const m7 = win(macros, 0, 6);
       const sessCount = (a, b) => { const o = {}; win(training, a, b).forEach((t) => { o[t.type] = (o[t.type] || 0) + 1; }); return o; };
       const kLast = lastN(knee, 1)[0] ?? null;
-      const compact = (s) => s.exercices
-        ? { d: s.date, t: s.type, ex: s.exercices.map((e) => ({ n: e.nom, s: e.series.map((x) => `${x.poids || 0}x${x.val || 0}${x.leg ? "/" + x.leg : ""}`) })) }
-        : { d: s.date, t: s.type, ...(s.duration != null ? { min: s.duration } : {}), ...(s.rpe != null ? { rpe: s.rpe } : {}) };
+
+      // --- progression par exercice, calculée ici plutôt qu'envoyée en brut ---
+      // Le dump des séries brutes sur 14 jours était le plus gros poste du prompt (mesuré :
+      // il pesait pour l'essentiel des 7 457 tokens d'entrée) pour le signal le plus faible —
+      // on demandait au modèle de faire de l'arithmétique dans une réponse de 500 mots, ce
+      // qu'il survolait forcément. Le JS sait le faire exactement et gratuitement : on
+      // n'envoie plus que la meilleure série par séance et la tendance qui en découle.
+      const bestSet = (ex) => {
+        const done = (ex.series || []).filter((s) => s.fait && (+s.poids > 0 || +s.val > 0));
+        if (!done.length) return null;
+        // « meilleure » = charge la plus lourde, puis le plus de reps à charge égale.
+        const b = done.reduce((a, s) => (+s.poids > +a.poids || (+s.poids === +a.poids && +s.val > +a.val) ? s : a), done[0]);
+        return { poids: +b.poids || 0, val: +b.val || 0 };
+      };
+      const exoProgress = (() => {
+        const byExo = {};
+        last14(training).filter((s) => s.exercices).forEach((s) => {
+          s.exercices.forEach((e) => {
+            const b = bestSet(e);
+            if (!b) return;
+            (byExo[e.nom] ||= []).push({ d: s.date, ...b });
+          });
+        });
+        return Object.entries(byExo).map(([nom, hist]) => {
+          const h = hist.slice(-3); // 3 dernières séances suffisent pour lire une tendance
+          const last = h[h.length - 1], prev = h.length > 1 ? h[h.length - 2] : null;
+          // Volume = charge × reps : capte une progression même quand le poids ne bouge pas.
+          const vol = (x) => x.poids * x.val;
+          const tendance = !prev ? "1re fois"
+            : vol(last) > vol(prev) ? "hausse"
+            : vol(last) < vol(prev) ? "baisse" : "stable";
+          return { exo: nom, series_max: h.map((x) => `${x.d.slice(5)} ${x.poids}x${x.val}`), tendance };
+        });
+      })();
+
+      // Séances non-muscu : durée et RPE suffisent, il n'y a pas de séries à analyser.
+      const autresSeances = last14(training).filter((s) => !s.exercices)
+        .map((s) => ({ d: s.date.slice(5), t: s.type, ...(s.duration != null ? { min: s.duration } : {}), ...(s.rpe != null ? { rpe: s.rpe } : {}) }));
 
       // --- temps réel : hier vs aujourd'hui, avec deltas explicites ---
       const findDay = (arr, d) => arr.find((e) => e.date === d);
@@ -2562,10 +2637,21 @@ export default function App() {
         poids: { dernier: lastN(weight, 1)[0]?.kg ?? null, moy_7j: w7, moy_7j_precedents: w14, tendance_kg_sur_semaine: (w7 != null && w14 != null) ? round(w7 - w14) : null },
         macros_moy_7j: { proteines: avgKey(m7, "protein"), glucides: avgKey(m7, "carbs"), lipides: avgKey(m7, "fat"), fibres: avgKey(m7, "fiber"), eau_ml: avgKey(m7, "water") },
         cibles: { proteines: atToday.protein, glucides: atToday.carbs, lipides: atToday.fat, fibres: atToday.fiber, eau_ml: targets.water },
-        sommeil: { heures_moy_7j: avgKey(win(sleep, 0, 6), "hours"), qualite_moy_7j: avgKey(win(sleep, 0, 6), "quality") },
+        // Sommeil et genou : ces agrégats remplacent les tableaux bruts 14 j qui étaient
+        // envoyés en plus et n'apportaient rien de plus que ce que le JS calcule ici.
+        sommeil: {
+          heures_moy_7j: avgKey(win(sleep, 0, 6), "hours"), qualite_moy_7j: avgKey(win(sleep, 0, 6), "quality"),
+          pire_nuit_7j: (() => { const v = win(sleep, 0, 6).map((s) => s.hours).filter((x) => x != null); return v.length ? round(Math.min(...v), 2) : null; })(),
+          nuits_sous_6h_7j: win(sleep, 0, 6).filter((s) => s.hours != null && s.hours < 6).length,
+        },
         pas_moy_7j: steps7 != null ? Math.round(steps7) : null,
         seances_7j: sessCount(0, 6), seances_14j: sessCount(0, 13),
-        genou: { derniere_douleur: kLast?.pain ?? null, base_ok: kLast ? kLast.baseline !== false : null, jours_hors_base_14j: win(knee, 0, 13).filter((k) => k.baseline === false).length },
+        genou: {
+          derniere_douleur: kLast?.pain ?? null, derniere_date: kLast?.date ?? null,
+          base_ok: kLast ? kLast.baseline !== false : null,
+          jours_hors_base_14j: win(knee, 0, 13).filter((k) => k.baseline === false).length,
+          douleur_moy_7j: avgKey(win(knee, 0, 6), "pain"), douleur_moy_7j_precedents: avgKey(win(knee, 7, 13), "pain"),
+        },
       };
 
       const notesTxt = last14(notes).map((n) => `${n.date} : ${n.text}`).join("\n")
@@ -2579,7 +2665,14 @@ export default function App() {
         const m = macros.find((e) => e.date === d);
         const st = steps.find((e) => e.date === d);
         const kcal = m ? Math.round((m.protein ?? 0) * 4 + (m.carbs ?? 0) * 4 + (m.fat ?? 0) * 9) : null;
-        return { date: d, poids: w?.kg ?? null, kcal, proteines: m?.protein ?? null, glucides: m?.carbs ?? null, lipides: m?.fat ?? null, fibres: m?.fiber ?? null, eau_ml: m?.water ?? null, pas: st?.count ?? null, cible_kcal: Math.round(targetsForDate(d, targets).protein * 4 + targetsForDate(d, targets).carbs * 4 + targetsForDate(d, targets).fat * 9) };
+        const at = targetsForDate(d, targets);
+        // Clés courtes et champs nuls omis : sur 14 lignes, les `"proteines":null` répétés
+        // pesaient pour rien. Une légende explicite les abréviations dans le prompt.
+        const row = { d: d.slice(5), p: w?.kg, kc: kcal, P: m?.protein, G: m?.carbs, L: m?.fat,
+          F: m?.fiber, eau: m?.water, pas: st?.count,
+          cible_kc: Math.round(at.protein * 4 + at.carbs * 4 + at.fat * 9) };
+        Object.keys(row).forEach((k) => { if (row[k] == null) delete row[k]; });
+        return row;
       });
 
       // La fenêtre d'objectif ne produit plus qu'un constat FACTUEL, généré depuis la
@@ -2614,13 +2707,12 @@ ${JSON.stringify(realtime)}
 RÉSUMÉ 14 JOURS (moyennes fiables, tendance de fond) :
 ${JSON.stringify(summary)}
 
-JOUR PAR JOUR — poids/kcal/macros/fibres/eau/pas, pour corréler (repère les liens entre apports et variations de poids : rétention d'eau via sodium/glucides vs vraie perte de masse grasse) :
+JOUR PAR JOUR — pour corréler apports et variations de poids (rétention d'eau via sodium/glucides vs vraie perte de masse grasse). Clés : d=date, p=poids, kc=kcal, P/G/L=protéines/glucides/lipides, F=fibres, eau=ml, pas, cible_kc=cible kcal du jour. Un champ absent = pas de donnée ce jour-là :
 ${JSON.stringify(merged)}
 
-DONNÉES BRUTES 14 jours (JSON, du plus ancien au plus récent). Séances : "s" liste les séries au format "poidsXreps" (suffixe /G ou /D = jambe) :
-Séances: ${JSON.stringify(last14(training).map(compact))}
-Sommeil: ${JSON.stringify(last14(sleep))}
-Genou: ${JSON.stringify(last14(knee))}
+PROGRESSION PAR EXERCICE (14 j) — déjà calculée, ne refais pas l'arithmétique. "series_max" = meilleure série de chaque séance au format "MM-JJ poidsXreps" ; "tendance" compare le volume (charge × reps) de la dernière séance à la précédente :
+${JSON.stringify(exoProgress)}
+${autresSeances.length ? `Séances sans séries (basket/escalade) : ${JSON.stringify(autresSeances)}` : ""}
 ${notesTxt ? `\nNOTES DE CONTEXTE écrites par Yoann (14 j, ex. alcool, insomnie, petite blessure) — à prendre en compte activement dans l'analyse :\n${notesTxt}\n` : ""}
 ${(journal || "").trim() ? `CARNET DE BORD — état que TU as écrit à la fin de ta dernière analyse. C'est ta mémoire : appuie-toi dessus pour enchaîner (a-t-il appliqué ce que tu avais demandé ? où en est la progression ?) au lieu de repartir de zéro.\n${journal.trim()}\n` : "CARNET DE BORD : vide, c'est ta première analyse. Tu le créeras en fin de réponse.\n"}
 Structure ta réponse en deux temps :
@@ -2633,6 +2725,35 @@ Puis, APRÈS ta conclusion, écris la ligne \`${CARNET_MARK}\` seule, et en dess
 
       return { system, user };
     },
+
+    /**
+     * Briefing complet à coller dans une conversation claude.ai.
+     *
+     * Volontairement PLUS riche que le prompt API : ici les tokens ne coûtent rien
+     * (l'abonnement couvre la conversation), donc on garde les séries brutes que le prompt
+     * API n'envoie plus, et on ajoute le profil et le carnet pour que la conversation
+     * démarre avec tout le contexte. C'est le pendant « suivi de fond » du point du jour.
+     */
+    buildBriefing: () => {
+      const { system, user } = coach.buildPrompt("");
+      const brut = last14(training).filter((s) => s.exercices).map((s) => ({
+        d: s.date, t: s.type,
+        ex: s.exercices.map((e) => ({ n: e.nom, s: e.series.map((x) => `${x.poids || 0}x${x.val || 0}${x.leg ? "/" + x.leg : ""}`) })),
+      }));
+      return `${system}
+
+${user.split("Structure ta réponse en deux temps")[0].trim()}
+
+SÉRIES BRUTES 14 jours (détail complet, pour analyser la progressive overload exercice par exercice) :
+${JSON.stringify(brut)}
+
+Sommeil brut : ${JSON.stringify(last14(sleep))}
+Genou brut : ${JSON.stringify(last14(knee))}
+
+---
+Fais-moi une revue de fond : tendances sur la durée, corrélations entre apports/activité/poids/récupération, et ce qu'il faut ajuster pour la semaine à venir. Tu peux me poser des questions.`;
+    },
+
     apiKey, model,
   };
 
@@ -2677,7 +2798,7 @@ Puis, APRÈS ta conclusion, écris la ligne \`${CARNET_MARK}\` seule, et en dess
       {/* Contenu */}
       <main style={{ flex: 1, overflowY: "auto", padding: "14px 16px 24px" }}>
         {loading ? <Empty>Chargement…</Empty> : showSettings ? (
-          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets }} saveTargets={save.targets} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
+          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets }} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
             {tab === "dash" && <Dashboard {...{ weight, sleep, knee, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab }} />}
