@@ -177,6 +177,28 @@ protocole-app/
   Testé sur plusieurs scénarios (genou hors base, empilement Lower+Basket,
   zone déjà travaillée le jour même) — logique validée, ne pas simplifier
   sans retester ces cas.
+  **Étape 4 (30/07/2026)** : trois ajouts. (1) Nudges souples sommeil/charge
+  — une nuit courte (<6h ou qualité ≤2, sur la nuit d'hier seulement) et/ou
+  3 séances sur les 3 derniers jours retirent des points à Upper/Lower/
+  Basket/Escalade (jamais à Repos, qui en profite au contraire) ; silencieux
+  si la donnée est absente, pour ne pas punir une simple absence de saisie
+  comme le fait le genou. (2) Fenêtre de sèche (`isCutWindow`) : pénalise
+  Basket (−10) et Escalade (−8) — les deux options à impact/tirage visées
+  par la règle "pas de volume à impact en plus de l'habituel" du profil
+  permanent — et bonifie Repos (+4), sans jamais les interdire (ils restent
+  dans la rotation normale, juste moins poussés). (3) Score affiché dans la
+  carte "Prochaine séance" (petit badge monospace à côté de chaque type),
+  pour rendre le classement auditable au lieu d'une boîte noire. Le
+  recommandeur prend désormais `sleep` et `targets` en plus de `training`/
+  `knee`.
+- **Couplage recommandeur ↔ Coach IA** (étape 4, 30/07/2026) : `buildPrompt`
+  recalcule `recommendSessions` avec les mêmes données et injecte son
+  verdict (`summary.recommandeur` : top + score + motif, alternatives,
+  à éviter) dans le prompt. Consigne explicite au modèle : commenter/
+  valider CE verdict plutôt que d'en proposer un autre de son côté, sauf
+  désaccord argumenté à signaler explicitement. Avant ce couplage, la carte
+  dashboard et l'analyse IA pouvaient recommander deux séances différentes
+  sans que rien ne le signale.
 - **Macros** : protéines/glucides/lipides/fibres, cibles par défaut
   **215/205/80/30 g** (~2400 kcal), graphique 14 jours en **calories** (pas
   protéines — changé exprès). Une bascule temporaire par date existe

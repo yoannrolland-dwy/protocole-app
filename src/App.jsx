@@ -15,7 +15,7 @@ import { store, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 
-const APP_VERSION = "3.17.0";
+const APP_VERSION = "3.18.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -345,7 +345,7 @@ const BASKET_PROTOCOLS = {
    RECOMMANDEUR — historique des séances + état du genou
    Sort des suggestions classées ET des séances à éviter.
    ============================================================ */
-function recommendSessions({ training, knee }) {
+function recommendSessions({ training, knee, sleep, targets }) {
   const t0 = today();
   const isUpper = (t) => t.type === "Upper A" || t.type === "Upper B";
   const isLower = (t) => t.type === "Lower A" || t.type === "Lower B";
@@ -393,6 +393,27 @@ function recommendSessions({ training, knee }) {
     ? (kLast ? `Douleur genou pas notée depuis ${kneeAge} j — prudence par défaut, note-la pour un vrai conseil.` : "Douleur genou jamais notée — prudence par défaut.")
     : null;
 
+  // Sommeil récent — nudge, pas un blocage : contrairement au genou (tendinopathie, donc
+  // gate dur), une mauvaise nuit est un facteur de prudence parmi d'autres, pas un verdict
+  // de sécurité. Pas de donnée = pas de pénalité (silencieux), pour ne pas punir une simple
+  // absence de saisie comme le ferait le genou.
+  const lastNight = (sleep || []).slice().sort(byDate).pop();
+  const lastNightFresh = lastNight && daysBetween(lastNight.date, t0) <= 1;
+  const sleepPoor = lastNightFresh && (lastNight.hours < 6 || (lastNight.quality != null && lastNight.quality <= 2));
+  const sleepNote = sleepPoor ? `Nuit courte (${fmtHM(lastNight.hours)}) → séance allégée ou repos conseillé.` : null;
+
+  // Charge des 3 derniers jours (fatigue à court terme) — distinct du volume 7 j déjà
+  // utilisé plus haut : 3 séances sur 3 jours signale une fatigue qu'une moyenne
+  // hebdomadaire peut masquer.
+  const load3 = within(training, 2).length;
+  const loadHigh = load3 >= 3;
+
+  // Fenêtre d'objectif (sèche avant vacances) : la règle du profil est de ne jamais AJOUTER
+  // de volume à impact par rapport au rythme habituel — donc on n'interdit pas Basket/
+  // Escalade (ils restent dans sa rotation normale), mais on n'inflate plus leur score et on
+  // favorise un peu plus le repos, pour ne pas pousser vers plus de séances que d'habitude.
+  const cutOn = isCutWindow(t0, targets);
+
   // ce qui est déjà fait aujourd'hui
   const todayTypes = training.filter((t) => t.date === t0).map((t) => t.type);
   const upperToday = todayTypes.some((x) => x.startsWith("Upper"));
@@ -409,6 +430,11 @@ function recommendSessions({ training, knee }) {
   const sugg = [], avoid = [];
   const push = (arr, type, score, reason) => arr.push({ type, score, reason });
 
+  // Nudge fatigue partagé (sommeil + charge 3j), appliqué à toute option encore en lice —
+  // jamais à Repos, qui doit au contraire en profiter.
+  const fatigueScore = (s) => s - (sleepPoor ? 6 : 0) - (loadHigh ? 6 : 0);
+  const fatigueReason = () => [sleepNote, loadHigh ? `${load3} séances sur les 3 derniers jours → fatigue à surveiller.` : null].filter(Boolean).join(" ");
+
   // ---- HAUT DU CORPS : jamais bloqué par le genou ----
   const upV = variant("Upper A", "Upper B");
   if (climbToday) {
@@ -419,6 +445,8 @@ function recommendSessions({ training, knee }) {
     if (kneeRed) { upScore += 18; upReason += " Genou à ménager → c'est l'option sûre, jambes au repos."; }
     if (dClimb <= 1) { upScore -= 8; upReason += " Escalade récente : allège le tirage (coude)."; }
     if (dUpper === 0) { upScore -= 32; upReason = `Haut du corps déjà fait aujourd'hui (${upper7}/2 cette semaine) — à reprendre après récupération.`; }
+    upScore = fatigueScore(upScore);
+    const upFat = fatigueReason(); if (upFat) upReason += ` ${upFat}`;
     push(sugg, upV, upScore, upReason);
   }
 
@@ -435,6 +463,8 @@ function recommendSessions({ training, knee }) {
     let loReason = `Lower ${lower7}/2 cette semaine · dernier ${ago(dLower)}.`;
     if (kneeUnknown) loReason += ` ${kneeNote} Charge prudente, tempo 6 s.`;
     else if (kneeAmber) loReason += ` Genou sensible (${painLast}/10${flagged7 ? `, ${flagged7} j hors base` : ""}) → charge prudente, tempo 6 s.`;
+    loScore = fatigueScore(loScore);
+    const loFat = fatigueReason(); if (loFat) loReason += ` ${loFat}`;
     push(sugg, loV, loScore, loReason);
   }
 
@@ -450,6 +480,9 @@ function recommendSessions({ training, knee }) {
     let bReason = `${basket7}× cette semaine · dernier ${ago(dBasket)}. Passer par l'échauffement guidé.`;
     if (kneeUnknown) bReason += ` ${kneeNote}`;
     else if (kneeAmber) bReason += " Genou sensible : réduire le volume de sauts.";
+    if (cutOn) { bScore -= 10; bReason += " Fenêtre de sèche : pas de volume à impact en plus de l'habituel."; }
+    bScore = fatigueScore(bScore);
+    const bFat = fatigueReason(); if (bFat) bReason += ` ${bFat}`;
     push(sugg, "Basket", bScore, bReason);
   }
 
@@ -460,13 +493,20 @@ function recommendSessions({ training, knee }) {
     let cScore = 10 + cap(dClimb) - (dClimb <= 1 ? 8 : 0) + (lowerToday ? 6 : 0);
     let cReason = `${climb7}× cette semaine · dernière ${ago(dClimb)}. Compte comme volume tirage : à placer un jour Lower ou off.`;
     if (lowerToday) cReason += " Lower déjà fait aujourd'hui : bon jour pour l'escalade (pas de conflit coude).";
+    if (cutOn) { cScore -= 8; cReason += " Fenêtre de sèche : pas de volume tirage en plus de l'habituel."; }
+    cScore = fatigueScore(cScore);
+    const cFat = fatigueReason(); if (cFat) cReason += ` ${cFat}`;
     push(sugg, "Escalade", cScore, cReason);
   }
 
-  // ---- REPOS ----
-  push(sugg, "Repos / mobilité", kneeRed ? 45 : (upper7 + lower7 + basket7 + climb7 >= 6 ? 22 : 5),
-    kneeRed ? "Décharge : mobilité douce + routine de rééduc autonome."
-            : `${upper7 + lower7 + basket7 + climb7} séances sur 7 j — une journée creuse consolide les adaptations.`);
+  // ---- REPOS ---- (jamais pénalisé par la fatigue ou la sèche : c'est l'option qui en profite)
+  let restScore = kneeRed ? 45 : (upper7 + lower7 + basket7 + climb7 >= 6 ? 22 : 5);
+  let restReason = kneeRed ? "Décharge : mobilité douce + routine de rééduc autonome."
+    : `${upper7 + lower7 + basket7 + climb7} séances sur 7 j — une journée creuse consolide les adaptations.`;
+  if (!kneeRed && sleepPoor) { restScore += 10; restReason += ` ${sleepNote}`; }
+  if (!kneeRed && loadHigh) { restScore += 8; restReason += ` ${load3} séances sur les 3 derniers jours → fatigue à surveiller.`; }
+  if (!kneeRed && cutOn) { restScore += 4; restReason += " Fenêtre de sèche : le repos ne compte pas comme volume manqué."; }
+  push(sugg, "Repos / mobilité", restScore, restReason);
 
   return {
     suggestions: sugg.sort((a, b) => b.score - a.score).slice(0, 3),
@@ -982,7 +1022,7 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
     ? Math.round((mToday.protein ?? 0) * 4 + (mToday.carbs ?? 0) * 4 + (mToday.fat ?? 0) * 9)
     : null;
 
-  const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee }), [training, knee]);
+  const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee, sleep, targets }), [training, knee, sleep, targets]);
 
   const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
   const waterToday = mToday?.water ?? 0;
@@ -1042,11 +1082,17 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
       {/* Prochaine séance */}
       <Card accentLeft onClick={() => setTab("train")} style={{ padding: "13px 14px", cursor: "pointer" }}>
         <Label style={{ letterSpacing: 1.5, marginBottom: 5 }}>Prochaine séance</Label>
-        <div style={{ fontSize: 16, color: C.text, fontWeight: 800, marginBottom: 3 }}>{suggestions[0]?.type}</div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginBottom: 3 }}>
+          <div style={{ fontSize: 16, color: C.text, fontWeight: 800 }}>{suggestions[0]?.type}</div>
+          <div style={{ fontFamily: C.mono, fontSize: 10, color: C.dim }}>{suggestions[0]?.score}</div>
+        </div>
         <Body>{suggestions[0]?.reason}</Body>
         {suggestions.slice(1).map((r) => (
           <div key={r.type} style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.divider}` }}>
-            <div style={{ fontSize: 12, color: C.text2, fontWeight: 700 }}>{r.type}</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+              <div style={{ fontSize: 12, color: C.text2, fontWeight: 700 }}>{r.type}</div>
+              <div style={{ fontFamily: C.mono, fontSize: 9.5, color: C.dim }}>{r.score}</div>
+            </div>
             <div style={{ fontSize: 10.5, color: C.dim, lineHeight: 1.4, marginTop: 1 }}>{r.reason}</div>
           </div>
         ))}
@@ -2564,6 +2610,11 @@ export default function App() {
       const sessCount = (a, b) => { const o = {}; win(training, a, b).forEach((t) => { o[t.type] = (o[t.type] || 0) + 1; }); return o; };
       const kLast = lastN(knee, 1)[0] ?? null;
 
+      // Verdict du recommandeur ("Prochaine séance") : recalculé ici avec les mêmes données,
+      // et injecté dans le prompt pour que le coach commente/valide UN seul avis au lieu de
+      // produire le sien indépendamment (les deux pouvaient se contredire avant ce couplage).
+      const reco = recommendSessions({ training, knee, sleep, targets });
+
       // --- progression par exercice, calculée ici plutôt qu'envoyée en brut ---
       // Le dump des séries brutes sur 14 jours était le plus gros poste du prompt (mesuré :
       // il pesait pour l'essentiel des 7 457 tokens d'entrée) pour le signal le plus faible —
@@ -2652,6 +2703,11 @@ export default function App() {
           jours_hors_base_14j: win(knee, 0, 13).filter((k) => k.baseline === false).length,
           douleur_moy_7j: avgKey(win(knee, 0, 6), "pain"), douleur_moy_7j_precedents: avgKey(win(knee, 7, 13), "pain"),
         },
+        recommandeur: {
+          top: reco.suggestions[0] ? { type: reco.suggestions[0].type, score: reco.suggestions[0].score, motif: reco.suggestions[0].reason } : null,
+          alternatives: reco.suggestions.slice(1).map((s) => ({ type: s.type, score: s.score })),
+          a_eviter: reco.avoid.map((a) => ({ type: a.type, motif: a.reason })),
+        },
       };
 
       const notesTxt = last14(notes).map((n) => `${n.date} : ${n.text}`).join("\n")
@@ -2716,7 +2772,7 @@ ${autresSeances.length ? `Séances sans séries (basket/escalade) : ${JSON.strin
 ${notesTxt ? `\nNOTES DE CONTEXTE écrites par Yoann (14 j, ex. alcool, insomnie, petite blessure) — à prendre en compte activement dans l'analyse :\n${notesTxt}\n` : ""}
 ${(journal || "").trim() ? `CARNET DE BORD — état que TU as écrit à la fin de ta dernière analyse. C'est ta mémoire : appuie-toi dessus pour enchaîner (a-t-il appliqué ce que tu avais demandé ? où en est la progression ?) au lieu de repartir de zéro.\n${journal.trim()}\n` : "CARNET DE BORD : vide, c'est ta première analyse. Tu le créeras en fin de réponse.\n"}
 Structure ta réponse en deux temps :
-1. **Aujourd'hui / les prochaines 24h** : à partir du bloc TEMPS RÉEL, dis-lui concrètement quoi faire (ou éviter) MAINTENANT — séance, nutrition, hydratation, récupération, genou — en te basant sur ce qui s'est passé hier et sur les notes de contexte.
+1. **Aujourd'hui / les prochaines 24h** : à partir du bloc TEMPS RÉEL, dis-lui concrètement quoi faire (ou éviter) MAINTENANT — séance, nutrition, hydratation, récupération, genou — en te basant sur ce qui s'est passé hier et sur les notes de contexte. Le champ \`recommandeur\` (dans RÉSUMÉ 14 JOURS) donne déjà un verdict calculé sur la séance du jour (score + motif, alternatives, à éviter) : appuie-toi dessus au lieu d'en recalculer un autre de ton côté — commente-le, nuance-le ou signale un désaccord argumenté si tu vois un facteur qu'il ignore, mais ne propose pas une séance différente sans le dire explicitement.
 2. **Tendance de fond (14 jours)** : ce qui se dessine sur la durée et ce qu'il faut ajuster pour la semaine à venir, EN CORRÉLANT explicitement poids, kcal, macros, fibres et eau à partir du dataset JOUR PAR JOUR (ex. un pic de poids coïncide-t-il avec un pic de glucides/sodium la veille plutôt qu'un vrai surplus calorique ? un manque de fibres ou d'eau coïncide-t-il avec une stagnation ?).
 Traite explicitement CHAQUE domaine : poids (bruit quotidien vs moyenne glissante), macros (protéines jour le jour, reste en moyenne 7j), eau (jours de basket +1L), sommeil (impact récup), pas quotidiens (corrélation activité/résultat), séances (équilibre Upper/Lower, progressive overload exercice par exercice, respect coude/escalade), genou/douleur (Silbernagel, priorité absolue si ça a flambé).
 Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reciter les données brutes (cite seulement les chiffres qui appuient un conseil) : va droit aux conseils, en bullet points courts. Limite stricte : 500 mots maximum au total — écourte les détails plutôt que de laisser une section inachevée, et termine toujours par une phrase de conclusion complète. Ce n'est pas un avis médical.
