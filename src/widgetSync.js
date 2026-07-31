@@ -9,8 +9,9 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 const WidgetBridge = registerPlugin("WidgetBridge");
 
 /**
- * snapshot attendu : { poids, pas, calories, eau, sommeil } — chacun
- * { value: string, note: string }.
+ * snapshot attendu : { poids, pas, calories, eau, sommeil, sync } — chacun
+ * { value: string, note: string }. "sync" n'affiche pas sa valeur (juste l'icône Sync),
+ * seule sa note (horodatage de dernière synchro) est utilisée.
  */
 export async function updateDashboardWidget(snapshot) {
   if (!Capacitor.isNativePlatform()) return;

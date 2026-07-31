@@ -18,7 +18,7 @@ import { updateDashboardWidget } from "./widgetSync.js";
 import { runAutoBackup } from "./autoBackup.js";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.24.6";
+const APP_VERSION = "3.25.1";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -2623,6 +2623,12 @@ export default function App({ silent = false } = {}) {
       calories: { value: kcalToday != null ? `${kcalToday}` : "—", note: `/ ${kcalTgt} kcal` },
       eau: { value: `${(waterToday / 1000).toFixed(2)} L`, note: `/ ${(waterTgt / 1000).toFixed(1)} L` },
       sommeil: { value: lastNightDash ? fmtHM(lastNightDash.hours) : "—", note: lastNightDash ? fmt(lastNightDash.date) : "—" },
+      // Pas de "value" affichée pour ce tile (juste l'icône Sync) — seule la note sert,
+      // horodatage du dernier instantané poussé au widget (peu importe si déclenché par
+      // l'ouverture normale de l'app ou par le bouton Sync lui-même).
+      // "À jour · dernière synchro : HH:MM:SS" tient sur 4 lignes et écrase l'icône dans
+      // une tuile aussi étroite — condensé pour rester sur une ligne comme les autres notes.
+      sync: { value: "", note: `MAJ ${new Date().toLocaleTimeString("fr-FR")}` },
     });
   }, [loading, weight, sleep, macros, steps, training, targets, phase]);
 

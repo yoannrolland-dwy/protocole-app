@@ -22,7 +22,9 @@ class WidgetBridgePlugin : Plugin() {
     companion object {
         const val PREFS = "widget_dashboard"
         const val EXTRA_SILENT_SYNC = "silent_sync"
-        val KEYS = listOf("poids", "pas", "calories", "eau", "sommeil")
+        // "sync" n'a pas de tuile de valeur affichée (seulement une note, l'heure de la
+        // dernière synchro) : sa clé "value" est stockée mais jamais lue.
+        val KEYS = listOf("poids", "pas", "calories", "eau", "sommeil", "sync")
     }
 
     @PluginMethod

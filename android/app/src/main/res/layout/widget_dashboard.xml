@@ -222,17 +222,39 @@
             android:layout_weight="1"
             android:layout_margin="3dp"
             android:orientation="vertical"
-            android:gravity="center"
             android:paddingHorizontal="8dp"
             android:paddingVertical="6dp"
             android:background="@drawable/widget_tile_background">
 
-            <ImageView
-                android:id="@+id/tile_sync_icon"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:src="@drawable/ic_sync_arrow"
-                android:scaleType="fitCenter" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SYNC"
+                android:textSize="9sp"
+                android:textColor="#8a8a84" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:gravity="center_vertical|start">
+
+                <ImageView
+                    android:id="@+id/tile_sync_icon"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_sync_arrow"
+                    android:scaleType="fitCenter" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tile_sync_note"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="9sp"
+                android:fontFamily="monospace"
+                android:textColor="#6b6b66" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

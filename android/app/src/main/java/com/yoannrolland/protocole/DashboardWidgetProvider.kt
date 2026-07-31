@@ -78,6 +78,7 @@ class DashboardWidgetProvider : AppWidgetProvider() {
             fillTile(views, R.id.tile_calories_value, R.id.tile_calories_note, prefs, "calories")
             fillTile(views, R.id.tile_eau_value, R.id.tile_eau_note, prefs, "eau")
             fillTile(views, R.id.tile_sommeil_value, R.id.tile_sommeil_note, prefs, "sommeil")
+            views.setTextViewText(R.id.tile_sync_note, prefs.getString("sync_note", ""))
             views.setFloat(R.id.tile_sync_icon, "setRotation", syncAngle)
 
             val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
