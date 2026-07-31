@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_background"
+    android:padding="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/tile_poids"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_margin="3dp"
+            android:orientation="vertical"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="6dp"
+            android:background="@drawable/widget_tile_background">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="POIDS"
+                android:textSize="9sp"
+                android:textColor="#8a8a84" />
+
+            <TextView
+                android:id="@+id/tile_poids_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="—"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace"
+                android:textColor="#f5f5f0" />
+
+            <TextView
+                android:id="@+id/tile_poids_note"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="9sp"
+                android:fontFamily="monospace"
+                android:textColor="#6b6b66" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tile_calories"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_margin="3dp"
+            android:orientation="vertical"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="6dp"
+            android:background="@drawable/widget_tile_background">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CALORIES"
+                android:textSize="9sp"
+                android:textColor="#8a8a84" />
+
+            <TextView
+                android:id="@+id/tile_calories_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="—"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace"
+                android:textColor="#f5f5f0" />
+
+            <TextView
+                android:id="@+id/tile_calories_note"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="9sp"
+                android:fontFamily="monospace"
+                android:textColor="#6b6b66" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tile_sommeil"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_margin="3dp"
+            android:orientation="vertical"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="6dp"
+            android:background="@drawable/widget_tile_background">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SOMMEIL"
+                android:textSize="9sp"
+                android:textColor="#8a8a84" />
+
+            <TextView
+                android:id="@+id/tile_sommeil_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="—"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace"
+                android:textColor="#f5f5f0" />
+
+            <TextView
+                android:id="@+id/tile_sommeil_note"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="9sp"
+                android:fontFamily="monospace"
+                android:textColor="#6b6b66" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/tile_pas"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_margin="3dp"
+            android:orientation="vertical"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="6dp"
+            android:background="@drawable/widget_tile_background">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="PAS"
+                android:textSize="9sp"
+                android:textColor="#8a8a84" />
+
+            <TextView
+                android:id="@+id/tile_pas_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="—"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace"
+                android:textColor="#f5f5f0" />
+
+            <TextView
+                android:id="@+id/tile_pas_note"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="9sp"
+                android:fontFamily="monospace"
+                android:textColor="#6b6b66" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tile_eau"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_margin="3dp"
+            android:orientation="vertical"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="6dp"
+            android:background="@drawable/widget_tile_background">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="EAU"
+                android:textSize="9sp"
+                android:textColor="#8a8a84" />
+
+            <TextView
+                android:id="@+id/tile_eau_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="—"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace"
+                android:textColor="#f5f5f0" />
+
+            <TextView
+                android:id="@+id/tile_eau_note"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="9sp"
+                android:fontFamily="monospace"
+                android:textColor="#6b6b66" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tile_genou"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_margin="3dp"
+            android:orientation="vertical"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="6dp"
+            android:background="@drawable/widget_tile_background">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="GENOU"
+                android:textSize="9sp"
+                android:textColor="#8a8a84" />
+
+            <TextView
+                android:id="@+id/tile_genou_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="—"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace"
+                android:textColor="#d7ff3f" />
+
+            <TextView
+                android:id="@+id/tile_genou_note"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="9sp"
+                android:fontFamily="monospace"
+                android:textColor="#6b6b66" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

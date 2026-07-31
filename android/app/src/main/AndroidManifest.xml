@@ -30,6 +30,19 @@
             android:name=".RestAlarmReceiver"
             android:exported="false" />
 
+        <!-- Widget d'écran d'accueil : 6 tuiles du tableau de bord, lecture seule,
+             tap = ouvre l'app. Voir DashboardWidgetProvider.kt / WidgetBridgePlugin.kt. -->
+        <receiver
+            android:name=".DashboardWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/dashboard_widget_info" />
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

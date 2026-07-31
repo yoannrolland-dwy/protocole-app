@@ -4,4 +4,5 @@
     <string name="title_activity_main">Protocole</string>
     <string name="package_name">com.yoannrolland.protocole</string>
     <string name="custom_url_scheme">com.yoannrolland.protocole</string>
+    <string name="widget_dashboard_description">Tableau de bord Protocole</string>
 </resources>

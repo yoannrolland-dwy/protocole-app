@@ -11,6 +11,8 @@ public class MainActivity extends BridgeActivity {
         // Notifications du minuteur de repos : son sur le volume alarme + décompte
         // persistant dans la barre d'état (voir RestTimerPlugin.kt)
         registerPlugin(RestTimerPlugin.class);
+        // Pont vers le widget d'écran d'accueil (voir WidgetBridgePlugin.kt)
+        registerPlugin(WidgetBridgePlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
