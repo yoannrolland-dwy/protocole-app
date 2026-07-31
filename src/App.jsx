@@ -15,8 +15,9 @@ import { store, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 import { updateDashboardWidget } from "./widgetSync.js";
+import { runAutoBackup } from "./autoBackup.js";
 
-const APP_VERSION = "3.21.1";
+const APP_VERSION = "3.22.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -2202,7 +2203,7 @@ function MacroTab({ macros, targets, save, training }) {
    RÉGLAGES
    ============================================================ */
 function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync, onHealthSync,
-                         coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, saveTargets, buildBriefing }) {
+                         coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, saveTargets, buildBriefing, lastAutoBackup }) {
   const [k, setK] = useState(apiKey);
   const [m, setM] = useState(model);
   const [msg, setMsg] = useState("");
@@ -2378,6 +2379,12 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
         <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
           Exporte régulièrement : c'est ta seule sauvegarde. Vider les données du navigateur effacerait l'app.
         </Body>
+        {Capacitor.isNativePlatform() && (
+          <Body style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>
+            Sauvegarde auto locale (dossier Documents/Protocole) : {lastAutoBackup ? `dernière le ${fmt(lastAutoBackup)}` : "pas encore faite"}.
+            Ne remplace pas l'export manuel ci-dessus (celle-ci reste sur le téléphone).
+          </Body>
+        )}
       </Card>
 
       {Capacitor.isNativePlatform() && (
@@ -2466,6 +2473,7 @@ export default function App() {
   const [model, setModelState] = useState("claude-sonnet-5");
   const [coachProfile, setCoachProfileState] = useState("");
   const [coachJournal, setCoachJournalState] = useState("");
+  const [lastAutoBackup, setLastAutoBackup] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -2497,6 +2505,7 @@ export default function App() {
         setCoachProfileState(storedProfile);
       }
       setCoachJournalState(await store.get("coachJournal", ""));
+      setLastAutoBackup(await store.get("lastAutoBackupDate", null));
       setLoading(false);
     })();
   }, []);
@@ -2557,10 +2566,27 @@ export default function App() {
     runHealthSync();
   }, [loading]);
 
+  // Sauvegarde locale auto (une fois par jour, voir autoBackup.js) : un ref pour lire la
+  // dernière date à jour depuis le listener "resume" (monté une seule fois, sinon il
+  // resterait bloqué sur la valeur de `lastAutoBackup` au premier rendu).
+  const lastAutoBackupRef = useRef(lastAutoBackup);
+  useEffect(() => { lastAutoBackupRef.current = lastAutoBackup; }, [lastAutoBackup]);
+  const doAutoBackup = () => {
+    runAutoBackup(lastAutoBackupRef.current, (date) => {
+      lastAutoBackupRef.current = date;
+      setLastAutoBackup(date);
+      store.set("lastAutoBackupDate", date);
+    });
+  };
+  useEffect(() => {
+    if (loading) return;
+    doAutoBackup();
+  }, [loading]);
+
   // Resynchro à chaque retour au premier plan (pas seulement au lancement à froid)
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
-    const handle = CapacitorApp.addListener("resume", () => runHealthSync());
+    const handle = CapacitorApp.addListener("resume", () => { runHealthSync(); doAutoBackup(); });
     return () => { handle.then((h) => h.remove()); };
   }, []);
 
@@ -2881,7 +2907,7 @@ Fais-moi une revue de fond : tendances sur la durée, corrélations entre apport
       {/* Contenu */}
       <main style={{ flex: 1, overflowY: "auto", padding: "14px 16px 24px" }}>
         {loading ? <Empty>Chargement…</Empty> : showSettings ? (
-          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets }} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
+          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup }} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
             {tab === "dash" && <Dashboard {...{ weight, sleep, knee, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab }} />}
