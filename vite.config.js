@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: "prompt",
       includeAssets: ["icon-192.png", "icon-512.png", "apple-touch-icon.png"],
       manifest: {
-        name: "PROTOCOLE",
-        short_name: "PROTOCOLE",
+        name: "Protocole",
+        short_name: "Protocole",
         description: "Console perso de suivi — muscu, sommeil, genou, macros",
         lang: "fr",
         theme_color: "#050505",

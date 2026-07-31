@@ -16,7 +16,7 @@ if (Capacitor.isNativePlatform()) {
   // PWA : quand une nouvelle version est déployée, on propose de recharger.
   const updateSW = registerSW({
     onNeedRefresh() {
-      if (confirm("Nouvelle version de PROTOCOLE disponible. Recharger maintenant ?")) {
+      if (confirm("Nouvelle version de Protocole disponible. Recharger maintenant ?")) {
         updateSW(true);
       }
     },

@@ -15,7 +15,7 @@ import { store, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 
-const APP_VERSION = "3.18.0";
+const APP_VERSION = "3.20.2";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -1016,7 +1016,7 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
 
   const lastNightDash = lastN(sleep, 1)[0];
 
-  const kLast = lastN(knee, 1)[0];
+  const kToday = knee.find((k) => k.date === today());
   const mToday = macros.find((m) => m.date === today());
   const kcalToday = mToday
     ? Math.round((mToday.protein ?? 0) * 4 + (mToday.carbs ?? 0) * 4 + (mToday.fat ?? 0) * 9)
@@ -1047,8 +1047,8 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
     { label: "Sommeil", tab: "sleep", val: lastNightDash ? fmtHM(lastNightDash.hours) : "—", unit: "",
       note: lastNightDash ? `${fmt(lastNightDash.date)}${lastNightDash.quality != null ? " · " + "★".repeat(lastNightDash.quality) : ""}` : "—",
       color: C.text },
-    { label: "Genou", tab: "knee", val: kLast ? kLast.pain : "—", unit: "/10", note: kLast ? fmt(kLast.date) : "—",
-      color: kLast && (kLast.baseline === false || kLast.pain >= 6) ? C.danger : C.accent },
+    { label: "Genou", tab: "knee", val: kToday ? kToday.pain : "—", unit: "/10", note: kToday ? fmt(kToday.date) : "—",
+      color: kToday && (kToday.baseline === false || kToday.pain >= 6) ? C.danger : C.accent },
   ];
 
   return (
@@ -2051,20 +2051,33 @@ function MacroTab({ macros, targets, save, training }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <ScreenHeader title="Macros" subtitle={date === today() ? "aujourd'hui" : fmt(date)} />
 
-      {/* Calories — héro */}
-      <Card style={{ padding: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+      {/* Calories + Eau — héros côte à côte */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <Card style={{ padding: 14 }}>
           <Label style={{ fontSize: 10, letterSpacing: 1.5 }}>Calories</Label>
-          <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>cible {kcalTarget} kcal</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 10px" }}>
-          <span style={{ fontFamily: C.mono, fontSize: 38, fontWeight: 800, color: C.text }}>{Math.round(kcal)}</span>
-          <span style={{ fontSize: 15, color: C.muted, fontWeight: 700 }}>/{kcalTarget} kcal</span>
-        </div>
-        <div style={{ background: C.bg, borderRadius: 6, height: 8, overflow: "hidden" }}>
-          <div style={{ background: C.accent, width: `${kcalPct}%`, height: "100%" }} />
-        </div>
-      </Card>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 4, margin: "6px 0 8px" }}>
+            <span style={{ fontFamily: C.mono, fontSize: 26, fontWeight: 800, color: C.text }}>{Math.round(kcal)}</span>
+            <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>/{kcalTarget}</span>
+          </div>
+          <div style={{ background: C.bg, borderRadius: 6, height: 8, overflow: "hidden" }}>
+            <div style={{ background: C.accent, width: `${kcalPct}%`, height: "100%" }} />
+          </div>
+        </Card>
+        <Card style={{ padding: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <Droplet size={12} color={C.accent} />
+            <Label style={{ fontSize: 10 }}>Eau</Label>
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 4, margin: "6px 0 8px" }}>
+            <span style={{ fontFamily: C.mono, fontSize: 26, fontWeight: 800, color: C.text }}>{(water / 1000).toFixed(2)}</span>
+            <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>/{(waterTgt / 1000).toFixed(1)} L</span>
+          </div>
+          <div style={{ background: C.bg, borderRadius: 6, height: 8, overflow: "hidden" }}>
+            <div style={{ background: C.accent, width: `${Math.min(100, (water / waterTgt) * 100)}%`, height: "100%" }} />
+          </div>
+          {basketDay && <span style={{ display: "inline-block", fontSize: 8.5, color: "#000", background: C.accent, padding: "2px 5px", borderRadius: 4, fontWeight: 800, marginTop: 6 }}>+1 L BASKET</span>}
+        </Card>
+      </div>
 
       {/* Protéines / glucides / lipides / fibres */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -2077,30 +2090,28 @@ function MacroTab({ macros, targets, save, training }) {
         ))}
       </div>
 
-      {/* Eau */}
+      {/* Tendance calories — remontée à la place de l'ancienne tuile Eau */}
       <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <Droplet size={13} color={C.accent} />
-            <Label style={{ fontSize: 10 }}>Eau</Label>
-            {basketDay && <span style={{ fontSize: 9, color: "#000", background: C.accent, padding: "2px 6px", borderRadius: 4, fontWeight: 800 }}>+1 L BASKET</span>}
-          </div>
-          <span style={{ fontFamily: C.mono, fontSize: 13, color: C.accent, fontWeight: 800 }}>
-            {(water / 1000).toFixed(2)} / {(waterTgt / 1000).toFixed(1)} L
-          </span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+          <Label>Calories · 14 jours</Label>
+          <span style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono }}>cible ~{kcalTarget} kcal</span>
         </div>
-        <div style={{ background: C.bg, borderRadius: 6, height: 8, overflow: "hidden", marginBottom: 10 }}>
-          <div style={{ background: C.accent, width: `${Math.min(100, (water / waterTgt) * 100)}%`, height: "100%" }} />
-        </div>
-        {isSynced ? (
-          <SyncedBanner onCorrect={() => setForceManual(true)} />
-        ) : (
-          <div style={{ display: "flex", gap: 8 }}>
-            <Btn variant="plain" onClick={() => addWater(250)} style={{ flex: 1 }}>+250 ml</Btn>
-            <Btn variant="plain" onClick={() => addWater(500)} style={{ flex: 1 }}>+500 ml</Btn>
-            <Btn variant="ghost" onClick={() => addWater(-250)}>−250</Btn>
+        {kcalTrend.length ? (
+          <div style={{ height: 130 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={kcalTrend} margin={{ top: 4, right: 4, left: -22, bottom: 0 }}>
+                <CartesianGrid stroke={C.divider} vertical={false} />
+                <XAxis dataKey="date" tick={chartAxis} interval="preserveEnd" />
+                <YAxis tick={chartAxis} />
+                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle} />
+                <ReferenceLine y={kcalTarget} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
+                <Bar dataKey="kcal" radius={[3, 3, 0, 0]}>
+                  {kcalTrend.map((d, i) => <Cell key={i} fill={Math.abs(d.kcal - kcalTarget) <= kcalTarget * 0.1 ? C.accent : C.border} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-        )}
+        ) : <Empty>Aucune donnée.</Empty>}
       </Card>
 
       {/* Saisie */}
@@ -2125,32 +2136,16 @@ function MacroTab({ macros, targets, save, training }) {
                 </Btn>
               )}
             </div>
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.divider}` }}>
+              <Label style={{ marginBottom: 8 }}>Eau</Label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Btn variant="plain" onClick={() => addWater(250)} style={{ flex: 1 }}>+250 ml</Btn>
+                <Btn variant="plain" onClick={() => addWater(500)} style={{ flex: 1 }}>+500 ml</Btn>
+                <Btn variant="ghost" onClick={() => addWater(-250)}>−250</Btn>
+              </div>
+            </div>
           </>
         )}
-      </Card>
-
-      {/* Tendance calories */}
-      <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-          <Label>Calories · 14 jours</Label>
-          <span style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono }}>cible ~{kcalTarget} kcal</span>
-        </div>
-        {kcalTrend.length ? (
-          <div style={{ height: 130 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={kcalTrend} margin={{ top: 4, right: 4, left: -22, bottom: 0 }}>
-                <CartesianGrid stroke={C.divider} vertical={false} />
-                <XAxis dataKey="date" tick={chartAxis} interval="preserveEnd" />
-                <YAxis tick={chartAxis} />
-                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle} />
-                <ReferenceLine y={kcalTarget} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
-                <Bar dataKey="kcal" radius={[3, 3, 0, 0]}>
-                  {kcalTrend.map((d, i) => <Cell key={i} fill={Math.abs(d.kcal - kcalTarget) <= kcalTarget * 0.1 ? C.accent : C.border} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        ) : <Empty>Aucune donnée.</Empty>}
       </Card>
 
       {/* Péri-training */}
@@ -2405,7 +2400,7 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
       )}
 
       {msg && <Body style={{ color: C.accent, fontSize: 12 }}>{msg}</Body>}
-      <Body style={{ fontSize: 10, color: C.dim, textAlign: "center", fontFamily: C.mono }}>PROTOCOLE v{APP_VERSION}</Body>
+      <Body style={{ fontSize: 10, color: C.dim, textAlign: "center", fontFamily: C.mono }}>Protocole v{APP_VERSION}</Body>
     </div>
   );
 }
@@ -2837,7 +2832,7 @@ Fais-moi une revue de fond : tendances sur la durée, corrélations entre apport
         display: "flex", justifyContent: "space-between", alignItems: "flex-start",
       }}>
         <div>
-          <div style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 800, letterSpacing: 3, color: C.accent }}>PROTOCOLE</div>
+          <div style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 800, letterSpacing: 3, color: C.accent }}>Protocole</div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 2, textTransform: "uppercase", letterSpacing: 1 }}>{longDate(today())}</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

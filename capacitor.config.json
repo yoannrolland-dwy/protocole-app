@@ -1,6 +1,6 @@
 {
   "appId": "com.yoannrolland.protocole",
-  "appName": "PROTOCOLE",
+  "appName": "Protocole",
   "webDir": "dist",
   "plugins": {
     "SystemBars": {
