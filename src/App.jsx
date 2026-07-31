@@ -16,8 +16,9 @@ import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 import { updateDashboardWidget } from "./widgetSync.js";
 import { runAutoBackup } from "./autoBackup.js";
+import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.22.0";
+const APP_VERSION = "3.24.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -2563,7 +2564,15 @@ export default function App() {
 
   useEffect(() => {
     if (loading) return;
-    runHealthSync();
+    (async () => {
+      await runHealthSync();
+      // Lancé par le bouton Sync du widget (activité invisible, voir SilentSyncActivity.kt) :
+      // laisser React committer les setState de runHealthSync (donc l'effet qui pousse
+      // l'instantané au widget, plus bas) avant de refermer l'activité.
+      if (await isSilentSync()) {
+        setTimeout(finishSilentSync, 150);
+      }
+    })();
   }, [loading]);
 
   // Sauvegarde locale auto (une fois par jour, voir autoBackup.js) : un ref pour lire la
@@ -2590,14 +2599,15 @@ export default function App() {
     return () => { handle.then((h) => h.remove()); };
   }, []);
 
-  // Widget d'écran d'accueil (Android) : mêmes 6 valeurs que les tuiles du tableau de
-  // bord, reformatées pour l'affichage natif (voir widgetSync.js / DashboardWidgetProvider.kt).
+  // Widget d'écran d'accueil (Android) : 5 valeurs des tuiles du tableau de bord
+  // (Poids, Calories, Sommeil, Pas, Eau), reformatées pour l'affichage natif — la 6e
+  // tuile du widget est un bouton Sync, pas une donnée (voir widgetSync.js /
+  // DashboardWidgetProvider.kt).
   useEffect(() => {
     if (loading || !Capacitor.isNativePlatform()) return;
     const tgtW = phaseTarget(phase, targets);
     const wLast = lastN(weight, 1)[0];
     const lastNightDash = lastN(sleep, 1)[0];
-    const kToday = knee.find((k) => k.date === today());
     const mToday = macros.find((m) => m.date === today());
     const kcalToday = mToday ? Math.round((mToday.protein ?? 0) * 4 + (mToday.carbs ?? 0) * 4 + (mToday.fat ?? 0) * 9) : null;
     const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
@@ -2613,13 +2623,8 @@ export default function App() {
       calories: { value: kcalToday != null ? `${kcalToday}` : "—", note: `/ ${kcalTgt} kcal` },
       eau: { value: `${(waterToday / 1000).toFixed(2)} L`, note: `/ ${(waterTgt / 1000).toFixed(1)} L` },
       sommeil: { value: lastNightDash ? fmtHM(lastNightDash.hours) : "—", note: lastNightDash ? fmt(lastNightDash.date) : "—" },
-      genou: {
-        value: kToday ? `${kToday.pain}/10` : "—",
-        note: kToday ? fmt(kToday.date) : "—",
-        alert: !!(kToday && (kToday.baseline === false || kToday.pain >= 6)),
-      },
     });
-  }, [loading, weight, sleep, knee, macros, steps, training, targets, phase]);
+  }, [loading, weight, sleep, macros, steps, training, targets, phase]);
 
   const save = {
     weight: (v) => { setWeight(v); store.set("weightLog", v); },

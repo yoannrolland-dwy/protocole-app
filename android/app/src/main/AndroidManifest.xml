@@ -24,6 +24,16 @@
 
         </activity>
 
+        <!-- Bouton Sync du widget : activité invisible, tâche séparée de MainActivity
+             (voir SilentSyncActivity.kt). Jamais dans les récents, jamais dans l'historique. -->
+        <activity
+            android:name=".SilentSyncActivity"
+            android:theme="@style/Theme.Invisible"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:exported="false" />
+
         <!-- Reçoit l'alarme de fin de repos (AlarmManager.setAlarmClock) et joue le son
              elle-même, indépendamment de tout pipeline de notification. -->
         <receiver

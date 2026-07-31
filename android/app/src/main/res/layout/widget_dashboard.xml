@@ -216,42 +216,23 @@
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/tile_genou"
+            android:id="@+id/tile_sync"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:layout_margin="3dp"
             android:orientation="vertical"
+            android:gravity="center"
             android:paddingHorizontal="8dp"
             android:paddingVertical="6dp"
             android:background="@drawable/widget_tile_background">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="GENOU"
-                android:textSize="9sp"
-                android:textColor="#8a8a84" />
-
-            <TextView
-                android:id="@+id/tile_genou_value"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="—"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:fontFamily="monospace"
-                android:textColor="#d7ff3f" />
-
-            <TextView
-                android:id="@+id/tile_genou_note"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text=""
-                android:textSize="9sp"
-                android:fontFamily="monospace"
-                android:textColor="#6b6b66" />
+            <ImageView
+                android:id="@+id/tile_sync_icon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_sync_arrow"
+                android:scaleType="fitCenter" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

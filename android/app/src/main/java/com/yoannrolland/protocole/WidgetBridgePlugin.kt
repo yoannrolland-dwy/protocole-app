@@ -21,7 +21,8 @@ class WidgetBridgePlugin : Plugin() {
 
     companion object {
         const val PREFS = "widget_dashboard"
-        val KEYS = listOf("poids", "pas", "calories", "eau", "sommeil", "genou")
+        const val EXTRA_SILENT_SYNC = "silent_sync"
+        val KEYS = listOf("poids", "pas", "calories", "eau", "sommeil")
     }
 
     @PluginMethod
@@ -34,7 +35,6 @@ class WidgetBridgePlugin : Plugin() {
             if (tile != null) {
                 editor.putString("${key}_value", tile.getString("value", "—"))
                 editor.putString("${key}_note", tile.getString("note", ""))
-                if (key == "genou") editor.putBoolean("genou_alert", tile.optBoolean("alert", false))
             }
         }
         editor.apply()
@@ -44,5 +44,24 @@ class WidgetBridgePlugin : Plugin() {
         if (ids.isNotEmpty()) DashboardWidgetProvider.updateAll(context, manager, ids)
 
         call.resolve()
+    }
+
+    /** Vrai si cette instance de l'app a été lancée par le bouton Sync du widget (voir SilentSyncActivity). */
+    @PluginMethod
+    fun isSilentSync(call: PluginCall) {
+        val silent = activity?.intent?.getBooleanExtra(EXTRA_SILENT_SYNC, false) ?: false
+        call.resolve(JSObject().put("silent", silent))
+    }
+
+    /** Appelé par le JS une fois la synchro (et la mise à jour du widget) terminées : arrête
+     *  l'animation de la flèche et referme l'activité invisible sans transition visible. */
+    @PluginMethod
+    fun finishSilentSync(call: PluginCall) {
+        DashboardWidgetProvider.stopSpin(context)
+        call.resolve()
+        activity?.let {
+            it.overridePendingTransition(0, 0)
+            it.finish()
+        }
     }
 }
