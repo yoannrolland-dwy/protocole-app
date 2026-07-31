@@ -18,7 +18,7 @@ import { updateDashboardWidget } from "./widgetSync.js";
 import { runAutoBackup } from "./autoBackup.js";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.24.0";
+const APP_VERSION = "3.24.6";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -2455,7 +2455,7 @@ const targetsForDate = (d, base) => {
   return { ...base, protein, carbs, fat, fiber };
 };
 
-export default function App() {
+export default function App({ silent = false } = {}) {
   const [tab, setTab] = useState("dash");
   const [showSettings, setShowSettings] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -2880,6 +2880,11 @@ Fais-moi une revue de fond : tendances sur la durée, corrélations entre apport
     { key: "knee", label: "Genou", icon: HeartPulse },
     { key: "macro", label: "Macros", icon: Utensils },
   ];
+
+  // Lancé par le bouton Sync du widget (SilentSyncActivity, voir main.jsx) : tous les
+  // effets ci-dessus (chargement, runHealthSync, mise à jour du widget) tournent
+  // normalement, mais rien ne doit jamais s'afficher à l'écran.
+  if (silent) return null;
 
   return (
     <div style={{

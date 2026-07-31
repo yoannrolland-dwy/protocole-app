@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
 import { Capacitor } from "@capacitor/core";
 import App from "./App.jsx";
+import { isSilentSync } from "./silentSync.js";
 import "./index.css";
 
 if (Capacitor.isNativePlatform()) {
@@ -23,8 +24,19 @@ if (Capacitor.isNativePlatform()) {
   });
 }
 
-createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// Bouton Sync du widget (SilentSyncActivity, voir DashboardWidgetProvider.kt) : l'app est
+// lancée dans une activité au thème translucide, mais la WebView peint elle-même le fond
+// noir de l'app par-dessus quoi qu'il arrive — la translucidité de la fenêtre Android ne
+// suffit donc pas. En mode silencieux, on rend le fond transparent et App() ne restitue
+// rien (voir le prop `silent`), tout en laissant tourner ses effets (synchro, widget).
+isSilentSync().then((silent) => {
+  if (silent) {
+    document.documentElement.style.background = "transparent";
+    document.body.style.background = "transparent";
+  }
+  createRoot(document.getElementById("root")).render(
+    <React.StrictMode>
+      <App silent={silent} />
+    </React.StrictMode>
+  );
+});

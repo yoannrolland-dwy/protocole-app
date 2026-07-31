@@ -20,18 +20,50 @@
         <item name="android:background">@drawable/splash</item>
     </style>
 
+    <!-- Animations à durée nulle : plus fiable que windowAnimationStyle="@null", que
+         certains launchers surchargés (One UI) n'interprètent pas comme "désactivée". -->
+    <style name="NoAnimation">
+        <item name="android:activityOpenEnterAnimation">@anim/no_anim</item>
+        <item name="android:activityOpenExitAnimation">@anim/no_anim</item>
+        <item name="android:activityCloseEnterAnimation">@anim/no_anim</item>
+        <item name="android:activityCloseExitAnimation">@anim/no_anim</item>
+        <item name="android:taskOpenEnterAnimation">@anim/no_anim</item>
+        <item name="android:taskOpenExitAnimation">@anim/no_anim</item>
+        <item name="android:taskCloseEnterAnimation">@anim/no_anim</item>
+        <item name="android:taskCloseExitAnimation">@anim/no_anim</item>
+        <item name="android:taskToFrontEnterAnimation">@anim/no_anim</item>
+        <item name="android:taskToFrontExitAnimation">@anim/no_anim</item>
+        <item name="android:taskToBackEnterAnimation">@anim/no_anim</item>
+        <item name="android:taskToBackExitAnimation">@anim/no_anim</item>
+    </style>
+
     <!-- Utilisé uniquement par SilentSyncActivity (bouton Sync du widget) : l'activité
          existe pour exécuter la synchro Health Connect en tâche de fond, mais ne doit
          jamais être visible ni animée à l'ouverture/fermeture. -->
     <style name="Theme.Invisible" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowIsTranslucent">true</item>
-        <item name="android:windowBackground">@android:color/transparent</item>
+        <!-- Requis pour que window.setLayout(1, 1) (voir SilentSyncActivity) soit respecté :
+             une fenêtre d'activité non flottante est forcée en plein écran par le système,
+             qui ignore alors toute taille demandée par le code. -->
+        <item name="android:windowIsFloating">true</item>
+        <!-- @null (pas juste transparent) : c'est ce qui supprime la "starting window" que
+             Android dessine au niveau système avant même que l'activité existe — une
+             ColorDrawable transparente, elle, continue d'être utilisée comme fond de cette
+             fenêtre de démarrage et peut apparaître grise selon le thème hérité. -->
+        <item name="android:windowBackground">@null</item>
         <item name="android:windowContentOverlay">@null</item>
-        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowAnimationStyle">@style/NoAnimation</item>
         <item name="android:windowNoTitle">true</item>
         <item name="windowActionBar">false</item>
-        <item name="android:windowIsFloating">true</item>
         <item name="android:backgroundDimEnabled">false</item>
         <item name="android:windowDisablePreview">true</item>
+        <item name="android:colorBackgroundCacheHint">@null</item>
+        <!-- Android 12+ affiche un "starting window" (SplashScreen API) au niveau système
+             AVANT même que le code de l'activité ne s'exécute — c'était le rectangle gris
+             observé, indépendant de tout ce qu'on fait dans onCreate(). Sans effet sur les
+             versions antérieures (attributs ignorés), donc rien à conditionner par API. -->
+        <item name="android:windowSplashScreenBackground">@android:color/transparent</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@android:color/transparent</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
     </style>
 </resources>
