@@ -18,7 +18,7 @@ import { updateDashboardWidget } from "./widgetSync.js";
 import { runAutoBackup } from "./autoBackup.js";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.25.1";
+const APP_VERSION = "3.26.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -2605,7 +2605,6 @@ export default function App({ silent = false } = {}) {
   // DashboardWidgetProvider.kt).
   useEffect(() => {
     if (loading || !Capacitor.isNativePlatform()) return;
-    const tgtW = phaseTarget(phase, targets);
     const wLast = lastN(weight, 1)[0];
     const lastNightDash = lastN(sleep, 1)[0];
     const mToday = macros.find((m) => m.date === today());
@@ -2618,11 +2617,14 @@ export default function App({ silent = false } = {}) {
     const kcalTgt = Math.round(at.protein * 4 + at.carbs * 4 + at.fat * 9);
 
     updateDashboardWidget({
-      poids: { value: wLast ? `${wLast.kg} kg` : "—", note: `cible ${tgtW}` },
+      poids: { value: wLast ? `${wLast.kg} kg` : "—", note: wLast ? fmt(wLast.date) : "—" },
       pas: { value: stepsToday.toLocaleString("fr-FR"), note: `/ ${STEPS_TARGET.toLocaleString("fr-FR")}` },
       calories: { value: kcalToday != null ? `${kcalToday}` : "—", note: `/ ${kcalTgt} kcal` },
       eau: { value: `${(waterToday / 1000).toFixed(2)} L`, note: `/ ${(waterTgt / 1000).toFixed(1)} L` },
-      sommeil: { value: lastNightDash ? fmtHM(lastNightDash.hours) : "—", note: lastNightDash ? fmt(lastNightDash.date) : "—" },
+      sommeil: {
+        value: lastNightDash ? fmtHM(lastNightDash.hours) : "—",
+        note: lastNightDash?.quality != null ? "★".repeat(lastNightDash.quality) : "—",
+      },
       // Pas de "value" affichée pour ce tile (juste l'icône Sync) — seule la note sert,
       // horodatage du dernier instantané poussé au widget (peu importe si déclenché par
       // l'ouverture normale de l'app ou par le bouton Sync lui-même).
@@ -2630,7 +2632,7 @@ export default function App({ silent = false } = {}) {
       // une tuile aussi étroite — condensé pour rester sur une ligne comme les autres notes.
       sync: { value: "", note: `MAJ ${new Date().toLocaleTimeString("fr-FR")}` },
     });
-  }, [loading, weight, sleep, macros, steps, training, targets, phase]);
+  }, [loading, weight, sleep, macros, steps, training, targets]);
 
   const save = {
     weight: (v) => { setWeight(v); store.set("weightLog", v); },
