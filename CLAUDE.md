@@ -51,6 +51,8 @@ versions plus anciennes que Claude connaîtrait mieux par défaut) :
 - @capacitor/core, @capacitor/android, @capacitor/app 8.4.x/8.1.x (app native)
 - @capgo/capacitor-health 8.10.0 (lecture Health Connect : pas, sommeil,
   énergie, hydratation — PAS le détail des macros, voir plus bas)
+- @capacitor-mlkit/barcode-scanning 8.1.0 (scan code-barres, module Nutrition M3,
+  natif seulement)
 
 ### Structure des fichiers
 ```
@@ -71,7 +73,8 @@ protocole-app/
     data/ciqual.json     # table CIQUAL compactée (3178 aliments, 246 Ko)
     nutrition/           # module Nutrition interne (onglet "Repas", bêta)
       ciqual.js          #   chargement lazy + recherche + scoring
-      off.js             #   recherche Open Food Facts (M2, produits de marque)
+      off.js             #   recherche + lecture par code-barres Open Food Facts
+      scan.js            #   scan code-barres ML Kit (M3, natif seulement)
       foodStore.js       #   clés foodLog/foodPins, totaux, favoris dérivés
       NutritionTab.jsx   #   l'onglet
       FoodSearch.jsx     #   recherche (CIQUAL + OFF), quantité, saisie libre
@@ -405,14 +408,14 @@ Objectif : se détacher complètement de MyFitnessPal / Cronometer en intégrant
 journal alimentaire dans PROTOCOLE, proche de Cronometer (journal pur, aucun
 coaching dans le module — le jugement reste au Coach IA).
 
-**Chantier volontairement itératif. M0-M2 livrés, M3+ reste à faire.**
+**Chantier volontairement itératif. M0-M3 livrés, M4+ reste à faire.**
 
 | Jalon | Contenu | État |
 |---|---|---|
 | M0 | Base CIQUAL + moteur de recherche | ✅ 01/08/2026 |
 | M1 | Onglet « Repas » isolé, CIQUAL + repas + historique | ✅ 01/08/2026 |
 | M2 | Open Food Facts (recherche texte, sans cache persisté) | ✅ 02/08/2026 |
-| M3 | Scan code-barres ML Kit (natif seulement) | à faire |
+| M3 | Scan code-barres ML Kit (natif seulement) | ✅ 02/08/2026 |
 | M4 | Portions/unités, recettes, copier un repas | à faire (quick-add livré en avance, voir plus bas) |
 | M5 | (abandonné — micronutriments écartés, voir plus bas) | — |
 | M6 | **Bascule** : `foodLog` alimente `macroLog`, coupure HC nutrition/eau | à faire |
@@ -541,11 +544,29 @@ coaching dans le module — le jugement reste au Coach IA).
     onglets de saisie (Poids, Sommeil, Pas, Séances, Genou, Macros) — une date future n'y
     a aucun sens, ce sont des mesures de ce qui s'est passé. Seul `NutritionTab` passe
     `future` pour lever le plafond.
-- M3 : utiliser `BarcodeScanner.scan()` (Google Code Scanner) et **pas**
-  `startScan()`, qui affiche la caméra derrière la WebView et impose de rendre le
-  fond transparent — incompatible avec le fond opaque du design system.
-  `@capacitor-mlkit/barcode-scanning` 8.1.0 déclare `@capacitor/core >=8.0.0`,
-  compatibilité vérifiée le 01/08/2026.
+- **M3 livré le 02/08/2026** (`@capacitor-mlkit/barcode-scanning` 8.1.0,
+  `src/nutrition/scan.js`) : `BarcodeScanner.scan()` (Google Code Scanner) et **pas**
+  `startScan()`, qui affiche la caméra derrière la WebView et impose de rendre le fond
+  transparent — incompatible avec le fond opaque du design system. Formats restreints à
+  EAN-13/EAN-8/UPC-A/UPC-E (codes-barres produits uniquement).
+  - **Aucune permission CAMERA déclarée dans le manifeste, ni demandée à l'exécution** :
+    `scan()` ouvre l'interface native de Google Play Services par-dessus l'app (comme un
+    intent), documenté explicitement par le plugin ("no camera permission is required").
+    Vérifié le 02/08/2026 après `npx cap sync` : `AndroidManifest.xml` ne gagne aucune
+    ligne `<uses-permission>`.
+  - **Lecture par code-barres (`getOFFByBarcode` dans `off.js`) : quota bien plus large
+    que la recherche texte**, vérifié par rafale de 4 lectures à <0,1 s d'écart sans
+    aucune 503 (contre 503 dès ~4-6 s d'écart en recherche texte, voir plus haut). Endpoint
+    `api/v0/product/{code}.json`, séparé de `cgi/search.pl` — aucun `MIN_GAP_MS` ni
+    espacement forcé pour ce chemin, juste la même reprise en cas de vrai souci réseau.
+  - Premier scan sur l'appareil : le module Play Services (quelques Mo) peut nécessiter un
+    téléchargement (`installGoogleBarcodeScannerModule()`), déclenché automatiquement avant
+    `scan()` si `isGoogleBarcodeScannerModuleAvailable()` répond `false`.
+  - `@capacitor-mlkit/barcode-scanning` 8.1.0 déclare `@capacitor/core >=8.0.0` et
+    `minSdkVersion` 24 (l'app est en 26) — compatibilité vérifiée le 01/08/2026.
+  - **Non testé en conditions réelles avec un vrai scan caméra** dans cette session (pas de
+    moyen de piloter la caméra du téléphone à distance) — build natif installé (v3.33.0),
+    premier vrai test à faire par Yoann sur l'appareil.
 
 ## Règles absolues à ne jamais casser
 

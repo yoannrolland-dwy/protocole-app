@@ -12,11 +12,13 @@
 // secondes d'utilisation normale.
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Search, X, ChevronLeft, Star, PencilLine, Trash2 } from "lucide-react";
+import { Search, X, ChevronLeft, Star, PencilLine, Trash2, ScanBarcode } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
 import { C, Btn, Label, Body, Empty, Stepper, TextInput, inputStyle } from "../ui.jsx";
 import { searchCiqual } from "./ciqual.js";
-import { searchOFF } from "./off.js";
+import { searchOFF, getOFFByBarcode } from "./off.js";
 import { suggestions, searchBoost, MACROS, newQuickRef } from "./foodStore.js";
+import { scanBarcode } from "./scan.js";
 
 const OFF_DEBOUNCE_MS = 700;
 
@@ -201,9 +203,24 @@ export default function FoodSearch({ meal, mealLabel, date, log, pins, muted, on
   // L'ajout rapide (bouton "Macro rapide" par repas) ouvre directement ce panneau, sans
   // passer par la recherche — la friction visée est justement d'éviter la recherche.
   const [free, setFree] = useState(startFree);
+  // idle | scanning | lookup | notfound | error — distinct de offState : le scan peut
+  // échouer avant même d'atteindre OFF (module Play Services, annulation).
+  const [scanState, setScanState] = useState("idle");
+  const [scanCode, setScanCode] = useState(null);
   const inputRef = useRef(null);
   const runId = useRef(0);
   const offRunId = useRef(0);
+
+  const scan = async () => {
+    setScanState("idle"); // efface un message d'un scan précédent (notfound/error)
+    const { code, status } = await scanBarcode();
+    if (status !== "ok") { if (status === "error") setScanState("error"); return; }
+    setScanCode(code);
+    setScanState("lookup");
+    const { item, notFound, error } = await getOFFByBarcode(code);
+    if (item) { setSel(item); setScanState("idle"); }
+    else setScanState(error ? "error" : "notfound");
+  };
 
   const boost = useMemo(() => searchBoost(log, { meal, date }), [log, meal, date]);
   const sugg = useMemo(() => suggestions(log, { meal, pins, muted, date }), [log, meal, pins, muted, date]);
@@ -264,12 +281,39 @@ export default function FoodSearch({ meal, mealLabel, date, log, pins, muted, on
           <QtyPanel food={sel} initialQ={sel.lastQ} onAdd={onAdd} onBack={() => setSel(null)} />
         ) : (
           <>
-            <div style={{ position: "relative", marginBottom: 12 }}>
-              <Search size={15} color={C.muted} style={{ position: "absolute", left: 10, top: 11 }} />
-              <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)}
-                placeholder="Rechercher un aliment…"
-                style={{ ...inputStyle(false), paddingLeft: 32, fontFamily: "inherit", fontWeight: 600 }} />
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <div style={{ position: "relative", flex: 1 }}>
+                <Search size={15} color={C.muted} style={{ position: "absolute", left: 10, top: 11 }} />
+                <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)}
+                  placeholder="Rechercher un aliment…"
+                  style={{ ...inputStyle(false), paddingLeft: 32, fontFamily: "inherit", fontWeight: 600 }} />
+              </div>
+              {/* M3, natif seulement : scan() (Google Code Scanner) — pas de permission
+                  caméra, pas d'écran web équivalent. */}
+              {Capacitor.isNativePlatform() && (
+                <button onClick={scan} disabled={scanState === "lookup"} style={{
+                  background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 6,
+                  width: 40, color: scanState === "lookup" ? C.dim : C.accent, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <ScanBarcode size={18} />
+                </button>
+              )}
             </div>
+
+            {scanState === "lookup" && (
+              <Body style={{ fontSize: 11, color: C.dim, padding: "0 0 10px" }}>Recherche du produit scanné…</Body>
+            )}
+            {scanState === "notfound" && (
+              <Body style={{ fontSize: 11, color: C.dim, padding: "0 0 10px" }}>
+                Code {scanCode} inconnu d'Open Food Facts. Cherchez-le à la main ou utilisez la saisie libre.
+              </Body>
+            )}
+            {scanState === "error" && (
+              <Body style={{ fontSize: 11, color: C.dim, padding: "0 0 10px" }}>
+                Scan indisponible pour le moment — réessayez.
+              </Body>
+            )}
 
             <Label style={{ marginBottom: 4 }}>
               {showSugg ? "Vos aliments habituels" : `${results.length} résultat${results.length > 1 ? "s" : ""}`}

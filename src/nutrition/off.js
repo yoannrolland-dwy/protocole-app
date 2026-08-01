@@ -31,12 +31,16 @@
 import { Capacitor, CapacitorHttp } from "@capacitor/core";
 
 const SEARCH_URL = "https://world.openfoodfacts.org/cgi/search.pl";
+const PRODUCT_URL = "https://world.openfoodfacts.org/api/v0/product";
 const FIELDS = "code,product_name,brands,nutriments,quantity";
 const UA = "PROTOCOLE-App/1.0 (usage personnel, non commercial)";
 
 const MIN_GAP_MS = 3000;
 let lastRequestAt = 0;
 const cache = new Map(); // query normalisée -> résultat (tableau de food)
+// Lecture par code-barres (M3, scan) : cache séparé, clé = code-barres brut, jamais
+// mélangé avec les termes de recherche texte ci-dessus.
+const barcodeCache = new Map();
 
 async function get(url) {
   if (Capacitor.isNativePlatform()) {
@@ -111,4 +115,40 @@ export async function searchOFF(query, { limit = 20 } = {}) {
       await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
     }
   }
+}
+
+/**
+ * Lecture directe d'un produit par code-barres (M3, scan ML Kit).
+ *
+ * Endpoint et quota DIFFÉRENTS de `searchOFF` : c'est une lecture par clé, pas une
+ * recherche — testé en rafale (plusieurs codes lus à moins de 1 s d'écart) sans jamais
+ * de 503, contrairement à `cgi/search.pl`. Pas de `MIN_GAP_MS` ni d'espacement forcé ici,
+ * seulement la même reprise en cas de vrai souci réseau (le scan est un geste ponctuel de
+ * l'utilisateur, pas une frappe répétée à amortir).
+ *
+ * @returns {{ item: object|null, notFound: boolean, error: boolean }}
+ *   `notFound` : code-barres inconnu d'OFF (réponse propre, pas une erreur) — à
+ *   distinguer d'`error` (réseau/serveur), pour des messages différents dans l'UI.
+ */
+export async function getOFFByBarcode(barcode) {
+  const code = String(barcode).trim();
+  if (!code) return { item: null, notFound: false, error: false };
+  if (barcodeCache.has(code)) return barcodeCache.get(code);
+
+  const url = `${PRODUCT_URL}/${encodeURIComponent(code)}.json`;
+  let result;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const data = await get(url);
+      result = data.status === 1 && data.product
+        ? { item: toFood({ ...data.product, code: data.product.code || code }), notFound: false, error: false }
+        : { item: null, notFound: true, error: false };
+      break;
+    } catch {
+      if (attempt >= RETRY_DELAYS_MS.length) { result = { item: null, notFound: false, error: true }; break; }
+      await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+    }
+  }
+  barcodeCache.set(code, result);
+  return result;
 }
