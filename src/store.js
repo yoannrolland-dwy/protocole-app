@@ -29,10 +29,15 @@ export const store = {
 // silencieusement perdue à la prochaine restauration.
 // `coachProfile` (contexte permanent écrit par l'utilisateur) et `coachJournal` (carnet de
 // bord tenu par le modèle) sont du texte libre, ajoutés le 30/07/2026.
+// `foodLog` / `foodPins` : module Nutrition interne (chantier du 01/08/2026, voir
+// src/nutrition/). Déclarés ici DÈS l'étape 1 alors que le module est encore isolé de
+// `macroLog` — un journal alimentaire absent de l'export serait perdu à la première
+// restauration, et c'est précisément le genre d'oubli que cette liste existe pour éviter.
 export const DATA_KEYS = [
   "weightLog", "sleepLog", "trainingLog", "kneeLog", "macroLog", "noteLog", "stepsLog",
   "targets", "phase", "hsrWeek", "model",
   "coachProfile", "coachJournal",
+  "foodLog", "foodPins",
 ];
 
 export function exportData() {

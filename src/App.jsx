@@ -4,7 +4,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Cell,
 } from "recharts";
 import {
-  LayoutDashboard, Scale, Moon, Dumbbell, HeartPulse, Utensils, Footprints,
+  LayoutDashboard, Scale, Moon, Dumbbell, HeartPulse, Utensils, Footprints, Apple,
   Plus, AlertTriangle, CheckCircle2, Circle, Sparkles, Trash2,
   Play, Pause, SkipForward, RotateCcw, Timer, Droplet,
   ChevronRight, ChevronDown, Zap, Settings, Download, Upload, X, Copy,
@@ -16,9 +16,20 @@ import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 import { updateDashboardWidget } from "./widgetSync.js";
 import { runAutoBackup } from "./autoBackup.js";
+// Design system "Affirmée" : jetons + primitives, extraits de ce fichier le 01/08/2026
+// pour être partageables avec src/nutrition/ (un import depuis App.jsx aurait été circulaire).
+import {
+  C, today, fmt, round, longDate,
+  Card, Label, Body, Big, Empty, Btn, inputStyle, TextInput, Stepper,
+  Field, DateField, Pills, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle,
+} from "./ui.jsx";
+// Module Nutrition interne (chantier du 01/08/2026). Volontairement isolé : il gère sa
+// propre clé `foodLog` et ne reçoit d'ici que les cibles, en lecture. Ni `macroLog` ni
+// healthSync.js ne sont concernés tant que la bascule (M6) n'est pas décidée.
+import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.28.0";
+const APP_VERSION = "3.29.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -27,29 +38,8 @@ const APP_VERSION = "3.28.0";
    charges, timer, stockage local persistant, coach IA.
    ============================================================ */
 
-/* ---------- jetons de design ---------- */
-const C = {
-  bg: "#050505",
-  card: "#121212",
-  border: "#2a2a2a",
-  borderDim: "#232323",
-  divider: "#1c1c1c",
-  accent: "#d7ff3f",
-  accentRow: "#0d1000",
-  text: "#f5f5f0",
-  text2: "#8a8a84",
-  muted: "#6b6b66",
-  dim: "#4a4a46",
-  danger: "#ff3b30",
-  dangerBg: "#1a0e0c",
-  dangerBorder: "#4a1c14",
-  dangerText: "#cc9999",
-  mono: "ui-monospace, Menlo, Monaco, monospace",
-};
 
 /* ---------- utilitaires ---------- */
-const today = () => new Date().toISOString().slice(0, 10);
-const fmt = (d) => { const p = d.split("-"); return `${p[2]}/${p[1]}`; };
 const byDate = (a, b) => a.date.localeCompare(b.date);
 const upsert = (arr, entry) => {
   const i = arr.findIndex((e) => e.date === entry.date);
@@ -59,7 +49,6 @@ const upsert = (arr, entry) => {
 };
 const lastN = (arr, n) => arr.slice(-n);
 const avg = (nums) => (nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null);
-const round = (x, d = 1) => (x == null ? null : Math.round(x * 10 ** d) / 10 ** d);
 const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
 // entrées comprises dans les n derniers jours (fenêtre glissante, aujourd'hui inclus)
 const withinDays = (arr, n) => arr.filter((e) => {
@@ -75,8 +64,6 @@ const fmtHM = (dec) => {
   if (m === 60) { h += 1; m = 0; }
   return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, "0")}`;
 };
-const longDate = (d) => new Date(d + "T12:00:00")
-  .toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
 
 /* ============================================================
    DONNÉES DE RÉFÉRENCE
@@ -517,53 +504,6 @@ function recommendSessions({ training, knee, sleep, targets }) {
   };
 }
 
-/* ============================================================
-   PRIMITIVES UI (design "Affirmée")
-   ============================================================ */
-const Card = ({ children, style = {}, accentLeft = false, danger = false, onClick }) => (
-  <div onClick={onClick} style={{
-    background: danger ? C.dangerBg : C.card,
-    border: `1.5px solid ${danger ? C.dangerBorder : C.border}`,
-    borderLeft: accentLeft ? `3px solid ${C.accent}` : danger ? `3px solid ${C.danger}` : undefined,
-    borderRadius: 10, padding: 14, ...style,
-  }}>{children}</div>
-);
-
-const Label = ({ children, style = {} }) => (
-  <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: 1.2, color: C.muted, fontWeight: 700, ...style }}>{children}</div>
-);
-
-const Body = ({ children, style = {} }) => (
-  <div style={{ fontSize: 11.5, color: C.text2, lineHeight: 1.5, ...style }}>{children}</div>
-);
-
-const Big = ({ value, unit, color = C.text, size = 44 }) => (
-  <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-    <span style={{ fontFamily: C.mono, fontSize: size, fontWeight: 800, color, letterSpacing: -1 }}>{value}</span>
-    {unit && <span style={{ fontSize: 13, color: C.muted, fontWeight: 700 }}>{unit}</span>}
-  </div>
-);
-
-const Empty = ({ children }) => (
-  <div style={{ textAlign: "center", color: C.dim, fontSize: 12, padding: "34px 0" }}>{children}</div>
-);
-
-function Btn({ children, onClick, variant = "outline", style = {}, disabled }) {
-  const v = {
-    primary: { background: C.accent, color: "#000", border: `1.5px solid ${C.accent}` },
-    outline: { background: C.card, color: C.accent, border: `1.5px solid ${C.accent}` },
-    plain:   { background: C.card, color: C.text2, border: `1.5px solid ${C.border}` },
-    ghost:   { background: "transparent", color: C.muted, border: "1.5px solid transparent" },
-    danger:  { background: "transparent", color: C.danger, border: `1.5px solid ${C.dangerBorder}` },
-  }[variant];
-  return (
-    <button onClick={onClick} disabled={disabled} style={{
-      ...v, borderRadius: 8, padding: "9px 12px", fontSize: 12, fontWeight: 800,
-      textTransform: "uppercase", letterSpacing: 0.5, cursor: "pointer",
-      opacity: disabled ? 0.4 : 1, fontFamily: "inherit", ...style,
-    }}>{children}</button>
-  );
-}
 
 // Bandeau affiché à la place de la saisie quand la donnée du jour vient de Health Connect —
 // avec un accès de secours pour corriger manuellement (jour manquant, valeur fausse).
@@ -577,102 +517,6 @@ const SyncedBanner = ({ onCorrect }) => (
   </div>
 );
 
-const inputStyle = (focused = false) => ({
-  background: C.bg, border: `1.5px solid ${focused ? C.accent : C.border}`,
-  borderRadius: 6, padding: "8px 10px", fontFamily: C.mono, fontSize: 13,
-  color: C.text, fontWeight: 700, width: "100%", outline: "none",
-});
-
-function TextInput({ value, onChange, placeholder, type = "text", inputMode, style = {} }) {
-  const [foc, setFoc] = useState(false);
-  return (
-    <input type={type} inputMode={inputMode} value={value} placeholder={placeholder}
-      onChange={onChange} onFocus={() => setFoc(true)} onBlur={() => setFoc(false)}
-      style={{ ...inputStyle(foc), ...style }} />
-  );
-}
-
-function Stepper({ value, set, step = 1, unit = "", min = 0, max = null, int = false }) {
-  const clamp = (v) => {
-    let x = int ? Math.round(v) : round(v, 2);
-    if (min != null) x = Math.max(min, x);
-    if (max != null) x = Math.min(max, x);
-    return x;
-  };
-  const [txt, setTxt] = useState(String(value));
-  const [foc, setFoc] = useState(false);
-  useEffect(() => { setTxt(String(value)); }, [value]);
-  const commit = (raw) => {
-    const n = parseFloat(String(raw).replace(",", "."));
-    if (isNaN(n)) { setTxt(String(value)); return; }
-    const v = clamp(n); set(v); setTxt(String(v));
-  };
-  const bump = (d) => set(clamp((Number(value) || 0) + d));
-  const sq = { background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 6,
-    color: C.accent, width: 38, height: 36, fontSize: 18, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" };
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <button onClick={() => bump(-step)} style={sq}>–</button>
-      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 5 }}>
-        <input type="text" inputMode="decimal" value={txt}
-          onChange={(e) => setTxt(e.target.value.replace(",", "."))}
-          onFocus={() => setFoc(true)}
-          onBlur={(e) => { setFoc(false); commit(e.target.value); }}
-          onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-          style={{ ...inputStyle(foc), textAlign: "center", fontSize: 16 }} />
-        {unit && <span style={{ fontSize: 12, color: C.muted, fontWeight: 700 }}>{unit}</span>}
-      </div>
-      <button onClick={() => bump(step)} style={sq}>+</button>
-    </div>
-  );
-}
-
-const Field = ({ label, children }) => (
-  <div>
-    <Label style={{ marginBottom: 5 }}>{label}</Label>
-    {children}
-  </div>
-);
-
-const DateField = ({ value, onChange }) => (
-  <Field label="Date">
-    <input type="date" value={value} max={today()} onChange={(e) => onChange(e.target.value)}
-      style={{ ...inputStyle(false), fontSize: 13 }} />
-  </Field>
-);
-
-function Pills({ options, value, onChange, small = false }) {
-  return (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-      {options.map((o) => {
-        const on = value === o.key;
-        return (
-          <button key={String(o.key)} onClick={() => onChange(o.key)} style={{
-            padding: small ? "5px 10px" : "7px 12px", borderRadius: 6, cursor: "pointer",
-            fontSize: small ? 11 : 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5,
-            background: on ? C.accent : C.card, color: on ? "#000" : C.muted,
-            border: `1.5px solid ${on ? C.accent : C.border}`, fontFamily: "inherit",
-          }}>{o.label}</button>
-        );
-      })}
-    </div>
-  );
-}
-
-const ScreenHeader = ({ title, subtitle, right }) => (
-  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-    <div>
-      <div style={{ fontSize: 16, color: C.text, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>{title}</div>
-      {subtitle && <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{subtitle}</div>}
-    </div>
-    {right}
-  </div>
-);
-
-const chartAxis = { fontSize: 10, fill: C.muted };
-const tooltipStyle = { background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 8, fontSize: 12, color: C.text };
-// recharts met la valeur en noir par défaut (invisible sur fond sombre) sans itemStyle explicite
-const tooltipItemStyle = { color: C.text, fontWeight: 700 };
 
 /* ============================================================
    ROUTINE PLAYER
@@ -2887,6 +2731,7 @@ Fais-moi une revue de fond : tendances sur la durée, corrélations entre apport
     { key: "train", label: "Séances", icon: Dumbbell },
     { key: "knee", label: "Genou", icon: HeartPulse },
     { key: "macro", label: "Macros", icon: Utensils },
+    { key: "food", label: "Repas", icon: Apple },
   ];
 
   // Lancé par le bouton Sync du widget (SilentSyncActivity, voir main.jsx) : tous les
@@ -2935,6 +2780,7 @@ Fais-moi une revue de fond : tendances sur la durée, corrélations entre apport
             {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek }} />}
             {tab === "knee" && <KneeTab {...{ knee, save, hsrWeek }} />}
             {tab === "macro" && <MacroTab {...{ macros, targets, save, training }} />}
+            {tab === "food" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} />}
           </>
         )}
       </main>
@@ -2949,7 +2795,10 @@ Fais-moi une revue de fond : tendances sur la durée, corrélations entre apport
           const on = tab === key && !showSettings;
           return (
             <button key={key} onClick={() => { setTab(key); setShowSettings(false); }} style={{
-              background: "none", border: "none", cursor: "pointer", padding: "2px 6px",
+              // 8 onglets depuis l'ajout de « Repas » : le padding horizontal passe de 6 à 3
+              // pour que les libellés les plus longs (« Sommeil », « Séances ») tiennent
+              // encore sur une ligne à 360 px de large.
+              background: "none", border: "none", cursor: "pointer", padding: "2px 3px",
               display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
               color: on ? C.accent : C.dim, fontFamily: "inherit",
             }}>

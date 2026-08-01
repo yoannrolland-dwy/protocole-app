@@ -66,6 +66,14 @@ protocole-app/
     App.jsx              # TOUT le code applicatif (~2100 lignes, un seul fichier)
     store.js             # persistance localStorage + export/import JSON
     healthSync.js        # synchro Health Connect (pas/sommeil/macros/eau)
+    ui.jsx               # design system "Affirmée" : jetons C + primitives,
+                         # extraits d'App.jsx le 01/08/2026 pour être partagés
+    data/ciqual.json     # table CIQUAL compactée (3178 aliments, 246 Ko)
+    nutrition/           # module Nutrition interne (onglet "Repas", bêta)
+      ciqual.js          #   chargement lazy + recherche + scoring
+      foodStore.js       #   clés foodLog/foodPins, totaux, favoris dérivés
+      NutritionTab.jsx   #   l'onglet
+      FoodSearch.jsx     #   recherche, quantité, saisie libre
     index.css            # @import "tailwindcss" + resets minimaux
   android/               # projet natif Capacitor — build/déploiement séparé
                          # de la PWA, voir "Mise à jour de l'app native"
@@ -92,7 +100,8 @@ protocole-app/
 
 ## Fonctionnalités en place (ne pas régresser sans le signaler)
 
-- **7 onglets** : Tableau de bord, Poids, Sommeil, Pas, Séances, Genou, Macros
+- **8 onglets** : Tableau de bord, Poids, Sommeil, Pas, Séances, Genou, Macros,
+  Repas (module Nutrition interne en bêta — voir la section dédiée plus bas)
 - **Carnet de musculation série par série** (`MuscuLogger`) : grille
   kg × reps (ou secondes pour les exos en mode "temps"), mémoire de la
   dernière perf **par série** (pas juste par exercice — si la 3e série était
@@ -389,12 +398,93 @@ protocole-app/
   `READ_TYPES` dans `healthSync.js`, réutilise le même écran de consentement
   @capgo que nutrition/hydratation/sommeil/pas.
 
+## Module Nutrition interne (chantier ouvert le 01/08/2026)
+
+Objectif : se détacher complètement de MyFitnessPal / Cronometer en intégrant un
+journal alimentaire dans PROTOCOLE, proche de Cronometer (journal pur, aucun
+coaching dans le module — le jugement reste au Coach IA).
+
+**Chantier volontairement itératif. M1 est livré, M2+ reste à faire.**
+
+| Jalon | Contenu | État |
+|---|---|---|
+| M0 | Base CIQUAL + moteur de recherche | ✅ 01/08/2026 |
+| M1 | Onglet « Repas » isolé, CIQUAL + repas + historique | ✅ 01/08/2026 |
+| M2 | Open Food Facts (recherche texte + cache produits) | à faire |
+| M3 | Scan code-barres ML Kit (natif seulement) | à faire |
+| M4 | Portions/unités, recettes, copier un repas, quick-add | à faire |
+| M5 | (abandonné — micronutriments écartés, voir plus bas) | — |
+| M6 | **Bascule** : `foodLog` alimente `macroLog`, coupure HC nutrition/eau | à faire |
+| M7 | Retrait des permissions HC nutrition/hydratation | à faire |
+
+### Décisions prises (ne pas les rouvrir sans demande explicite)
+
+- **Pas de base de données. Pas de Room, pas de SQLite, pas de plugin natif.**
+  CIQUAL tient en 3 178 lignes / 246 Ko (`src/data/ciqual.json`, chunk séparé de
+  74 Ko gzip, précaché par le service worker). Balayage linéaire en JS :
+  **0,24 ms par recherche**, mesuré. Room aurait imposé du Kotlin, un aller-retour
+  JS↔natif par frappe, et un module mort sur la PWA.
+- **Seulement 5 valeurs par aliment : kcal, protéines, glucides, lipides, fibres.**
+  Micronutriments écartés explicitement par Yoann le 01/08/2026 — ce qui aligne
+  exactement le module sur ce que `macroLog` suit déjà, donc la bascule M6 sera un
+  mapping direct.
+- **`src/nutrition/` et `src/ui.jsx` : la convention « tout dans App.jsx » est
+  levée pour ce chantier** (validé par Yoann). Les primitives du design system ont
+  été sorties de `App.jsx` vers `src/ui.jsx` à l'identique — sans ça, le module
+  nutrition ne pouvait pas les réutiliser sans import circulaire.
+- **Étape 1 strictement isolée** : `NutritionTab` gère sa propre clé `foodLog` et
+  ne reçoit d'`App.jsx` que les cibles, en lecture. `macroLog`, `MacroTab` et
+  `healthSync.js` ne sont pas touchés — Cronometer continue en parallèle, et
+  retirer l'onglet suffit à tout annuler.
+- **Health Connect nutrition/hydratation deviendra inutile, mais seulement à M6.**
+  Le vrai risque est là : tant que `runHealthSync` tourne, il écrase `macroLog`
+  avec les données Cronometer à chaque retour au premier plan. Au moment de la
+  bascule il faut **couper la lecture nutrition/eau**, pas seulement écrire
+  ailleurs. En revanche **ne pas écrire vers Health Connect** : rien ne consomme
+  ces données chez Yoann, ce serait deux permissions de plus pour rien. Pas,
+  sommeil et poids restent sur Health Connect, inchangés.
+
+### Points techniques à connaître
+
+- `scripts/build-ciqual.mjs` régénère `src/data/ciqual.json` depuis le XML ANSES.
+  Lancé **à la main**, résultat commité : aucun accès réseau au build Netlify.
+  Licence Ouverte Etalab 2.0, attribution affichée dans l'écran de recherche.
+- **887 aliments CIQUAL n'ont aucune énergie tabulée** (ni constituant 328 ni 333),
+  dont des aliments de base : sucre, lentilles cuites, amandes. L'énergie est alors
+  recalculée depuis les macros avec les coefficients du règlement UE 1169/2011
+  (+ 7 kcal/g d'alcool, sinon vin et sangria étaient donnés à moitié prix). Un
+  garde-fou du script alerte si une boisson alcoolisée passe sans teneur en alcool.
+- `ALIM_NOM_INDEX_FR` de l'ANSES contient de vrais **synonymes** (« Cocktail à base
+  de rhum » → « Mojito, pina colada, daïquiri… ») : 542 alias de recherche gratuits.
+- Le scoring de recherche gère les **accords français** (« pâte complète » trouve
+  « Pâtes sèches, au blé complet ») et les **mots vides** (« blanc de poulet » ne
+  doit pas classer sur « de »). Curseur à régler en cas de mauvais classement :
+  `BREVITY` dans `ciqual.js`.
+- **Favoris et historique ne sont pas stockés : ils se dérivent de `foodLog`**
+  (fréquence + spécificité au repas + récence). Une liste tenue en parallèle
+  finirait par diverger. Seul l'épinglage manuel a une clé (`foodPins`).
+- `per100` est **figé à la saisie** (snapshot) : un produit Open Food Facts peut
+  être corrigé ou disparaître, l'historique doit rester reproductible.
+- **Poids réel mesuré : 236 octets par ligne de journal**, soit ~860 Ko/an à
+  10 lignes/jour. Tenable sous le quota localStorage mais ce n'est plus
+  négligeable comme l'est `macroLog` (1 ligne/jour). C'est ce chiffre mesuré, pas
+  une estimation, qui doit servir à décider d'un éventuel passage à SQLite.
+- Open Food Facts (M2) : quota **~10 req/min sur la recherche texte** (~100 sur le
+  code-barres) → pas de recherche à la frappe sur OFF, déclenchement après une
+  pause seulement. L'en-tête `User-Agent` exigé par OFF est interdit en JS
+  navigateur : passer par `CapacitorHttp` sur le natif.
+- M3 : utiliser `BarcodeScanner.scan()` (Google Code Scanner) et **pas**
+  `startScan()`, qui affiche la caméra derrière la WebView et impose de rendre le
+  fond transparent — incompatible avec le fond opaque du design system.
+  `@capacitor-mlkit/barcode-scanning` 8.1.0 déclare `@capacitor/core >=8.0.0`,
+  compatibilité vérifiée le 01/08/2026.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
    `trainingLog`, `kneeLog`, `macroLog`, `noteLog`, `stepsLog`, `targets`,
-   `phase`, `hsrWeek`, `apiKey`, `model`, `coachProfile`, `coachJournal` —
-   préfixées `protocole:` dans `store.js`)
+   `phase`, `hsrWeek`, `apiKey`, `model`, `coachProfile`, `coachJournal`,
+   `foodLog`, `foodPins` — préfixées `protocole:` dans `store.js`)
    sans écrire une migration. Casser une clé = perdre l'historique de
    l'utilisateur, ce qui est la pire chose possible ici.
    **Toute nouvelle clé doit être ajoutée à `DATA_KEYS` dans `store.js`**,

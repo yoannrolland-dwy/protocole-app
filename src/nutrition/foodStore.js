@@ -1,0 +1,190 @@
+// Journal alimentaire — état et persistance du module Nutrition (M1).
+//
+// ISOLATION VOLONTAIRE (étape 1 du chantier du 01/08/2026) : ce module possède sa propre
+// clé localStorage et gère lui-même son chargement/sauvegarde. Il n'écrit RIEN dans
+// `macroLog`, ne touche pas à healthSync.js, et App.jsx ne fait que monter l'onglet.
+// Tant que la bascule (M6) n'est pas faite, Cronometer continue d'alimenter `macroLog`
+// via Health Connect sans le moindre conflit, et retirer l'onglet suffit à tout annuler.
+
+import { useEffect, useState } from "react";
+import { store } from "../store.js";
+
+export const MEALS = [
+  { key: "petitdej", label: "Petit-déjeuner" },
+  { key: "dejeuner", label: "Déjeuner" },
+  { key: "gouter", label: "Goûter" },
+  { key: "diner", label: "Dîner" },
+  { key: "autre", label: "Autre" },
+];
+
+export const MACROS = ["kcal", "prot", "gluc", "lip", "fib"];
+
+const todayKey = () => new Date().toISOString().slice(0, 10);
+
+// randomUUID exige un contexte sécurisé. La WebView Capacitor sert bien depuis un origine
+// sécurisée, mais un repli coûte trois lignes et évite un plantage silencieux à la saisie.
+const newId = () =>
+  (globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`);
+
+/**
+ * Une ligne de journal.
+ *
+ * `per100` est FIGÉ à la saisie (snapshot), pas résolu à la lecture : un produit Open Food
+ * Facts peut être corrigé ou disparaître, et l'historique doit rester reproductible.
+ * On ne fige que les 5 macros.
+ *
+ * Poids réel MESURÉ le 01/08/2026 : 236 octets par ligne une fois sérialisée (l'id UUID
+ * et l'horodatage ISO pèsent à eux seuls 60 caractères). Soit ~2,4 Ko/jour à 10 lignes,
+ * donc ~860 Ko par an — tenable sous le quota localStorage (5-10 Mo), mais plus le
+ * poste négligeable qu'est `macroLog` (1 ligne/jour). C'est ce chiffre, et pas une
+ * estimation, qui doit servir à décider d'un éventuel passage à SQLite.
+ *
+ * `ref` porte la source (`ciqual:` / `off:` / `custom:` / `quick`), ce qui rend la ligne
+ * auto-suffisante pour être rejouée, dédupliquée et scorée.
+ */
+export function makeEntry({ date, meal, food, q }) {
+  return {
+    id: newId(),
+    date,
+    meal,
+    ref: food.ref,
+    name: food.name,
+    q: Number(q),
+    per100: {
+      kcal: food.per100.kcal, prot: food.per100.prot,
+      gluc: food.per100.gluc, lip: food.per100.lip, fib: food.per100.fib,
+    },
+    at: new Date().toISOString(),
+  };
+}
+
+// Valeurs réelles d'une ligne = per100 × quantité / 100. `null` reste `null` : une donnée
+// absente de la table ne doit jamais être présentée comme un zéro mesuré.
+// Les calories sont arrondies à l'entier (une décimale de kcal n'a aucun sens et créait
+// un écart visible entre le total d'un repas et la ligne qui le compose), les macros au
+// dixième de gramme.
+export function amounts(e) {
+  const k = e.q / 100;
+  const out = {};
+  for (const m of MACROS) {
+    const v = e.per100?.[m];
+    out[m] = v === null || v === undefined ? null
+      : m === "kcal" ? Math.round(v * k)
+      : Math.round(v * k * 10) / 10;
+  }
+  return out;
+}
+
+export function entriesFor(log, date) {
+  return log.filter((e) => e.date === date);
+}
+
+/**
+ * Totaux d'un ensemble de lignes.
+ * `missing` compte, par macro, les lignes dont la donnée est absente — pour que l'UI
+ * puisse afficher un total honnête (« 148 g + ? ») plutôt qu'un chiffre faussement exact.
+ */
+export function totals(entries) {
+  const t = { kcal: 0, prot: 0, gluc: 0, lip: 0, fib: 0 };
+  const missing = { kcal: 0, prot: 0, gluc: 0, lip: 0, fib: 0 };
+  for (const e of entries) {
+    const a = amounts(e);
+    for (const m of MACROS) {
+      if (a[m] === null) missing[m]++;
+      else t[m] += a[m];
+    }
+  }
+  for (const m of MACROS) t[m] = m === "kcal" ? Math.round(t[m]) : Math.round(t[m] * 10) / 10;
+  return { ...t, missing };
+}
+
+// --- Favoris et historique intelligent ---------------------------------------
+//
+// Rien n'est stocké : tout se DÉRIVE de `foodLog`. Une liste de favoris entretenue en
+// parallèle finirait forcément par diverger du journal (aliment supprimé, renommé,
+// import JSON partiel) ; dérivée, elle est juste par construction et coûte zéro octet.
+
+const WINDOW_DAYS = 60;
+
+const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+
+/**
+ * Statistiques d'usage par `ref` sur les 60 derniers jours.
+ * @returns {Map<string, {ref, name, per100, freq, mealFreq, days}>}
+ */
+export function usageStats(log, { meal, date = todayKey() } = {}) {
+  const stats = new Map();
+  for (const e of log) {
+    const age = daysBetween(e.date, date);
+    if (age < 0 || age > WINDOW_DAYS) continue;
+    let s = stats.get(e.ref);
+    if (!s) stats.set(e.ref, (s = { ref: e.ref, name: e.name, per100: e.per100, freq: 0, mealFreq: 0, days: age, lastQ: e.q }));
+    s.freq++;
+    if (meal && e.meal === meal) s.mealFreq++;
+    if (age <= s.days) { s.days = age; s.name = e.name; s.per100 = e.per100; s.lastQ = e.q; }
+  }
+  return stats;
+}
+
+// Fréquence + spécificité au repas + récence. Le facteur 2 sur `mealFreq` fait qu'un
+// aliment mangé tous les matins domine la liste du petit-déjeuner sans polluer celle du
+// dîner, ce qui est le comportement recherché.
+const score = (s) => s.freq + 2 * s.mealFreq + Math.max(0, 14 - s.days);
+
+/** Aliments à proposer avant toute frappe (l'écran d'ajout ouvre là-dessus). */
+export function suggestions(log, { meal, pins = [], limit = 12, date = todayKey() } = {}) {
+  const stats = usageStats(log, { meal, date });
+  const pinned = new Set(pins);
+  return [...stats.values()]
+    .map((s) => ({ ...s, _s: score(s) + (pinned.has(s.ref) ? 1000 : 0) }))
+    .sort((a, b) => b._s - a._s)
+    .slice(0, limit)
+    .map((s) => ({ ref: s.ref, name: s.name, per100: s.per100, lastQ: s.lastQ, pinned: pinned.has(s.ref) }));
+}
+
+/**
+ * Bonus à injecter dans searchCiqual : fait remonter ce que l'utilisateur mange vraiment.
+ * Plafonné à 30 points — de quoi départager des résultats proches (les scores textuels
+ * tournent autour de 90-200), jamais de quoi imposer un aliment hors sujet.
+ */
+export function searchBoost(log, { meal, date = todayKey() } = {}) {
+  const stats = usageStats(log, { meal, date });
+  const byCode = new Map();
+  for (const s of stats.values()) {
+    const m = /^ciqual:(\d+)$/.exec(s.ref);
+    if (m) byCode.set(Number(m[1]), Math.min(30, score(s)));
+  }
+  return (code) => byCode.get(code) || 0;
+}
+
+// --- Hook de persistance ------------------------------------------------------
+
+export function useFoodLog() {
+  const [log, setLog] = useState([]);
+  const [pins, setPins] = useState([]);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      setLog(await store.get("foodLog", []));
+      setPins(await store.get("foodPins", []));
+      setReady(true);
+    })();
+  }, []);
+
+  const write = (next) => { setLog(next); store.set("foodLog", next); };
+
+  return {
+    log,
+    pins,
+    ready,
+    add: (e) => write([...log, e]),
+    update: (id, patch) => write(log.map((e) => (e.id === id ? { ...e, ...patch } : e))),
+    remove: (id) => write(log.filter((e) => e.id !== id)),
+    togglePin: (ref) => {
+      const next = pins.includes(ref) ? pins.filter((r) => r !== ref) : [...pins, ref];
+      setPins(next);
+      store.set("foodPins", next);
+    },
+  };
+}
