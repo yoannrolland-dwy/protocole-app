@@ -307,11 +307,40 @@ class HealthNutritionPlugin : Plugin() {
                 fun <T> dedupe(records: List<T>, key: (T) -> String, modifiedAt: (T) -> Instant) =
                     records.groupBy(key).values.map { grp -> grp.maxByOrNull(modifiedAt)!! }
 
-                val nutriRecords = dedupe(
-                    hc.readRecords(ReadRecordsRequest(NutritionRecord::class, range)).records,
-                    { "${it.metadata.dataOrigin.packageName}|${it.startTime}" },
-                    { it.metadata.lastModifiedTime },
-                )
+                // Cronometer casse l'hypothèse ci-dessus : il écrit un NutritionRecord PAR REPAS,
+                // mais tous avec le MÊME instant de début nominal dans la journée (constaté le
+                // 01/08/2026 — 4 enregistrements, même "start", valeurs différentes). La
+                // déduplication par (source + début) ci-dessus en gardait un seul, perdant 3
+                // repas sur 4. MyFitnessPal, lui, écrit un total de JOURNÉE ENTIÈRE qui évolue
+                // (mêmes début/fin, valeurs qui grossissent au fil des ajouts) — plusieurs
+                // versions du même total ne doivent PAS s'additionner, juste garder la dernière.
+                // Impossible de distinguer les deux comportements sans connaître la source :
+                // on ne resserre donc la déduplication par (source + début) qu'aux sources
+                // connues pour écrire un total de journée plutôt qu'un repas.
+                val WHOLE_DAY_SUMMARY_SOURCES = setOf("com.myfitnesspal.android")
+
+                fun nutritionExactKey(r: NutritionRecord) = listOf(
+                    r.metadata.dataOrigin.packageName, r.startTime,
+                    r.energy?.inKilocalories, r.protein?.inGrams, r.totalCarbohydrate?.inGrams,
+                    r.totalFat?.inGrams, r.dietaryFiber?.inGrams,
+                ).joinToString("|")
+
+                val nutriRecords = hc.readRecords(ReadRecordsRequest(NutritionRecord::class, range)).records
+                    // 1) Retire les doublons stricts (mêmes valeurs, même instant, même source) —
+                    //    écritures répétées identiques, vues avec Cronometer (deux écritures à
+                    //    46 ms d'intervalle pour le même repas).
+                    .groupBy { nutritionExactKey(it) }.values.map { grp -> grp.maxByOrNull { it.metadata.lastModifiedTime }!! }
+                    // 2) Repas distincts au même instant nominal (Cronometer) : gardés tels quels,
+                    //    additionnés plus bas. Total de journée réécrit (MyFitnessPal) : ne garder
+                    //    que la version la plus récente par (source + début).
+                    .groupBy { it.metadata.dataOrigin.packageName }
+                    .flatMap { (src, recs) ->
+                        if (src in WHOLE_DAY_SUMMARY_SOURCES) {
+                            recs.groupBy { it.startTime }.values.map { grp -> grp.maxByOrNull { it.metadata.lastModifiedTime }!! }
+                        } else {
+                            recs
+                        }
+                    }
                 nutriRecords.forEach { r ->
                     val d = days.getOrPut(dayOf(r.startTime)) { DayTotals() }
                     r.energy?.inKilocalories?.let { d.kcal += it; d.hasNutrition = true }
