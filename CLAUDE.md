@@ -408,7 +408,7 @@ Objectif : se détacher complètement de MyFitnessPal / Cronometer en intégrant
 journal alimentaire dans PROTOCOLE, proche de Cronometer (journal pur, aucun
 coaching dans le module — le jugement reste au Coach IA).
 
-**Chantier volontairement itératif. M0-M3 livrés, M4+ reste à faire.**
+**Chantier volontairement itératif. M0-M4 livrés, M6+ reste à faire (M5 abandonné).**
 
 | Jalon | Contenu | État |
 |---|---|---|
@@ -416,7 +416,7 @@ coaching dans le module — le jugement reste au Coach IA).
 | M1 | Onglet « Repas » isolé, CIQUAL + repas + historique | ✅ 01/08/2026 |
 | M2 | Open Food Facts (recherche texte, sans cache persisté) | ✅ 02/08/2026 |
 | M3 | Scan code-barres ML Kit (natif seulement) | ✅ 02/08/2026 |
-| M4 | Portions/unités, recettes, copier un repas | à faire (quick-add livré en avance, voir plus bas) |
+| M4 | Portions/unités, recettes, copier un repas | ✅ 02/08/2026 (quick-add livré en avance dès M2) |
 | M5 | (abandonné — micronutriments écartés, voir plus bas) | — |
 | M6 | **Bascule** : `foodLog` alimente `macroLog`, coupure HC nutrition/eau | à faire |
 | M7 | Retrait des permissions HC nutrition/hydratation | à faire |
@@ -566,14 +566,60 @@ coaching dans le module — le jugement reste au Coach IA).
     `minSdkVersion` 24 (l'app est en 26) — compatibilité vérifiée le 01/08/2026.
   - **Non testé en conditions réelles avec un vrai scan caméra** dans cette session (pas de
     moyen de piloter la caméra du téléphone à distance) — build natif installé (v3.33.0),
-    premier vrai test à faire par Yoann sur l'appareil.
+    **testé avec succès par Yoann sur l'appareil le 02/08/2026.**
+- **M4 livré le 02/08/2026.** Trois briques indépendantes, toutes réutilisent le pipeline
+  existant sans code dédié supplémentaire côté journal :
+  - **Copier un repas** (`copySourceCandidates`/`copyEntries` dans `foodStore.js`) : liste
+    les jours (passés OU futurs déjà planifiés) qui ont déjà CE repas précis rempli, tap =
+    duplication immédiate (nouveaux `id`/horodatage, `ref`/`per100` intacts). Panneau
+    inline dans la carte du repas, pas une feuille plein écran — c'est un choix rapide
+    parmi peu d'options.
+  - **Portions nommées** (`foodPortions`, ref → `[{label, grams}]`) : "1 pot = 125 g"
+    directement dans `QtyPanel`, apprises une fois par aliment (`ref`), valables pour
+    toutes ses saisies futures dans n'importe quel repas. Épinglé/masqué n'a pas
+    d'équivalent ici : une portion mal nommée se supprime avec le `×` sur sa chip.
+  - **Recettes** (`foodRecipes`, `compileRecipe`/`recipeAsFood` dans `foodStore.js`) :
+    compile une liste d'ingrédients (recherche CIQUAL dédiée, volontairement sans OFF pour
+    ne pas imbriquer son quota/debounce dans un sous-écran) en UN `per100` sur le poids
+    total, avec un `ref` stable `recipe:<id>`. **Décision clé** : une recette devient un
+    "aliment" comme un autre (même forme `{ref, name, per100}`) plutôt qu'un mécanisme
+    séparé — elle traverse `QtyPanel`, les portions nommées, la recherche, tout le reste,
+    sans un seul `if` dédié. `defaultQ = totalWeight` : une recette se mange en général en
+    un lot défini, pas par portion de 100 g comme un aliment brut. Une macro devient
+    `null` sur toute la recette si NE SERAIT-CE QU'UN ingrédient avec une quantité > 0 a
+    cette macro absente — additionner un nombre et une inconnue ne donne jamais un vrai
+    total. Section "Vos recettes" dans `FoodSearch` : toujours visible sans frappe (jamais
+    de réseau, la liste reste courte), filtrée par nom sinon.
+  - Bug de coordonnées rencontré en testant "Copier un repas" dans le navigateur d'aperçu
+    Claude Code (pas un bug de l'app) : un clic ciblant le conteneur du panneau au lieu de
+    la ligne cliquable à l'intérieur ne déclenchait rien silencieusement — résolu en
+    ciblant l'élément DOM précis plutôt que des coordonnées d'écran.
+- **Retours du 02/08/2026 sur M4, deux ajouts avant le commit :**
+  - **OFF dans le sélecteur d'ingrédients de recette.** La séparation stricte M2 (pas d'OFF
+    dans `IngredientPicker`, pour ne pas imbriquer son quota/debounce) a été révisée : Yoann
+    mange surtout des produits à code-barres, donc CIQUAL seul manquait trop d'ingrédients
+    réels. Extrait un hook partagé `useFoodSearch(q, {boost, limit})` (CIQUAL + OFF, même
+    debounce 700 ms) et un composant `OffSection`, utilisés à la fois par la recherche
+    principale et `IngredientPicker` — élimine la duplication plutôt que de recopier la
+    logique une deuxième fois.
+  - **Dupliquer une journée (sens inverse de "Copier un repas")** : `DuplicatePanel` dans
+    `NutritionTab.jsx`, accessible depuis la carte Date. Là où "Copier un repas" part d'un
+    repas VIDE et choisit où TIRER (un jour source), celui-ci part du jour AFFICHÉ et choisit
+    où COLLER (un ou plusieurs repas, "Toute la journée", vers une date au choix — passée ou
+    future). **Aucun risque d'écrasement** : ni cette fonctionnalité ni `copyEntries` ne
+    suppriment jamais rien, elles ne font qu'AJOUTER des lignes — un aliment déjà présent sur
+    le jour cible n'est jamais touché, propriété déjà vraie de `copyEntries` avant même cette
+    demande, donc aucune logique de fusion à écrire séparément. Cases pré-cochées sur les
+    repas qui ont déjà du contenu le jour affiché. Testé : contenu ajouté deux fois de suite
+    sur la même date cible, l'entrée saisie manuellement entre les deux n'a pas bougé.
 
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
    `trainingLog`, `kneeLog`, `macroLog`, `noteLog`, `stepsLog`, `targets`,
    `phase`, `hsrWeek`, `apiKey`, `model`, `coachProfile`, `coachJournal`,
-   `foodLog`, `foodPins` — préfixées `protocole:` dans `store.js`)
+   `foodLog`, `foodPins`, `foodMuted`, `foodPortions`, `foodRecipes` —
+   préfixées `protocole:` dans `store.js`)
    sans écrire une migration. Casser une clé = perdre l'historique de
    l'utilisateur, ce qui est la pire chose possible ici.
    **Toute nouvelle clé doit être ajoutée à `DATA_KEYS` dans `store.js`**,

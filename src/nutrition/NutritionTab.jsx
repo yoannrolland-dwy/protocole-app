@@ -5,9 +5,12 @@
 // continue en parallèle et retirer l'onglet suffit à tout annuler.
 
 import React, { useState, useMemo } from "react";
-import { Plus, Trash2, ChevronDown, ChevronRight, Droplet, Zap } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight, Droplet, Zap, Copy } from "lucide-react";
 import { C, Card, Label, Body, Btn, Empty, Stepper, DateField, ScreenHeader, Pills, today, fmt, upsert } from "../ui.jsx";
-import { MEALS, useFoodLog, makeEntry, amounts, entriesFor, totals, isQuickRef } from "./foodStore.js";
+import {
+  MEALS, useFoodLog, makeEntry, amounts, entriesFor, totals, isQuickRef,
+  copySourceCandidates, copyEntries,
+} from "./foodStore.js";
 import FoodSearch from "./FoodSearch.jsx";
 
 const MEAL_OPTIONS = MEALS.map((m) => ({ key: m.key, label: m.label }));
@@ -79,6 +82,80 @@ function EntryRow({ e, onUpdate, onRemove }) {
   );
 }
 
+// "Copier un repas" (M4) : liste des jours qui ont déjà ce repas rempli, tap = copie
+// immédiate. Panneau inline (pas une feuille plein écran) — c'est un choix rapide parmi
+// peu d'options, pas une recherche.
+function CopyPanel({ candidates, onPick, onClose }) {
+  return (
+    <div style={{ padding: "4px 0 10px" }}>
+      {candidates.length === 0 ? (
+        <Body style={{ fontSize: 11, color: C.dim }}>Aucun autre jour avec ce repas rempli.</Body>
+      ) : candidates.map((c) => (
+        <div key={c.date} onClick={() => onPick(c.date)} style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          padding: "8px 2px", borderBottom: `1px solid ${C.divider}`, cursor: "pointer",
+        }}>
+          <span style={{ fontSize: 12, color: C.text }}>{fmt(c.date)}</span>
+          <span style={{ fontFamily: C.mono, fontSize: 11, color: C.muted }}>
+            {c.count} aliment{c.count > 1 ? "s" : ""} · {c.kcal} kcal{c.missing > 0 ? " +?" : ""}
+          </span>
+        </div>
+      ))}
+      <Btn variant="ghost" onClick={onClose} style={{ width: "100%", marginTop: 6, padding: "6px 12px", fontSize: 10.5 }}>Annuler</Btn>
+    </div>
+  );
+}
+
+// Dupliquer la journée affichée vers une autre date (M4, sens inverse de CopyPanel :
+// ici on part du jour courant pour choisir où COLLER, plutôt que de choisir d'où TIRER).
+// Fusion, jamais d'écrasement : copyEntries ne fait qu'AJOUTER des lignes, ce qui suffit
+// à garantir qu'un aliment déjà présent sur le jour cible n'est jamais touché.
+function DuplicatePanel({ entries, date, onConfirm, onClose }) {
+  const [checked, setChecked] = useState(
+    () => new Set(MEALS.filter((m) => entries.some((e) => e.meal === m.key)).map((m) => m.key)),
+  );
+  const [target, setTarget] = useState("");
+  const allChecked = checked.size === MEALS.length;
+  const toggle = (key) => {
+    const next = new Set(checked);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    setChecked(next);
+  };
+  const count = entries.filter((e) => checked.has(e.meal)).length;
+  const canConfirm = target && target !== date && checked.size > 0;
+
+  const chip = (on) => ({
+    padding: "6px 11px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 800,
+    textTransform: "uppercase", letterSpacing: 0.5,
+    background: on ? C.accent : C.card, color: on ? "#000" : C.muted,
+    border: `1.5px solid ${on ? C.accent : C.border}`, fontFamily: "inherit",
+  });
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <Label>Repas à copier</Label>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {MEALS.map((m) => (
+          <button key={m.key} onClick={() => toggle(m.key)} style={chip(checked.has(m.key))}>{m.label}</button>
+        ))}
+        <button onClick={() => setChecked(allChecked ? new Set() : new Set(MEALS.map((m) => m.key)))} style={chip(allChecked)}>
+          Toute la journée
+        </button>
+      </div>
+      <Label>Vers le</Label>
+      <input type="date" value={target} onChange={(e) => setTarget(e.target.value)}
+        style={{ background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 6, padding: "8px 10px", fontFamily: "inherit", fontSize: 13, color: C.text, width: "100%" }} />
+      <Body style={{ fontSize: 10.5, color: C.dim }}>
+        {count} aliment{count > 1 ? "s" : ""} {count > 1 ? "seront ajoutés" : "sera ajouté"} au jour choisi — l'existant n'est jamais remplacé.
+      </Body>
+      <div style={{ display: "flex", gap: 8 }}>
+        <Btn variant="primary" style={{ flex: 1 }} disabled={!canConfirm} onClick={() => onConfirm([...checked], target)}>Copier</Btn>
+        <Btn variant="ghost" onClick={onClose}>Annuler</Btn>
+      </div>
+    </div>
+  );
+}
+
 export default function NutritionTab({ targetsFor, macros, save, training }) {
   const [date, setDate] = useState(today());
   const [openMeal, setOpenMeal] = useState(null);
@@ -86,6 +163,8 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
   // saisie libre, sans passer par la recherche — c'est justement la recherche qu'on
   // veut éviter pour un ajout rapide de macros sans aliment précis en tête.
   const [quickAdd, setQuickAdd] = useState(false);
+  const [copyMeal, setCopyMeal] = useState(null);
+  const [duplicating, setDuplicating] = useState(false);
   const food = useFoodLog();
 
   const dayEntries = useMemo(() => entriesFor(food.log, date), [food.log, date]);
@@ -116,6 +195,19 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
   };
   const closeSearch = () => { setOpenMeal(null); setQuickAdd(false); };
 
+  const copyFrom = (mealKey, fromDate) => {
+    const entries = food.log.filter((e) => e.date === fromDate && e.meal === mealKey);
+    food.addMany(copyEntries(entries, { date, meal: mealKey }));
+    setCopyMeal(null);
+  };
+
+  const duplicateTo = (mealKeys, targetDate) => {
+    const toAdd = mealKeys.flatMap((mealKey) =>
+      copyEntries(dayEntries.filter((e) => e.meal === mealKey), { date: targetDate, meal: mealKey }));
+    if (toAdd.length) food.addMany(toAdd);
+    setDuplicating(false);
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <ScreenHeader
@@ -129,6 +221,16 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
 
       <Card>
         <DateField value={date} onChange={setDate} future />
+        {duplicating ? (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.divider}` }}>
+            <DuplicatePanel entries={dayEntries} date={date} onConfirm={duplicateTo} onClose={() => setDuplicating(false)} />
+          </div>
+        ) : (
+          <Btn variant="ghost" onClick={() => setDuplicating(true)} style={{ width: "100%", marginTop: 10, padding: "6px 0", fontSize: 10.5 }}>
+            <Copy size={11} style={{ display: "inline", verticalAlign: -1, marginRight: 5 }} />
+            Dupliquer cette journée vers un autre jour
+          </Btn>
+        )}
       </Card>
 
       {/* Calories du jour + reste à consommer : c'est l'information qu'on vient chercher
@@ -197,14 +299,25 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
             {entries.map((e) => (
               <EntryRow key={e.id} e={e} onUpdate={food.update} onRemove={food.remove} />
             ))}
-            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-              <Btn variant="plain" onClick={() => { setOpenMeal(meal.key); setQuickAdd(false); }} style={{ flex: 1, padding: "7px 12px", fontSize: 11 }}>
-                <Plus size={12} style={{ display: "inline", verticalAlign: -2, marginRight: 5 }} />Ajouter
-              </Btn>
-              <Btn variant="plain" onClick={() => { setOpenMeal(meal.key); setQuickAdd(true); }} style={{ padding: "7px 12px", fontSize: 11 }}>
-                <Zap size={12} style={{ display: "inline", verticalAlign: -2, marginRight: 5 }} />Macro rapide
-              </Btn>
-            </div>
+            {copyMeal === meal.key ? (
+              <CopyPanel
+                candidates={copySourceCandidates(food.log, { meal: meal.key, excludeDate: date })}
+                onPick={(d) => copyFrom(meal.key, d)}
+                onClose={() => setCopyMeal(null)}
+              />
+            ) : (
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <Btn variant="plain" onClick={() => { setOpenMeal(meal.key); setQuickAdd(false); }} style={{ flex: 1, padding: "7px 12px", fontSize: 11 }}>
+                  <Plus size={12} style={{ display: "inline", verticalAlign: -2, marginRight: 5 }} />Ajouter
+                </Btn>
+                <Btn variant="plain" onClick={() => { setOpenMeal(meal.key); setQuickAdd(true); }} style={{ padding: "7px 12px", fontSize: 11 }}>
+                  <Zap size={12} style={{ display: "inline", verticalAlign: -2, marginRight: 5 }} />
+                </Btn>
+                <Btn variant="plain" onClick={() => setCopyMeal(meal.key)} style={{ padding: "7px 12px", fontSize: 11 }}>
+                  <Copy size={12} />
+                </Btn>
+              </div>
+            )}
           </Card>
         );
       })}
@@ -224,9 +337,15 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
           log={food.log}
           pins={food.pins}
           muted={food.muted}
+          portions={food.portions}
+          recipes={food.recipes}
           onAdd={add}
           onTogglePin={food.togglePin}
           onMute={food.muteFromSuggestions}
+          onSavePortion={food.savePortion}
+          onRemovePortion={food.removePortion}
+          onCreateRecipe={food.addRecipe}
+          onRemoveRecipe={food.removeRecipe}
           onClose={closeSearch}
           startFree={quickAdd}
         />

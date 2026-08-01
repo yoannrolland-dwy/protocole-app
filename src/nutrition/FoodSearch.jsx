@@ -12,17 +12,82 @@
 // secondes d'utilisation normale.
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Search, X, ChevronLeft, Star, PencilLine, Trash2, ScanBarcode } from "lucide-react";
+import { Search, X, ChevronLeft, Star, PencilLine, Trash2, ScanBarcode, ChefHat, Plus } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { C, Btn, Label, Body, Empty, Stepper, TextInput, inputStyle } from "../ui.jsx";
-import { searchCiqual } from "./ciqual.js";
+import { searchCiqual, normalize } from "./ciqual.js";
 import { searchOFF, getOFFByBarcode } from "./off.js";
-import { suggestions, searchBoost, MACROS, newQuickRef } from "./foodStore.js";
+import { suggestions, searchBoost, MACROS, newQuickRef, portionsFor, compileRecipe, recipeAsFood, isRecipeRef } from "./foodStore.js";
 import { scanBarcode } from "./scan.js";
 
 const OFF_DEBOUNCE_MS = 700;
 
 const MACRO_LABEL = { kcal: "kcal", prot: "P", gluc: "G", lip: "L", fib: "Fib" };
+
+/**
+ * Recherche CIQUAL + Open Food Facts partagée entre la recherche principale d'un repas et
+ * le sélecteur d'ingrédients d'une recette (02/08/2026 : les recettes doivent pouvoir
+ * piocher des produits de marque aussi, pas seulement des aliments bruts). CIQUAL tourne
+ * à chaque caractère (0,24 ms mesuré), OFF seulement 700 ms après la dernière frappe — son
+ * quota de recherche texte est trop étroit pour suivre la frappe (voir off.js).
+ */
+function useFoodSearch(q, { boost, limit = 40 } = {}) {
+  const [results, setResults] = useState([]);
+  const [offResults, setOffResults] = useState([]);
+  const [offState, setOffState] = useState("idle"); // idle | loading | done | error
+  const runId = useRef(0);
+  const offRunId = useRef(0);
+
+  useEffect(() => {
+    if (q.trim().length < 2) { setResults([]); return; }
+    // Jeton de course : searchCiqual est asynchrone (le JSON se charge à la première
+    // frappe), donc une réponse tardive ne doit jamais écraser une plus récente.
+    const id = ++runId.current;
+    searchCiqual(q, { limit, boost }).then((r) => { if (runId.current === id) setResults(r); });
+  }, [q, boost, limit]);
+
+  useEffect(() => {
+    if (q.trim().length < 2) { setOffResults([]); setOffState("idle"); return; }
+    setOffState("idle");
+    const id = ++offRunId.current;
+    const t = setTimeout(() => {
+      if (offRunId.current !== id) return;
+      setOffState("loading");
+      searchOFF(q).then(({ items, error }) => {
+        if (offRunId.current !== id) return;
+        setOffResults(items);
+        setOffState(error ? "error" : "done");
+      });
+    }, OFF_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  return { results, offResults, offState };
+}
+
+// Bloc "Produits industriels" affiché sous les résultats CIQUAL — identique dans la
+// recherche principale et le sélecteur d'ingrédients de recette.
+function OffSection({ offState, offResults, onPick }) {
+  return (
+    <>
+      <Label style={{ marginTop: 18, marginBottom: 4 }}>Produits industriels</Label>
+      {(offState === "idle" || offState === "loading") && (
+        <Body style={{ fontSize: 11, color: C.dim, padding: "6px 0" }}>
+          {offState === "loading" ? "Recherche Open Food Facts…" : "…"}
+        </Body>
+      )}
+      {offState === "error" && (
+        <Body style={{ fontSize: 11, color: C.dim, padding: "6px 0" }}>
+          Open Food Facts est indisponible pour le moment — réessayez dans quelques secondes.
+        </Body>
+      )}
+      {offState === "done" && offResults.length === 0 && (
+        <Body style={{ fontSize: 11, color: C.dim, padding: "6px 0" }}>Aucun produit trouvé.</Body>
+      )}
+      {offResults.map((f) => <Row key={f.ref} food={f} onClick={() => onPick(f)} />)}
+    </>
+  );
+}
 
 // Une valeur absente de la table n'est pas un zéro : on l'affiche « — » pour que le
 // total du jour puisse rester honnête (voir totals().missing dans foodStore).
@@ -129,9 +194,111 @@ function FreeEntry({ onAdd, onBack, backLabel = "Saisie libre" }) {
   );
 }
 
+/* ---------- création d'une recette (M4) ----------
+   Même recherche CIQUAL + OFF que l'écran principal (via useFoodSearch) : les ingrédients
+   d'une recette sont aussi souvent des produits de marque que des aliments bruts — Yoann
+   mange surtout à code-barres (retour du 02/08/2026), pas de raison de s'en priver ici. */
+function IngredientPicker({ onAdd, onCancel }) {
+  const [q, setQ] = useState("");
+  const [pick, setPick] = useState(null);
+  const [grams, setGrams] = useState(100);
+  const { results, offResults, offState } = useFoodSearch(q, { limit: 15 });
+  const showEmpty = q.trim().length >= 2 && results.length === 0;
+
+  if (pick) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <Label style={{ fontSize: 11 }}>{pick.name}</Label>
+        <Stepper value={grams} set={setGrams} step={10} unit="g" min={1} int />
+        <div style={{ display: "flex", gap: 8 }}>
+          <Btn variant="primary" style={{ flex: 1 }} onClick={() => onAdd({ ...pick, q: Number(grams) })}>Ajouter à la recette</Btn>
+          <Btn variant="ghost" onClick={() => setPick(null)}>Retour</Btn>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8 }}>
+        <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher un ingrédient…" style={{ flex: 1 }} />
+        <Btn variant="ghost" onClick={onCancel} style={{ padding: "0 10px" }}>Annuler</Btn>
+      </div>
+      {showEmpty && <Empty>Aucun résultat dans CIQUAL.</Empty>}
+      {results.map((f) => (
+        <div key={f.ref} onClick={() => { setPick(f); setGrams(100); }} style={{
+          padding: "8px 2px", borderBottom: `1px solid ${C.divider}`, cursor: "pointer",
+        }}>
+          <div style={{ fontSize: 12, color: C.text }}>{f.name}</div>
+          <div style={{ fontFamily: C.mono, fontSize: 10, color: C.muted, marginTop: 2 }}>{val(f.per100.kcal)} kcal /100 g</div>
+        </div>
+      ))}
+      {q.trim().length >= 2 && (
+        <OffSection offState={offState} offResults={offResults} onPick={(f) => { setPick(f); setGrams(100); }} />
+      )}
+    </div>
+  );
+}
+
+function RecipeBuilder({ onSave, onBack }) {
+  const [name, setName] = useState("");
+  const [ingredients, setIngredients] = useState([]);
+  const [picking, setPicking] = useState(false);
+  const compiled = useMemo(() => compileRecipe(name || "?", ingredients), [name, ingredients]);
+  const ok = name.trim().length > 0 && ingredients.length > 0;
+
+  if (picking) {
+    return <IngredientPicker onCancel={() => setPicking(false)}
+      onAdd={(ing) => { setIngredients([...ingredients, ing]); setPicking(false); }} />;
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", padding: 4 }}>
+          <ChevronLeft size={20} />
+        </button>
+        <Label style={{ fontSize: 11 }}>Nouvelle recette</Label>
+      </div>
+      <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom (ex. Mon shaker du matin)" />
+
+      {ingredients.map((ing, i) => (
+        <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 2px", borderBottom: `1px solid ${C.divider}` }}>
+          <span style={{ fontSize: 12, color: C.text }}>{ing.name} <span style={{ color: C.muted, fontFamily: C.mono, fontSize: 10.5 }}>· {ing.q}g</span></span>
+          <button onClick={() => setIngredients(ingredients.filter((_, j) => j !== i))} style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", padding: 6 }}>
+            <Trash2 size={13} />
+          </button>
+        </div>
+      ))}
+
+      <Btn variant="plain" onClick={() => setPicking(true)}>
+        <Plus size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />Ajouter un ingrédient
+      </Btn>
+
+      {ingredients.length > 0 && (
+        <div style={{ background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <Label>Total ({compiled.totalWeight} g)</Label>
+            <span style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 800, color: C.accent }}>
+              {val(compiled.per100.kcal)} kcal<span style={{ color: C.muted, fontSize: 10 }}>/100g</span>
+            </span>
+          </div>
+        </div>
+      )}
+
+      <Btn variant="primary" disabled={!ok} onClick={() => onSave(name.trim(), ingredients)}>Enregistrer la recette</Btn>
+    </div>
+  );
+}
+
 /* ---------- réglage de la quantité ---------- */
-function QtyPanel({ food, initialQ, onAdd, onBack }) {
+// Portions nommées (M4) : "1 pot = 125 g" plutôt que retaper les grammes à chaque fois.
+// Rangées par `ref` dans foodStore (foodPortions), donc apprises une fois pour toutes
+// les saisies futures de cet aliment précis.
+function QtyPanel({ food, initialQ, portions, onSavePortion, onRemovePortion, onAdd, onBack }) {
   const [q, setQ] = useState(initialQ ?? 100);
+  const [addingPortion, setAddingPortion] = useState(false);
+  const [portionLabel, setPortionLabel] = useState("");
   const k = q / 100;
   // `int` pour les calories : cohérent avec amounts() dans foodStore, où une décimale de
   // kcal a été jugée trompeuse.
@@ -153,6 +320,29 @@ function QtyPanel({ food, initialQ, onAdd, onBack }) {
       <div>
         <Label style={{ marginBottom: 6 }}>Quantité (g)</Label>
         <Stepper value={q} set={setQ} step={10} unit="g" min={1} int />
+
+        {portions.length > 0 && (
+          <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+            {portions.map((p) => (
+              <div key={p.label} style={{
+                display: "flex", alignItems: "center", gap: 4, borderRadius: 6,
+                background: q === p.grams ? C.accent : C.card,
+                border: `1.5px solid ${q === p.grams ? C.accent : C.border}`,
+                paddingLeft: 10,
+              }}>
+                <button onClick={() => setQ(p.grams)} style={{
+                  background: "none", border: "none", cursor: "pointer", padding: "5px 0",
+                  fontSize: 11, fontWeight: 800, color: q === p.grams ? "#000" : C.text,
+                }}>{p.label} · {p.grams}g</button>
+                <button onClick={() => onRemovePortion(food.ref, p.label)} style={{
+                  background: "none", border: "none", cursor: "pointer", padding: "5px 7px",
+                  color: q === p.grams ? "#000" : C.dim,
+                }}><X size={11} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
           {[30, 50, 100, 150, 200, 250].map((v) => (
             <button key={v} onClick={() => setQ(v)} style={{
@@ -163,6 +353,22 @@ function QtyPanel({ food, initialQ, onAdd, onBack }) {
             }}>{v}</button>
           ))}
         </div>
+
+        {addingPortion ? (
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+            <input value={portionLabel} onChange={(e) => setPortionLabel(e.target.value)}
+              placeholder={`Nom (ex. 1 pot)`} style={{ ...inputStyle(false), flex: 1, fontSize: 12 }} />
+            <Btn variant="primary" disabled={!portionLabel.trim()} style={{ padding: "0 12px" }} onClick={() => {
+              onSavePortion(food.ref, portionLabel.trim(), q);
+              setPortionLabel(""); setAddingPortion(false);
+            }}>OK</Btn>
+          </div>
+        ) : (
+          <button onClick={() => setAddingPortion(true)} style={{
+            background: "none", border: "none", cursor: "pointer", padding: "7px 0 0",
+            fontSize: 10.5, color: C.muted, textDecoration: "underline",
+          }}>Enregistrer {q} g comme portion nommée</button>
+        )}
       </div>
 
       <div style={{ background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: 12 }}>
@@ -183,7 +389,7 @@ function QtyPanel({ food, initialQ, onAdd, onBack }) {
         </div>
         {MACROS.some((m) => food.per100[m] === null || food.per100[m] === undefined) && (
           <Body style={{ fontSize: 10, color: C.dim, marginTop: 9 }}>
-            Certaines valeurs sont absentes de {food.ref.startsWith("off:") ? "la fiche Open Food Facts" : "la table CIQUAL"} et ne seront pas comptées.
+            Certaines valeurs sont absentes {isRecipeRef(food.ref) ? "d'un des ingrédients de cette recette" : food.ref.startsWith("off:") ? "de la fiche Open Food Facts" : "de la table CIQUAL"} et ne seront pas comptées.
           </Body>
         )}
       </div>
@@ -194,22 +400,22 @@ function QtyPanel({ food, initialQ, onAdd, onBack }) {
 }
 
 /* ---------- feuille principale ---------- */
-export default function FoodSearch({ meal, mealLabel, date, log, pins, muted, onAdd, onTogglePin, onMute, onClose, startFree = false }) {
+export default function FoodSearch({
+  meal, mealLabel, date, log, pins, muted, portions, recipes,
+  onAdd, onTogglePin, onMute, onSavePortion, onRemovePortion, onCreateRecipe, onRemoveRecipe,
+  onClose, startFree = false,
+}) {
   const [q, setQ] = useState("");
-  const [results, setResults] = useState([]);
-  const [offResults, setOffResults] = useState([]);
-  const [offState, setOffState] = useState("idle"); // idle | loading | done | error
   const [sel, setSel] = useState(null);
   // L'ajout rapide (bouton "Macro rapide" par repas) ouvre directement ce panneau, sans
   // passer par la recherche — la friction visée est justement d'éviter la recherche.
   const [free, setFree] = useState(startFree);
+  const [building, setBuilding] = useState(false);
   // idle | scanning | lookup | notfound | error — distinct de offState : le scan peut
   // échouer avant même d'atteindre OFF (module Play Services, annulation).
   const [scanState, setScanState] = useState("idle");
   const [scanCode, setScanCode] = useState(null);
   const inputRef = useRef(null);
-  const runId = useRef(0);
-  const offRunId = useRef(0);
 
   const scan = async () => {
     setScanState("idle"); // efface un message d'un scan précédent (notfound/error)
@@ -224,38 +430,20 @@ export default function FoodSearch({ meal, mealLabel, date, log, pins, muted, on
 
   const boost = useMemo(() => searchBoost(log, { meal, date }), [log, meal, date]);
   const sugg = useMemo(() => suggestions(log, { meal, pins, muted, date }), [log, meal, pins, muted, date]);
+  const { results, offResults, offState } = useFoodSearch(q, { boost });
 
   useEffect(() => { if (!startFree) inputRef.current?.focus(); }, [startFree]);
 
-  useEffect(() => {
-    if (q.trim().length < 2) { setResults([]); return; }
-    // Jeton de course : searchCiqual est asynchrone (le JSON se charge à la première
-    // frappe), donc une réponse tardive ne doit jamais écraser une plus récente.
-    const id = ++runId.current;
-    searchCiqual(q, { limit: 40, boost }).then((r) => { if (runId.current === id) setResults(r); });
-  }, [q, boost]);
-
-  // Open Food Facts : jamais à la frappe (voir le commentaire en tête de fichier). Un
-  // timer redémarré à chaque caractère ne se déclenche que quand la frappe s'arrête
-  // vraiment, ce qui suffit à rester largement sous le quota en usage normal.
-  useEffect(() => {
-    if (q.trim().length < 2) { setOffResults([]); setOffState("idle"); return; }
-    setOffState("idle");
-    const id = ++offRunId.current;
-    const t = setTimeout(() => {
-      if (offRunId.current !== id) return;
-      setOffState("loading");
-      searchOFF(q).then(({ items, error }) => {
-        if (offRunId.current !== id) return;
-        setOffResults(items);
-        setOffState(error ? "error" : "done");
-      });
-    }, OFF_DEBOUNCE_MS);
-    return () => clearTimeout(t);
-  }, [q]);
-
   const showSugg = q.trim().length < 2;
   const list = showSugg ? sugg : results;
+  // Recettes : jamais de réseau ni de debounce, juste un filtre local — la liste est
+  // toujours courte. Toutes affichées sans frappe, filtrées par nom sinon.
+  const matchedRecipes = useMemo(() => {
+    if (!recipes?.length) return [];
+    if (showSugg) return recipes;
+    const nq = normalize(q);
+    return recipes.filter((r) => normalize(r.name).includes(nq));
+  }, [recipes, q, showSugg]);
 
   return (
     <div style={{
@@ -274,11 +462,20 @@ export default function FoodSearch({ meal, mealLabel, date, log, pins, muted, on
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: 14 }}>
-        {free ? (
+        {building ? (
+          <RecipeBuilder onBack={() => setBuilding(false)} onSave={(name, ingredients) => {
+            const r = compileRecipe(name, ingredients);
+            onCreateRecipe(r);
+            setBuilding(false);
+            setSel(recipeAsFood(r));
+          }} />
+        ) : free ? (
           <FreeEntry onAdd={onAdd} onBack={() => setFree(false)}
             backLabel={startFree ? "Macro rapide" : "Saisie libre"} />
         ) : sel ? (
-          <QtyPanel food={sel} initialQ={sel.lastQ} onAdd={onAdd} onBack={() => setSel(null)} />
+          <QtyPanel food={sel} initialQ={sel.lastQ ?? sel.defaultQ}
+            portions={portionsFor(portions, sel.ref)} onSavePortion={onSavePortion} onRemovePortion={onRemovePortion}
+            onAdd={onAdd} onBack={() => setSel(null)} />
         ) : (
           <>
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
@@ -315,7 +512,18 @@ export default function FoodSearch({ meal, mealLabel, date, log, pins, muted, on
               </Body>
             )}
 
-            <Label style={{ marginBottom: 4 }}>
+            {matchedRecipes.length > 0 && (
+              <>
+                <Label style={{ marginBottom: 4 }}>Vos recettes</Label>
+                {matchedRecipes.map((r) => (
+                  <Row key={`recipe:${r.id}`} food={recipeAsFood(r)}
+                    onClick={() => setSel(recipeAsFood(r))}
+                    onRemove={() => onRemoveRecipe(r.id)} />
+                ))}
+              </>
+            )}
+
+            <Label style={{ marginBottom: 4, marginTop: matchedRecipes.length > 0 ? 14 : 0 }}>
               {showSugg ? "Vos aliments habituels" : `${results.length} résultat${results.length > 1 ? "s" : ""}`}
             </Label>
 
@@ -330,32 +538,18 @@ export default function FoodSearch({ meal, mealLabel, date, log, pins, muted, on
               ))
             )}
 
-            {!showSugg && (
-              <>
-                <Label style={{ marginTop: 18, marginBottom: 4 }}>Produits industriels</Label>
-                {(offState === "idle" || offState === "loading") && (
-                  <Body style={{ fontSize: 11, color: C.dim, padding: "6px 0" }}>
-                    {offState === "loading" ? "Recherche Open Food Facts…" : "…"}
-                  </Body>
-                )}
-                {offState === "error" && (
-                  <Body style={{ fontSize: 11, color: C.dim, padding: "6px 0" }}>
-                    Open Food Facts est indisponible pour le moment — réessayez dans quelques secondes.
-                  </Body>
-                )}
-                {offState === "done" && offResults.length === 0 && (
-                  <Body style={{ fontSize: 11, color: C.dim, padding: "6px 0" }}>Aucun produit trouvé.</Body>
-                )}
-                {offResults.map((f) => (
-                  <Row key={f.ref} food={f} onClick={() => setSel(f)} />
-                ))}
-              </>
-            )}
+            {!showSugg && <OffSection offState={offState} offResults={offResults} onPick={setSel} />}
 
-            <Btn variant="plain" onClick={() => setFree(true)} style={{ width: "100%", marginTop: 14 }}>
-              <PencilLine size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
-              Saisie libre
-            </Btn>
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <Btn variant="plain" onClick={() => setFree(true)} style={{ flex: 1 }}>
+                <PencilLine size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
+                Saisie libre
+              </Btn>
+              <Btn variant="plain" onClick={() => setBuilding(true)} style={{ flex: 1 }}>
+                <ChefHat size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
+                Nouvelle recette
+              </Btn>
+            </div>
             <Body style={{ fontSize: 9.5, color: C.dim, marginTop: 10, textAlign: "center" }}>
               Table Ciqual 2020 — ANSES · Licence Ouverte 2.0<br />
               Open Food Facts · Licence Open Database (ODbL)

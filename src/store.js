@@ -34,12 +34,13 @@ export const store = {
 // encore isolé de `macroLog` — un journal alimentaire absent de l'export serait perdu à
 // la première restauration, et c'est précisément le genre d'oubli que cette liste existe
 // pour éviter. `foodMuted` (02/08/2026) : refs retirés de "Vos aliments habituels" (pas de
-// l'historique réel — voir suggestions() dans foodStore.js).
+// l'historique réel — voir suggestions() dans foodStore.js). `foodPortions` / `foodRecipes`
+// (M4, 02/08/2026) : portions nommées par aliment et recettes composées.
 export const DATA_KEYS = [
   "weightLog", "sleepLog", "trainingLog", "kneeLog", "macroLog", "noteLog", "stepsLog",
   "targets", "phase", "hsrWeek", "model",
   "coachProfile", "coachJournal",
-  "foodLog", "foodPins", "foodMuted",
+  "foodLog", "foodPins", "foodMuted", "foodPortions", "foodRecipes",
 ];
 
 export function exportData() {

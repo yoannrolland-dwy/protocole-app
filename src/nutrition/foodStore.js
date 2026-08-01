@@ -111,6 +111,95 @@ export function totals(entries) {
   return { ...t, missing };
 }
 
+// --- Copier un repas (M4) ------------------------------------------------------
+//
+// Distinct des "aliments habituels" : ici on rejoue TOUT un repas déjà loggé en une
+// fois (utile en sèche répétitive — mêmes 3-4 aliments enchaînés), plutôt que de les
+// rajouter un par un depuis la recherche.
+
+/**
+ * Jours candidats pour "copier un repas" : les jours passés (ou futurs déjà planifiés)
+ * qui ont au moins une entrée sur CE repas précis, les plus récents en premier.
+ */
+export function copySourceCandidates(log, { meal, excludeDate, limit = 10 } = {}) {
+  const byDate = new Map();
+  for (const e of log) {
+    if (e.meal !== meal || e.date === excludeDate) continue;
+    let d = byDate.get(e.date);
+    if (!d) byDate.set(e.date, (d = { date: e.date, count: 0, kcal: 0, missing: 0 }));
+    d.count++;
+    const a = amounts(e);
+    if (a.kcal === null) d.missing++; else d.kcal += a.kcal;
+  }
+  return [...byDate.values()]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, limit)
+    .map((d) => ({ ...d, kcal: Math.round(d.kcal) }));
+}
+
+/** Rejoue un ensemble d'entrées vers une autre date/repas : nouveaux id/horodatage,
+ * `ref`/`per100` intacts (même snapshot, pas de re-résolution). */
+export function copyEntries(entries, { date, meal }) {
+  return entries.map((e) => ({
+    ...e, id: newId(), date, meal, at: new Date().toISOString(),
+  }));
+}
+
+// --- Portions nommées (M4) ------------------------------------------------------
+//
+// "1 pot = 125 g" plutôt que de retaper les grammes à chaque fois. Rangées par `ref`
+// (pas par jour) : une portion apprise pour un aliment vaut pour toutes ses saisies
+// futures, dans n'importe quel repas.
+
+export function portionsFor(portions, ref) {
+  return portions?.[ref] || [];
+}
+
+// --- Recettes (M4) ---------------------------------------------------------------
+//
+// Une recette compile une liste d'ingrédients en UN aliment (per100 sur le poids
+// total), avec son propre `ref` stable (`recipe:<id>`) — elle traverse tout le reste
+// du pipeline (recherche, QtyPanel, journal) exactement comme un aliment CIQUAL ou
+// OFF, sans code dédié supplémentaire. Les ingrédients sont conservés dans l'objet
+// pour référence mais ne sont PAS des lignes de journal : seule la recette compilée
+// en est une une fois ajoutée à un repas.
+//
+// Une macro devient `null` sur toute la recette si NE SERAIT-CE QU'UN ingrédient avec
+// une quantité > 0 a cette macro absente — additionner un nombre et une inconnue ne
+// peut pas donner un vrai total, mieux vaut l'avouer que d'afficher un chiffre faux.
+export function compileRecipe(name, ingredients) {
+  const totalWeight = ingredients.reduce((s, i) => s + i.q, 0);
+  const per100 = {};
+  for (const m of MACROS) {
+    let sum = 0, hasNull = false;
+    for (const i of ingredients) {
+      const v = i.per100?.[m];
+      if (v === null || v === undefined) { if (i.q > 0) hasNull = true; continue; }
+      sum += v * (i.q / 100);
+    }
+    per100[m] = hasNull || totalWeight === 0 ? null
+      : m === "kcal" ? Math.round((sum / totalWeight) * 100)
+      : Math.round((sum / totalWeight) * 100 * 10) / 10;
+  }
+  return {
+    id: newId(),
+    name: name.trim(),
+    totalWeight,
+    ingredients: ingredients.map((i) => ({ ref: i.ref, name: i.name, q: i.q })),
+    per100,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/** Forme "aliment" d'une recette stockée, pour l'utiliser dans la recherche/QtyPanel
+ * exactement comme un résultat CIQUAL/OFF. `defaultQ` = tout le lot (pas 100 g) : une
+ * recette se mange en général en une fois, pas par portion de 100 g. */
+export function recipeAsFood(r) {
+  return { ref: `recipe:${r.id}`, name: r.name, grp: `Recette · ${r.totalWeight} g`, per100: r.per100, defaultQ: r.totalWeight };
+}
+
+export const isRecipeRef = (ref) => typeof ref === "string" && ref.startsWith("recipe:");
+
 // --- Favoris et historique intelligent ---------------------------------------
 //
 // Rien n'est stocké : tout se DÉRIVE de `foodLog`. Une liste de favoris entretenue en
@@ -183,6 +272,8 @@ export function useFoodLog() {
   const [log, setLog] = useState([]);
   const [pins, setPins] = useState([]);
   const [muted, setMuted] = useState([]);
+  const [portions, setPortions] = useState({});
+  const [recipes, setRecipes] = useState([]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -190,6 +281,8 @@ export function useFoodLog() {
       setLog(await store.get("foodLog", []));
       setPins(await store.get("foodPins", []));
       setMuted(await store.get("foodMuted", []));
+      setPortions(await store.get("foodPortions", {}));
+      setRecipes(await store.get("foodRecipes", []));
       setReady(true);
     })();
   }, []);
@@ -200,8 +293,11 @@ export function useFoodLog() {
     log,
     pins,
     muted,
+    portions,
+    recipes,
     ready,
     add: (e) => write([...log, e]),
+    addMany: (es) => write([...log, ...es]),
     update: (id, patch) => write(log.map((e) => (e.id === id ? { ...e, ...patch } : e))),
     remove: (id) => write(log.filter((e) => e.id !== id)),
     togglePin: (ref) => {
@@ -221,6 +317,28 @@ export function useFoodLog() {
         setPins(nextPins);
         store.set("foodPins", nextPins);
       }
+    },
+    savePortion: (ref, label, grams) => {
+      const list = portions[ref] || [];
+      // Même libellé retapé = on remplace, pas de doublon silencieux.
+      const next = { ...portions, [ref]: [...list.filter((p) => p.label !== label), { label, grams }] };
+      setPortions(next);
+      store.set("foodPortions", next);
+    },
+    removePortion: (ref, label) => {
+      const next = { ...portions, [ref]: (portions[ref] || []).filter((p) => p.label !== label) };
+      setPortions(next);
+      store.set("foodPortions", next);
+    },
+    addRecipe: (r) => {
+      const next = [...recipes, r];
+      setRecipes(next);
+      store.set("foodRecipes", next);
+    },
+    removeRecipe: (id) => {
+      const next = recipes.filter((r) => r.id !== id);
+      setRecipes(next);
+      store.set("foodRecipes", next);
     },
   };
 }
