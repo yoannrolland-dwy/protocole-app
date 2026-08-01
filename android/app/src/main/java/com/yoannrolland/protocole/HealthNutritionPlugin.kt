@@ -304,9 +304,7 @@ class HealthNutritionPlugin : Plugin() {
                 // 27/07/2026). On ne garde donc que le plus récemment écrit de chaque groupe
                 // (source + instant de début), ce qui préserve les vrais repas distincts d'une
                 // même journée puisqu'ils ont des instants de début différents.
-                fun <T> dedupe(records: List<T>, key: (T) -> String, modifiedAt: (T) -> Instant) =
-                    records.groupBy(key).values.map { grp -> grp.maxByOrNull(modifiedAt)!! }
-
+                //
                 // Cronometer casse l'hypothèse ci-dessus : il écrit un NutritionRecord PAR REPAS,
                 // mais tous avec le MÊME instant de début nominal dans la journée (constaté le
                 // 01/08/2026 — 4 enregistrements, même "start", valeurs différentes). La
@@ -317,22 +315,17 @@ class HealthNutritionPlugin : Plugin() {
                 // Impossible de distinguer les deux comportements sans connaître la source :
                 // on ne resserre donc la déduplication par (source + début) qu'aux sources
                 // connues pour écrire un total de journée plutôt qu'un repas.
+                //
+                // Une déduplication "valeurs strictement identiques" avait été tentée en plus
+                // (retirée le 01/08/2026) : elle prenait pour un doublon technique deux vrais
+                // aliments identiques saisis à la volée (ex. 2× la même banane), qui ont forcément
+                // les mêmes macros — impossible à distinguer d'une vraie écriture en double sans
+                // l'identifiant natif de l'enregistrement. Mieux vaut restituer une saisie
+                // légitime en double (rare, visible, corrigeable dans l'app source) que perdre
+                // silencieusement de vrais repas.
                 val WHOLE_DAY_SUMMARY_SOURCES = setOf("com.myfitnesspal.android")
 
-                fun nutritionExactKey(r: NutritionRecord) = listOf(
-                    r.metadata.dataOrigin.packageName, r.startTime,
-                    r.energy?.inKilocalories, r.protein?.inGrams, r.totalCarbohydrate?.inGrams,
-                    r.totalFat?.inGrams, r.dietaryFiber?.inGrams,
-                ).joinToString("|")
-
                 val nutriRecords = hc.readRecords(ReadRecordsRequest(NutritionRecord::class, range)).records
-                    // 1) Retire les doublons stricts (mêmes valeurs, même instant, même source) —
-                    //    écritures répétées identiques, vues avec Cronometer (deux écritures à
-                    //    46 ms d'intervalle pour le même repas).
-                    .groupBy { nutritionExactKey(it) }.values.map { grp -> grp.maxByOrNull { it.metadata.lastModifiedTime }!! }
-                    // 2) Repas distincts au même instant nominal (Cronometer) : gardés tels quels,
-                    //    additionnés plus bas. Total de journée réécrit (MyFitnessPal) : ne garder
-                    //    que la version la plus récente par (source + début).
                     .groupBy { it.metadata.dataOrigin.packageName }
                     .flatMap { (src, recs) ->
                         if (src in WHOLE_DAY_SUMMARY_SOURCES) {
@@ -350,11 +343,21 @@ class HealthNutritionPlugin : Plugin() {
                     r.dietaryFiber?.inGrams?.let { d.fiber += it; d.hasNutrition = true }
                 }
 
-                val hydrRecords = dedupe(
-                    hc.readRecords(ReadRecordsRequest(HydrationRecord::class, range)).records,
-                    { "${it.metadata.dataOrigin.packageName}|${it.startTime}" },
-                    { it.metadata.lastModifiedTime },
-                )
+                // Même bug que pour la nutrition (voir plus haut) : Cronometer écrit un
+                // HydrationRecord par verre d'eau, tous au même instant nominal dans la
+                // journée — la déduplication générique par (source + début) n'en gardait
+                // qu'un seul, plafonnant le total du jour bien en dessous du vrai (constaté
+                // le 01/08/2026, l'utilisateur à ~3 L dans Cronometer contre une valeur bien
+                // moindre dans Protocole). Même repli : ne resserrer que pour MyFitnessPal.
+                val hydrRecords = hc.readRecords(ReadRecordsRequest(HydrationRecord::class, range)).records
+                    .groupBy { it.metadata.dataOrigin.packageName }
+                    .flatMap { (src, recs) ->
+                        if (src in WHOLE_DAY_SUMMARY_SOURCES) {
+                            recs.groupBy { it.startTime }.values.map { grp -> grp.maxByOrNull { it.metadata.lastModifiedTime }!! }
+                        } else {
+                            recs
+                        }
+                    }
                 hydrRecords.forEach { r ->
                     val d = days.getOrPut(dayOf(r.startTime)) { DayTotals() }
                     d.waterMl += r.volume.inMilliliters

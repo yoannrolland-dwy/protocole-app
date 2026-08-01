@@ -18,7 +18,7 @@ import { updateDashboardWidget } from "./widgetSync.js";
 import { runAutoBackup } from "./autoBackup.js";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.27.0";
+const APP_VERSION = "3.28.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
