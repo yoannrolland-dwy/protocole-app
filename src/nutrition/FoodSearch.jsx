@@ -4,15 +4,21 @@
 // la liste de résultats encombrée de champs de saisie, et laisse la place à un aperçu
 // des macros réelles avant de valider.
 //
-// M1 : CIQUAL + historique + saisie libre. Open Food Facts (M2) viendra s'ajouter sous
-// un séparateur dans la même liste, déclenché après une pause de frappe — la recherche
-// CIQUAL, elle, tourne à chaque caractère (0,24 ms mesuré).
+// CIQUAL tourne à chaque caractère (0,24 ms mesuré) et reste toujours en tête. Open Food
+// Facts (M2, produits de marque à code-barres) est sous un séparateur en dessous,
+// déclenché seulement 700 ms après la dernière frappe — son quota de recherche texte est
+// étroit (~10 req/min, une deuxième requête à moins de 5 s de la première renvoie déjà
+// une 503, vérifié le 01/08/2026), une recherche à la volée le ferait sauter en quelques
+// secondes d'utilisation normale.
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Search, X, ChevronLeft, Star, PencilLine } from "lucide-react";
+import { Search, X, ChevronLeft, Star, PencilLine, Trash2 } from "lucide-react";
 import { C, Btn, Label, Body, Empty, Stepper, TextInput, inputStyle } from "../ui.jsx";
 import { searchCiqual } from "./ciqual.js";
-import { suggestions, searchBoost, MACROS } from "./foodStore.js";
+import { searchOFF } from "./off.js";
+import { suggestions, searchBoost, MACROS, newQuickRef } from "./foodStore.js";
+
+const OFF_DEBOUNCE_MS = 700;
 
 const MACRO_LABEL = { kcal: "kcal", prot: "P", gluc: "G", lip: "L", fib: "Fib" };
 
@@ -20,7 +26,12 @@ const MACRO_LABEL = { kcal: "kcal", prot: "P", gluc: "G", lip: "L", fib: "Fib" }
 // total du jour puisse rester honnête (voir totals().missing dans foodStore).
 const val = (v, suffix = "") => (v === null || v === undefined ? "—" : `${v}${suffix}`);
 
-function Row({ food, onClick, pinned, onPin }) {
+// OFF est crowdsourcé : beaucoup de produits n'ont pas toutes les macros renseignées.
+// Un badge honnête plutôt que de faire passer une donnée manquante pour un vrai zéro.
+const missingCount = (food) => MACROS.filter((m) => food.per100[m] === null || food.per100[m] === undefined).length;
+
+function Row({ food, onClick, pinned, onPin, onRemove }) {
+  const incomplete = food.ref.startsWith("off:") && missingCount(food) > 0;
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 8,
@@ -35,7 +46,16 @@ function Row({ food, onClick, pinned, onPin }) {
           <span>L{val(food.per100.lip)}</span>
           <span style={{ color: C.dim }}>/100 g</span>
         </div>
-        {food.grp && <div style={{ fontSize: 9, color: C.dim, marginTop: 2, textTransform: "uppercase", letterSpacing: 0.8 }}>{food.grp}</div>}
+        {(food.brand || food.grp) && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+            <span style={{ fontSize: 9, color: C.dim, textTransform: "uppercase", letterSpacing: 0.8 }}>{food.brand || food.grp}</span>
+            {incomplete && (
+              <span style={{ fontSize: 8.5, color: C.dim, border: `1px solid ${C.border}`, borderRadius: 3, padding: "1px 4px" }}>
+                données incomplètes
+              </span>
+            )}
+          </div>
+        )}
       </div>
       {onPin && (
         <button onClick={onPin} style={{
@@ -45,22 +65,32 @@ function Row({ food, onClick, pinned, onPin }) {
           <Star size={15} fill={pinned ? C.accent : "none"} />
         </button>
       )}
+      {onRemove && (
+        <button onClick={onRemove} style={{
+          background: "none", border: "none", cursor: "pointer", padding: 6, color: C.dim,
+        }}>
+          <Trash2 size={14} />
+        </button>
+      )}
     </div>
   );
 }
 
-/* ---------- saisie libre ----------
+/* ---------- saisie libre / ajout rapide ----------
    Indispensable dès M1 : sans elle, un aliment absent de CIQUAL (skyr, whey, plat du
    restaurant) bloque la journée entière et rend le test en parallèle impossible.
    Les valeurs saisies sont les macros DE LA PORTION mangée — on les stocke donc en
    per100 avec une quantité de 100 g, ce qui garde le même modèle que le reste sans
-   demander à l'utilisateur de faire une règle de trois. */
-function FreeEntry({ onAdd, onBack }) {
+   demander à l'utilisateur de faire une règle de trois.
+   Le nom est optionnel (02/08/2026, "ajout rapide" demandé explicitement) : quand on
+   veut juste loguer "35g de protéines" sans réfléchir à un intitulé, exiger un nom est
+   la friction qui pousse à abandonner. Un nom vide se sauvegarde sous "Ajout rapide". */
+function FreeEntry({ onAdd, onBack, backLabel = "Saisie libre" }) {
   const [name, setName] = useState("");
   const [m, setM] = useState({ prot: "", gluc: "", lip: "", fib: "" });
   const num = (v) => { const n = parseFloat(String(v).replace(",", ".")); return Number.isFinite(n) ? n : 0; };
   const kcal = Math.round(num(m.prot) * 4 + num(m.gluc) * 4 + num(m.lip) * 9 + num(m.fib) * 2);
-  const ok = name.trim().length > 0;
+  const ok = MACROS.some((k) => k !== "kcal" && m[k] !== "" && num(m[k]) > 0);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -68,12 +98,12 @@ function FreeEntry({ onAdd, onBack }) {
         <button onClick={onBack} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", padding: 4 }}>
           <ChevronLeft size={20} />
         </button>
-        <Label style={{ fontSize: 11 }}>Saisie libre</Label>
+        <Label style={{ fontSize: 11 }}>{backLabel}</Label>
       </div>
       <Body style={{ fontSize: 10.5, color: C.dim }}>
         Macros de la portion réellement mangée, pas pour 100 g.
       </Body>
-      <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom (ex. Skyr vanille 150 g)" />
+      <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom (optionnel — ex. Skyr vanille 150 g)" />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         {[["prot", "Protéines"], ["gluc", "Glucides"], ["lip", "Lipides"], ["fib", "Fibres"]].map(([k, l]) => (
           <div key={k}>
@@ -89,8 +119,8 @@ function FreeEntry({ onAdd, onBack }) {
         <span style={{ fontFamily: C.mono, fontSize: 20, fontWeight: 800, color: C.accent }}>{kcal}</span>
       </div>
       <Btn variant="primary" disabled={!ok} onClick={() => onAdd({
-        ref: "quick",
-        name: name.trim(),
+        ref: newQuickRef(),
+        name: name.trim() || "Ajout rapide",
         per100: { kcal, prot: num(m.prot), gluc: num(m.gluc), lip: num(m.lip), fib: num(m.fib) },
       }, 100)}>Ajouter</Btn>
     </div>
@@ -151,7 +181,7 @@ function QtyPanel({ food, initialQ, onAdd, onBack }) {
         </div>
         {MACROS.some((m) => food.per100[m] === null || food.per100[m] === undefined) && (
           <Body style={{ fontSize: 10, color: C.dim, marginTop: 9 }}>
-            Certaines valeurs sont absentes de la table CIQUAL et ne seront pas comptées.
+            Certaines valeurs sont absentes de {food.ref.startsWith("off:") ? "la fiche Open Food Facts" : "la table CIQUAL"} et ne seront pas comptées.
           </Body>
         )}
       </div>
@@ -162,18 +192,23 @@ function QtyPanel({ food, initialQ, onAdd, onBack }) {
 }
 
 /* ---------- feuille principale ---------- */
-export default function FoodSearch({ meal, mealLabel, date, log, pins, onAdd, onTogglePin, onClose }) {
+export default function FoodSearch({ meal, mealLabel, date, log, pins, muted, onAdd, onTogglePin, onMute, onClose, startFree = false }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
+  const [offResults, setOffResults] = useState([]);
+  const [offState, setOffState] = useState("idle"); // idle | loading | done | error
   const [sel, setSel] = useState(null);
-  const [free, setFree] = useState(false);
+  // L'ajout rapide (bouton "Macro rapide" par repas) ouvre directement ce panneau, sans
+  // passer par la recherche — la friction visée est justement d'éviter la recherche.
+  const [free, setFree] = useState(startFree);
   const inputRef = useRef(null);
   const runId = useRef(0);
+  const offRunId = useRef(0);
 
   const boost = useMemo(() => searchBoost(log, { meal, date }), [log, meal, date]);
-  const sugg = useMemo(() => suggestions(log, { meal, pins, date }), [log, meal, pins, date]);
+  const sugg = useMemo(() => suggestions(log, { meal, pins, muted, date }), [log, meal, pins, muted, date]);
 
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => { if (!startFree) inputRef.current?.focus(); }, [startFree]);
 
   useEffect(() => {
     if (q.trim().length < 2) { setResults([]); return; }
@@ -182,6 +217,25 @@ export default function FoodSearch({ meal, mealLabel, date, log, pins, onAdd, on
     const id = ++runId.current;
     searchCiqual(q, { limit: 40, boost }).then((r) => { if (runId.current === id) setResults(r); });
   }, [q, boost]);
+
+  // Open Food Facts : jamais à la frappe (voir le commentaire en tête de fichier). Un
+  // timer redémarré à chaque caractère ne se déclenche que quand la frappe s'arrête
+  // vraiment, ce qui suffit à rester largement sous le quota en usage normal.
+  useEffect(() => {
+    if (q.trim().length < 2) { setOffResults([]); setOffState("idle"); return; }
+    setOffState("idle");
+    const id = ++offRunId.current;
+    const t = setTimeout(() => {
+      if (offRunId.current !== id) return;
+      setOffState("loading");
+      searchOFF(q).then(({ items, error }) => {
+        if (offRunId.current !== id) return;
+        setOffResults(items);
+        setOffState(error ? "error" : "done");
+      });
+    }, OFF_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [q]);
 
   const showSugg = q.trim().length < 2;
   const list = showSugg ? sugg : results;
@@ -204,7 +258,8 @@ export default function FoodSearch({ meal, mealLabel, date, log, pins, onAdd, on
 
       <div style={{ flex: 1, overflowY: "auto", padding: 14 }}>
         {free ? (
-          <FreeEntry onAdd={onAdd} onBack={() => setFree(false)} />
+          <FreeEntry onAdd={onAdd} onBack={() => setFree(false)}
+            backLabel={startFree ? "Macro rapide" : "Saisie libre"} />
         ) : sel ? (
           <QtyPanel food={sel} initialQ={sel.lastQ} onAdd={onAdd} onBack={() => setSel(null)} />
         ) : (
@@ -226,8 +281,31 @@ export default function FoodSearch({ meal, mealLabel, date, log, pins, onAdd, on
               list.map((f) => (
                 <Row key={f.ref + f.name} food={f} pinned={f.pinned}
                   onClick={() => setSel(f)}
-                  onPin={showSugg ? () => onTogglePin(f.ref) : undefined} />
+                  onPin={showSugg ? () => onTogglePin(f.ref) : undefined}
+                  onRemove={showSugg ? () => onMute(f.ref) : undefined} />
               ))
+            )}
+
+            {!showSugg && (
+              <>
+                <Label style={{ marginTop: 18, marginBottom: 4 }}>Produits industriels</Label>
+                {(offState === "idle" || offState === "loading") && (
+                  <Body style={{ fontSize: 11, color: C.dim, padding: "6px 0" }}>
+                    {offState === "loading" ? "Recherche Open Food Facts…" : "…"}
+                  </Body>
+                )}
+                {offState === "error" && (
+                  <Body style={{ fontSize: 11, color: C.dim, padding: "6px 0" }}>
+                    Open Food Facts est indisponible pour le moment — réessayez dans quelques secondes.
+                  </Body>
+                )}
+                {offState === "done" && offResults.length === 0 && (
+                  <Body style={{ fontSize: 11, color: C.dim, padding: "6px 0" }}>Aucun produit trouvé.</Body>
+                )}
+                {offResults.map((f) => (
+                  <Row key={f.ref} food={f} onClick={() => setSel(f)} />
+                ))}
+              </>
             )}
 
             <Btn variant="plain" onClick={() => setFree(true)} style={{ width: "100%", marginTop: 14 }}>
@@ -235,7 +313,8 @@ export default function FoodSearch({ meal, mealLabel, date, log, pins, onAdd, on
               Saisie libre
             </Btn>
             <Body style={{ fontSize: 9.5, color: C.dim, marginTop: 10, textAlign: "center" }}>
-              Table Ciqual 2020 — ANSES · Licence Ouverte 2.0
+              Table Ciqual 2020 — ANSES · Licence Ouverte 2.0<br />
+              Open Food Facts · Licence Open Database (ODbL)
             </Body>
           </>
         )}

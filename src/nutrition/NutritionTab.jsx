@@ -5,10 +5,12 @@
 // continue en parallèle et retirer l'onglet suffit à tout annuler.
 
 import React, { useState, useMemo } from "react";
-import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
-import { C, Card, Label, Body, Btn, Empty, Stepper, DateField, ScreenHeader, today, fmt } from "../ui.jsx";
-import { MEALS, useFoodLog, makeEntry, amounts, entriesFor, totals } from "./foodStore.js";
+import { Plus, Trash2, ChevronDown, ChevronRight, Droplet, Zap } from "lucide-react";
+import { C, Card, Label, Body, Btn, Empty, Stepper, DateField, ScreenHeader, Pills, today, fmt, upsert } from "../ui.jsx";
+import { MEALS, useFoodLog, makeEntry, amounts, entriesFor, totals, isQuickRef } from "./foodStore.js";
 import FoodSearch from "./FoodSearch.jsx";
+
+const MEAL_OPTIONS = MEALS.map((m) => ({ key: m.key, label: m.label }));
 
 // Cibles PROTOCOLE (protein/carbs/fat/fiber) → noms internes du module (prot/gluc/lip/fib).
 const TARGET_KEY = { prot: "protein", gluc: "carbs", lip: "fat", fib: "fiber" };
@@ -38,14 +40,19 @@ function MacroTile({ m, value, target, missing }) {
 function EntryRow({ e, onUpdate, onRemove }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState(e.q);
+  const [meal, setMeal] = useState(e.meal);
   const a = amounts(e);
+  // Une saisie libre stocke la portion telle quelle (q = 100) : proposer d'en changer les
+  // grammes n'aurait aucun sens. Le repas, en revanche, reste modifiable dans tous les cas.
+  const isQuick = isQuickRef(e.ref);
+  const changed = meal !== e.meal || (!isQuick && Number(q) !== e.q);
   return (
     <div style={{ borderBottom: `1px solid ${C.divider}` }}>
       <div onClick={() => setOpen(!open)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 0", cursor: "pointer" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 12, color: C.text, fontWeight: 600, lineHeight: 1.35 }}>{e.name}</div>
           <div style={{ display: "flex", gap: 9, marginTop: 2, fontFamily: C.mono, fontSize: 10, color: C.muted }}>
-            <span>{e.ref === "quick" ? "portion" : `${e.q} g`}</span>
+            <span>{isQuick ? "portion" : `${e.q} g`}</span>
             <span>P{a.prot ?? "—"}</span>
             <span>G{a.gluc ?? "—"}</span>
             <span>L{a.lip ?? "—"}</span>
@@ -56,32 +63,29 @@ function EntryRow({ e, onUpdate, onRemove }) {
       </div>
       {open && (
         <div style={{ padding: "4px 0 12px", display: "flex", flexDirection: "column", gap: 9 }}>
-          {/* Une saisie libre stocke la portion telle quelle (q = 100) : proposer d'en
-              changer les grammes n'aurait aucun sens, seule la suppression est utile. */}
-          {e.ref !== "quick" && (
-            <>
-              <Stepper value={q} set={setQ} step={10} unit="g" min={1} int />
-              <div style={{ display: "flex", gap: 8 }}>
-                <Btn variant="primary" style={{ flex: 1 }} disabled={q === e.q}
-                  onClick={() => { onUpdate(e.id, { q: Number(q) }); setOpen(false); }}>Modifier</Btn>
-                <Btn variant="danger" onClick={() => onRemove(e.id)}><Trash2 size={13} /></Btn>
-              </div>
-            </>
-          )}
-          {e.ref === "quick" && (
-            <Btn variant="danger" onClick={() => onRemove(e.id)} style={{ width: "100%" }}>
-              <Trash2 size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />Supprimer
-            </Btn>
-          )}
+          <div>
+            <Label style={{ marginBottom: 5 }}>Repas</Label>
+            <Pills small options={MEAL_OPTIONS} value={meal} onChange={setMeal} />
+          </div>
+          {!isQuick && <Stepper value={q} set={setQ} step={10} unit="g" min={1} int />}
+          <div style={{ display: "flex", gap: 8 }}>
+            <Btn variant="primary" style={{ flex: 1 }} disabled={!changed}
+              onClick={() => { onUpdate(e.id, { q: Number(q), meal }); setOpen(false); }}>Enregistrer</Btn>
+            <Btn variant="danger" onClick={() => onRemove(e.id)}><Trash2 size={13} /></Btn>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-export default function NutritionTab({ targetsFor }) {
+export default function NutritionTab({ targetsFor, macros, save, training }) {
   const [date, setDate] = useState(today());
   const [openMeal, setOpenMeal] = useState(null);
+  // Distinct de openMeal : "Macro rapide" ouvre la même feuille mais directement sur la
+  // saisie libre, sans passer par la recherche — c'est justement la recherche qu'on
+  // veut éviter pour un ajout rapide de macros sans aliment précis en tête.
+  const [quickAdd, setQuickAdd] = useState(false);
   const food = useFoodLog();
 
   const dayEntries = useMemo(() => entriesFor(food.log, date), [food.log, date]);
@@ -91,10 +95,26 @@ export default function NutritionTab({ targetsFor }) {
   const kcalTarget = Math.round(tg.protein * 4 + tg.carbs * 4 + tg.fat * 9);
   const left = kcalTarget - t.kcal;
 
+  // Eau : PAS une donnée du module Nutrition. `macroLog.water` existe déjà (saisie
+  // manuelle + synchro Health Connect via runHealthSync dans App.jsx) — on l'affiche
+  // simplement ici aussi, pour éviter d'avoir à changer d'onglet, sans dupliquer ni
+  // déplacer la donnée. Mêmes boutons que l'onglet Macros, même cible (dont le bonus
+  // basket +1 L, porté par targetsFor via targetsForDate).
+  const curMacro = macros.find((m) => m.date === date) || {};
+  const water = curMacro.water ?? 0;
+  const basketDay = training.some((tr) => tr.type === "Basket" && tr.date === date);
+  const waterTgt = tg.water + (basketDay ? 1000 : 0);
+  const addWater = (ml) => {
+    const next = Math.max(0, (macros.find((m) => m.date === date)?.water ?? 0) + ml);
+    save.macros(upsert(macros, { date, water: next, source: "manual" }));
+  };
+
   const add = (f, q) => {
     food.add(makeEntry({ date, meal: openMeal, food: f, q }));
     setOpenMeal(null);
+    setQuickAdd(false);
   };
+  const closeSearch = () => { setOpenMeal(null); setQuickAdd(false); };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -108,7 +128,7 @@ export default function NutritionTab({ targetsFor }) {
       />
 
       <Card>
-        <DateField value={date} onChange={setDate} />
+        <DateField value={date} onChange={setDate} future />
       </Card>
 
       {/* Calories du jour + reste à consommer : c'est l'information qu'on vient chercher
@@ -140,23 +160,51 @@ export default function NutritionTab({ targetsFor }) {
         ))}
       </div>
 
+      <Card>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 8 }}>
+          <Droplet size={12} color={C.accent} />
+          <Label>Eau</Label>
+          <span style={{ marginLeft: "auto", fontFamily: C.mono, fontSize: 15, fontWeight: 800, color: C.text }}>
+            {(water / 1000).toFixed(2)}<span style={{ fontSize: 10, color: C.muted, fontWeight: 700 }}> / {(waterTgt / 1000).toFixed(1)} L</span>
+          </span>
+        </div>
+        <div style={{ background: C.bg, borderRadius: 6, height: 6, overflow: "hidden", marginBottom: 10 }}>
+          <div style={{ background: C.accent, width: `${Math.min(100, (water / waterTgt) * 100)}%`, height: "100%" }} />
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Btn variant="plain" onClick={() => addWater(250)} style={{ flex: 1 }}>+250 ml</Btn>
+          <Btn variant="plain" onClick={() => addWater(500)} style={{ flex: 1 }}>+500 ml</Btn>
+          <Btn variant="ghost" onClick={() => addWater(-250)}>−250</Btn>
+        </div>
+      </Card>
+
       {MEALS.map((meal) => {
         const entries = dayEntries.filter((e) => e.meal === meal.key);
         const mt = totals(entries);
         return (
           <Card key={meal.key}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: entries.length ? 4 : 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: entries.length ? 2 : 10 }}>
               <Label style={{ fontSize: 10, color: C.text2 }}>{meal.label}</Label>
               <span style={{ fontFamily: C.mono, fontSize: 12, fontWeight: 800, color: entries.length ? C.accent : C.dim }}>
                 {entries.length ? `${n0(mt.kcal)} kcal` : "—"}
               </span>
             </div>
+            {entries.length > 0 && (
+              <div style={{ display: "flex", gap: 10, marginBottom: 8, fontFamily: C.mono, fontSize: 10, color: C.muted }}>
+                <span>P{mt.prot}</span><span>G{mt.gluc}</span><span>L{mt.lip}</span><span>Fib{mt.fib}</span>
+              </div>
+            )}
             {entries.map((e) => (
               <EntryRow key={e.id} e={e} onUpdate={food.update} onRemove={food.remove} />
             ))}
-            <Btn variant="plain" onClick={() => setOpenMeal(meal.key)} style={{ width: "100%", marginTop: 10, padding: "7px 12px", fontSize: 11 }}>
-              <Plus size={12} style={{ display: "inline", verticalAlign: -2, marginRight: 5 }} />Ajouter
-            </Btn>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <Btn variant="plain" onClick={() => { setOpenMeal(meal.key); setQuickAdd(false); }} style={{ flex: 1, padding: "7px 12px", fontSize: 11 }}>
+                <Plus size={12} style={{ display: "inline", verticalAlign: -2, marginRight: 5 }} />Ajouter
+              </Btn>
+              <Btn variant="plain" onClick={() => { setOpenMeal(meal.key); setQuickAdd(true); }} style={{ padding: "7px 12px", fontSize: 11 }}>
+                <Zap size={12} style={{ display: "inline", verticalAlign: -2, marginRight: 5 }} />Macro rapide
+              </Btn>
+            </div>
           </Card>
         );
       })}
@@ -164,7 +212,8 @@ export default function NutritionTab({ targetsFor }) {
       {dayEntries.length === 0 && <Empty>Aucun aliment enregistré ce jour.</Empty>}
 
       <Body style={{ fontSize: 10, color: C.dim, textAlign: "center", padding: "4px 0 2px" }}>
-        Module interne en test — n'alimente pas encore les Macros ni Health Connect.
+        Module interne en test — les calories et macros n'alimentent pas encore
+        l'onglet Macros ni Health Connect (l'eau, elle, est déjà le même compteur).
       </Body>
 
       {openMeal && (
@@ -174,9 +223,12 @@ export default function NutritionTab({ targetsFor }) {
           date={date}
           log={food.log}
           pins={food.pins}
+          muted={food.muted}
           onAdd={add}
           onTogglePin={food.togglePin}
-          onClose={() => setOpenMeal(null)}
+          onMute={food.muteFromSuggestions}
+          onClose={closeSearch}
+          startFree={quickAdd}
         />
       )}
     </div>

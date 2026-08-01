@@ -23,8 +23,21 @@ const todayKey = () => new Date().toISOString().slice(0, 10);
 
 // randomUUID exige un contexte sécurisé. La WebView Capacitor sert bien depuis un origine
 // sécurisée, mais un repli coûte trois lignes et évite un plantage silencieux à la saisie.
-const newId = () =>
+export const newId = () =>
   (globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`);
+
+// Préfixe des saisies libres / ajouts rapides. CHAQUE entrée doit avoir un `ref` UNIQUE
+// (jamais le littéral "quick") : `suggestions()`/`usageStats()` regroupent les lignes du
+// journal par `ref` pour bâtir "Vos aliments habituels" — un ref partagé aurait fusionné
+// "Whey vanille 30g" et un simple "ajout rapide de macros" en une seule entrée fantôme
+// (la plus récente écrasant les autres), et masquer l'une depuis la liste des habituels
+// (foodMuted) aurait alors masqué TOUTES les saisies libres futures. Trouvé le 02/08/2026.
+export const QUICK_PREFIX = "quick:";
+// "quick" (sans suffixe) reste reconnu pour les entrées déjà enregistrées avant ce
+// correctif (02/08/2026) — elles gardent leur ref littérale telle quelle, seules les
+// nouvelles saisies obtiennent un identifiant unique.
+export const isQuickRef = (ref) => ref === "quick" || (typeof ref === "string" && ref.startsWith(QUICK_PREFIX));
+export const newQuickRef = () => QUICK_PREFIX + newId();
 
 /**
  * Une ligne de journal.
@@ -131,11 +144,18 @@ export function usageStats(log, { meal, date = todayKey() } = {}) {
 // dîner, ce qui est le comportement recherché.
 const score = (s) => s.freq + 2 * s.mealFreq + Math.max(0, 14 - s.days);
 
-/** Aliments à proposer avant toute frappe (l'écran d'ajout ouvre là-dessus). */
-export function suggestions(log, { meal, pins = [], limit = 12, date = todayKey() } = {}) {
+/**
+ * Aliments à proposer avant toute frappe (l'écran d'ajout ouvre là-dessus).
+ * `muted` retire un aliment de CETTE liste — pas de foodLog : demandé pour désencombrer
+ * "Vos aliments habituels" (un essai raté, un aliment qu'on ne mange plus), sans jamais
+ * toucher à l'historique réel des jours déjà enregistrés.
+ */
+export function suggestions(log, { meal, pins = [], muted = [], limit = 12, date = todayKey() } = {}) {
   const stats = usageStats(log, { meal, date });
   const pinned = new Set(pins);
+  const hidden = new Set(muted);
   return [...stats.values()]
+    .filter((s) => !hidden.has(s.ref))
     .map((s) => ({ ...s, _s: score(s) + (pinned.has(s.ref) ? 1000 : 0) }))
     .sort((a, b) => b._s - a._s)
     .slice(0, limit)
@@ -162,12 +182,14 @@ export function searchBoost(log, { meal, date = todayKey() } = {}) {
 export function useFoodLog() {
   const [log, setLog] = useState([]);
   const [pins, setPins] = useState([]);
+  const [muted, setMuted] = useState([]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     (async () => {
       setLog(await store.get("foodLog", []));
       setPins(await store.get("foodPins", []));
+      setMuted(await store.get("foodMuted", []));
       setReady(true);
     })();
   }, []);
@@ -177,6 +199,7 @@ export function useFoodLog() {
   return {
     log,
     pins,
+    muted,
     ready,
     add: (e) => write([...log, e]),
     update: (id, patch) => write(log.map((e) => (e.id === id ? { ...e, ...patch } : e))),
@@ -185,6 +208,19 @@ export function useFoodLog() {
       const next = pins.includes(ref) ? pins.filter((r) => r !== ref) : [...pins, ref];
       setPins(next);
       store.set("foodPins", next);
+    },
+    // Épinglé et masqué sont mutuellement exclusifs : masquer un aliment qu'on avait
+    // épinglé par erreur doit aussi le désépingler, sinon il resterait invisible malgré
+    // un score artificiellement forcé en tête.
+    muteFromSuggestions: (ref) => {
+      const nextMuted = muted.includes(ref) ? muted : [...muted, ref];
+      setMuted(nextMuted);
+      store.set("foodMuted", nextMuted);
+      if (pins.includes(ref)) {
+        const nextPins = pins.filter((r) => r !== ref);
+        setPins(nextPins);
+        store.set("foodPins", nextPins);
+      }
     },
   };
 }

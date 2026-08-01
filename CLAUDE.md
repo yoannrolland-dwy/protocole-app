@@ -71,9 +71,10 @@ protocole-app/
     data/ciqual.json     # table CIQUAL compactée (3178 aliments, 246 Ko)
     nutrition/           # module Nutrition interne (onglet "Repas", bêta)
       ciqual.js          #   chargement lazy + recherche + scoring
+      off.js             #   recherche Open Food Facts (M2, produits de marque)
       foodStore.js       #   clés foodLog/foodPins, totaux, favoris dérivés
       NutritionTab.jsx   #   l'onglet
-      FoodSearch.jsx     #   recherche, quantité, saisie libre
+      FoodSearch.jsx     #   recherche (CIQUAL + OFF), quantité, saisie libre
     index.css            # @import "tailwindcss" + resets minimaux
   android/               # projet natif Capacitor — build/déploiement séparé
                          # de la PWA, voir "Mise à jour de l'app native"
@@ -404,15 +405,15 @@ Objectif : se détacher complètement de MyFitnessPal / Cronometer en intégrant
 journal alimentaire dans PROTOCOLE, proche de Cronometer (journal pur, aucun
 coaching dans le module — le jugement reste au Coach IA).
 
-**Chantier volontairement itératif. M1 est livré, M2+ reste à faire.**
+**Chantier volontairement itératif. M0-M2 livrés, M3+ reste à faire.**
 
 | Jalon | Contenu | État |
 |---|---|---|
 | M0 | Base CIQUAL + moteur de recherche | ✅ 01/08/2026 |
 | M1 | Onglet « Repas » isolé, CIQUAL + repas + historique | ✅ 01/08/2026 |
-| M2 | Open Food Facts (recherche texte + cache produits) | à faire |
+| M2 | Open Food Facts (recherche texte, sans cache persisté) | ✅ 02/08/2026 |
 | M3 | Scan code-barres ML Kit (natif seulement) | à faire |
-| M4 | Portions/unités, recettes, copier un repas, quick-add | à faire |
+| M4 | Portions/unités, recettes, copier un repas | à faire (quick-add livré en avance, voir plus bas) |
 | M5 | (abandonné — micronutriments écartés, voir plus bas) | — |
 | M6 | **Bascule** : `foodLog` alimente `macroLog`, coupure HC nutrition/eau | à faire |
 | M7 | Retrait des permissions HC nutrition/hydratation | à faire |
@@ -443,6 +444,13 @@ coaching dans le module — le jugement reste au Coach IA).
   ailleurs. En revanche **ne pas écrire vers Health Connect** : rien ne consomme
   ces données chez Yoann, ce serait deux permissions de plus pour rien. Pas,
   sommeil et poids restent sur Health Connect, inchangés.
+- **L'eau est une exception à l'isolation, décidée le 02/08/2026** : `NutritionTab`
+  lit et écrit `macroLog.water` directement (mêmes boutons +250/+500/−250 que
+  `MacroTab`), au lieu de dupliquer la donnée dans `foodLog`. Ce n'est pas une
+  entorse au principe d'isolation — l'eau était déjà listée comme fonctionnalité à
+  garder telle quelle dans la demande initiale (« déjà interfacée avec Health
+  Connect ») — juste le même compteur rendu visible dans les deux onglets. Seuls
+  kcal/macros restent isolés dans `foodLog` jusqu'à M6.
 
 ### Points techniques à connaître
 
@@ -469,10 +477,70 @@ coaching dans le module — le jugement reste au Coach IA).
   10 lignes/jour. Tenable sous le quota localStorage mais ce n'est plus
   négligeable comme l'est `macroLog` (1 ligne/jour). C'est ce chiffre mesuré, pas
   une estimation, qui doit servir à décider d'un éventuel passage à SQLite.
-- Open Food Facts (M2) : quota **~10 req/min sur la recherche texte** (~100 sur le
-  code-barres) → pas de recherche à la frappe sur OFF, déclenchement après une
-  pause seulement. L'en-tête `User-Agent` exigé par OFF est interdit en JS
-  navigateur : passer par `CapacitorHttp` sur le natif.
+- **Open Food Facts (M2, `src/nutrition/off.js`) : quota confirmé bien plus serré
+  qu'annoncé.** Testé en direct le 01-02/08/2026 : une deuxième requête à moins de
+  ~5 s de la première renvoie déjà une 503 "Page temporarily unavailable" (pas un
+  simple ralentissement). D'où trois protections cumulées, aucune seule ne suffit :
+  déclenchement 700 ms après la dernière frappe (jamais à la frappe comme CIQUAL),
+  un espacement minimum forcé côté client (`MIN_GAP_MS`) même si le debounce est
+  contourné, et un cache mémoire **volontairement non persisté** (une requête déjà
+  vue dans la session ne retape jamais l'API — mais on n'écrit rien en
+  localStorage, un produit OFF corrigé par la communauté ne doit pas rester
+  périmé indéfiniment). Un échec réseau/quota ne fait jamais planter l'écran :
+  `searchOFF` retourne `{items:[], error:true}`, affiché comme message plutôt que
+  remonté en exception — CIQUAL continue de fonctionner à côté dans tous les cas.
+  Endpoint utilisé : `cgi/search.pl` (l'ancien, pas `/api/v2/search` qui répondait
+  503 en test). L'en-tête `User-Agent` exigé par OFF est interdit en `fetch()`
+  navigateur : `CapacitorHttp` le permet sur le natif (contourne aussi le CORS) ;
+  repli `fetch()` sans le header sur la PWA. **Non vérifié en conditions réelles
+  dans le navigateur d'aperçu Claude Code** : son bac à sable bloque tout accès
+  réseau externe (confirmé même vers `example.com`) — seul `curl` en dehors du
+  navigateur a pu valider le comportement de l'API. Premier vrai test : sur
+  l'app native, où le réseau n'est pas restreint.
+- **Radicaux courts et bruit des alias CIQUAL** : le repli morphologique de
+  `matchTerm` (accords français) exigeait au départ seulement 3 lettres de
+  radical (`STEM_MIN`), et deux faux positifs réels sont apparus au test : « skyr »
+  remontait « Whisky » (radical « sky » trouvé au milieu du mot, hors début de
+  mot), et « whey » remontait un jambon végétal via l'alias anglais « wheaty »
+  présent dans les données ANSES. Corrigé le 02/08/2026 par deux garde-fous :
+  un radical tronqué ne compte que s'il matche en DÉBUT de mot (score ≥ 55, pas
+  un simple fragment), et `STEM_MIN` est passé à 4 — un mot de 4 lettres ou moins
+  ne subit plus aucun repli du tout. Les deux mots n'existant réellement pas dans
+  CIQUAL (normal, ce sont des produits de marque), ils remontent maintenant zéro
+  résultat plutôt qu'un résultat trompeur — et se retrouvent via Open Food Facts.
+- **Retours d'usage réel du 02/08/2026** (première session de test en parallèle de
+  Cronometer) : la recherche CIQUAL+OFF est jugée correcte mais **pas au niveau de
+  MyFitnessPal** — Yoann mange surtout des produits à code-barres, ce qui pousse M3 (scan)
+  plus haut en priorité perçue que prévu. Trois correctifs livrés en réponse :
+  - **Reprise automatique sur échec OFF** (`off.js`) : mesuré que le seuil réel n'est PAS
+    une fenêtre glissante simple (4 s → 503, 5 s → 200, 6 s → 503 juste après) — aucun
+    espacement client fixe ne peut donc garantir de passer. Un échec est retenté avant
+    d'afficher quoi que ce soit ; le message d'erreur a aussi été reformulé pour ne plus
+    affirmer "quota atteint", non vérifiable depuis le client. **Renforcé le même jour**
+    (retour "un peu plus fluide mais peut mieux faire") : 2 tentatives de rattrapage au
+    lieu d'une (délais croissants 2,5 s / 4 s, 3 essais au total), même logique que la
+    reprise déjà en place pour l'API Claude. Un vrai 503 isolé, voire deux d'affilée, ne
+    remontent donc plus jamais jusqu'à l'écran.
+  - **Masquer un aliment de "Vos aliments habituels"** (`foodMuted`, nouvelle clé
+    `DATA_KEYS`) : décongestionne la liste dérivée sans jamais toucher à l'historique réel
+    (`foodLog`). Épinglé et masqué sont mutuellement exclusifs.
+  - **"Macro rapide" par carte repas** : ouvre directement la saisie libre (sans passer
+    par la recherche), nom désormais optionnel (repli sur "Ajout rapide").
+  - **Bug trouvé en testant ce dernier point, corrigé le 02/08/2026** : toutes les saisies
+    libres partageaient le littéral `ref: "quick"`. `suggestions()`/`usageStats()`
+    regroupent le journal par `ref` pour bâtir les habituels — un ref partagé fusionnait
+    silencieusement toutes les saisies libres en une seule entrée fantôme (la plus
+    récente écrasant les autres), et masquer cette entrée aurait masqué TOUTES les
+    saisies libres futures. Chaque saisie libre reçoit maintenant un ref unique
+    (`newQuickRef()`, préfixe `quick:` + id). Les entrées déjà enregistrées avec le
+    littéral `quick` restent reconnues (`isQuickRef()`) pour la compatibilité arrière,
+    mais ne bénéficient pas rétroactivement de l'unicité.
+  - **Dates futures dans l'onglet Repas** (`DateField` dans `ui.jsx`, prop `future`) :
+    demandé explicitement pour planifier des repas à l'avance (ex. macros d'un match
+    prévu). Le plafond `max={today()}` reste le comportement PAR DÉFAUT sur les 6 autres
+    onglets de saisie (Poids, Sommeil, Pas, Séances, Genou, Macros) — une date future n'y
+    a aucun sens, ce sont des mesures de ce qui s'est passé. Seul `NutritionTab` passe
+    `future` pour lever le plafond.
 - M3 : utiliser `BarcodeScanner.scan()` (Google Code Scanner) et **pas**
   `startScan()`, qui affiche la caméra derrière la WebView et impose de rendre le
   fond transparent — incompatible avec le fond opaque du design system.

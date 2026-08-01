@@ -77,7 +77,11 @@ function termScore(hay, term) {
 // deux lettres finales — ce qui couvre s / e / es / ne / le. Léger malus pour qu'une
 // correspondance exacte reste toujours devant.
 const STEM_PENALTY = 0.85;
-const STEM_MIN = 3;
+// Plancher à 4 (pas 3) : un mot de 4 lettres ou moins ("whey", "skyr") ne donne plus lieu
+// à un repli du tout. Trouvé le 02/08/2026 : à 3, le radical "whe" de "whey" tombait sur
+// l'alias "wheaty" d'un jambon végétal — un mot anglais isolé dans les données ANSES,
+// sémantiquement proche mais sans rapport avec le produit cherché.
+const STEM_MIN = 4;
 
 function matchTerm(hay, term) {
   const s = termScore(hay, term);
@@ -85,7 +89,12 @@ function matchTerm(hay, term) {
   for (let cut = 1; cut <= 2; cut++) {
     if (term.length - cut < STEM_MIN) break;
     const st = termScore(hay, term.slice(0, term.length - cut));
-    if (st) return st * STEM_PENALTY;
+    // Un radical tronqué ne doit compter que s'il retombe en DÉBUT de mot (score ≥ 55).
+    // Sans ce plancher, « skyr » → radical « sky » matchait au milieu de « whisky » (score
+    // 20, fragment en position quelconque) et le faisait remonter en tête — trouvé en
+    // testant l'app le 02/08/2026. Le repli morphologique sert les accords (pâte/complète),
+    // pas les coïncidences de 3 lettres au milieu d'un mot sans rapport.
+    if (st >= 55) return st * STEM_PENALTY;
   }
   return 0;
 }

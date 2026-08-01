@@ -19,7 +19,7 @@ import { runAutoBackup } from "./autoBackup.js";
 // Design system "Affirmée" : jetons + primitives, extraits de ce fichier le 01/08/2026
 // pour être partageables avec src/nutrition/ (un import depuis App.jsx aurait été circulaire).
 import {
-  C, today, fmt, round, longDate,
+  C, today, fmt, round, longDate, byDate, upsert,
   Card, Label, Body, Big, Empty, Btn, inputStyle, TextInput, Stepper,
   Field, DateField, Pills, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle,
 } from "./ui.jsx";
@@ -29,7 +29,7 @@ import {
 import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.29.0";
+const APP_VERSION = "3.32.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -40,13 +40,6 @@ const APP_VERSION = "3.29.0";
 
 
 /* ---------- utilitaires ---------- */
-const byDate = (a, b) => a.date.localeCompare(b.date);
-const upsert = (arr, entry) => {
-  const i = arr.findIndex((e) => e.date === entry.date);
-  const next = [...arr];
-  if (i >= 0) next[i] = { ...next[i], ...entry }; else next.push(entry);
-  return next.sort(byDate);
-};
 const lastN = (arr, n) => arr.slice(-n);
 const avg = (nums) => (nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null);
 const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
@@ -2780,7 +2773,7 @@ Fais-moi une revue de fond : tendances sur la durée, corrélations entre apport
             {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek }} />}
             {tab === "knee" && <KneeTab {...{ knee, save, hsrWeek }} />}
             {tab === "macro" && <MacroTab {...{ macros, targets, save, training }} />}
-            {tab === "food" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} />}
+            {tab === "food" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} />}
           </>
         )}
       </main>

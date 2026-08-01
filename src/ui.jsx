@@ -36,6 +36,13 @@ export const fmt = (d) => { const p = d.split("-"); return `${p[2]}/${p[1]}`; };
 export const round = (x, d = 1) => (x == null ? null : Math.round(x * 10 ** d) / 10 ** d);
 export const longDate = (d) => new Date(d + "T12:00:00")
   .toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" });
+export const byDate = (a, b) => a.date.localeCompare(b.date);
+export const upsert = (arr, entry) => {
+  const i = arr.findIndex((e) => e.date === entry.date);
+  const next = [...arr];
+  if (i >= 0) next[i] = { ...next[i], ...entry }; else next.push(entry);
+  return next.sort(byDate);
+};
 
 /* ============================================================
    PRIMITIVES UI (design "Affirmée")
@@ -142,9 +149,13 @@ export const Field = ({ label, children }) => (
   </div>
 );
 
-export const DateField = ({ value, onChange }) => (
+// `future` lève le plafond à aujourd'hui : nécessaire pour planifier des repas à venir
+// (module Nutrition), mais volontairement PAS le comportement par défaut — sur les autres
+// onglets (Poids, Sommeil, Pas, Séances, Genou, Macros), une date future n'a aucun sens,
+// ce sont des mesures de ce qui s'est passé, pas des plans.
+export const DateField = ({ value, onChange, future = false }) => (
   <Field label="Date">
-    <input type="date" value={value} max={today()} onChange={(e) => onChange(e.target.value)}
+    <input type="date" value={value} max={future ? undefined : today()} onChange={(e) => onChange(e.target.value)}
       style={{ ...inputStyle(false), fontSize: 13 }} />
   </Field>
 );
