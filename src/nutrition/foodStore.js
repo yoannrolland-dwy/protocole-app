@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { store } from "../store.js";
+import { today as todayKey } from "../ui.jsx";
 
 export const MEALS = [
   { key: "petitdej", label: "Petit-déjeuner" },
@@ -20,8 +21,6 @@ export const MEALS = [
 ];
 
 export const MACROS = ["kcal", "prot", "gluc", "lip", "fib"];
-
-const todayKey = () => new Date().toISOString().slice(0, 10);
 
 // randomUUID exige un contexte sécurisé. La WebView Capacitor sert bien depuis un origine
 // sécurisée, mais un repli coûte trois lignes et évite un plantage silencieux à la saisie.

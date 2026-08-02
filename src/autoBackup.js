@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { exportData } from "./store.js";
+import { today } from "./ui.jsx";
 
 // Sauvegarde locale automatique : un export JSON silencieux par jour, écrit dans le
 // dossier "Documents" public du téléphone (survit à une réinstallation de l'app, visible
@@ -12,7 +13,6 @@ import { exportData } from "./store.js";
 
 const FOLDER = "Protocole";
 const KEEP_DAYS = 30;
-const today = () => new Date().toISOString().slice(0, 10);
 
 /** Appelé au lancement et à chaque retour au premier plan ; no-op si déjà fait aujourd'hui. */
 export async function runAutoBackup(lastDate, onDone) {

@@ -19,7 +19,7 @@ import { runAutoBackup } from "./autoBackup.js";
 // Design system "Affirmée" : jetons + primitives, extraits de ce fichier le 01/08/2026
 // pour être partageables avec src/nutrition/ (un import depuis App.jsx aurait été circulaire).
 import {
-  C, today, fmt, round, longDate, byDate, upsert,
+  C, today, shiftDateKey, fmt, round, longDate, byDate, upsert,
   Card, Label, Body, Big, Empty, Btn, inputStyle, TextInput, Stepper,
   Field, DateField, Pills, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle,
 } from "./ui.jsx";
@@ -29,7 +29,7 @@ import {
 import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.36.0";
+const APP_VERSION = "3.37.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -2560,7 +2560,7 @@ export default function App({ silent = false } = {}) {
 
       // --- temps réel : hier vs aujourd'hui, avec deltas explicites ---
       const findDay = (arr, d) => arr.find((e) => e.date === d);
-      const y = (() => { const t = new Date(today()); t.setDate(t.getDate() - 1); return t.toISOString().slice(0, 10); })();
+      const y = shiftDateKey(today(), -1);
       const wToday = findDay(weight, today()), wYest = findDay(weight, y);
       const mToday = findDay(macros, today()), mYest = findDay(macros, y);
       const sToday = findDay(sleep, today()), sYest = findDay(sleep, y);
