@@ -219,8 +219,17 @@ protocole-app/
   sèche intensive avant vacances) — revient automatiquement aux cibles par
   défaut après la période, ne pas la confondre avec un changement
   permanent. Eau en boutons rapides (+250/+500 ml, PAS de saisie manuelle
-  pour l'eau — décision explicite). Cible eau **+1 L automatique les jours
-  où une séance Basket est loggée** (je transpire beaucoup au basket).
+  pour l'eau — décision explicite). Cible eau de base **2000 mL** (baissée
+  de 3000 le 02/08/2026 — alimentation riche en légumes qui couvre déjà une
+  bonne partie des besoins hydriques), éditable dans Réglages → "Cible eau
+  de base" (`DEFAULT_TARGETS.water` dans `App.jsx`, champ ajouté en même
+  temps pour que la valeur reste corrigeable sans rebuild — avant ça,
+  aucun écran ne permettait d'éditer une cible de base, seulement la
+  fenêtre d'objectif temporaire). Cible eau **+1 L automatique les jours
+  où une séance Basket est loggée** (je transpire beaucoup au basket),
+  logique inchangée, s'applique par-dessus la nouvelle base sans code
+  modifié à ses 4 points de lecture (dashboard, onglet Macros, widget,
+  Coach IA).
   **Sur l'app native**, macros et eau du jour sont écrasées par la synchro
   Health Connect si elle a des données ce jour-là (voir section dédiée) —
   les boutons rapides restent utiles pour corriger/compléter entre deux
@@ -276,6 +285,21 @@ protocole-app/
   écraserait tout et laisserait `cut` absent.
 
 ### Coach IA — contrat exact (ne pas simplifier sans le signaler)
+- **Détail des repas dans le prompt** (02/08/2026) : jusqu'ici le Coach IA ne
+  voyait que les totaux macros du jour (`macroLog`, alimenté par `foodLog`
+  depuis M6) — jamais QUOI a été mangé. `buildPrompt` lit désormais `foodLog`
+  directement (`getSync("foodLog", [])` dans `store.js`, lecture **synchrone**
+  au moment précis du clic sur "Analyser" — pas une copie chargée au montage
+  de l'app comme `macros`/`weight`/etc., pour ne jamais rater un repas ajouté
+  dans l'onglet Repas pendant la session en cours) et regroupe hier/aujourd'hui
+  par repas (`repas_hier`/`repas_aujourdhui` dans le bloc TEMPS RÉEL : nom +
+  quantité de chaque aliment, PAS les macros qui sont déjà dans `macros_*`).
+  Consigne explicite au modèle : commenter la COMPOSITION quand elle appelle un
+  conseil concret (répartition protéique entre repas, repas pauvre en fibres,
+  timing autour de l'entraînement), pas relire la liste. `buildBriefing`
+  (export claude.ai, tokens gratuits) va plus loin et dumpe les 14 jours de
+  repas bruts aliment par aliment (`REPAS BRUTS 14 jours`), même logique que
+  les séries de musculation brutes déjà présentes.
 - Appel direct à `https://api.anthropic.com/v1/messages` depuis le
   navigateur avec la clé API saisie par l'utilisateur (stockée en local
   uniquement), header `anthropic-dangerous-direct-browser-access: true`.

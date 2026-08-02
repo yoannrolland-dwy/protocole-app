@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
-import { store, exportData, importData } from "./store.js";
+import { store, getSync, exportData, importData } from "./store.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 import { updateDashboardWidget } from "./widgetSync.js";
@@ -27,9 +27,10 @@ import {
 // propre clé `foodLog` et ne reçoit d'ici que les cibles, en lecture. Ni `macroLog` ni
 // healthSync.js ne sont concernés tant que la bascule (M6) n'est pas décidée.
 import NutritionTab from "./nutrition/NutritionTab.jsx";
+import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor } from "./nutrition/foodStore.js";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.38.1";
+const APP_VERSION = "3.39.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -2161,6 +2162,14 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
       </Card>
 
       <Card>
+        <Label style={{ marginBottom: 8 }}>Cible eau de base</Label>
+        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
+          Cible quotidienne hors basket. +1 L automatique les jours où une séance Basket est loggée.
+        </Body>
+        <Field label="Eau (mL)"><Stepper value={targets.water ?? 0} set={(v) => saveTargets({ ...targets, water: v })} step={100} min={0} int /></Field>
+      </Card>
+
+      <Card>
         <Label style={{ marginBottom: 8 }}>Objectif temporaire · cibles macros</Label>
         <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
           Sur cette période, ces cibles remplacent les cibles de base partout dans l'app. En dehors,
@@ -2269,7 +2278,7 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
 // `targets` déjà passée partout — aucune nouvelle prop à faire circuler.
 // `enabled: false` la neutralise sans perdre les valeurs, pour la réactiver plus tard.
 const DEFAULT_TARGETS = {
-  protein: 215, carbs: 205, fat: 80, fiber: 30, water: 3000, weightMaintenance: 96,
+  protein: 215, carbs: 205, fat: 80, fiber: 30, water: 2000, weightMaintenance: 96,
   cut: { enabled: true, start: "2026-07-27", end: "2026-08-18", protein: 220, carbs: 185, fat: 65, fiber: 30 },
 };
 
@@ -2505,8 +2514,25 @@ export default function App({ silent = false } = {}) {
   // (invisible à la compilation, puisque l'erreur n'existe qu'à l'exécution).
   const last14 = (arr) => arr.filter((e) => daysBetween(e.date, today()) <= 14).sort(byDate);
 
+  // Détail des repas (nom + quantité de chaque aliment, par repas) : ce que `macros`
+  // (agrégats macroLog) ne peut pas montrer. Regroupé ici plutôt que dans `foodStore.js`,
+  // pour rester au plus près de ce que le Coach IA en fait (labels lisibles, jours vides
+  // omis) sans imposer cette forme au reste du module Nutrition.
+  const mealsFor = (log, date) => {
+    const out = {};
+    FOOD_MEALS.forEach(({ key, label }) => {
+      const items = foodEntriesFor(log, date).filter((e) => e.meal === key)
+        .map((e) => `${e.name} ${e.q}g`);
+      if (items.length) out[label] = items;
+    });
+    return out;
+  };
+
   const coach = {
     buildPrompt: (note, { profile = coachProfile, journal = coachJournal } = {}) => {
+      // Lu au moment de l'analyse (pas une copie chargée au montage de l'app) : un repas
+      // ajouté dans l'onglet Repas pendant la session en cours doit être vu immédiatement.
+      const foodLog = getSync("foodLog", []);
       const tgtW = phaseTarget(phase, targets);
       const win = (arr, a, b) => arr.filter((e) => { const d = daysBetween(e.date, today()); return d >= a && d <= b; });
       const avgKey = (arr, k) => { const v = arr.map((e) => e[k]).filter((x) => x != null); return v.length ? round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
@@ -2581,6 +2607,8 @@ export default function App({ silent = false } = {}) {
         sommeil_avant_hier: sYest ? { heures: round(sYest.hours, 2), qualite: sYest.quality ?? null } : null,
         macros_hier: mYest ? { proteines: mYest.protein, glucides: mYest.carbs, lipides: mYest.fat, fibres: mYest.fiber, eau_ml: mYest.water } : null,
         macros_aujourdhui_en_cours: mToday ? { proteines: mToday.protein, glucides: mToday.carbs, lipides: mToday.fat, fibres: mToday.fiber, eau_ml: mToday.water, cible_eau_ml: waterTgtToday } : null,
+        repas_hier: mealsFor(foodLog, y),
+        repas_aujourdhui: mealsFor(foodLog, today()),
         pas_hier: sYest_steps?.count ?? null, pas_aujourdhui: sToday_steps?.count ?? null,
         seances_hier: trYest.map((t) => t.type),
         seances_aujourdhui: trToday.map((t) => t.type),
@@ -2677,7 +2705,7 @@ ${autresSeances.length ? `Séances sans séries (basket/escalade) : ${JSON.strin
 ${notesTxt ? `\nNOTES DE CONTEXTE écrites par Yoann (14 j, ex. alcool, insomnie, petite blessure) — à prendre en compte activement dans l'analyse :\n${notesTxt}\n` : ""}
 ${(journal || "").trim() ? `CARNET DE BORD — état que TU as écrit à la fin de ta dernière analyse. C'est ta mémoire : appuie-toi dessus pour enchaîner (a-t-il appliqué ce que tu avais demandé ? où en est la progression ?) au lieu de repartir de zéro.\n${journal.trim()}\n` : "CARNET DE BORD : vide, c'est ta première analyse. Tu le créeras en fin de réponse.\n"}
 Structure ta réponse en deux temps :
-1. **Aujourd'hui / les prochaines 24h** : à partir du bloc TEMPS RÉEL, dis-lui concrètement quoi faire (ou éviter) MAINTENANT — séance, nutrition, hydratation, récupération, genou — en te basant sur ce qui s'est passé hier et sur les notes de contexte. Le champ \`recommandeur\` (dans RÉSUMÉ 14 JOURS) donne déjà un verdict calculé sur la séance du jour (score + motif, alternatives, à éviter) : appuie-toi dessus au lieu d'en recalculer un autre de ton côté — commente-le, nuance-le ou signale un désaccord argumenté si tu vois un facteur qu'il ignore, mais ne propose pas une séance différente sans le dire explicitement.
+1. **Aujourd'hui / les prochaines 24h** : à partir du bloc TEMPS RÉEL, dis-lui concrètement quoi faire (ou éviter) MAINTENANT — séance, nutrition, hydratation, récupération, genou — en te basant sur ce qui s'est passé hier et sur les notes de contexte. \`repas_hier\`/\`repas_aujourdhui\` donnent le détail réel des aliments par repas (pas seulement les totaux macros) : commente la COMPOSITION si elle appelle un conseil concret (répartition protéique entre repas, repas trop pauvre/trop riche en fibres, timing autour de l'entraînement) — pas une simple relecture de la liste. Le champ \`recommandeur\` (dans RÉSUMÉ 14 JOURS) donne déjà un verdict calculé sur la séance du jour (score + motif, alternatives, à éviter) : appuie-toi dessus au lieu d'en recalculer un autre de ton côté — commente-le, nuance-le ou signale un désaccord argumenté si tu vois un facteur qu'il ignore, mais ne propose pas une séance différente sans le dire explicitement.
 2. **Tendance de fond (14 jours)** : ce qui se dessine sur la durée et ce qu'il faut ajuster pour la semaine à venir, EN CORRÉLANT explicitement poids, kcal, macros, fibres et eau à partir du dataset JOUR PAR JOUR (ex. un pic de poids coïncide-t-il avec un pic de glucides/sodium la veille plutôt qu'un vrai surplus calorique ? un manque de fibres ou d'eau coïncide-t-il avec une stagnation ?).
 Traite explicitement CHAQUE domaine : poids (bruit quotidien vs moyenne glissante), macros (protéines jour le jour, reste en moyenne 7j), eau (jours de basket +1L), sommeil (impact récup), pas quotidiens (corrélation activité/résultat), séances (équilibre Upper/Lower, progressive overload exercice par exercice, respect coude/escalade), genou/douleur (Silbernagel, priorité absolue si ça a flambé).
 Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reciter les données brutes (cite seulement les chiffres qui appuient un conseil) : va droit aux conseils, en bullet points courts. Limite stricte : 500 mots maximum au total — écourte les détails plutôt que de laisser une section inachevée, et termine toujours par une phrase de conclusion complète. Ce n'est pas un avis médical.
@@ -2701,12 +2729,17 @@ Puis, APRÈS ta conclusion, écris la ligne \`${CARNET_MARK}\` seule, et en dess
         d: s.date, t: s.type,
         ex: s.exercices.map((e) => ({ n: e.nom, s: e.series.map((x) => `${x.poids || 0}x${x.val || 0}${x.leg ? "/" + x.leg : ""}`) })),
       }));
+      const foodLog = getSync("foodLog", []);
+      const repasBrut = [...new Set(last14(foodLog).map((e) => e.date))].sort().map((d) => ({ d, ...mealsFor(foodLog, d) }));
       return `${system}
 
 ${user.split("Structure ta réponse en deux temps")[0].trim()}
 
 SÉRIES BRUTES 14 jours (détail complet, pour analyser la progressive overload exercice par exercice) :
 ${JSON.stringify(brut)}
+
+REPAS BRUTS 14 jours (détail complet, aliment par aliment) :
+${JSON.stringify(repasBrut)}
 
 Sommeil brut : ${JSON.stringify(last14(sleep))}
 Genou brut : ${JSON.stringify(last14(knee))}

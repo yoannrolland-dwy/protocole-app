@@ -3,6 +3,19 @@
 
 const PREFIX = "protocole:";
 
+// Variante synchrone de `get` — même lecture, sans le `Promise` inutile. Sert au Coach IA
+// (buildPrompt/buildBriefing, tous deux synchrones) pour lire `foodLog` au moment exact du
+// clic sur "Analyser" plutôt qu'une copie chargée au montage de l'app, qui pourrait être
+// périmée si un repas a été ajouté dans l'onglet Repas pendant la session en cours.
+export function getSync(key, fallback) {
+  try {
+    const v = localStorage.getItem(PREFIX + key);
+    return v == null ? fallback : JSON.parse(v);
+  } catch {
+    return fallback;
+  }
+}
+
 export const store = {
   async get(key, fallback) {
     try {

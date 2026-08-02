@@ -389,8 +389,8 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
       {dayEntries.length === 0 && <Empty>Aucun aliment enregistré ce jour.</Empty>}
 
       <Body style={{ fontSize: 10, color: C.dim, textAlign: "center", padding: "4px 0 2px" }}>
-        Module interne en test — les calories et macros n'alimentent pas encore
-        l'onglet Macros ni Health Connect (l'eau, elle, est déjà le même compteur).
+        Module interne en test — calories et macros alimentent l'onglet Macros,
+        plus Health Connect côté nutrition (coupé depuis la bascule M6).
       </Body>
 
       {openMeal && (
