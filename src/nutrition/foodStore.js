@@ -265,7 +265,7 @@ const score = (s) => s.freq + 2 * s.mealFreq + Math.max(0, 14 - s.days);
  * "Vos aliments habituels" (un essai raté, un aliment qu'on ne mange plus), sans jamais
  * toucher à l'historique réel des jours déjà enregistrés.
  */
-export function suggestions(log, { meal, pins = [], muted = [], limit = 12, date = todayKey() } = {}) {
+export function suggestions(log, { meal, pins = [], muted = [], limit = 25, date = todayKey() } = {}) {
   const stats = usageStats(log, { meal, date });
   const pinned = new Set(pins);
   const hidden = new Set(muted);

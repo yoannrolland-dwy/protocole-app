@@ -29,7 +29,7 @@ import {
 import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.37.0";
+const APP_VERSION = "3.38.1";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA

@@ -6,9 +6,9 @@
 // supplémentaire de leur côté. La lecture nutrition/eau depuis Health Connect est coupée
 // (healthSync.js) : `foodLog` est l'unique écrivain des macros au quotidien désormais.
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Plus, Trash2, ChevronDown, ChevronRight, Droplet, Zap, Copy } from "lucide-react";
-import { C, Card, Label, Body, Btn, Empty, Stepper, DateField, ScreenHeader, Pills, today, fmt, upsert } from "../ui.jsx";
+import { C, Card, Label, Body, Btn, Empty, Stepper, DateField, ScreenHeader, Pills, today, fmt, upsert, shiftDateKey } from "../ui.jsx";
 import {
   MEALS, useFoodLog, makeEntry, amounts, entriesFor, totals, isQuickRef,
   copySourceCandidates, copyEntries, deriveMacroLog,
@@ -237,8 +237,35 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
     setDuplicating(false);
   };
 
+  // Navigation au doigt (demandé le 03/08/2026) : swipe gauche = jour suivant, droite =
+  // jour précédent. Décision volontairement AU RELÂCHÉ (touchend), jamais preventDefault
+  // sur touchmove — le scroll vertical normal de la page n'est donc jamais bloqué ni
+  // saccadé, on se contente d'observer si le trajet final ressemble à un swipe horizontal
+  // une fois le doigt levé. Départ ignoré si trop près du bord gauche de l'écran, pour ne
+  // jamais entrer en conflit avec le geste "retour" du système Android.
+  const touchStart = useRef(null);
+  const EDGE_GUARD = 24;
+  const SWIPE_MIN_DIST = 60;
+  const SWIPE_MAX_SLOPE = 0.6; // vertical / horizontal — au-delà, c'est un scroll, pas un swipe
+  const onTouchStart = (e) => {
+    if (openMeal) { touchStart.current = null; return; } // FoodSearch est une feuille à part, pas concernée
+    const t = e.touches[0];
+    touchStart.current = t.clientX < EDGE_GUARD ? null : { x: t.clientX, y: t.clientY };
+  };
+  const onTouchEnd = (e) => {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (Math.abs(dx) < SWIPE_MIN_DIST || Math.abs(dy) > Math.abs(dx) * SWIPE_MAX_SLOPE) return;
+    setDate((d) => shiftDateKey(d, dx < 0 ? 1 : -1));
+  };
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}
+      onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <ScreenHeader
         title="Nutrition"
         subtitle={date === today() ? "aujourd'hui" : fmt(date)}
@@ -315,7 +342,15 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
         return (
           <Card key={meal.key}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: entries.length ? 2 : 10 }}>
-              <Label style={{ fontSize: 10, color: C.text2 }}>{meal.label}</Label>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                <Label style={{ fontSize: 10, color: C.text2 }}>{meal.label}</Label>
+                {/* Repère discret du jour affiché — le swipe seul ne se voit pas assez
+                    (demandé le 03/08/2026) : sans ça, rien à l'écran n'indique qu'on a
+                    changé de jour après un swipe. */}
+                <span style={{ fontSize: 9, color: C.dim, fontFamily: C.mono }}>
+                  {date === today() ? "aujourd'hui" : fmt(date)}
+                </span>
+              </div>
               <span style={{ fontFamily: C.mono, fontSize: 12, fontWeight: 800, color: entries.length ? C.accent : C.dim }}>
                 {entries.length ? `${n0(mt.kcal)} kcal` : "—"}
               </span>

@@ -675,6 +675,28 @@ coaching dans le module — le jugement reste au Coach IA).
     demande, donc aucune logique de fusion à écrire séparément. Cases pré-cochées sur les
     repas qui ont déjà du contenu le jour affiché. Testé : contenu ajouté deux fois de suite
     sur la même date cible, l'entrée saisie manuellement entre les deux n'a pas bougé.
+- **Retours du 03/08/2026** :
+  - **« Vos aliments habituels » passe de 12 à 25** (`suggestions()` dans
+    `foodStore.js`, simple changement de la limite par défaut — dérivé de
+    `foodLog`, aucun coût de stockage supplémentaire).
+  - **Changer de jour au doigt (swipe) dans l'onglet Repas.** Décision AU
+    RELÂCHÉ (`touchend`), jamais `preventDefault` sur `touchmove` : le
+    scroll vertical normal de la page n'est donc jamais bloqué ni
+    saccadé, on regarde seulement si le trajet final ressemble à un swipe
+    horizontal une fois le doigt levé (distance mini 60px, pente
+    verticale/horizontale sous 0,6). Départ ignoré si à moins de 24px du
+    bord gauche de l'écran, pour ne jamais entrer en conflit avec le
+    geste "retour" du système Android. Désactivé quand `FoodSearch` est
+    ouvert (feuille plein écran à part, un swipe en train de chercher un
+    aliment ne doit pas changer le jour en dessous). Testé avec de vrais
+    `TouchEvent` simulés : swipe gauche → jour suivant, droite → jour
+    précédent, et les trois garde-fous (bord, distance, pente)
+    confirmés inopérants chacun séparément.
+  - **Date en estompé à côté de chaque repas** ("Goûter 05/08" ou "Goûter
+    aujourd'hui") : le swipe seul ne se voyait pas assez, rien à l'écran
+    n'indiquait qu'on avait changé de jour. Réutilise la même logique que
+    le sous-titre en haut d'écran (`date === today() ? "aujourd'hui" :
+    fmt(date)`).
 
 ## Règles absolues à ne jamais casser
 
