@@ -269,10 +269,6 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
       <ScreenHeader
         title="Nutrition"
         subtitle={date === today() ? "aujourd'hui" : fmt(date)}
-        right={<span style={{
-          fontSize: 8.5, fontWeight: 800, letterSpacing: 1, color: "#000",
-          background: C.accent, padding: "3px 6px", borderRadius: 4,
-        }}>BÊTA</span>}
       />
 
       <Card>
