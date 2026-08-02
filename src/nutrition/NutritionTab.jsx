@@ -1,15 +1,17 @@
 // Onglet Nutrition — journal alimentaire interne (M1 du chantier du 01/08/2026).
 //
-// ISOLÉ : lit les cibles de PROTOCOLE (via la prop `targetsFor`) mais n'écrit que dans
-// `foodLog`. `macroLog` et la synchro Health Connect ne sont pas touchés, donc Cronometer
-// continue en parallèle et retirer l'onglet suffit à tout annuler.
+// BASCULE M6 (02/08/2026) : `foodLog` alimente désormais `macroLog` (voir l'effet de
+// dérivation plus bas et `deriveMacroLog` dans foodStore.js) — l'onglet Macros, le Coach
+// IA et le widget reflètent donc directement ce qui est loggé ici, sans code
+// supplémentaire de leur côté. La lecture nutrition/eau depuis Health Connect est coupée
+// (healthSync.js) : `foodLog` est l'unique écrivain des macros au quotidien désormais.
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Plus, Trash2, ChevronDown, ChevronRight, Droplet, Zap, Copy } from "lucide-react";
 import { C, Card, Label, Body, Btn, Empty, Stepper, DateField, ScreenHeader, Pills, today, fmt, upsert } from "../ui.jsx";
 import {
   MEALS, useFoodLog, makeEntry, amounts, entriesFor, totals, isQuickRef,
-  copySourceCandidates, copyEntries,
+  copySourceCandidates, copyEntries, deriveMacroLog,
 } from "./foodStore.js";
 import FoodSearch from "./FoodSearch.jsx";
 
@@ -166,6 +168,33 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
   const [copyMeal, setCopyMeal] = useState(null);
   const [duplicating, setDuplicating] = useState(false);
   const food = useFoodLog();
+
+  // BASCULE M6 : recalcule les totaux macroLog pour CHAQUE date présente dans foodLog à
+  // chaque changement du journal, quelle que soit la date affichée à l'écran — une
+  // copie/duplication peut très bien modifier un autre jour que celui-ci ("Dupliquer
+  // cette journée" cible explicitement une AUTRE date). deriveMacroLog ne renvoie que les
+  // dates qui ont des entrées, jamais la liste complète : un jour qui n'existe que dans
+  // l'historique Cronometer (avant le module) n'est donc jamais recalculé ni écrasé.
+  // Comparaison avant écriture pour ne déclencher un save.macros que si quelque chose a
+  // réellement changé (évite une boucle de re-render/écriture à chaque frappe).
+  useEffect(() => {
+    if (!food.ready) return;
+    const derived = deriveMacroLog(food.log);
+    if (!derived.length) return;
+    let next = macros;
+    let changed = false;
+    for (const d of derived) {
+      const cur = macros.find((m) => m.date === d.date);
+      if (!cur || cur.protein !== d.protein || cur.carbs !== d.carbs || cur.fat !== d.fat || cur.fiber !== d.fiber || cur.source !== "foodlog") {
+        next = upsert(next, d);
+        changed = true;
+      }
+    }
+    if (changed) save.macros(next);
+    // food.log et macros suffisent à déterminer si une dérivation est nécessaire ; save
+    // est stable (vient de App.jsx), l'omettre évite une boucle de dépendances inutile.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [food.log, food.ready, macros]);
 
   const dayEntries = useMemo(() => entriesFor(food.log, date), [food.log, date]);
   const t = useMemo(() => totals(dayEntries), [dayEntries]);

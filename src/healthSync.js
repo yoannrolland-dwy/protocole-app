@@ -1,22 +1,28 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 
-// Synchro Health Connect (Android) — pas, sommeil, macros et eau sur 14 jours.
+// Synchro Health Connect (Android) — pas, sommeil et poids sur 14 jours.
 // N'a d'effet que dans l'app native (Capacitor) ; no-op sur la PWA/navigateur.
+//
+// BASCULE M6 (02/08/2026) : nutrition et hydratation NE SONT PLUS lues ici. `foodLog`
+// (module Nutrition) est désormais l'unique écrivain de `macroLog`, eau comprise (saisie
+// manuelle via les boutons +250/+500 ml, décision explicite de Yoann à la bascule — plus
+// besoin que Health Connect fasse transiter la valeur écrite par MyFitnessPal). Les
+// permissions READ_NUTRITION/READ_HYDRATION restent déclarées côté Android tant que M7
+// (retrait des permissions) n'est pas fait — coupure de LECTURE seulement ici.
 const SYNC_DAYS = 14;
 const toKey = (d) => d.toISOString().slice(0, 10);
 const round2 = (x) => Math.round(x * 100) / 100;
 
-// Lecteur natif maison : le plugin @capgo n'expose que l'énergie du NutritionRecord,
-// celui-ci récupère aussi protéines/glucides/lipides/fibres (voir HealthNutritionPlugin.kt).
+// Lecteur natif maison — ne sert plus qu'au sommeil et au poids depuis la bascule M6
+// (voir HealthNutritionPlugin.kt : readNutrition() existe toujours côté Kotlin mais
+// n'est plus appelé ici).
 const HealthNutrition = registerPlugin("HealthNutrition");
 
 // Types demandés au plugin @capgo : il gère l'écran de consentement Health Connect.
-// dietaryEnergyConsumed → READ_NUTRITION, dietaryWater → READ_HYDRATION, weight →
-// READ_WEIGHT : ce sont exactement les permissions dont le lecteur natif a besoin, d'où
-// un seul consentement. "weight" ajouté le 28/07/2026 : une pesée saisie à la main dans
-// Samsung Health (pas MyFitnessPal, qui ne déclare pas WRITE_WEIGHT) apparaît bien dans
-// Health Connect — voir HealthNutritionPlugin.readWeight().
-const READ_TYPES = ["steps", "sleep", "dietaryEnergyConsumed", "dietaryWater", "weight"];
+// weight → READ_WEIGHT, ajouté le 28/07/2026 : une pesée saisie à la main dans Samsung
+// Health (pas MyFitnessPal, qui ne déclare pas WRITE_WEIGHT) apparaît bien dans Health
+// Connect — voir HealthNutritionPlugin.readWeight().
+const READ_TYPES = ["steps", "sleep", "weight"];
 
 export async function syncHealthConnect() {
   if (!Capacitor.isNativePlatform()) return { status: "web" };
@@ -42,10 +48,8 @@ export async function syncHealthConnect() {
 
   const canSteps = auth.readAuthorized?.includes("steps");
   const canSleep = auth.readAuthorized?.includes("sleep");
-  const canNutrition = auth.readAuthorized?.includes("dietaryEnergyConsumed")
-    && auth.readAuthorized?.includes("dietaryWater");
   const canWeight = auth.readAuthorized?.includes("weight");
-  if (!canSteps && !canSleep && !canNutrition && !canWeight) return { status: "denied" };
+  if (!canSteps && !canSleep && !canWeight) return { status: "denied" };
 
   // Bornes alignées sur minuit UTC (même convention que today() dans App.jsx) pour que
   // les buckets "day" retournés par le plugin correspondent aux vraies dates calendaires,
@@ -56,7 +60,6 @@ export async function syncHealthConnect() {
   const start = new Date(todayUTC.getTime() - (SYNC_DAYS - 1) * 24 * 60 * 60 * 1000);
   const stepsByDate = {};
   const sleepByDate = {};
-  const macrosByDate = {};
   const weightByDate = {};
 
   try {
@@ -86,26 +89,6 @@ export async function syncHealthConnect() {
       });
     }
 
-    if (canNutrition) {
-      const { days } = await HealthNutrition.readNutrition({
-        startDate: start.toISOString(),
-        endDate: end.toISOString(),
-      });
-      (days || []).forEach((d) => {
-        // Un jour sans macro renseignée ne doit pas écraser une saisie manuelle par des zéros.
-        if (!d.hasNutrition && !d.hasWater) return;
-        macrosByDate[d.date] = {
-          ...(d.hasNutrition ? {
-            protein: Math.round(d.protein),
-            carbs: Math.round(d.carbs),
-            fat: Math.round(d.fat),
-            fiber: Math.round(d.fiber),
-          } : {}),
-          ...(d.hasWater ? { water: Math.round(d.waterMl) } : {}),
-        };
-      });
-    }
-
     if (canWeight) {
       const { days } = await HealthNutrition.readWeight({
         startDate: start.toISOString(), endDate: end.toISOString(),
@@ -116,5 +99,5 @@ export async function syncHealthConnect() {
     return { status: "error", message: String(e) };
   }
 
-  return { status: "ok", stepsByDate, sleepByDate, macrosByDate, weightByDate };
+  return { status: "ok", stepsByDate, sleepByDate, weightByDate };
 }

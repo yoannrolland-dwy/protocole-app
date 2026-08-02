@@ -29,7 +29,7 @@ import {
 import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.35.0";
+const APP_VERSION = "3.36.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -498,15 +498,18 @@ function recommendSessions({ training, knee, sleep, targets }) {
 }
 
 
-// Bandeau affiché à la place de la saisie quand la donnée du jour vient de Health Connect —
-// avec un accès de secours pour corriger manuellement (jour manquant, valeur fausse).
-const SyncedBanner = ({ onCorrect }) => (
+// Bandeau affiché à la place de la saisie quand la donnée du jour vient d'ailleurs.
+// `onCorrect` optionnel : pour Health Connect, corriger localement reste utile jusqu'à
+// la prochaine synchro. Pour `foodLog` (bascule M6), corriger ici serait futile — l'effet
+// de dérivation dans NutritionTab.jsx réécrase le jour au prochain changement du journal,
+// où qu'il ait lieu — donc pas de bouton, juste l'information.
+const SyncedBanner = ({ onCorrect, label = "Synchronisé depuis Health Connect" }) => (
   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
     <Body style={{ fontSize: 11, color: C.dim }}>
       <Zap size={11} style={{ display: "inline", marginRight: 4, verticalAlign: -1 }} color={C.accent} />
-      Synchronisé depuis Health Connect
+      {label}
     </Body>
-    <Btn variant="ghost" onClick={onCorrect} style={{ padding: "4px 8px", fontSize: 10 }}>Corriger manuellement</Btn>
+    {onCorrect && <Btn variant="ghost" onClick={onCorrect} style={{ padding: "4px 8px", fontSize: 10 }}>Corriger manuellement</Btn>}
   </div>
 );
 
@@ -1865,7 +1868,10 @@ function MacroTab({ macros, targets, save, training }) {
   const water = cur.water ?? 0;
   const basketDay = training.some((t) => t.type === "Basket" && t.date === date);
   const waterTgt = targets.water + (basketDay ? 1000 : 0);
-  const isSynced = cur.source === "healthconnect" && !forceManual;
+  // "foodlog" (bascule M6) : ce jour vient du journal de l'onglet Repas, comme
+  // "healthconnect" venait de Health Connect — même traitement lecture seule.
+  const fromFoodLog = cur.source === "foodlog";
+  const isSynced = (cur.source === "healthconnect" || fromFoodLog) && !forceManual;
   const pickDate = (d) => {
     setDate(d);
     const atd = targetsForDate(d, targets);
@@ -1958,7 +1964,10 @@ function MacroTab({ macros, targets, save, training }) {
       <Card>
         <div style={{ marginBottom: 10 }}><DateField value={date} onChange={pickDate} /></div>
         {isSynced ? (
-          <SyncedBanner onCorrect={() => setForceManual(true)} />
+          <SyncedBanner
+            label={fromFoodLog ? "Synchronisé depuis l'onglet Repas" : "Synchronisé depuis Health Connect"}
+            onCorrect={fromFoodLog ? undefined : () => setForceManual(true)}
+          />
         ) : (
           <>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -2379,15 +2388,8 @@ export default function App({ silent = false } = {}) {
         return next;
       });
     }
-    if (Object.keys(result.macrosByDate || {}).length) {
-      setMacros((prev) => {
-        let next = prev;
-        // upsert fusionne : les champs absents (jour sans eau, p. ex.) gardent leur valeur locale.
-        Object.entries(result.macrosByDate).forEach(([date, m]) => { next = upsert(next, { date, ...m, source: "healthconnect" }); });
-        store.set("macroLog", next);
-        return next;
-      });
-    }
+    // Nutrition/eau : plus lues depuis Health Connect (bascule M6, 02/08/2026) — foodLog
+    // est l'unique écrivain de macroLog désormais, voir la dérivation dans NutritionTab.jsx.
     if (Object.keys(result.weightByDate || {}).length) {
       setWeight((prev) => {
         let next = prev;

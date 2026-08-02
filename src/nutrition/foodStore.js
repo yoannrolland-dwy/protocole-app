@@ -1,10 +1,12 @@
 // Journal alimentaire — état et persistance du module Nutrition (M1).
 //
-// ISOLATION VOLONTAIRE (étape 1 du chantier du 01/08/2026) : ce module possède sa propre
-// clé localStorage et gère lui-même son chargement/sauvegarde. Il n'écrit RIEN dans
-// `macroLog`, ne touche pas à healthSync.js, et App.jsx ne fait que monter l'onglet.
-// Tant que la bascule (M6) n'est pas faite, Cronometer continue d'alimenter `macroLog`
-// via Health Connect sans le moindre conflit, et retirer l'onglet suffit à tout annuler.
+// Isolation d'origine (M1, 01/08/2026) LEVÉE À M6 (02/08/2026) : `foodLog` est
+// maintenant la source de vérité des macros. `deriveMacroLog()` pousse ses totaux
+// quotidiens dans `macroLog` (voir NutritionTab.jsx), mais uniquement pour les dates où
+// `foodLog` a réellement des entrées — l'historique Cronometer des jours antérieurs à
+// l'existence du module n'est jamais touché. La lecture nutrition/eau depuis Health
+// Connect est coupée (healthSync.js) : `foodLog` est désormais l'unique écrivain des
+// macros au quotidien. L'eau reste une exception partagée (voir plus bas), inchangée.
 
 import { useEffect, useState } from "react";
 import { store } from "../store.js";
@@ -109,6 +111,31 @@ export function totals(entries) {
   }
   for (const m of MACROS) t[m] = m === "kcal" ? Math.round(t[m]) : Math.round(t[m] * 10) / 10;
   return { ...t, missing };
+}
+
+// --- Dérivation vers macroLog (M6) ------------------------------------------------
+//
+// `macroLog` suit des noms de champs différents de `foodLog` (hérités de MacroTab, très
+// antérieur au module Nutrition) : protein/carbs/fat/fiber, pas prot/gluc/lip/fib.
+// Même correspondance que `TARGET_KEY` dans NutritionTab.jsx pour les cibles.
+const MACRO_FIELD = { prot: "protein", gluc: "carbs", lip: "fat", fib: "fiber" };
+
+/**
+ * Calcule, pour CHAQUE date présente dans `log`, les totaux macroLog dérivés de
+ * `foodLog`. Ne retourne QUE les dates qui ont au moins une entrée — jamais la liste
+ * complète de `macroLog`, pour ne jamais menacer les jours antérieurs à l'existence du
+ * module (historique Cronometer). L'appelant (NutritionTab) est responsable de fusionner
+ * ces totaux dans `macroLog` via `upsert`, qui préserve les champs non fournis (`water`
+ * en particulier — cette fonction ne le touche jamais).
+ */
+export function deriveMacroLog(log) {
+  const dates = [...new Set(log.map((e) => e.date))];
+  return dates.map((date) => {
+    const t = totals(entriesFor(log, date));
+    const fields = { date, source: "foodlog" };
+    for (const [k, name] of Object.entries(MACRO_FIELD)) fields[name] = t[k];
+    return fields;
+  });
 }
 
 // --- Copier un repas (M4) ------------------------------------------------------

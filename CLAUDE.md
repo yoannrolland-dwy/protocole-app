@@ -408,7 +408,7 @@ Objectif : se détacher complètement de MyFitnessPal / Cronometer en intégrant
 journal alimentaire dans PROTOCOLE, proche de Cronometer (journal pur, aucun
 coaching dans le module — le jugement reste au Coach IA).
 
-**Chantier volontairement itératif. M0-M4 livrés, M6+ reste à faire (M5 abandonné).**
+**Chantier volontairement itératif. M0-M4 et M6 livrés, M7 reste à faire (M5 abandonné).**
 
 | Jalon | Contenu | État |
 |---|---|---|
@@ -418,7 +418,7 @@ coaching dans le module — le jugement reste au Coach IA).
 | M3 | Scan code-barres ML Kit (natif seulement) | ✅ 02/08/2026 |
 | M4 | Portions/unités, recettes, copier un repas | ✅ 02/08/2026 (quick-add livré en avance dès M2) |
 | M5 | (abandonné — micronutriments écartés, voir plus bas) | — |
-| M6 | **Bascule** : `foodLog` alimente `macroLog`, coupure HC nutrition/eau | à faire |
+| M6 | **Bascule** : `foodLog` alimente `macroLog`, coupure HC nutrition/eau | ✅ 02/08/2026 |
 | M7 | Retrait des permissions HC nutrition/hydratation | à faire |
 
 ### Décisions prises (ne pas les rouvrir sans demande explicite)
@@ -436,24 +436,50 @@ coaching dans le module — le jugement reste au Coach IA).
   levée pour ce chantier** (validé par Yoann). Les primitives du design system ont
   été sorties de `App.jsx` vers `src/ui.jsx` à l'identique — sans ça, le module
   nutrition ne pouvait pas les réutiliser sans import circulaire.
-- **Étape 1 strictement isolée** : `NutritionTab` gère sa propre clé `foodLog` et
-  ne reçoit d'`App.jsx` que les cibles, en lecture. `macroLog`, `MacroTab` et
-  `healthSync.js` ne sont pas touchés — Cronometer continue en parallèle, et
-  retirer l'onglet suffit à tout annuler.
-- **Health Connect nutrition/hydratation deviendra inutile, mais seulement à M6.**
-  Le vrai risque est là : tant que `runHealthSync` tourne, il écrase `macroLog`
-  avec les données Cronometer à chaque retour au premier plan. Au moment de la
-  bascule il faut **couper la lecture nutrition/eau**, pas seulement écrire
-  ailleurs. En revanche **ne pas écrire vers Health Connect** : rien ne consomme
-  ces données chez Yoann, ce serait deux permissions de plus pour rien. Pas,
-  sommeil et poids restent sur Health Connect, inchangés.
+- **Étape 1 strictement isolée (M1, levée à M6)** : `NutritionTab` gérait sa propre
+  clé `foodLog` et ne recevait d'`App.jsx` que les cibles, en lecture — `macroLog`,
+  `MacroTab` et `healthSync.js` n'étaient pas touchés, Cronometer continuait en
+  parallèle. Ce n'est plus le cas depuis la bascule M6 (voir plus bas) : `foodLog`
+  alimente désormais `macroLog`.
 - **L'eau est une exception à l'isolation, décidée le 02/08/2026** : `NutritionTab`
   lit et écrit `macroLog.water` directement (mêmes boutons +250/+500/−250 que
   `MacroTab`), au lieu de dupliquer la donnée dans `foodLog`. Ce n'est pas une
   entorse au principe d'isolation — l'eau était déjà listée comme fonctionnalité à
   garder telle quelle dans la demande initiale (« déjà interfacée avec Health
-  Connect ») — juste le même compteur rendu visible dans les deux onglets. Seuls
-  kcal/macros restent isolés dans `foodLog` jusqu'à M6.
+  Connect ») — juste le même compteur rendu visible dans les deux onglets.
+- **M6 livré le 02/08/2026** (`deriveMacroLog` dans `foodStore.js`, effet dans
+  `NutritionTab.jsx`) : confirmé par Yoann avant de lancer — l'eau reste 100 %
+  manuelle via les boutons de l'app (plus besoin que MyFitnessPal la fasse
+  transiter par Health Connect).
+  - **Dérivation, pas duplication de code** : `deriveMacroLog(log)` renvoie les
+    totaux (mappés vers les noms `protein/carbs/fat/fiber` de `macroLog`,
+    `MACRO_FIELD` dans `foodStore.js`) **uniquement pour les dates présentes dans
+    `foodLog`** — jamais la liste complète de `macroLog`. C'est la garantie qui
+    protège l'historique Cronometer antérieur au module : une date qui n'existe
+    que dans `macroLog` (jamais loggée via Repas) n'est ni lue ni réécrite.
+  - L'effet de dérivation tourne sur TOUT `foodLog` à chaque changement, pas
+    seulement la date affichée à l'écran — nécessaire parce que "Dupliquer cette
+    journée" (M4) peut modifier une date différente de celle en cours de
+    consultation. Écriture dans `macroLog` seulement si une comparaison montre un
+    changement réel (`source` ou une des 4 macros), pour ne pas déclencher de
+    cycle de re-render/écriture à chaque frappe.
+  - **Nouveau `source: "foodlog"`** dans `macroLog`, traité par `MacroTab` comme
+    `"healthconnect"` (lecture seule, bandeau) mais **sans bouton "Corriger
+    manuellement"** : une correction y serait de toute façon réécrasée au
+    prochain changement dans `foodLog`, où qu'il ait lieu — mieux vaut ne pas
+    proposer une action qui ne tient pas dans la durée. `SyncedBanner` (App.jsx)
+    prend désormais un `label` et un `onCorrect` optionnels pour ça.
+  - **Coupure de LECTURE seulement** (`healthSync.js`) : `dietaryEnergyConsumed`
+    et `dietaryWater` retirés de `READ_TYPES`, bloc `readNutrition`/`macrosByDate`
+    supprimé. Les permissions Android `READ_NUTRITION`/`READ_HYDRATION` restent
+    déclarées (@capgo/capacitor-health) jusqu'à M7 — ne pas les retirer sans
+    demande explicite, ce sera un chantier séparé.
+  - **Testé avec un faux historique Cronometer** (`macroLog` seedé avec une date
+    antérieure au module, `source: "healthconnect"`) : après ajout dans Repas sur
+    le jour courant, la date historique reste identique au bit près, la nouvelle
+    date apparaît avec `source: "foodlog"`, le Dashboard/graphique 14 jours/widget
+    reflètent le tout sans code supplémentaire de leur côté (ils lisaient déjà
+    `macroLog`, seule sa source de vérité a changé).
 
 ### Points techniques à connaître
 
