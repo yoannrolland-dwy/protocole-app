@@ -30,7 +30,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor } from "./nutrition/foodStore.js";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.41.0";
+const APP_VERSION = "3.42.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -326,10 +326,53 @@ const BASKET_PROTOCOLS = {
 };
 
 /* ============================================================
-   RECOMMANDEUR — historique des séances + état du genou
+   ÉTAT D'UNE ZONE DOULOUREUSE (genou, coude)
+   Même forme d'entrée pour les deux : { date, pain, baseline }.
+   Extrait du recommandeur pour que le genou et le coude partagent exactement la même
+   lecture (péremption, seuils, comptage hors base) au lieu de deux logiques parallèles
+   qui divergeraient au premier ajustement.
+   ============================================================ */
+// Une douleur notée il y a plus de 3 jours n'est plus un état, c'est une donnée périmée :
+// sans cette péremption, une note à 6 bloquait les séances indéfiniment jusqu'à la
+// prochaine saisie. Critique depuis que la douleur n'a plus de valeur par défaut (donc
+// moins de saisies, donc des états plus souvent périmés).
+const PAIN_FRESH_DAYS = 3;
+/**
+ * @param log      journal de la zone (kneeLog / elbowLog)
+ * @param t0       date du jour
+ * @param label    libellé affiché dans les raisons ("genou", "coude")
+ * @param opts.unknownIsCaution  true (genou) : pas de donnée fraîche ⇒ prudence par défaut,
+ *   parce que le quadricipital est le tendon qui interdit des séances entières et qu'une
+ *   absence de saisie ne doit pas passer pour un feu vert. false (coude) : silence total,
+ *   même principe que les nudges sommeil/charge — le coude module des scores, il ne bloque
+ *   rien tant qu'aucune donnée réelle ne le justifie.
+ */
+function zoneState(log, t0, label, { unknownIsCaution }) {
+  const within = (arr, n) => arr.filter((e) => { const d = daysBetween(e.date, t0); return d >= 0 && d <= n; });
+  const last = lastN(log || [], 1)[0];
+  const age = last ? daysBetween(last.date, t0) : Infinity;
+  const fresh = !!last && age >= 0 && age <= PAIN_FRESH_DAYS;
+  const unknown = !fresh;
+  const painLast = fresh ? last.pain : null;
+  const flagged7 = within(log || [], 6).filter((k) => k.baseline === false).length;
+  const red = fresh && (last.baseline === false || last.pain >= 6);
+  // État inconnu ≠ feu vert (genou) : on reste prudent sans bloquer, et on le dit dans la
+  // raison affichée pour inciter à noter la douleur.
+  const amber = !red && ((unknownIsCaution && unknown) || painLast >= 4 || flagged7 >= 1);
+  const note = unknown && unknownIsCaution
+    ? (last ? `Douleur ${label} pas notée depuis ${age} j — prudence par défaut, note-la pour un vrai conseil.` : `Douleur ${label} jamais notée — prudence par défaut.`)
+    : null;
+  // Motif chiffré réutilisé tel quel dans les "à éviter", pour que la raison affichée
+  // porte toujours le fait qui a déclenché l'exclusion.
+  const redWhy = red ? (last.baseline === false ? "pas revenu à la base sous 24 h" : `douleur ${last.pain}/10`) : null;
+  return { last, age, fresh, unknown, painLast, flagged7, red, amber, note, redWhy };
+}
+
+/* ============================================================
+   RECOMMANDEUR — historique des séances + état du genou et du coude
    Sort des suggestions classées ET des séances à éviter.
    ============================================================ */
-function recommendSessions({ training, knee, sleep, targets }) {
+function recommendSessions({ training, knee, elbow, sleep, targets }) {
   const t0 = today();
   const isUpper = (t) => t.type === "Upper A" || t.type === "Upper B";
   const isLower = (t) => t.type === "Lower A" || t.type === "Lower B";
@@ -357,25 +400,21 @@ function recommendSessions({ training, knee, sleep, targets }) {
   const dClimb = daysSince((t) => t.type === "Escalade");
   const dKnee = daysSince((t) => TEMPLATES[t.type]?.knee); // Lower + Basket
 
-  // état du genou — avec péremption. Sans elle, une douleur à 6 notée il y a dix jours
-  // bloquait Lower et Basket indéfiniment, jusqu'à la prochaine saisie : l'état n'était
-  // jamais fenêtré alors que `flagged7` juste en dessous l'était. Devenu critique depuis
-  // que la douleur n'a plus de valeur par défaut (donc moins de saisies, donc des états
-  // plus souvent périmés).
-  const KNEE_FRESH_DAYS = 3;
-  const kLast = lastN(knee, 1)[0];
-  const kneeAge = kLast ? daysBetween(kLast.date, t0) : Infinity;
-  const kneeFresh = !!kLast && kneeAge >= 0 && kneeAge <= KNEE_FRESH_DAYS;
-  const kneeUnknown = !kneeFresh;
-  const painLast = kneeFresh ? kLast.pain : null;
-  const flagged7 = within(knee, 6).filter((k) => k.baseline === false).length;
-  const kneeRed = kneeFresh && (kLast.baseline === false || kLast.pain >= 6);
-  // État inconnu ≠ feu vert : on reste prudent (comme une douleur modérée) sans bloquer,
-  // et on le dit dans la raison affichée pour inciter à noter la douleur.
-  const kneeAmber = !kneeRed && (kneeUnknown || painLast >= 4 || flagged7 >= 1);
-  const kneeNote = kneeUnknown
-    ? (kLast ? `Douleur genou pas notée depuis ${kneeAge} j — prudence par défaut, note-la pour un vrai conseil.` : "Douleur genou jamais notée — prudence par défaut.")
-    : null;
+  // État du genou (bas du corps) et du coude (tirage) — même lecture, deux réglages.
+  // Le genou est un gate dur : pas de donnée fraîche ⇒ prudence par défaut. Le coude ne
+  // module que des scores tant qu'une douleur réelle n'est pas notée (silencieux sinon).
+  const K = zoneState(knee, t0, "genou", { unknownIsCaution: true });
+  const E = zoneState(elbow, t0, "coude", { unknownIsCaution: false });
+  const { unknown: kneeUnknown, painLast, flagged7, red: kneeRed, amber: kneeAmber, note: kneeNote } = K;
+  const kLast = K.last;
+  const elbowRed = E.red, elbowAmber = E.amber;
+  // Raison chiffrée réutilisée sur Upper et Escalade quand le coude est sensible. La
+  // dernière douleur peut être absente alors que la zone est ambre (relevé hors base il y
+  // a 4-6 j, donc compté dans `flagged7` mais périmé comme état) : on ne prétend pas
+  // afficher un chiffre du jour dans ce cas.
+  const elbowWhy = E.painLast != null
+    ? `Coude ${E.painLast}/10${E.flagged7 ? `, ${E.flagged7} j hors base sur 7` : ""}`
+    : `Coude : ${E.flagged7} j hors base sur les 7 derniers jours`;
 
   // Sommeil récent — nudge, pas un blocage : contrairement au genou (tendinopathie, donc
   // gate dur), une mauvaise nuit est un facteur de prudence parmi d'autres, pas un verdict
@@ -419,14 +458,17 @@ function recommendSessions({ training, knee, sleep, targets }) {
   const fatigueScore = (s) => s - (sleepPoor ? 6 : 0) - (loadHigh ? 6 : 0);
   const fatigueReason = () => [sleepNote, loadHigh ? `${load3} séances sur les 3 derniers jours → fatigue à surveiller.` : null].filter(Boolean).join(" ");
 
-  // ---- HAUT DU CORPS : jamais bloqué par le genou ----
+  // ---- HAUT DU CORPS : jamais bloqué par le genou, mais bloqué par le coude ----
   const upV = variant("Upper A", "Upper B");
-  if (climbToday) {
+  if (elbowRed) {
+    push(avoid, "Upper A / B", 0, `Coude : ${E.redWhy}. Volume de tirage à suspendre jusqu'au retour à la base (Silbernagel).`);
+  } else if (climbToday) {
     push(avoid, "Upper A / B", 0, "Escalade déjà faite aujourd'hui — volume de tirage sur le coude, ne pas empiler un Upper.");
   } else {
     let upScore = 20 + (2 - upper7) * 12 + cap(dUpper);
     let upReason = `Upper ${upper7}/2 cette semaine · dernier ${ago(dUpper)}.`;
     if (kneeRed) { upScore += 18; upReason += " Genou à ménager → c'est l'option sûre, jambes au repos."; }
+    if (elbowAmber) { upScore -= 10; upReason += ` ${elbowWhy} → charge de tirage prudente, prises neutres/pronation.`; }
     if (dClimb <= 1) { upScore -= 8; upReason += " Escalade récente : allège le tirage (coude)."; }
     if (dUpper === 0) { upScore -= 32; upReason = `Haut du corps déjà fait aujourd'hui (${upper7}/2 cette semaine) — à reprendre après récupération.`; }
     upScore = fatigueScore(upScore);
@@ -471,22 +513,32 @@ function recommendSessions({ training, knee, sleep, targets }) {
   }
 
   // ---- ESCALADE ---- (pas de jour attitré : autorisée surtout jours Lower ou off, jamais un jour Upper)
-  if (upperToday) {
+  if (elbowRed) {
+    push(avoid, "Escalade", 0, `Coude : ${E.redWhy}. C'est la séance qui charge le plus le tendon distal du biceps — attendre le retour à la base.`);
+  } else if (upperToday) {
     push(avoid, "Escalade", 0, "Upper déjà fait aujourd'hui — l'escalade ajoute du volume de tirage (coude).");
   } else {
     let cScore = 10 + cap(dClimb) - (dClimb <= 1 ? 8 : 0) + (lowerToday ? 6 : 0);
     let cReason = `${climb7}× cette semaine · dernière ${ago(dClimb)}. Compte comme volume tirage : à placer un jour Lower ou off.`;
     if (lowerToday) cReason += " Lower déjà fait aujourd'hui : bon jour pour l'escalade (pas de conflit coude).";
+    // Pénalité plus lourde que sur Upper : à volume égal, l'escalade est la sollicitation
+    // la plus intense du tendon distal du biceps (prises fermées, à-coups, blocages).
+    if (elbowAmber) { cScore -= 12; cReason += ` ${elbowWhy} → volume de tirage à réduire.`; }
     if (cutOn) { cScore -= 8; cReason += " Fenêtre de sèche : pas de volume tirage en plus de l'habituel."; }
     cScore = fatigueScore(cScore);
     const cFat = fatigueReason(); if (cFat) cReason += ` ${cFat}`;
     push(sugg, "Escalade", cScore, cReason);
   }
 
-  // ---- REPOS ---- (jamais pénalisé par la fatigue ou la sèche : c'est l'option qui en profite)
+  // ---- REPOS ---- (jamais pénalisé par la fatigue, la sèche ou une douleur : c'est
+  // l'option qui en profite)
   let restScore = kneeRed ? 45 : (upper7 + lower7 + basket7 + climb7 >= 6 ? 22 : 5);
   let restReason = kneeRed ? "Décharge : mobilité douce + routine de rééduc autonome."
     : `${upper7 + lower7 + basket7 + climb7} séances sur 7 j — une journée creuse consolide les adaptations.`;
+  // Coude hors base : Upper ET Escalade sont écartés, il ne reste que le bas du corps —
+  // le repos remonte, sans jamais atteindre le score d'un genou hors base (qui, lui,
+  // écarte aussi Lower et Basket, donc ne laisse quasiment rien d'autre).
+  if (elbowRed) { restScore += 12; restReason += ` Coude hors base (${E.redWhy}) : tout le haut du corps est écarté aujourd'hui.`; }
   if (!kneeRed && sleepPoor) { restScore += 10; restReason += ` ${sleepNote}`; }
   if (!kneeRed && loadHigh) { restScore += 8; restReason += ` ${load3} séances sur les 3 derniers jours → fatigue à surveiller.`; }
   if (!kneeRed && cutOn) { restScore += 4; restReason += " Fenêtre de sèche : le repos ne compte pas comme volume manqué."; }
@@ -845,7 +897,7 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
           </span>
         </div>
       )}
-      {state === "idle" && <Body style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Analyse tes 14 derniers jours (poids, macros, eau, séances, sommeil, genou), au jour le jour et sur la semaine glissante. Nécessite ta clé API (Réglages).</Body>}
+      {state === "idle" && <Body style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Analyse tes 14 derniers jours (poids, macros, eau, séances, sommeil, douleurs genou/coude), au jour le jour et sur la semaine glissante. Nécessite ta clé API (Réglages).</Body>}
     </Card>
   );
 }
@@ -853,7 +905,7 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
 /* ============================================================
    TAB — DASHBOARD
    ============================================================ */
-function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab }) {
+function Dashboard({ weight, sleep, knee, elbow, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast ? round(wLast.kg - tgtW) : null;
@@ -861,12 +913,13 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
   const lastNightDash = lastN(sleep, 1)[0];
 
   const kToday = knee.find((k) => k.date === today());
+  const eToday = elbow.find((k) => k.date === today());
   const mToday = macros.find((m) => m.date === today());
   const kcalToday = mToday
     ? Math.round((mToday.protein ?? 0) * 4 + (mToday.carbs ?? 0) * 4 + (mToday.fat ?? 0) * 9)
     : null;
 
-  const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee, sleep, targets }), [training, knee, sleep, targets]);
+  const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee, elbow, sleep, targets }), [training, knee, elbow, sleep, targets]);
 
   const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
   const waterToday = mToday?.water ?? 0;
@@ -891,13 +944,20 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
     { label: "Sommeil", tab: "sleep", val: lastNightDash ? fmtHM(lastNightDash.hours) : "—", unit: "",
       note: lastNightDash ? `${fmt(lastNightDash.date)}${lastNightDash.quality != null ? " · " + "★".repeat(lastNightDash.quality) : ""}` : "—",
       color: C.text },
-    { label: "Genou", tab: "knee", val: kToday ? kToday.pain : "—", unit: "/10", note: kToday ? fmt(kToday.date) : "—",
-      color: kToday && (kToday.baseline === false || kToday.pain >= 6) ? C.danger : C.accent },
+    // Deux tendinopathies actives : la tuile en montre deux valeurs plutôt qu'une seule.
+    // `pair` déclenche un rendu spécifique plus bas (val/unit/bar ne s'appliquent pas ici).
+    { label: "Douleurs", tab: "pain", note: "aujourd'hui",
+      pair: [
+        { k: "Genou", val: kToday ? kToday.pain : "—",
+          col: kToday && (kToday.baseline === false || kToday.pain >= 6) ? C.danger : kToday ? C.accent : C.muted },
+        { k: "Coude", val: eToday ? eToday.pain : "—",
+          col: eToday && (eToday.baseline === false || eToday.pain >= 6) ? C.danger : eToday ? C.accent : C.muted },
+      ] },
   ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {/* Tuiles : poids/pas · calories/eau · sommeil/genou — toutes cliquables */}
+      {/* Tuiles : poids/pas · calories/eau · sommeil/douleurs — toutes cliquables */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         {tiles.map((t) => (
           <div key={t.label} onClick={() => setTab(t.tab)} style={{
@@ -905,6 +965,18 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
             padding: 11, cursor: "pointer",
           }}>
             <Label>{t.label}</Label>
+            {t.pair ? (
+              <div style={{ display: "flex", gap: 8, marginTop: 3 }}>
+                {t.pair.map((p) => (
+                  <div key={p.k} style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: C.mono, fontSize: 19, fontWeight: 800, color: p.col }}>
+                      {p.val}<span style={{ fontSize: 11, color: C.muted }}>/10</span>
+                    </div>
+                    <div style={{ fontSize: 8.5, color: C.dim, textTransform: "uppercase", letterSpacing: 0.5 }}>{p.k}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
             <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 3 }}>
               <span style={{ fontFamily: C.mono, fontSize: 19, fontWeight: 800, color: t.color }}>
                 {t.val}<span style={{ fontSize: 11, color: C.muted }}>{t.unit}</span>
@@ -913,6 +985,7 @@ function Dashboard({ weight, sleep, knee, macros, steps, targets, training, phas
                 <span style={{ fontSize: 11, color: t.extra.col, fontWeight: 700, marginLeft: "auto" }}>{t.extra.txt}</span>
               )}
             </div>
+            )}
             <div style={{ fontSize: 8.5, color: C.dim, marginTop: 2, textTransform: "uppercase", letterSpacing: 0.5 }}>{t.note}</div>
             {t.bar != null && (
               <div style={{ background: C.bg, borderRadius: 6, height: 4, overflow: "hidden", marginTop: 5 }}>
@@ -1698,47 +1771,77 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek }) {
 }
 
 /* ============================================================
-   TAB — GENOU
+   TAB — DOULEURS (genou + coude)
    ============================================================ */
-function KneeTab({ knee, save, hsrWeek }) {
+// Une zone = un journal (clé localStorage distincte, même forme `{date, pain, baseline}`)
+// et son habillage. Ajouter une 3e zone un jour ne coûte qu'une entrée ici + une clé dans
+// `DATA_KEYS` + une ligne dans `save` — c'est le but de cette table.
+const PAIN_ZONES = [
+  {
+    key: "knee", label: "Genou",
+    title: "Genou · réhab", sub: "tendon quadricipital · HSR · Silbernagel",
+    // La table HSR et les routines guidées sont propres au quadricipital : elles ne
+    // doivent pas s'afficher sous la zone Coude, où elles n'ont aucun sens.
+    hsr: true, routines: true,
+    alertText: "Décharge : pas de basket ni de Lower tant que la douleur n'est pas revenue à sa base. Réduire charge ou amplitude à la prochaine exposition.",
+  },
+  {
+    key: "elbow", label: "Coude",
+    title: "Coude · réhab", sub: "tendon distal du biceps · prises neutres · Silbernagel",
+    hsr: false, routines: false,
+    alertText: "Décharge du tirage : pas d'escalade ni d'Upper tant que la douleur n'est pas revenue à sa base. Prises neutres/pronation, supination (chin-ups) à éviter.",
+  },
+];
+
+function PainTab({ knee, elbow, save, hsrWeek }) {
+  const logs = { knee, elbow };
+  const [zoneKey, setZoneKey] = useState("knee");
+  const zone = PAIN_ZONES.find((z) => z.key === zoneKey);
+  const log = logs[zoneKey];
+  const entryOf = (zk, d) => (logs[zk] || []).find((e) => e.date === d);
+
   const [date, setDate] = useState(today());
   // Aucune valeur par défaut (ni 4 ni 5) : rien n'est présélectionné à l'ouverture, et
   // l'enregistrement reste bloqué tant qu'un chiffre n'a pas été touché. Demandé
   // explicitement pour forcer une vraie évaluation de la sensation plutôt qu'un
   // enregistrement réflexe — une entrée « par défaut » fausserait l'historique et la
-  // règle de Silbernagel.
+  // règle de Silbernagel. Vaut pour les deux zones.
   // ...mais si le jour affiché a DÉJÀ une entrée, on la recharge (exigence explicite) :
   // sinon l'écran afficherait « rien de noté » alors que la donnée existe, et on risquerait
   // de croire la journée non renseignée. Les onglets ne sont montés qu'une fois le
-  // localStorage lu (voir le garde `loading` du composant App), donc `knee` est déjà peuplé
-  // ici, et rouvrir l'onglet relance cette initialisation.
-  const existingToday = knee.find((k) => k.date === today());
+  // localStorage lu (voir le garde `loading` du composant App), donc les journaux sont
+  // déjà peuplés ici, et rouvrir l'onglet relance cette initialisation.
+  const existingToday = (knee || []).find((k) => k.date === today());
   const [pain, setPain] = useState(existingToday ? existingToday.pain : null);
   const [baseline, setBaseline] = useState(existingToday ? existingToday.baseline !== false : true);
   const [routine, setRoutine] = useState(null);
-  // Changer de date recharge l'entrée existante, ou remet à vide si ce jour n'a rien —
-  // sans ce reset, la douleur d'une autre date resterait affichée et pourrait être
-  // enregistrée par erreur sur le nouveau jour.
-  const pickDate = (d) => {
-    setDate(d);
-    const e = knee.find((k) => k.date === d);
+  // Changer de date OU de zone recharge l'entrée existante, ou remet à vide si la
+  // combinaison visée n'a rien — sans ce reset, la douleur d'une autre date (ou de l'autre
+  // tendon) resterait affichée et pourrait être enregistrée par erreur.
+  const pick = (zk, d) => {
+    setZoneKey(zk); setDate(d);
+    const e = entryOf(zk, d);
     setPain(e ? e.pain : null);
     setBaseline(e ? e.baseline !== false : true);
+    if (zk !== zoneKey) setRoutine(null);
   };
-  const add = () => { if (pain == null) return; save.knee(upsert(knee, { date, pain, baseline })); };
+  const pickDate = (d) => pick(zoneKey, d);
+  const add = () => { if (pain == null) return; save[zoneKey](upsert(log, { date, pain, baseline })); };
 
-  const kLast = lastN(knee, 1)[0];
+  const kLast = lastN(log, 1)[0];
   // Même logique de péremption que le recommandeur : une alerte vieille de dix jours
   // n'est plus un signal, c'est une donnée périmée — on affiche son âge pour le dire.
   const kLastAge = kLast ? daysBetween(kLast.date, today()) : null;
   const alert = kLast && (kLast.baseline === false || kLast.pain >= 6);
   const alertStale = alert && kLastAge > 3;
-  const data = lastN(knee, 30).map((k) => ({ date: fmt(k.date), pain: k.pain, flag: k.baseline === false }));
+  const data = lastN(log, 30).map((k) => ({ date: fmt(k.date), pain: k.pain, flag: k.baseline === false }));
   const curRow = hsrForWeek(hsrWeek);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader title="Genou · réhab" subtitle="tendon quadricipital · HSR · Silbernagel" />
+      <ScreenHeader title={zone.title} subtitle={zone.sub} />
+
+      <Pills options={PAIN_ZONES.map((z) => ({ key: z.key, label: z.label }))} value={zoneKey} onChange={(k) => pick(k, date)} />
 
       <Card>
         <Label style={{ marginBottom: 8 }}>Douleur · 30 jours</Label>
@@ -1773,7 +1876,7 @@ function KneeTab({ knee, save, hsrWeek }) {
           <Body style={{ color: C.dangerText }}>
             {alertStale
               ? "Ce signal date : note ta douleur du jour pour savoir où tu en es vraiment."
-              : "Décharge : pas de basket ni de Lower tant que la douleur n'est pas revenue à sa base. Réduire charge ou amplitude à la prochaine exposition."}
+              : zone.alertText}
           </Body>
         </Card>
       )}
@@ -1801,13 +1904,14 @@ function KneeTab({ knee, save, hsrWeek }) {
         <Pills options={[{ key: true, label: "Oui" }, { key: false, label: "Non" }]} value={baseline} onChange={setBaseline} small />
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <Btn variant="primary" onClick={add} disabled={pain == null} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
-          {knee.some((k) => k.date === date) && (
-            <Btn variant="danger" onClick={() => save.knee(knee.filter((k) => k.date !== date))}><Trash2 size={14} /></Btn>
+          {log.some((k) => k.date === date) && (
+            <Btn variant="danger" onClick={() => save[zoneKey](log.filter((k) => k.date !== date))}><Trash2 size={14} /></Btn>
           )}
         </div>
       </Card>
 
-      {/* Table HSR */}
+      {/* Table HSR — genou uniquement */}
+      {zone.hsr && (
       <Card style={{ padding: "10px 14px" }}>
         <Label style={{ padding: "4px 0" }}>Table HSR · presse &amp; leg ext</Label>
         {HSR_TABLE.map((row) => {
@@ -1824,9 +1928,10 @@ function KneeTab({ knee, save, hsrWeek }) {
           );
         })}
       </Card>
+      )}
 
-      {/* Routines guidées */}
-      {routine ? (
+      {/* Routines guidées — genou uniquement */}
+      {zone.routines && (routine ? (
         <RoutinePlayer routine={ROUTINES[routine]} onClose={() => setRoutine(null)} />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1842,7 +1947,7 @@ function KneeTab({ knee, save, hsrWeek }) {
             </div>
           ))}
         </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -2319,6 +2424,7 @@ export default function App({ silent = false } = {}) {
   const [sleep, setSleep] = useState([]);
   const [training, setTraining] = useState([]);
   const [knee, setKnee] = useState([]);
+  const [elbow, setElbow] = useState([]);
   const [macros, setMacros] = useState([]);
   const [steps, setSteps] = useState([]);
   const [notes, setNotes] = useState([]);
@@ -2337,6 +2443,7 @@ export default function App({ silent = false } = {}) {
       setSleep(await store.get("sleepLog", []));
       setTraining(await store.get("trainingLog", []));
       setKnee(await store.get("kneeLog", []));
+      setElbow(await store.get("elbowLog", []));
       setMacros(await store.get("macroLog", []));
       setSteps(await store.get("stepsLog", []));
       setNotes(await store.get("noteLog", []));
@@ -2487,6 +2594,7 @@ export default function App({ silent = false } = {}) {
     sleep: (v) => { setSleep(v); store.set("sleepLog", v); },
     training: (v) => { setTraining(v); store.set("trainingLog", v); },
     knee: (v) => { setKnee(v); store.set("kneeLog", v); },
+    elbow: (v) => { setElbow(v); store.set("elbowLog", v); },
     macros: (v) => { setMacros(v); store.set("macroLog", v); },
     steps: (v) => { setSteps(v); store.set("stepsLog", v); },
     notes: (v) => { setNotes(v); store.set("noteLog", v); },
@@ -2540,11 +2648,12 @@ export default function App({ silent = false } = {}) {
       const m7 = win(macros, 0, 6);
       const sessCount = (a, b) => { const o = {}; win(training, a, b).forEach((t) => { o[t.type] = (o[t.type] || 0) + 1; }); return o; };
       const kLast = lastN(knee, 1)[0] ?? null;
+      const eLast = lastN(elbow, 1)[0] ?? null;
 
       // Verdict du recommandeur ("Prochaine séance") : recalculé ici avec les mêmes données,
       // et injecté dans le prompt pour que le coach commente/valide UN seul avis au lieu de
       // produire le sien indépendamment (les deux pouvaient se contredire avant ce couplage).
-      const reco = recommendSessions({ training, knee, sleep, targets });
+      const reco = recommendSessions({ training, knee, elbow, sleep, targets });
 
       // --- progression par exercice, calculée ici plutôt qu'envoyée en brut ---
       // Le dump des séries brutes sur 14 jours était le plus gros poste du prompt (mesuré :
@@ -2591,6 +2700,7 @@ export default function App({ silent = false } = {}) {
       const mToday = findDay(macros, today()), mYest = findDay(macros, y);
       const sToday = findDay(sleep, today()), sYest = findDay(sleep, y);
       const kToday = findDay(knee, today()), kYest = findDay(knee, y);
+      const eToday = findDay(elbow, today()), eYest = findDay(elbow, y);
       const trToday = training.filter((t) => t.date === today());
       const trYest = training.filter((t) => t.date === y);
       const basketTodayFlag = trToday.some((t) => t.type === "Basket");
@@ -2614,6 +2724,8 @@ export default function App({ silent = false } = {}) {
         seances_aujourdhui: trToday.map((t) => t.type),
         douleur_genou_hier: kYest ? { pain: kYest.pain, base_ok: kYest.baseline !== false } : null,
         douleur_genou_aujourdhui: kToday ? { pain: kToday.pain, base_ok: kToday.baseline !== false } : null,
+        douleur_coude_hier: eYest ? { pain: eYest.pain, base_ok: eYest.baseline !== false } : null,
+        douleur_coude_aujourdhui: eToday ? { pain: eToday.pain, base_ok: eToday.baseline !== false } : null,
       };
 
       const summary = {
@@ -2635,6 +2747,15 @@ export default function App({ silent = false } = {}) {
           base_ok: kLast ? kLast.baseline !== false : null,
           jours_hors_base_14j: win(knee, 0, 13).filter((k) => k.baseline === false).length,
           douleur_moy_7j: avgKey(win(knee, 0, 6), "pain"), douleur_moy_7j_precedents: avgKey(win(knee, 7, 13), "pain"),
+        },
+        // Mêmes agrégats pour le tendon distal du biceps (V1, 03/08/2026) : jusqu'ici le
+        // coude n'existait que comme contrainte dans le `system`, sans un seul chiffre à
+        // commenter. Coût : quelques dizaines de tokens.
+        coude: {
+          derniere_douleur: eLast?.pain ?? null, derniere_date: eLast?.date ?? null,
+          base_ok: eLast ? eLast.baseline !== false : null,
+          jours_hors_base_14j: win(elbow, 0, 13).filter((k) => k.baseline === false).length,
+          douleur_moy_7j: avgKey(win(elbow, 0, 6), "pain"), douleur_moy_7j_precedents: avgKey(win(elbow, 7, 13), "pain"),
         },
         recommandeur: {
           top: reco.suggestions[0] ? { type: reco.suggestions[0].type, score: reco.suggestions[0].score, motif: reco.suggestions[0].reason } : null,
@@ -2705,9 +2826,9 @@ ${autresSeances.length ? `Séances sans séries (basket/escalade) : ${JSON.strin
 ${notesTxt ? `\nNOTES DE CONTEXTE écrites par Yoann (14 j, ex. alcool, insomnie, petite blessure) — à prendre en compte activement dans l'analyse :\n${notesTxt}\n` : ""}
 ${(journal || "").trim() ? `CARNET DE BORD — état que TU as écrit à la fin de ta dernière analyse. C'est ta mémoire : appuie-toi dessus pour enchaîner (a-t-il appliqué ce que tu avais demandé ? où en est la progression ?) au lieu de repartir de zéro.\n${journal.trim()}\n` : "CARNET DE BORD : vide, c'est ta première analyse. Tu le créeras en fin de réponse.\n"}
 Structure ta réponse en deux temps :
-1. **Aujourd'hui / les prochaines 24h** : à partir du bloc TEMPS RÉEL, dis-lui concrètement quoi faire (ou éviter) MAINTENANT — séance, nutrition, hydratation, récupération, genou — en te basant sur ce qui s'est passé hier et sur les notes de contexte. \`repas_hier\`/\`repas_aujourdhui\` donnent le détail réel des aliments par repas (pas seulement les totaux macros) : commente la COMPOSITION si elle appelle un conseil concret (répartition protéique entre repas, repas trop pauvre/trop riche en fibres, timing autour de l'entraînement) — pas une simple relecture de la liste. Le champ \`recommandeur\` (dans RÉSUMÉ 14 JOURS) donne déjà un verdict calculé sur la séance du jour (score + motif, alternatives, à éviter) : appuie-toi dessus au lieu d'en recalculer un autre de ton côté — commente-le, nuance-le ou signale un désaccord argumenté si tu vois un facteur qu'il ignore, mais ne propose pas une séance différente sans le dire explicitement.
+1. **Aujourd'hui / les prochaines 24h** : à partir du bloc TEMPS RÉEL, dis-lui concrètement quoi faire (ou éviter) MAINTENANT — séance, nutrition, hydratation, récupération, douleurs (genou ET coude) — en te basant sur ce qui s'est passé hier et sur les notes de contexte. \`repas_hier\`/\`repas_aujourdhui\` donnent le détail réel des aliments par repas (pas seulement les totaux macros) : commente la COMPOSITION si elle appelle un conseil concret (répartition protéique entre repas, repas trop pauvre/trop riche en fibres, timing autour de l'entraînement) — pas une simple relecture de la liste. Le champ \`recommandeur\` (dans RÉSUMÉ 14 JOURS) donne déjà un verdict calculé sur la séance du jour (score + motif, alternatives, à éviter) : appuie-toi dessus au lieu d'en recalculer un autre de ton côté — commente-le, nuance-le ou signale un désaccord argumenté si tu vois un facteur qu'il ignore, mais ne propose pas une séance différente sans le dire explicitement.
 2. **Tendance de fond (14 jours)** : ce qui se dessine sur la durée et ce qu'il faut ajuster pour la semaine à venir, EN CORRÉLANT explicitement poids, kcal, macros, fibres et eau à partir du dataset JOUR PAR JOUR (ex. un pic de poids coïncide-t-il avec un pic de glucides/sodium la veille plutôt qu'un vrai surplus calorique ? un manque de fibres ou d'eau coïncide-t-il avec une stagnation ?).
-Traite explicitement CHAQUE domaine : poids (bruit quotidien vs moyenne glissante), macros (protéines jour le jour, reste en moyenne 7j), eau (jours de basket +1L), sommeil (impact récup), pas quotidiens (corrélation activité/résultat), séances (équilibre Upper/Lower, progressive overload exercice par exercice, respect coude/escalade), genou/douleur (Silbernagel, priorité absolue si ça a flambé).
+Traite explicitement CHAQUE domaine : poids (bruit quotidien vs moyenne glissante), macros (protéines jour le jour, reste en moyenne 7j), eau (jours de basket +1L), sommeil (impact récup), pas quotidiens (corrélation activité/résultat), séances (équilibre Upper/Lower, progressive overload exercice par exercice, respect coude/escalade), douleurs genou ET coude (Silbernagel sur les deux tendons, priorité absolue si l'un des deux a flambé — le coude conditionne l'escalade et le tirage, le genou le Lower et le basket).
 Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reciter les données brutes (cite seulement les chiffres qui appuient un conseil) : va droit aux conseils, en bullet points courts. Limite stricte : 500 mots maximum au total — écourte les détails plutôt que de laisser une section inachevée, et termine toujours par une phrase de conclusion complète. Ce n'est pas un avis médical.
 
 Puis, APRÈS ta conclusion, écris la ligne \`${CARNET_MARK}\` seule, et en dessous la version mise à jour du carnet de bord. Règles du carnet : c'est un ÉTAT, pas un journal — tu réécris la version complète à chaque fois, tu élagues ce qui est résolu ou périmé, tu gardes ce qui est en cours. ${CARNET_MAX_CHARS} caractères maximum. Y faire figurer : où en est la progression (chiffrée), ce que tu as demandé de changer et si ça a été appliqué, ce qui a marché ou pas, les points de vigilance en cours. Pas de conseils dedans, pas de redite de la réponse ci-dessus.`;
@@ -2743,6 +2864,7 @@ ${JSON.stringify(repasBrut)}
 
 Sommeil brut : ${JSON.stringify(last14(sleep))}
 Genou brut : ${JSON.stringify(last14(knee))}
+Coude brut : ${JSON.stringify(last14(elbow))}
 
 ---
 Fais-moi une revue de fond : tendances sur la durée, corrélations entre apports/activité/poids/récupération, et ce qu'il faut ajuster pour la semaine à venir. Tu peux me poser des questions.`;
@@ -2757,7 +2879,7 @@ Fais-moi une revue de fond : tendances sur la durée, corrélations entre apport
     { key: "sleep", label: "Sommeil", icon: Moon },
     { key: "steps", label: "Pas", icon: Footprints },
     { key: "train", label: "Séances", icon: Dumbbell },
-    { key: "knee", label: "Genou", icon: HeartPulse },
+    { key: "pain", label: "Douleurs", icon: HeartPulse },
     { key: "macro", label: "Macros", icon: Utensils },
     { key: "food", label: "Repas", icon: Apple },
   ];
@@ -2801,12 +2923,12 @@ Fais-moi une revue de fond : tendances sur la durée, corrélations entre apport
           <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup }} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab }} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, elbow, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab }} />}
             {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
             {tab === "sleep" && <SleepTab {...{ sleep, save }} />}
             {tab === "steps" && <StepsTab {...{ steps, save }} />}
             {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek }} />}
-            {tab === "knee" && <KneeTab {...{ knee, save, hsrWeek }} />}
+            {tab === "pain" && <PainTab {...{ knee, elbow, save, hsrWeek }} />}
             {tab === "macro" && <MacroTab {...{ macros, targets, save, training }} />}
             {tab === "food" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} />}
           </>

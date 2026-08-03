@@ -49,8 +49,14 @@ export const store = {
 // pour éviter. `foodMuted` (02/08/2026) : refs retirés de "Vos aliments habituels" (pas de
 // l'historique réel — voir suggestions() dans foodStore.js). `foodPortions` / `foodRecipes`
 // (M4, 02/08/2026) : portions nommées par aliment et recettes composées.
+// `elbowLog` (V1, 03/08/2026) : douleur du tendon distal du biceps, MÊME forme que
+// `kneeLog` (`{ date, pain, baseline }`). Clé séparée volontairement plutôt qu'un
+// `painLog` unique avec un champ `zone` : fusionner aurait imposé de migrer l'historique
+// de douleur réel du genou, pour un gain purement esthétique. L'UI et le recommandeur
+// sont écrits génériquement (PAIN_ZONES / zoneState dans App.jsx) pour qu'une 3e zone ne
+// coûte qu'une ligne — l'élégance de la clé unique sans son risque.
 export const DATA_KEYS = [
-  "weightLog", "sleepLog", "trainingLog", "kneeLog", "macroLog", "noteLog", "stepsLog",
+  "weightLog", "sleepLog", "trainingLog", "kneeLog", "elbowLog", "macroLog", "noteLog", "stepsLog",
   "targets", "phase", "hsrWeek", "model",
   "coachProfile", "coachJournal",
   "foodLog", "foodPins", "foodMuted", "foodPortions", "foodRecipes",

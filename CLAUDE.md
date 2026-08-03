@@ -118,7 +118,7 @@ protocole-app/
 
 ## Fonctionnalités en place (ne pas régresser sans le signaler)
 
-- **8 onglets** : Tableau de bord, Poids, Sommeil, Pas, Séances, Genou, Macros,
+- **8 onglets** : Tableau de bord, Poids, Sommeil, Pas, Séances, Douleurs, Macros,
   Repas (module Nutrition interne en bêta — voir la section dédiée plus bas)
 - **Carnet de musculation série par série** (`MuscuLogger`) : grille
   kg × reps (ou secondes pour les exos en mode "temps"), mémoire de la
@@ -185,21 +185,23 @@ protocole-app/
   le volume média est baissé à zéro indépendamment du volume alarme, ce cas
   précis serait silencieux. Vibration
   passée en amplitude explicite maximale (255/255) sur chaque impulsion.
-- **Genou** : log douleur 0-10 **sans aucune valeur par défaut** (ni 4 ni 5 —
-  changé le 30/07/2026) : rien n'est présélectionné à l'ouverture et le bouton
-  Enregistrer reste désactivé tant qu'un chiffre n'a pas été touché, pour forcer
-  une vraie évaluation de la sensation plutôt qu'un enregistrement réflexe. Si
-  le jour affiché a déjà une entrée, elle est rechargée (à l'ouverture de
-  l'onglet comme au changement de date) ; changer vers un jour sans entrée
-  remet le champ à vide. +
-  règle de Silbernagel (retour à la base sous 24h), table HSR, deux
-  routines guidées avec minuteur (rééduc autonome, échauffement basket
-  sécurisé).
+- **Douleurs (genou + coude)** — onglet unique depuis V1 (03/08/2026), voir la
+  section dédiée plus bas. Log douleur 0-10 **sans aucune valeur par défaut**
+  (ni 4 ni 5 — changé le 30/07/2026) : rien n'est présélectionné à l'ouverture
+  et le bouton Enregistrer reste désactivé tant qu'un chiffre n'a pas été
+  touché, pour forcer une vraie évaluation de la sensation plutôt qu'un
+  enregistrement réflexe. Si le jour affiché a déjà une entrée, elle est
+  rechargée (à l'ouverture de l'onglet, au changement de date **et au changement
+  de zone**) ; passer sur une combinaison zone/jour sans entrée remet le champ à
+  vide. + règle de Silbernagel (retour à la base sous 24h) sur les deux zones,
+  table HSR et deux routines guidées avec minuteur (rééduc autonome,
+  échauffement basket sécurisé) **attachées au genou seul**.
 - **Recommandeur "Prochaine séance"** (`recommendSessions`) : analyse tout
   l'historique des séances et des douleurs (pas de jours fixes — je n'ai
   plus de rythme figé). Retourne `{ suggestions, avoid }` : 3 suggestions
   classées par score + une liste "à éviter aujourd'hui" avec raison
-  chiffrée (ex. genou hors base → Lower et Basket écartés ; Upper déjà fait
+  chiffrée (ex. genou hors base → Lower et Basket écartés ; coude hors base →
+  Upper et Escalade écartés, depuis V1 ; Upper déjà fait
   aujourd'hui → Escalade déconseillée car volume de tirage sur le coude).
   Testé sur plusieurs scénarios (genou hors base, empilement Lower+Basket,
   zone déjà travaillée le jour même) — logique validée, ne pas simplifier
@@ -749,10 +751,59 @@ coaching dans le module — le jugement reste au Coach IA).
     le sous-titre en haut d'écran (`date === today() ? "aujourd'hui" :
     fmt(date)`).
 
+## Chantier V — étapes livrées
+
+### V1 — Douleurs : harmoniser coude et genou (03/08/2026, v3.42.0)
+
+Le tendon distal du biceps n'existait que comme *contrainte* (prises neutres dans
+les templates, pénalités fixes escalade/Upper, une phrase dans le `system` du
+Coach IA) : aucun chiffre, donc le recommandeur écartait l'escalade sur une règle
+figée plutôt que sur l'état réel du coude. Désormais les deux tendinopathies sont
+mesurées de la même façon.
+
+- **Nouvelle clé `elbowLog`** (dans `DATA_KEYS`), **même forme que `kneeLog`**
+  (`{ date, pain, baseline }`). Clé séparée volontairement plutôt qu'un `painLog`
+  unique avec un champ `zone` : fusionner aurait imposé de migrer l'historique de
+  douleur réel du genou pour un gain purement esthétique. **Aucune migration,
+  `kneeLog` n'est pas touché** (vérifié au test : identique au bit près après
+  plusieurs saisies côté coude).
+- **`KneeTab` → `PainTab`** (onglet « Douleurs », `tab: "pain"`), piloté par la
+  table `PAIN_ZONES` : une zone = un libellé, un journal, et deux drapeaux
+  (`hsr`, `routines`). **La table HSR et les deux routines guidées ne s'affichent
+  que sur le genou** — elles sont propres au quadricipital. Ajouter une 3e zone
+  un jour = une entrée dans `PAIN_ZONES` + une clé dans `DATA_KEYS` + une ligne
+  dans `save`.
+- **`zoneState(log, t0, label, { unknownIsCaution })`** : extrait du
+  recommandeur, partagé par les deux zones (péremption `PAIN_FRESH_DAYS = 3`,
+  seuils rouge/ambre, comptage hors base 7 j). Le paramètre `unknownIsCaution`
+  porte la seule vraie différence de traitement :
+  - **genou = `true`** : pas de donnée fraîche ⇒ prudence par défaut (gate dur,
+    il interdit des séances entières).
+  - **coude = `false`** : **silence total** tant qu'aucune douleur n'est notée —
+    même principe que les nudges sommeil/charge, une absence de saisie ne doit
+    pas devenir une alerte.
+- **Règles du recommandeur ajoutées** : coude hors base → **Upper ET Escalade
+  écartés** (raison chiffrée, comme le genou) et Repos +12 ; coude ambre →
+  **Upper −10 et Escalade −12** (pénalité plus lourde sur l'escalade : c'est la
+  sollicitation la plus intense du tendon distal du biceps), jamais sur Repos.
+  Cas de repli traité : une zone peut être ambre sans douleur du jour (relevé
+  hors base il y a 4-6 j, compté dans `flagged7` mais périmé) — la raison
+  affichée ne prétend alors pas donner un chiffre du jour.
+- **Coach IA** : `douleur_coude_hier`/`douleur_coude_aujourdhui` dans le bloc
+  temps réel, `summary.coude` (mêmes agrégats que `summary.genou`), « coude »
+  ajouté à la ligne « Traite explicitement CHAQUE domaine », `Coude brut` dans le
+  briefing claude.ai. Coût : quelques dizaines de tokens.
+- **Dashboard** : la tuile Genou devient une tuile **Douleurs à deux valeurs**
+  (rendu `pair` dans la liste `tiles`, les tuiles simples sont inchangées).
+- Testé dans le navigateur d'aperçu : jour sans entrée coude → champ vide +
+  Enregistrer désactivé + pas de table HSR ; coude hors base → Upper et Escalade
+  dans « à éviter » avec motif ; coude à 4/10 → Upper 36 → 26 et Escalade sortie
+  du top 3 ; `elbowLog` bien présent dans l'export JSON.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
-   `trainingLog`, `kneeLog`, `macroLog`, `noteLog`, `stepsLog`, `targets`,
+   `trainingLog`, `kneeLog`, `elbowLog`, `macroLog`, `noteLog`, `stepsLog`, `targets`,
    `phase`, `hsrWeek`, `apiKey`, `model`, `coachProfile`, `coachJournal`,
    `foodLog`, `foodPins`, `foodMuted`, `foodPortions`, `foodRecipes` —
    préfixées `protocole:` dans `store.js`)

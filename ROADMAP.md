@@ -8,7 +8,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 
 | Étape | Contenu | Effort | État |
 |---|---|---|---|
-| V1 | Douleurs : harmoniser coude et genou | moyen | à faire |
+| V1 | Douleurs : harmoniser coude et genou | moyen | ✅ 03/08/2026 (v3.42.0) |
 | V2 | Sauvegarde régulière hors du téléphone | petit | à faire |
 | V3 | Progression visible par exercice | moyen | à faire |
 | V4 | Détection de record sur une série | petit | à faire |
