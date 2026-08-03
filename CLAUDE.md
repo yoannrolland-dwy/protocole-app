@@ -213,7 +213,8 @@ protocole-app/
   dashboard et l'analyse IA pouvaient recommander deux séances différentes
   sans que rien ne le signale.
 - **Macros** : protéines/glucides/lipides/fibres, cibles par défaut
-  **215/205/80/30 g** (~2400 kcal), graphique 14 jours en **calories** (pas
+  **215/205/80/35 g** (fibres passées de 30 à 35 g le 03/08/2026, base ET
+  fenêtre de sèche en cours) (~2400 kcal), graphique 14 jours en **calories** (pas
   protéines — changé exprès). Une bascule temporaire par date existe
   (`targetsForDate` dans `App.jsx`) pour des périodes ponctuelles (ex.
   sèche intensive avant vacances) — revient automatiquement aux cibles par

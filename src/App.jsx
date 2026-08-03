@@ -30,7 +30,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor } from "./nutrition/foodStore.js";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.39.1";
+const APP_VERSION = "3.40.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -2278,8 +2278,8 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
 // `targets` déjà passée partout — aucune nouvelle prop à faire circuler.
 // `enabled: false` la neutralise sans perdre les valeurs, pour la réactiver plus tard.
 const DEFAULT_TARGETS = {
-  protein: 215, carbs: 205, fat: 80, fiber: 30, water: 2000, weightMaintenance: 96,
-  cut: { enabled: true, start: "2026-07-27", end: "2026-08-18", protein: 220, carbs: 185, fat: 65, fiber: 30 },
+  protein: 215, carbs: 205, fat: 80, fiber: 35, water: 2000, weightMaintenance: 96,
+  cut: { enabled: true, start: "2026-07-27", end: "2026-08-18", protein: 220, carbs: 185, fat: 65, fiber: 35 },
 };
 
 // Amorçage du profil permanent : reprend mot pour mot les règles de coaching qui étaient
