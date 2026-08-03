@@ -835,10 +835,17 @@ ce point unique de défaillance, sans backend et sans OAuth (les deux écartés 
   laisser sonner le rappel de la semaine précédente. Un rappel hebdomadaire fixe
   aurait été du bruit le lendemain d'un export. Échéance déjà passée → avancée
   d'une semaine à la fois plutôt qu'ignorée par Android.
-- **`android:allowBackup="true"`** est bien présent dans le manifeste, mais la
-  vérification `adb shell bmgr` **n'a pas pu être faite** (téléphone débranché au
-  moment du build). À traiter de toute façon comme un filet gratuit éventuel,
-  **jamais** comme la sauvegarde principale.
+- **Vérifié sur l'appareil le 03/08/2026** (v3.43.0 installée) : au lancement,
+  `LocalNotifications.schedule` part bien avec `id 4242`,
+  `at: 2026-08-10T19:00 local`, `repeats: true, every: "week"` — soit J+7 puisque
+  aucune sauvegarde n'avait encore été faite. Aucune erreur `cloudBackup:` dans
+  logcat.
+- **`android:allowBackup="true"` ne sert à RIEN sur ce téléphone** : `adb shell
+  bmgr enabled` répond « **Backup Manager currently disabled** » (vérifié le
+  03/08/2026). Le filet Android n'est donc pas seulement invérifiable, il est
+  **inactif**. Ne jamais le présenter comme un second filet tant que ce n'est pas
+  réactivé côté Android, et de toute façon **jamais** comme la sauvegarde
+  principale.
 
 ## Règles absolues à ne jamais casser
 
