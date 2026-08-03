@@ -270,7 +270,8 @@ protocole-app/
 - **Dates + suppression** sur les 6 onglets de saisie (Poids, Sommeil, Pas,
   Séances, Genou, Macros) — sélecteur de date avec pré-remplissage si la
   date a déjà une entrée, bouton Supprimer conditionnel.
-- **Réglages (⚙)** : export/import JSON (Réglages → Exporter/Importer),
+- **Réglages (⚙)** : sauvegarde/restauration JSON (Réglages → Sauvegarder hors
+  du téléphone / Restaurer un fichier),
   champ clé API Anthropic + modèle pour le Coach IA, **profil permanent du
   coach**, **carnet de bord** (lisible/corrigeable/videable) et **fenêtre
   d'objectif temporaire** (dates + cibles macros) — les trois ajoutés le
@@ -800,6 +801,45 @@ mesurées de la même façon.
   dans « à éviter » avec motif ; coude à 4/10 → Upper 36 → 26 et Escalade sortie
   du top 3 ; `elbowLog` bien présent dans l'export JSON.
 
+### V2 — Sauvegarde régulière hors du téléphone (03/08/2026, v3.43.0)
+
+`autoBackup.js` écrivait déjà un export quotidien dans `Documents/Protocole` : ça
+protège d'un bug qui corromprait le localStorage, **pas** de la perte/casse du
+téléphone ni d'un « vider les données » (qui efface aussi ce dossier). V2 comble
+ce point unique de défaillance, sans backend et sans OAuth (les deux écartés dans
+`ROADMAP.md`).
+
+- **`src/cloudBackup.js`** : `daysSinceBackup`, `isBackupStale` (seuil
+  `STALE_DAYS = 14`) et `scheduleBackupReminder` (rappel `REMIND_DAYS = 7`).
+- **Le bouton existant est réutilisé, pas dupliqué** : « Exporter » devient
+  « **Sauvegarder hors du téléphone** » (même chemin natif Filesystem+Share déjà
+  en place), et « Importer » devient « Restaurer un fichier ». La date n'est
+  enregistrée **que si `Share.share` résout** — annuler la feuille rejette la
+  promesse, donc une annulation ne date rien (message dédié « Sauvegarde
+  annulée » au lieu de l'ancien « Export impossible : Share canceled »). On date
+  une intention aboutie, pas une réception : impossible de vérifier depuis l'app
+  que le fichier est bien arrivé sur Drive, et le texte de confirmation le dit.
+- **Clé `lastCloudBackup`, volontairement ABSENTE de `DATA_KEYS`** — restaurer
+  une vieille sauvegarde ne doit pas faire croire à l'app qu'elle vient d'être
+  sauvegardée. Même raisonnement que `lastAutoBackupDate`. **Vérifié au test** :
+  un `importData` contenant `lastCloudBackup: "2020-01-01"` laisse la valeur
+  locale intacte.
+- **Bandeau d'alerte** au-delà de 14 jours (ou jamais sauvegardé), dans les
+  Réglages **et sur le Dashboard** — c'est le rappel visible, pas le bouton, qui
+  fait que la sauvegarde a lieu. Le bandeau du Dashboard ouvre les Réglages au
+  tap. Seuil vérifié à la journée près : J-14 rien, J-15 bandeau.
+- **Rappel système** (natif) : notification `id 4242` programmée à
+  `dernière sauvegarde + 7 j` à 19h, répétée chaque semaine. **Reprogrammée à
+  chaque lancement ET à chaque sauvegarde** (`useEffect` dépendant de
+  `lastCloudBackup`) : une sauvegarde fraîche repousse l'échéance au lieu de
+  laisser sonner le rappel de la semaine précédente. Un rappel hebdomadaire fixe
+  aurait été du bruit le lendemain d'un export. Échéance déjà passée → avancée
+  d'une semaine à la fois plutôt qu'ignorée par Android.
+- **`android:allowBackup="true"`** est bien présent dans le manifeste, mais la
+  vérification `adb shell bmgr` **n'a pas pu être faite** (téléphone débranché au
+  moment du build). À traiter de toute façon comme un filet gratuit éventuel,
+  **jamais** comme la sauvegarde principale.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
@@ -811,7 +851,9 @@ mesurées de la même façon.
    l'utilisateur, ce qui est la pire chose possible ici.
    **Toute nouvelle clé doit être ajoutée à `DATA_KEYS` dans `store.js`**,
    sinon elle est absente de l'export JSON et silencieusement perdue à la
-   prochaine restauration.
+   prochaine restauration. **Deux exceptions volontaires**, à ne pas « corriger » :
+   `lastAutoBackupDate` et `lastCloudBackup` sont des marqueurs de sauvegarde —
+   les restaurer ferait croire à l'app qu'une sauvegarde vient d'avoir lieu.
 2. **Toujours vérifier que le build passe** (`npm run build`) avant de
    considérer une modification terminée.
 3. **Bumper `APP_VERSION`** (dans `App.jsx`) et `"version"` (dans
@@ -871,8 +913,9 @@ ce point en doute sans nouveau test.
   gère lui-même git add/commit/push directement, c'est very bien aussi et
   probablement plus fluide que de repasser par GitHub Desktop à la main.
 - Sauvegarde des données utilisateur = export JSON manuel (Réglages →
-  Exporter), à ne jamais oublier de rappeler avant une mise à jour
-  importante — GitHub ne contient que le code, jamais les données perso.
+  **Sauvegarder hors du téléphone**, renommé à V2), à ne jamais oublier de
+  rappeler avant une mise à jour importante — GitHub ne contient que le code,
+  jamais les données perso.
 
 ## Mise à jour de l'app Android native (différent du déploiement PWA)
 

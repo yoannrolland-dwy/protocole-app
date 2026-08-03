@@ -12,6 +12,7 @@ import {
 import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
 import { store, getSync, exportData, importData } from "./store.js";
+import { isBackupStale, daysSinceBackup, scheduleBackupReminder } from "./cloudBackup.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 import { updateDashboardWidget } from "./widgetSync.js";
@@ -30,7 +31,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor } from "./nutrition/foodStore.js";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.42.0";
+const APP_VERSION = "3.43.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -905,7 +906,7 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
 /* ============================================================
    TAB — DASHBOARD
    ============================================================ */
-function Dashboard({ weight, sleep, knee, elbow, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab }) {
+function Dashboard({ weight, sleep, knee, elbow, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast ? round(wLast.kg - tgtW) : null;
@@ -957,6 +958,21 @@ function Dashboard({ weight, sleep, knee, elbow, macros, steps, targets, trainin
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {/* Sauvegarde externe périmée : le rappel doit être là où l'app s'ouvre, pas seulement
+          enterré dans les Réglages — c'est lui qui fait que la sauvegarde a lieu. */}
+      {isBackupStale(lastCloudBackup) && (
+        <Card danger onClick={openSettings} style={{ padding: "11px 13px", cursor: "pointer" }}>
+          <div style={{ fontSize: 11, color: C.danger, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>
+            ⚠ Sauvegarde hors du téléphone
+          </div>
+          <Body style={{ color: C.dangerText, fontSize: 11, marginTop: 3 }}>
+            {lastCloudBackup
+              ? `Dernière il y a ${daysSinceBackup(lastCloudBackup)} jours (${fmt(lastCloudBackup)}).`
+              : "Jamais faite."} Toucher ici pour sauvegarder (Réglages).
+          </Body>
+        </Card>
+      )}
+
       {/* Tuiles : poids/pas · calories/eau · sommeil/douleurs — toutes cliquables */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         {tiles.map((t) => (
@@ -2156,7 +2172,8 @@ function MacroTab({ macros, targets, save, training }) {
    RÉGLAGES
    ============================================================ */
 function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync, onHealthSync,
-                         coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, saveTargets, buildBriefing, lastAutoBackup }) {
+                         coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, saveTargets, buildBriefing,
+                         lastAutoBackup, lastCloudBackup, onCloudBackupDone }) {
   const [k, setK] = useState(apiKey);
   const [m, setM] = useState(model);
   const [msg, setMsg] = useState("");
@@ -2193,10 +2210,16 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
         const { Share } = await import("@capacitor/share");
         await Filesystem.writeFile({ path: name, data: json, directory: Directory.Cache, encoding: Encoding.UTF8 });
         const { uri } = await Filesystem.getUri({ path: name, directory: Directory.Cache });
+        // `Share.share` ne résout QUE si une destination a été choisie (annuler la feuille
+        // rejette la promesse) : c'est le seul signal disponible côté app pour dire que la
+        // sauvegarde est partie. On ne peut évidemment pas vérifier qu'elle est bien
+        // arrivée sur Drive — on date une intention aboutie, pas une réception.
         await Share.share({ title: name, files: [uri] });
-        setMsg("Export prêt — choisis où l'enregistrer.");
+        onCloudBackupDone?.();
+        setMsg("Sauvegarde envoyée — vérifie qu'elle est bien arrivée à destination.");
       } catch (e) {
-        setMsg(`Export impossible : ${e?.message || e}`);
+        const txt = String(e?.message || e);
+        setMsg(/cancel/i.test(txt) ? "Sauvegarde annulée — rien n'a été envoyé." : `Sauvegarde impossible : ${txt}`);
       }
       return;
     }
@@ -2205,6 +2228,9 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
     const a = document.createElement("a");
     a.href = url; a.download = name; a.click();
     URL.revokeObjectURL(url);
+    // Sur la PWA le fichier atterrit dans les téléchargements de la machine qui affiche
+    // l'app — donc hors du téléphone aussi, du point de vue du risque couvert.
+    onCloudBackupDone?.();
   };
   const doImport = (e) => {
     const file = e.target.files?.[0]; if (!file) return;
@@ -2324,26 +2350,45 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
 
       <Card>
         <Label style={{ marginBottom: 8 }}>Sauvegarde des données</Label>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Btn variant="primary" onClick={doExport} style={{ flex: 1 }}>
-            <Download size={14} style={{ display: "inline", marginRight: 4 }} />Exporter
-          </Btn>
-          <label style={{ flex: 1 }}>
+        {/* Bandeau d'alerte : c'est lui, pas le bouton, qui fait que la sauvegarde a lieu. */}
+        {isBackupStale(lastCloudBackup) && (
+          <div style={{
+            background: C.dangerBg, border: `1.5px solid ${C.danger}`, borderRadius: 8,
+            padding: "9px 11px", marginBottom: 10,
+          }}>
+            <div style={{ fontSize: 11, color: C.danger, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>
+              ⚠ Sauvegarde hors du téléphone
+            </div>
+            <Body style={{ color: C.dangerText, fontSize: 11, marginTop: 3 }}>
+              {lastCloudBackup
+                ? `Dernière il y a ${daysSinceBackup(lastCloudBackup)} jours (${fmt(lastCloudBackup)}).`
+                : "Jamais faite."} Perdre ou casser le téléphone effacerait tout l'historique.
+            </Body>
+          </div>
+        )}
+        <Btn variant="primary" onClick={doExport} style={{ width: "100%" }}>
+          <Download size={14} style={{ display: "inline", marginRight: 4 }} />Sauvegarder hors du téléphone
+        </Btn>
+        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
+          {Capacitor.isNativePlatform()
+            ? "Ouvre le partage Android : envoie le fichier vers Drive, un mail ou Fichiers. Rappel automatique au bout d'une semaine sans sauvegarde."
+            : "Télécharge le fichier JSON complet. Vider les données du navigateur effacerait l'app."}
+          {lastCloudBackup && !isBackupStale(lastCloudBackup) ? ` Dernière : ${fmt(lastCloudBackup)}.` : ""}
+        </Body>
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.divider}` }}>
+          <label>
             <span style={{
               display: "block", textAlign: "center", background: C.card, color: C.accent,
               border: `1.5px solid ${C.accent}`, borderRadius: 8, padding: "9px 12px",
               fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, cursor: "pointer",
-            }}><Upload size={14} style={{ display: "inline", marginRight: 4 }} />Importer</span>
+            }}><Upload size={14} style={{ display: "inline", marginRight: 4 }} />Restaurer un fichier</span>
             <input type="file" accept="application/json" onChange={doImport} style={{ display: "none" }} />
           </label>
         </div>
-        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
-          Exporte régulièrement : c'est ta seule sauvegarde. Vider les données du navigateur effacerait l'app.
-        </Body>
         {Capacitor.isNativePlatform() && (
-          <Body style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>
+          <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
             Sauvegarde auto locale (dossier Documents/Protocole) : {lastAutoBackup ? `dernière le ${fmt(lastAutoBackup)}` : "pas encore faite"}.
-            Ne remplace pas l'export manuel ci-dessus (celle-ci reste sur le téléphone).
+            Ne remplace pas celle ci-dessus : elle reste sur le téléphone, donc elle disparaît avec lui.
           </Body>
         )}
       </Card>
@@ -2436,6 +2481,7 @@ export default function App({ silent = false } = {}) {
   const [coachProfile, setCoachProfileState] = useState("");
   const [coachJournal, setCoachJournalState] = useState("");
   const [lastAutoBackup, setLastAutoBackup] = useState(null);
+  const [lastCloudBackup, setLastCloudBackup] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -2469,6 +2515,9 @@ export default function App({ silent = false } = {}) {
       }
       setCoachJournalState(await store.get("coachJournal", ""));
       setLastAutoBackup(await store.get("lastAutoBackupDate", null));
+      // Hors de DATA_KEYS volontairement (voir cloudBackup.js) : restaurer une vieille
+      // sauvegarde ne doit pas faire croire à l'app qu'elle vient d'être sauvegardée.
+      setLastCloudBackup(await store.get("lastCloudBackup", null));
       setLoading(false);
     })();
   }, []);
@@ -2546,6 +2595,19 @@ export default function App({ silent = false } = {}) {
     if (loading) return;
     doAutoBackup();
   }, [loading]);
+
+  // Rappel de sauvegarde externe : reprogrammé au démarrage ET après chaque sauvegarde
+  // (la date change ⇒ l'échéance recule). Sans la dépendance à `lastCloudBackup`, un export
+  // fait aujourd'hui laisserait le rappel de la semaine dernière sonner quand même.
+  useEffect(() => {
+    if (loading) return;
+    scheduleBackupReminder(lastCloudBackup);
+  }, [loading, lastCloudBackup]);
+  const markCloudBackup = () => {
+    const d = today();
+    setLastCloudBackup(d);
+    store.set("lastCloudBackup", d);
+  };
 
   // Resynchro à chaque retour au premier plan (pas seulement au lancement à froid)
   useEffect(() => {
@@ -2920,10 +2982,10 @@ Fais-moi une revue de fond : tendances sur la durée, corrélations entre apport
       {/* Contenu */}
       <main style={{ flex: 1, overflowY: "auto", padding: "14px 16px 24px" }}>
         {loading ? <Empty>Chargement…</Empty> : showSettings ? (
-          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup }} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
+          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, elbow, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab }} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, elbow, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup }} openSettings={() => setShowSettings(true)} />}
             {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
             {tab === "sleep" && <SleepTab {...{ sleep, save }} />}
             {tab === "steps" && <StepsTab {...{ steps, save }} />}
