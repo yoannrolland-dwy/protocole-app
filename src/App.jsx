@@ -13,7 +13,8 @@ import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
 import { store, getSync, exportData, importData } from "./store.js";
 import { isBackupStale, daysSinceBackup, scheduleBackupReminder } from "./cloudBackup.js";
-import { exoProgress, exerciseList, exerciseSessions, exerciseTrend, isTimeMode, setLabel } from "./training.js";
+import { exoProgress, exerciseList, exerciseSessions, exerciseTrend, isTimeMode, setLabel,
+         beats, recordToBeat, recordsBySession, painOutOfBase } from "./training.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 import { updateDashboardWidget } from "./widgetSync.js";
@@ -32,7 +33,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor } from "./nutrition/foodStore.js";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.44.0";
+const APP_VERSION = "3.45.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -1322,7 +1323,7 @@ function StepsTab({ steps, save }) {
 /* ============================================================
    CARNET DE MUSCU — série par série
    ============================================================ */
-function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, initial }) {
+function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, initial, painRed = false }) {
   const template = TEMPLATES[type];
   const hp = hsrParse(hsrForWeek(hsrWeek).scheme);
 
@@ -1473,14 +1474,44 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
   };
 
   const doneCount = exos.filter((e) => e.series.some((s) => s.fait)).length;
-  const GRID = "20px 1fr 1fr 26px 18px";
+  const GRID = "30px 1fr 1fr 26px 18px";
 
-  const renderRows = (e, ei, legFilter) => e.series
+  // ---- records (V4) ----
+  // Référence à battre = meilleure série de TOUT l'historique hors séance en cours (une
+  // séance en modification ne doit pas être son propre record à battre). Calculée une fois
+  // par exercice, pas à chaque frappe.
+  const refRecords = useMemo(() => {
+    const m = {};
+    exos.forEach((e) => { m[e.nom] = recordToBeat(training, e.nom, initial); });
+    return m;
+  }, [training, initial, exos.map((e) => e.nom).join("|")]);
+  // Indices des séries qui battent le record au moment où elles sont cochées : la référence
+  // avance au fil des séries, donc seules les vraies améliorations successives ressortent.
+  const recordIdx = (e) => {
+    let run = refRecords[e.nom];
+    const out = new Set();
+    if (!run) return out; // 1re fois sur cet exercice : une référence, pas un record
+    e.series.forEach((s, i) => {
+      if (!s.fait) return;
+      const cur = { poids: +s.poids || 0, val: +s.val || 0 };
+      if (!(cur.poids > 0 || cur.val > 0)) return;
+      if (beats(cur, run, e.mode)) { run = cur; out.add(i); }
+    });
+    return out;
+  };
+
+  const renderRows = (e, ei, legFilter) => {
+    // Douleur hors base aujourd'hui : le record est calculé et enregistré normalement, il
+    // n'est simplement pas mis en avant (voir painOutOfBase dans training.js).
+    const recs = painRed ? new Set() : recordIdx(e);
+    return e.series
     .map((s, si) => ({ s, si }))
     .filter(({ s }) => legFilter == null || s.leg === legFilter)
     .map(({ s, si }, n) => (
       <div key={si} style={{ display: "grid", gridTemplateColumns: GRID, gap: 7, alignItems: "center" }}>
-        <span style={{ fontFamily: C.mono, fontSize: 13, color: C.muted, fontWeight: 700 }}>{n + 1}</span>
+        <span style={{ fontFamily: C.mono, fontSize: 13, color: recs.has(si) ? C.accent : C.muted, fontWeight: 700 }}>
+          {n + 1}{recs.has(si) && <span style={{ fontSize: 11 }}>★</span>}
+        </span>
         <TextInput value={s.poids} inputMode="decimal" placeholder="kg"
           onChange={(ev) => upd(ei, si, "poids", ev.target.value.replace(",", "."))} style={{ padding: "7px 8px" }} />
         <TextInput value={s.val} inputMode="numeric" placeholder={e.mode === "temps" ? "sec" : e.target}
@@ -1494,6 +1525,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
         </button>
       </div>
     ));
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1548,6 +1580,13 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
             {isOpen && (
               <>
                 {e.consigne && <Body style={{ fontSize: 10.5, color: C.dim, marginTop: 6 }}>{e.consigne}</Body>}
+                {/* Le record à battre est affiché comme un fait, pas comme un objectif à
+                    forcer — et il disparaît les jours où un tendon est hors base. */}
+                {!painRed && refRecords[e.nom] && (
+                  <Body style={{ fontSize: 10.5, color: C.muted, marginTop: 6, fontFamily: C.mono }}>
+                    ★ record : {setLabel(refRecords[e.nom], e.mode)}
+                  </Body>
+                )}
 
                 <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 7, fontSize: 9,
                   color: C.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: "10px 0 6px", fontWeight: 700 }}>
@@ -1750,7 +1789,7 @@ function ProgressScreen({ training, onBack }) {
   );
 }
 
-function TrainTab({ training, save, hsrWeek, setHsrWeek }) {
+function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow }) {
   const [open, setOpen] = useState(null);
   const [progress, setProgress] = useState(false);
   const [date, setDate] = useState(today());
@@ -1793,11 +1832,15 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek }) {
   const vol = {};
   training.filter((t) => daysBetween(t.date, today()) <= 14).forEach((t) => { vol[t.type] = (vol[t.type] || 0) + 1; });
   const exoCount = useMemo(() => exerciseList(training).length, [training]);
+  // Records rejoués sur tout l'historique (V4) : quelles séances contenaient un record au
+  // moment où elles ont eu lieu. Clé par référence d'objet, comme la suppression.
+  const records = useMemo(() => recordsBySession(training), [training]);
+  const painRed = painOutOfBase([knee, elbow], date);
 
   if (open && TEMPLATES[open]?.kind === "muscu") {
     return (
       <MuscuLogger key={editing?.id || `new-${open}`} type={open} training={training} hsrWeek={hsrWeek} date={date} onDate={setDate}
-        onSave={saveMuscu} onCancel={() => { setOpen(null); setEditing(null); }} initial={editing} />
+        onSave={saveMuscu} onCancel={() => { setOpen(null); setEditing(null); }} initial={editing} painRed={painRed} />
     );
   }
   if (progress) return <ProgressScreen training={training} onBack={() => setProgress(false)} />;
@@ -1881,10 +1924,20 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek }) {
       {/* Historique */}
       <Card style={{ padding: "6px 14px" }}>
         <Label style={{ padding: "10px 0 6px", letterSpacing: 1.5 }}>Dernières séances</Label>
-        {training.length ? lastN(training, 10).reverse().map((t, i) => (
+        {training.length ? lastN(training, 10).reverse().map((t, i) => {
+          // Marqueur record : la séance contenait au moins une meilleure série de tous les
+          // temps AU MOMENT où elle a eu lieu, et aucun tendon n'était hors base ce jour-là.
+          const rec = records.get(t);
+          const recShown = rec && !painOutOfBase([knee, elbow], t.date);
+          return (
           <div key={i} onClick={() => editSession(t)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderTop: `1px solid ${C.divider}`, cursor: "pointer" }}>
             <div>
               <span style={{ fontSize: 12.5, color: C.text, fontWeight: 700 }}>{t.type}</span>
+              {recShown && (
+                <span title={rec.join(" · ")} style={{ fontSize: 10, color: C.accent, fontWeight: 800, marginLeft: 6, fontFamily: C.mono }}>
+                  ★{rec.length > 1 ? rec.length : ""}
+                </span>
+              )}
               <span style={{ fontSize: 10.5, color: C.muted, marginLeft: 8, fontFamily: C.mono }}>{fmt(t.date)}{t.start ? ` · ${t.start}` : ""}</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1899,7 +1952,8 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek }) {
               </button>
             </div>
           </div>
-        )) : <Empty>Aucune séance enregistrée.</Empty>}
+          );
+        }) : <Empty>Aucune séance enregistrée.</Empty>}
       </Card>
     </div>
   );
@@ -3084,7 +3138,7 @@ Fais-moi une revue de fond : tendances sur la durée, corrélations entre apport
             {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
             {tab === "sleep" && <SleepTab {...{ sleep, save }} />}
             {tab === "steps" && <StepsTab {...{ steps, save }} />}
-            {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek }} />}
+            {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, elbow }} />}
             {tab === "pain" && <PainTab {...{ knee, elbow, save, hsrWeek }} />}
             {tab === "macro" && <MacroTab {...{ macros, targets, save, training }} />}
             {tab === "food" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} />}

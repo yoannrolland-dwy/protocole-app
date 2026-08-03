@@ -888,6 +888,49 @@ douleur et les calories, mais aucune pour l'entraînement, qui est son cœur.
   c'est une absence de performance. Une seule séance → message dédié au lieu
   d'une courbe à un point.
 
+### V4 — Détection de record sur une série (03/08/2026, v3.45.0)
+
+Rend visible une progression que l'app connaissait déjà mais ne signalait jamais.
+Réutilise `bestSet` extrait à V3 — aucune nouvelle clé localStorage, un record
+n'est pas une donnée à stocker mais une lecture de l'historique.
+
+- **Définition** (dans `training.js`) : `beats(a, b, mode)` — charge la plus
+  lourde, puis le plus de reps à charge égale ; **secondes en mode temps**.
+  **Égaler n'est pas battre.** Calculé sur **tout l'historique**, jamais sur
+  14 jours (sinon tout redeviendrait un record tous les quinze jours).
+- **`recordsBySession(training)`** rejoue l'historique dans l'ordre
+  chronologique et renvoie une `Map` (**objet séance → exercices ayant battu un
+  record ce jour-là**), clé par référence d'objet comme la suppression/édition
+  ailleurs dans l'app — pas par `id`, que les séances les plus anciennes n'ont
+  pas toutes. **C'est la réponse au piège du premier lancement** : on ne déclare
+  pas un record sur chaque exercice de la prochaine séance, on relit l'existant.
+- **Le premier passage sur un exercice n'est PAS un record**, c'est une
+  référence (même convention que la tendance « 1re fois » de V3).
+- **`recordToBeat(training, nom, exclude)`** : référence affichée dans le
+  carnet, calculée en excluant la séance en cours (une séance en modification ne
+  doit pas être son propre record à battre). Sémantique assumée : « meilleure
+  série jamais faite », pas « meilleure série avant cette date » — rouvrir une
+  vieille séance ne ressuscite donc pas un record déjà dépassé depuis.
+- **Affichage** : dans le carnet, la référence (`★ record : 32 kg × 9`) sous la
+  consigne, et un `★` accent accolé au numéro de la série qui bat le record au
+  moment où elle est cochée (la référence avance au fil des séries, donc seules
+  les vraies améliorations successives ressortent). Dans « Dernières séances »,
+  un `★` (ou `★2`, `★3`…) à côté du type de séance. Pas de confettis, pas
+  d'animation : un record est un fait, le design system est austère.
+- **Garde-fou du profil** (`painOutOfBase`) : **aucun record n'est mis en avant
+  un jour où le genou OU le coude est hors base** (`baseline === false` ou
+  douleur ≥ 6, mêmes seuils que le recommandeur). Féliciter une charge record le
+  jour où le tendon a flambé, c'est encourager exactement ce que Silbernagel
+  cherche à éviter. Le record est calculé et enregistré normalement, il n'est
+  simplement pas signalé — et pas de relevé ce jour-là ne supprime rien (une
+  absence de saisie n'est pas une alerte).
+- **Testé** (script Node sur historique synthétique + aperçu) : séquence de
+  records conforme sur 5 séances, égalité non signalée, séance non cochée
+  ignorée, exercice jamais fait sans record, mode temps comparé en secondes,
+  garde-fou vérifié dans les deux sens (séance passée marquée `★2` masquée le
+  jour d'un genou hors base ; carnet sans aucune étoile ni référence avec un
+  coude à 7/10 le jour même, malgré une série qui bat largement le record).
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,

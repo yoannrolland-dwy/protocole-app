@@ -124,6 +124,93 @@ export function exerciseList(training) {
   return Object.values(byExo).sort((a, b) => b.last.localeCompare(a.last) || a.nom.localeCompare(b.nom));
 }
 
+/* ============================================================
+   RECORDS (V4)
+   ============================================================ */
+
+/**
+ * `a` bat-il `b` ? Charge la plus lourde, puis le plus de reps à charge égale ; secondes en
+ * mode temps. Même hiérarchie que `bestSet`, pour qu'un record soit toujours la série que
+ * l'app affiche déjà comme la meilleure.
+ * `b` absent = premier passage sur l'exercice : ce n'est PAS un record, c'est une référence
+ * (voir `recordsBySession` / `recordToBeat`, qui renvoient `null` dans ce cas).
+ */
+export function beats(a, b, mode) {
+  if (!a) return false;
+  if (!b) return false;
+  if (isTimeMode(mode)) return +a.val > +b.val;
+  return +a.poids > +b.poids || (+a.poids === +b.poids && +a.val > +b.val);
+}
+
+/**
+ * Meilleure série jamais réalisée sur cet exercice, toutes séances confondues SAUF celle
+ * passée en `exclude` (la séance en cours d'écriture ou de modification : elle ne doit pas
+ * être son propre record à battre). `null` si l'exercice n'a jamais été fait.
+ *
+ * Calculé sur TOUT l'historique, jamais sur 14 jours : sinon tout redeviendrait un record
+ * tous les quinze jours.
+ *
+ * Les exercices par jambe sont traités globalement (comme `bestSet`) : le record est la
+ * meilleure série, peu importe le côté.
+ */
+export function recordToBeat(training, nom, exclude = null) {
+  let best = null;
+  (training || []).forEach((s) => {
+    if (s === exclude || (exclude?.id && s.id === exclude.id)) return;
+    const e = s.exercices?.find((x) => x.nom === nom);
+    if (!e) return;
+    const b = bestSet(e);
+    if (b && (!best || beats(b, best, e.mode))) best = b;
+  });
+  return best;
+}
+
+/**
+ * Records **au moment où ils ont eu lieu** : rejoue l'historique dans l'ordre chronologique
+ * et retient, pour chaque séance, les exercices dont la meilleure série a battu tout ce qui
+ * précédait.
+ *
+ * C'est la réponse au piège du premier lancement : on ne déclare pas un record sur chaque
+ * exercice de la prochaine séance, on relit l'historique existant pour savoir où en étaient
+ * les records à chaque date.
+ *
+ * @returns Map (objet séance → liste des exercices ayant battu un record ce jour-là). Clé
+ *   par référence d'objet, comme la suppression et la modification de séance ailleurs dans
+ *   l'app — pas par `id`, que les séances les plus anciennes n'ont pas toutes.
+ */
+export function recordsBySession(training) {
+  const best = {};
+  const out = new Map();
+  [...(training || [])].sort(byDateAsc).forEach((s) => {
+    (s.exercices || []).forEach((e) => {
+      const b = bestSet(e);
+      if (!b) return;
+      const prev = best[e.nom];
+      if (!prev) { best[e.nom] = b; return; } // premier passage = référence, pas un record
+      if (beats(b, prev, e.mode)) {
+        best[e.nom] = b;
+        out.set(s, [...(out.get(s) || []), e.nom]);
+      }
+    });
+  });
+  return out;
+}
+
+/**
+ * Douleur hors base ce jour-là, sur l'une ou l'autre des deux zones (V1).
+ * Sert de garde-fou d'AFFICHAGE des records : féliciter une charge record le jour où le
+ * tendon a flambé, c'est encourager exactement ce que la règle de Silbernagel cherche à
+ * éviter. Le record reste calculé et enregistré, il n'est simplement pas mis en avant.
+ * Pas de relevé ce jour-là = pas de suppression du badge : une absence de saisie n'est pas
+ * une alerte (même principe que le coude dans le recommandeur).
+ */
+export function painOutOfBase(logs, date) {
+  return (logs || []).some((log) => {
+    const e = (log || []).find((x) => x.date === date);
+    return !!e && (e.baseline === false || e.pain >= 6);
+  });
+}
+
 /**
  * Tendance sur les 3 dernières séances, même définition que celle envoyée au Coach IA
  * (dernière vs précédente) — l'écran et le coach ne doivent jamais dire deux choses
