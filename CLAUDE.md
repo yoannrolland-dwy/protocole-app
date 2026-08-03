@@ -938,12 +938,21 @@ celle qui charge le tendon du coude — et le recommandeur lui appliquait une
 pénalité **forfaitaire** : une heure tranquille et une grosse session de blocs
 comptaient pareil.
 
-- **Périmètre : bloc uniquement**, échelle Fontainebleau. Pas de sélecteur
-  bloc/voie, pas d'échelle de voie — ne pas réintroduire la notion de « voie »
-  sans demande explicite.
-- **`src/climbing.js`** (module pur, testable en Node) : `FONT_GRADES` (22
-  cotations ordonnées — indispensable, `"6C+" > "6B"` est faux en comparaison de
-  texte), `climbSummary`, `climbLabel`, `climbLoad`.
+- **Périmètre : bloc uniquement.** Pas de sélecteur bloc/voie — ne pas
+  réintroduire la notion de « voie » sans demande explicite.
+- **ÉCHELLE : celle de SA SALLE, par couleur de piste — PAS Fontainebleau**
+  (corrigé en v3.47.0 le 03/08/2026 ; la v3.46.0 était partie sur Font par
+  erreur, `ROADMAP.md` le supposait). Six couleurs ordonnées **jaune < vert <
+  bleu < rouge < noir < violet**, cinq niveaux dans chaque (5 = le plus dur), soit
+  30 cotations. C'est ce que Yoann lit sur le mur : lui demander de convertir en
+  6B+ serait une saisie fausse et lente. **Ne pas reconvertir en Fontainebleau**,
+  y compris dans le prompt du Coach IA (consigne explicite pour le modèle).
+- **`src/climbing.js`** (module pur, testable en Node) : `COLORS`, `LEVELS`,
+  `GRADES` (échelle ordonnée), `gradeIndex`/`gradeLabel`/`gradeColor`,
+  `climbSummary`, `climbLabel`, `climbLoad`. Format stocké :
+  `"<couleur>-<niveau>"` (ex. `"bleu-3"`). L'ordre **doit** venir de la table :
+  en comparaison de texte `"bleu-1" < "jaune-5"`, c'est-à-dire l'inverse de la
+  difficulté réelle (test dédié sur ce piège).
 - **AUCUNE nouvelle clé localStorage** : les blocs vivent dans l'entrée de séance
   existante (`blocs: [{ cotation, issue }]`, `issue` ∈ flash/essais/echec), à
   côté de `duration` et `rpe`, exactement comme `exercices` pour la muscu. Le
@@ -954,18 +963,24 @@ comptaient pareil.
   les échecs comptent dans le **volume** (ils chargent le tendon autant, sinon
   plus) mais pas dans l'intensité réussie — d'où `max`/`mediane` sur les blocs
   réussis et `max_tente` à part. La médiane d'un nombre pair prend l'élément
-  inférieur du milieu : « 6A½ » n'existe pas, la valeur affichée doit rester une
-  vraie cotation.
+  inférieur du milieu : « Bleu 3½ » n'existe pas, la valeur affichée doit rester
+  une vraie cotation. Une cotation **hors échelle** compte dans le volume mais
+  pas dans l'intensité — elle charge le coude quoi qu'il arrive, et c'est ce qui
+  protège les blocs éventuellement saisis en Fontainebleau avec la v3.46.0.
 - **Saisie pensée pour la salle** (`BlocsField`) : une issue « armée » en haut
-  (défaut « après essais », le cas fréquent), puis une grille de 22 cotations à
-  taper — chaque tap ajoute un bloc et la case affiche son compteur. Récap groupé
-  par (cotation, issue) avec des boutons **−/+** pour ajuster une quantité d'un
-  pouce, c'est le « plusieurs blocs d'un coup » demandé. Jamais de champ texte
-  libre.
+  (défaut « après essais », le cas fréquent), puis **une ligne par couleur** avec
+  sa pastille et les niveaux 1 à 5 — chaque tap ajoute un bloc et la case affiche
+  son compteur. Récap groupé par (cotation, issue) avec des boutons **−/+** pour
+  ajuster une quantité d'un pouce, c'est le « plusieurs blocs d'un coup »
+  demandé. Jamais de champ texte libre.
+  **Les pastilles de couleur sont la seule entorse admise au « accent citron
+  uniquement »** du design system : ici la couleur EST la donnée, pas une
+  décoration. Le noir est rendu en gris clair — sur un fond `#050505` un vrai
+  noir serait invisible.
 - **Le vrai bénéfice — recommandeur** : `climbLoad` classe la dernière séance en
   légère (≤ 8 blocs) / normale / grosse (≥ 18) et **module la pénalité** sur
   Upper et Escalade (4 / 8 / 14 au lieu du forfait 8), avec une raison chiffrée
-  (« Escalade hier : 22 blocs (max 6C) — grosse session, tirage lourd sur le
+  (« Escalade hier : 20 blocs (max Rouge 2) — grosse session, tirage lourd sur le
   coude »). **Mesuré dans l'aperçu, même situation par ailleurs** : Upper 47
   (session légère) vs 43 (séance sans blocs, comportement d'origine) vs 37
   (grosse session, où Lower passe devant). Croisé avec la douleur de coude réelle
@@ -977,7 +992,7 @@ comptaient pareil.
   max_tente, flash, essais, echec}`) avec sa légende, jamais la liste brute —
   sur une séance de 20 blocs elle coûterait des tokens pour un signal que le JS
   calcule exactement.
-- « Dernières séances » affiche « 60′ · RPE 7 · 5 blocs · 6C max ».
+- « Dernières séances » affiche « 60′ · RPE 7 · 4 blocs · Rouge 1 max ».
 
 ## Règles absolues à ne jamais casser
 

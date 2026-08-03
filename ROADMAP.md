@@ -12,7 +12,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | V2 | Sauvegarde régulière hors du téléphone | petit | ✅ 03/08/2026 (v3.43.0) |
 | V3 | Progression visible par exercice | moyen | ✅ 03/08/2026 (v3.44.0) |
 | V4 | Détection de record sur une série | petit | ✅ 03/08/2026 (v3.45.0) |
-| V5 | Escalade : suivi des blocs | moyen | ✅ 03/08/2026 (v3.46.0) |
+| V5 | Escalade : suivi des blocs | moyen | ✅ 03/08/2026 (v3.47.0, cotations par couleur) |
 | V6 | Corriger les valeurs d'un aliment | petit | à faire |
 | V7 | Dépense énergétique adaptative (TDEE calculé) | gros | à faire |
 
@@ -272,9 +272,16 @@ de blocs comptent pareil.
 
 ### Périmètre : bloc uniquement
 
-**Yoann ne fait que du bloc** (confirmé le 03/08/2026). Pas de sélecteur bloc/voie,
-pas d'échelle française de cotation de voie — une seule échelle, Fontainebleau.
+**Yoann ne fait que du bloc** (confirmé le 03/08/2026). Pas de sélecteur bloc/voie.
 Ne pas réintroduire la notion de « voie » sans demande explicite.
+
+> **Correction du 03/08/2026 (après livraison de la v3.46.0).** Ce qui suit
+> supposait l'échelle Fontainebleau : c'était FAUX. Sa salle cote **par couleur de
+> piste**, dans l'ordre jaune < vert < bleu < rouge < noir < violet, avec cinq
+> niveaux dans chaque couleur (5 = le plus dur). C'est cette échelle qui est
+> livrée en v3.47.0 (voir CLAUDE.md). Tout ce que la section dit par ailleurs
+> (volume/intensité/réussite, table ordonnée, saisie au doigt, branchement sur le
+> recommandeur) reste valable — seule la liste des cotations change.
 
 ### Proposition
 

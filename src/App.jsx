@@ -15,7 +15,8 @@ import { store, getSync, exportData, importData } from "./store.js";
 import { isBackupStale, daysSinceBackup, scheduleBackupReminder } from "./cloudBackup.js";
 import { exoProgress, exerciseList, exerciseSessions, exerciseTrend, isTimeMode, setLabel,
          beats, recordToBeat, recordsBySession, painOutOfBase } from "./training.js";
-import { FONT_GRADES, gradeIndex, ISSUES, climbSummary, climbLabel, climbLoad } from "./climbing.js";
+import { COLORS, LEVELS, gradeIndex, makeGrade, gradeLabel, gradeColor, ISSUES,
+         climbSummary, climbLabel, climbLoad } from "./climbing.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 import { updateDashboardWidget } from "./widgetSync.js";
@@ -34,7 +35,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor } from "./nutrition/foodStore.js";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.46.0";
+const APP_VERSION = "3.47.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -415,7 +416,7 @@ function recommendSessions({ training, knee, elbow, sleep, targets }) {
   const CLIMB_PEN = { legere: 4, normale: 8, grosse: 14 };
   const climbPen = climbLast ? CLIMB_PEN[climbLast.level] : 8;
   const climbWhy = climbLast
-    ? `Escalade ${dClimb === 0 ? "aujourd'hui" : "hier"} : ${climbLast.n} blocs${climbLast.max ? ` (max ${climbLast.max})` : ""} — ${climbLast.level === "grosse" ? "grosse session, tirage lourd sur le coude" : climbLast.level === "legere" ? "session légère, impact limité sur le coude" : "charge de tirage normale"}.`
+    ? `Escalade ${dClimb === 0 ? "aujourd'hui" : "hier"} : ${climbLast.n} blocs${climbLast.max ? ` (max ${gradeLabel(climbLast.max)})` : ""} — ${climbLast.level === "grosse" ? "grosse session, tirage lourd sur le coude" : climbLast.level === "legere" ? "session légère, impact limité sur le coude" : "charge de tirage normale"}.`
     : "Escalade récente : allège le tirage (coude).";
 
   // État du genou (bas du corps) et du coude (tirage) — même lecture, deux réglages.
@@ -1843,21 +1844,34 @@ function BlocsField({ blocs, setBlocs }) {
       <Label style={{ marginBottom: 6 }}>Blocs · issue à enregistrer</Label>
       <Pills options={ISSUES.map((i) => ({ key: i.key, label: i.label }))} value={issue} onChange={setIssue} small />
 
-      <Label style={{ margin: "10px 0 6px" }}>Taper une cotation pour l'ajouter</Label>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 5 }}>
-        {FONT_GRADES.map((c) => {
-          const n = parCotation[c] || 0;
-          return (
-            <button key={c} onClick={() => add(c)} style={{
-              padding: "8px 2px", borderRadius: 6, cursor: "pointer", fontFamily: C.mono,
-              fontSize: 11.5, fontWeight: 800, position: "relative",
-              background: n ? C.accentRow : C.card, color: n ? C.accent : C.muted,
-              border: `1.5px solid ${n ? C.accent : C.border}`,
-            }}>
-              {c}{n > 0 && <span style={{ fontSize: 9, marginLeft: 2 }}>×{n}</span>}
-            </button>
-          );
-        })}
+      <Label style={{ margin: "10px 0 6px" }}>Taper un niveau pour l'ajouter</Label>
+      {/* Une ligne par couleur de piste, du plus facile au plus dur — la lecture du mur.
+          La pastille de couleur est la seule entorse admise au « accent citron uniquement » :
+          ici la couleur EST la donnée, pas une décoration. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+        {COLORS.map((col) => (
+          <div key={col.key} style={{ display: "grid", gridTemplateColumns: "62px repeat(5, 1fr)", gap: 5, alignItems: "center" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: col.hex, flexShrink: 0,
+                border: col.key === "noir" ? `1px solid ${C.border}` : "none" }} />
+              <span style={{ fontSize: 9.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.3, fontWeight: 700 }}>{col.label}</span>
+            </span>
+            {LEVELS.map((lv) => {
+              const g = makeGrade(col.key, lv);
+              const n = parCotation[g] || 0;
+              return (
+                <button key={lv} onClick={() => add(g)} style={{
+                  padding: "8px 2px", borderRadius: 6, cursor: "pointer", fontFamily: C.mono,
+                  fontSize: 12, fontWeight: 800,
+                  background: n ? C.accentRow : C.card, color: n ? C.accent : C.muted,
+                  border: `1.5px solid ${n ? C.accent : C.border}`,
+                }}>
+                  {lv}{n > 0 && <span style={{ fontSize: 9, marginLeft: 1 }}>×{n}</span>}
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
       {groupes.length > 0 && (
@@ -1867,9 +1881,11 @@ function BlocsField({ blocs, setBlocs }) {
               display: "flex", alignItems: "center", justifyContent: "space-between",
               padding: "6px 0", borderTop: `1px solid ${C.divider}`,
             }}>
-              <span style={{ fontFamily: C.mono, fontSize: 12, color: C.text, fontWeight: 700 }}>
-                {g.cotation}
-                <span style={{ color: g.issue === "echec" ? C.danger : C.muted, fontWeight: 400, marginLeft: 8, fontFamily: "inherit" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: C.mono, fontSize: 12, color: C.text, fontWeight: 700 }}>
+                <span style={{ width: 9, height: 9, borderRadius: 3, background: gradeColor(g.cotation) || C.dim,
+                  border: g.cotation.startsWith("noir") ? `1px solid ${C.border}` : "none" }} />
+                {gradeLabel(g.cotation)}
+                <span style={{ color: g.issue === "echec" ? C.danger : C.muted, fontWeight: 400, marginLeft: 2, fontFamily: "inherit" }}>
                   {ISSUES.find((i) => i.key === g.issue)?.label}
                 </span>
               </span>
@@ -1883,7 +1899,7 @@ function BlocsField({ blocs, setBlocs }) {
           ))}
           <div style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono, marginTop: 8 }}>
             {s.n} bloc{s.n > 1 ? "s" : ""}
-            {s.max ? ` · max ${s.max} · médiane ${s.mediane}` : " · aucun réussi"}
+            {s.max ? ` · max ${gradeLabel(s.max)} · médiane ${gradeLabel(s.mediane)}` : " · aucun réussi"}
             {` · ${s.flash} flash / ${s.essais} essais / ${s.echec} échec${s.echec > 1 ? "s" : ""}`}
           </div>
         </div>
@@ -3152,7 +3168,7 @@ ${JSON.stringify(merged)}
 
 PROGRESSION PAR EXERCICE (14 j) — déjà calculée, ne refais pas l'arithmétique. "series_max" = meilleure série de chaque séance au format "MM-JJ poidsXreps" (ou "MM-JJ Ns" pour les exercices en gainage, mesurés en secondes) ; "tendance" compare le volume (charge × reps, ou les secondes en gainage) de la dernière séance à la précédente :
 ${JSON.stringify(exoProgressData)}
-${autresSeances.length ? `Séances sans séries (basket/escalade) : ${JSON.stringify(autresSeances)}\nPour l'escalade, "blocs" résume la séance : n=nombre de blocs (le proxy de charge sur le tendon du coude), max/mediane=cotations Fontainebleau réussies, max_tente=le plus dur essayé, puis la répartition flash/essais/echec.` : ""}
+${autresSeances.length ? `Séances sans séries (basket/escalade) : ${JSON.stringify(autresSeances)}\nPour l'escalade (bloc en salle), "blocs" résume la séance : n=nombre de blocs (le proxy de charge sur le tendon du coude), max/mediane=cotations réussies, max_tente=le plus dur essayé, puis la répartition flash/essais/echec. Les cotations sont celles de SA SALLE, au format "couleur-niveau", ordonnées ainsi : jaune < vert < bleu < rouge < noir < violet, et 1 à 5 dans chaque couleur (5 = le plus dur). Ne pas les convertir en Fontainebleau.` : ""}
 ${notesTxt ? `\nNOTES DE CONTEXTE écrites par Yoann (14 j, ex. alcool, insomnie, petite blessure) — à prendre en compte activement dans l'analyse :\n${notesTxt}\n` : ""}
 ${(journal || "").trim() ? `CARNET DE BORD — état que TU as écrit à la fin de ta dernière analyse. C'est ta mémoire : appuie-toi dessus pour enchaîner (a-t-il appliqué ce que tu avais demandé ? où en est la progression ?) au lieu de repartir de zéro.\n${journal.trim()}\n` : "CARNET DE BORD : vide, c'est ta première analyse. Tu le créeras en fin de réponse.\n"}
 Structure ta réponse en deux temps :
