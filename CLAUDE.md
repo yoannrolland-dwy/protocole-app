@@ -470,7 +470,7 @@ Objectif : se détacher complètement de MyFitnessPal / Cronometer en intégrant
 journal alimentaire dans PROTOCOLE, proche de Cronometer (journal pur, aucun
 coaching dans le module — le jugement reste au Coach IA).
 
-**Chantier volontairement itératif. M0-M4 et M6 livrés, M7 reste à faire (M5 abandonné).**
+**Chantier terminé. M0-M4, M6 et M7 livrés (M5 abandonné).**
 
 | Jalon | Contenu | État |
 |---|---|---|
@@ -481,7 +481,19 @@ coaching dans le module — le jugement reste au Coach IA).
 | M4 | Portions/unités, recettes, copier un repas | ✅ 02/08/2026 (quick-add livré en avance dès M2) |
 | M5 | (abandonné — micronutriments écartés, voir plus bas) | — |
 | M6 | **Bascule** : `foodLog` alimente `macroLog`, coupure HC nutrition/eau | ✅ 02/08/2026 |
-| M7 | Retrait des permissions HC nutrition/hydratation | à faire |
+| M7 | Retrait des permissions HC nutrition/hydratation | ✅ 03/08/2026 |
+
+- **M7** : `@capgo/capacitor-health` déclare inconditionnellement dans son propre
+  manifeste (`node_modules/@capgo/capacitor-health/android/src/main/AndroidManifest.xml`)
+  les 4 permissions `READ_NUTRITION`/`WRITE_NUTRITION`/`READ_HYDRATION`/`WRITE_HYDRATION`,
+  qu'on les demande ou non à l'exécution (M6 avait coupé la LECTURE côté JS, pas la
+  déclaration côté manifeste). Retirées via `tools:node="remove"` dans
+  `android/app/src/main/AndroidManifest.xml` (ajout du namespace `xmlns:tools`, absent
+  jusqu'ici) — vérifié dans le manifeste fusionné généré par Gradle
+  (`app/build/intermediates/merged_manifest/debug/processDebugMainManifest/AndroidManifest.xml`) :
+  les 4 permissions ont bien disparu, les autres (pas/sommeil/poids) intactes. Conséquence
+  visible : l'écran de consentement Health Connect ne proposera plus nutrition/hydratation
+  au prochain octroi de permissions.
 
 ### Décisions prises (ne pas les rouvrir sans demande explicite)
 
