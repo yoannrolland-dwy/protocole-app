@@ -12,7 +12,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | V2 | Sauvegarde régulière hors du téléphone | petit | ✅ 03/08/2026 (v3.43.0) |
 | V3 | Progression visible par exercice | moyen | ✅ 03/08/2026 (v3.44.0) |
 | V4 | Détection de record sur une série | petit | ✅ 03/08/2026 (v3.45.0) |
-| V5 | Escalade : suivi des blocs | moyen | à faire |
+| V5 | Escalade : suivi des blocs | moyen | ✅ 03/08/2026 (v3.46.0) |
 | V6 | Corriger les valeurs d'un aliment | petit | à faire |
 | V7 | Dépense énergétique adaptative (TDEE calculé) | gros | à faire |
 

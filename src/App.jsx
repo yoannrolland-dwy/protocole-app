@@ -15,6 +15,7 @@ import { store, getSync, exportData, importData } from "./store.js";
 import { isBackupStale, daysSinceBackup, scheduleBackupReminder } from "./cloudBackup.js";
 import { exoProgress, exerciseList, exerciseSessions, exerciseTrend, isTimeMode, setLabel,
          beats, recordToBeat, recordsBySession, painOutOfBase } from "./training.js";
+import { FONT_GRADES, gradeIndex, ISSUES, climbSummary, climbLabel, climbLoad } from "./climbing.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 import { updateDashboardWidget } from "./widgetSync.js";
@@ -33,7 +34,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor } from "./nutrition/foodStore.js";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.45.0";
+const APP_VERSION = "3.46.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -403,6 +404,20 @@ function recommendSessions({ training, knee, elbow, sleep, targets }) {
   const dClimb = daysSince((t) => t.type === "Escalade");
   const dKnee = daysSince((t) => TEMPLATES[t.type]?.knee); // Lower + Basket
 
+  // Charge de la dernière séance d'escalade (V5) : jusqu'ici la pénalité « escalade
+  // récente » était FORFAITAIRE — une heure tranquille et une grosse session de blocs
+  // comptaient pareil. `climbLoad` renvoie `null` si la séance n'a pas de blocs saisis
+  // (tout l'historique d'avant V5), et le comportement forfaitaire d'origine s'applique
+  // alors tel quel : pas de charge supposée à partir d'une donnée absente.
+  const lastClimb = training.filter((t) => t.type === "Escalade").slice(-1)[0];
+  const climbLast = dClimb <= 1 ? climbLoad(lastClimb) : null;
+  // Pénalité modulée : une session légère pèse moins qu'un forfait, une grosse pèse plus.
+  const CLIMB_PEN = { legere: 4, normale: 8, grosse: 14 };
+  const climbPen = climbLast ? CLIMB_PEN[climbLast.level] : 8;
+  const climbWhy = climbLast
+    ? `Escalade ${dClimb === 0 ? "aujourd'hui" : "hier"} : ${climbLast.n} blocs${climbLast.max ? ` (max ${climbLast.max})` : ""} — ${climbLast.level === "grosse" ? "grosse session, tirage lourd sur le coude" : climbLast.level === "legere" ? "session légère, impact limité sur le coude" : "charge de tirage normale"}.`
+    : "Escalade récente : allège le tirage (coude).";
+
   // État du genou (bas du corps) et du coude (tirage) — même lecture, deux réglages.
   // Le genou est un gate dur : pas de donnée fraîche ⇒ prudence par défaut. Le coude ne
   // module que des scores tant qu'une douleur réelle n'est pas notée (silencieux sinon).
@@ -472,7 +487,7 @@ function recommendSessions({ training, knee, elbow, sleep, targets }) {
     let upReason = `Upper ${upper7}/2 cette semaine · dernier ${ago(dUpper)}.`;
     if (kneeRed) { upScore += 18; upReason += " Genou à ménager → c'est l'option sûre, jambes au repos."; }
     if (elbowAmber) { upScore -= 10; upReason += ` ${elbowWhy} → charge de tirage prudente, prises neutres/pronation.`; }
-    if (dClimb <= 1) { upScore -= 8; upReason += " Escalade récente : allège le tirage (coude)."; }
+    if (dClimb <= 1) { upScore -= climbPen; upReason += ` ${climbWhy}`; }
     if (dUpper === 0) { upScore -= 32; upReason = `Haut du corps déjà fait aujourd'hui (${upper7}/2 cette semaine) — à reprendre après récupération.`; }
     upScore = fatigueScore(upScore);
     const upFat = fatigueReason(); if (upFat) upReason += ` ${upFat}`;
@@ -521,8 +536,9 @@ function recommendSessions({ training, knee, elbow, sleep, targets }) {
   } else if (upperToday) {
     push(avoid, "Escalade", 0, "Upper déjà fait aujourd'hui — l'escalade ajoute du volume de tirage (coude).");
   } else {
-    let cScore = 10 + cap(dClimb) - (dClimb <= 1 ? 8 : 0) + (lowerToday ? 6 : 0);
+    let cScore = 10 + cap(dClimb) - (dClimb <= 1 ? climbPen : 0) + (lowerToday ? 6 : 0);
     let cReason = `${climb7}× cette semaine · dernière ${ago(dClimb)}. Compte comme volume tirage : à placer un jour Lower ou off.`;
+    if (dClimb <= 1 && climbLast) cReason += ` ${climbWhy}`;
     if (lowerToday) cReason += " Lower déjà fait aujourd'hui : bon jour pour l'escalade (pas de conflit coude).";
     // Pénalité plus lourde que sur Upper : à volume égal, l'escalade est la sollicitation
     // la plus intense du tendon distal du biceps (prises fermées, à-coups, blocages).
@@ -1789,6 +1805,98 @@ function ProgressScreen({ training, onBack }) {
   );
 }
 
+/* ============================================================
+   SAISIE DES BLOCS D'ESCALADE (V5)
+   Doit rester rapide au doigt EN SALLE : une grille de cotations à taper, jamais un champ
+   texte libre, et un moyen d'ajouter plusieurs blocs de même cotation d'un coup.
+   ============================================================ */
+function BlocsField({ blocs, setBlocs }) {
+  // Issue « armée » : on choisit une fois, puis on tape les cotations. Défaut « après
+  // essais », le cas le plus fréquent — flash et échec sont les exceptions.
+  const [issue, setIssue] = useState("essais");
+
+  const add = (cotation, n = 1) => setBlocs([...blocs, ...Array.from({ length: n }, () => ({ cotation, issue }))]);
+  // Retire UN bloc de ce couple (cotation, issue) — le dernier ajouté.
+  const rm = (cotation, iss) => {
+    const i = blocs.map((b) => b.cotation === cotation && b.issue === iss).lastIndexOf(true);
+    if (i >= 0) setBlocs(blocs.filter((_, j) => j !== i));
+  };
+
+  // Récapitulatif groupé par (cotation, issue), trié par difficulté croissante : c'est la
+  // lecture utile en fin de séance, pas la liste chronologique des 20 blocs.
+  const groupes = [];
+  blocs.forEach((b) => {
+    const g = groupes.find((x) => x.cotation === b.cotation && x.issue === b.issue);
+    if (g) g.n += 1; else groupes.push({ cotation: b.cotation, issue: b.issue, n: 1 });
+  });
+  groupes.sort((a, b) => gradeIndex(a.cotation) - gradeIndex(b.cotation)
+    || ISSUES.findIndex((x) => x.key === a.issue) - ISSUES.findIndex((x) => x.key === b.issue));
+
+  const s = climbSummary(blocs);
+  // Compte par cotation, toutes issues confondues : affiché dans la grille pour savoir où
+  // on en est sans lire le récapitulatif.
+  const parCotation = {};
+  blocs.forEach((b) => { parCotation[b.cotation] = (parCotation[b.cotation] || 0) + 1; });
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <Label style={{ marginBottom: 6 }}>Blocs · issue à enregistrer</Label>
+      <Pills options={ISSUES.map((i) => ({ key: i.key, label: i.label }))} value={issue} onChange={setIssue} small />
+
+      <Label style={{ margin: "10px 0 6px" }}>Taper une cotation pour l'ajouter</Label>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 5 }}>
+        {FONT_GRADES.map((c) => {
+          const n = parCotation[c] || 0;
+          return (
+            <button key={c} onClick={() => add(c)} style={{
+              padding: "8px 2px", borderRadius: 6, cursor: "pointer", fontFamily: C.mono,
+              fontSize: 11.5, fontWeight: 800, position: "relative",
+              background: n ? C.accentRow : C.card, color: n ? C.accent : C.muted,
+              border: `1.5px solid ${n ? C.accent : C.border}`,
+            }}>
+              {c}{n > 0 && <span style={{ fontSize: 9, marginLeft: 2 }}>×{n}</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {groupes.length > 0 && (
+        <div style={{ marginTop: 10 }}>
+          {groupes.map((g) => (
+            <div key={`${g.cotation}-${g.issue}`} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "6px 0", borderTop: `1px solid ${C.divider}`,
+            }}>
+              <span style={{ fontFamily: C.mono, fontSize: 12, color: C.text, fontWeight: 700 }}>
+                {g.cotation}
+                <span style={{ color: g.issue === "echec" ? C.danger : C.muted, fontWeight: 400, marginLeft: 8, fontFamily: "inherit" }}>
+                  {ISSUES.find((i) => i.key === g.issue)?.label}
+                </span>
+              </span>
+              {/* −/+ collés : ajuster une quantité d'un pouce, sans repasser par la grille */}
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <button onClick={() => rm(g.cotation, g.issue)} style={blocStep}>−</button>
+                <span style={{ fontFamily: C.mono, fontSize: 13, fontWeight: 800, color: C.accent, minWidth: 16, textAlign: "center" }}>{g.n}</span>
+                <button onClick={() => setBlocs([...blocs, { cotation: g.cotation, issue: g.issue }])} style={blocStep}>+</button>
+              </span>
+            </div>
+          ))}
+          <div style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono, marginTop: 8 }}>
+            {s.n} bloc{s.n > 1 ? "s" : ""}
+            {s.max ? ` · max ${s.max} · médiane ${s.mediane}` : " · aucun réussi"}
+            {` · ${s.flash} flash / ${s.essais} essais / ${s.echec} échec${s.echec > 1 ? "s" : ""}`}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+const blocStep = {
+  width: 28, height: 28, borderRadius: 6, background: C.card, color: C.accent,
+  border: `1.5px solid ${C.border}`, cursor: "pointer", fontSize: 15, fontWeight: 800,
+  fontFamily: "inherit", lineHeight: 1,
+};
+
 function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow }) {
   const [open, setOpen] = useState(null);
   const [progress, setProgress] = useState(false);
@@ -1796,6 +1904,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow }) {
   const [startTime, setStartTime] = useState(() => new Date().toTimeString().slice(0, 5));
   const [duration, setDuration] = useState(60);
   const [rpe, setRpe] = useState(7);
+  const [blocs, setBlocs] = useState([]);
   // Séance déjà enregistrée en cours de modification (référence exacte de l'objet
   // dans `training`) — null quand on démarre une nouvelle séance à blanc.
   const [editing, setEditing] = useState(null);
@@ -1807,6 +1916,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow }) {
     setStartTime(new Date().toTimeString().slice(0, 5));
     setDuration(60);
     setRpe(7);
+    setBlocs([]);
     setOpen(sel ? null : type);
   };
 
@@ -1816,11 +1926,15 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow }) {
     setStartTime(t.start ?? new Date().toTimeString().slice(0, 5));
     setDuration(t.duration ?? 60);
     setRpe(t.rpe ?? 7);
+    setBlocs(t.blocs ?? []);
     setOpen(t.type);
   };
 
   const logSession = (type) => {
-    const rec = { id: editing?.id ?? `${date}-${type}-${Date.now()}`, date, type, start: startTime, duration: round(duration), rpe };
+    const rec = { id: editing?.id ?? `${date}-${type}-${Date.now()}`, date, type, start: startTime, duration: round(duration), rpe,
+      // Champ omis quand il n'y a rien à dire : une séance sans blocs saisis reste
+      // exactement la même entrée qu'avant V5 (et le recommandeur le voit).
+      ...(type === "Escalade" && blocs.length ? { blocs } : {}) };
     save.training((editing ? training.map((x) => (x === editing ? rec : x)) : [...training, rec]).sort(byDate));
     setOpen(null); setEditing(null);
   };
@@ -1889,6 +2003,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow }) {
             <Field label="Durée (min)"><Stepper value={duration} set={setDuration} step={5} min={0} int /></Field>
           </div>
           <Field label="RPE"><Stepper value={rpe} set={setRpe} step={1} min={1} max={10} int /></Field>
+          {open === "Escalade" && <BlocsField blocs={blocs} setBlocs={setBlocs} />}
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <Btn variant="primary" onClick={() => logSession(open)} style={{ flex: 1 }}>
               <CheckCircle2 size={14} style={{ display: "inline", marginRight: 4 }} />{editing ? "Enregistrer les modifications" : "Enregistrer"}
@@ -1944,7 +2059,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow }) {
               <span style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono }}>
                 {t.exercices
                   ? `${t.exercices.length} exos · ${t.exercices.reduce((a, e) => a + (e.series?.length || 0), 0)} séries`
-                  : `${t.duration != null ? t.duration + "′" : ""}${t.rpe != null ? ` · RPE ${t.rpe}` : ""}`}
+                  : `${t.duration != null ? t.duration + "′" : ""}${t.rpe != null ? ` · RPE ${t.rpe}` : ""}${climbLabel(t.blocs) ? ` · ${climbLabel(t.blocs)}` : ""}`}
               </span>
               <button onClick={(ev) => { ev.stopPropagation(); save.training(training.filter((x) => x !== t)); }}
                 style={{ background: "none", border: "none", cursor: "pointer", color: C.dim, padding: 0 }}>
@@ -2901,8 +3016,12 @@ export default function App({ silent = false } = {}) {
       const exoProgressData = exoProgress(last14(training));
 
       // Séances non-muscu : durée et RPE suffisent, il n'y a pas de séries à analyser.
+      // Sauf l'escalade depuis V5 : on remonte le RÉSUMÉ des blocs (nombre, cotation max et
+      // médiane, réussite), jamais la liste brute — sur une séance de 20 blocs elle
+      // coûterait des tokens pour un signal que le JS calcule exactement.
       const autresSeances = last14(training).filter((s) => !s.exercices)
-        .map((s) => ({ d: s.date.slice(5), t: s.type, ...(s.duration != null ? { min: s.duration } : {}), ...(s.rpe != null ? { rpe: s.rpe } : {}) }));
+        .map((s) => ({ d: s.date.slice(5), t: s.type, ...(s.duration != null ? { min: s.duration } : {}), ...(s.rpe != null ? { rpe: s.rpe } : {}),
+          ...(climbSummary(s.blocs) ? { blocs: climbSummary(s.blocs) } : {}) }));
 
       // --- temps réel : hier vs aujourd'hui, avec deltas explicites ---
       const findDay = (arr, d) => arr.find((e) => e.date === d);
@@ -3033,7 +3152,7 @@ ${JSON.stringify(merged)}
 
 PROGRESSION PAR EXERCICE (14 j) — déjà calculée, ne refais pas l'arithmétique. "series_max" = meilleure série de chaque séance au format "MM-JJ poidsXreps" (ou "MM-JJ Ns" pour les exercices en gainage, mesurés en secondes) ; "tendance" compare le volume (charge × reps, ou les secondes en gainage) de la dernière séance à la précédente :
 ${JSON.stringify(exoProgressData)}
-${autresSeances.length ? `Séances sans séries (basket/escalade) : ${JSON.stringify(autresSeances)}` : ""}
+${autresSeances.length ? `Séances sans séries (basket/escalade) : ${JSON.stringify(autresSeances)}\nPour l'escalade, "blocs" résume la séance : n=nombre de blocs (le proxy de charge sur le tendon du coude), max/mediane=cotations Fontainebleau réussies, max_tente=le plus dur essayé, puis la répartition flash/essais/echec.` : ""}
 ${notesTxt ? `\nNOTES DE CONTEXTE écrites par Yoann (14 j, ex. alcool, insomnie, petite blessure) — à prendre en compte activement dans l'analyse :\n${notesTxt}\n` : ""}
 ${(journal || "").trim() ? `CARNET DE BORD — état que TU as écrit à la fin de ta dernière analyse. C'est ta mémoire : appuie-toi dessus pour enchaîner (a-t-il appliqué ce que tu avais demandé ? où en est la progression ?) au lieu de repartir de zéro.\n${journal.trim()}\n` : "CARNET DE BORD : vide, c'est ta première analyse. Tu le créeras en fin de réponse.\n"}
 Structure ta réponse en deux temps :

@@ -931,6 +931,54 @@ n'est pas une donnée à stocker mais une lecture de l'historique.
   jour d'un genou hors base ; carnet sans aucune étoile ni référence avec un
   coude à 7/10 le jour même, malgré une série qui bat largement le record).
 
+### V5 — Escalade : suivi des blocs (03/08/2026, v3.46.0)
+
+L'escalade était la séance la moins documentée (durée + RPE) alors que c'est
+celle qui charge le tendon du coude — et le recommandeur lui appliquait une
+pénalité **forfaitaire** : une heure tranquille et une grosse session de blocs
+comptaient pareil.
+
+- **Périmètre : bloc uniquement**, échelle Fontainebleau. Pas de sélecteur
+  bloc/voie, pas d'échelle de voie — ne pas réintroduire la notion de « voie »
+  sans demande explicite.
+- **`src/climbing.js`** (module pur, testable en Node) : `FONT_GRADES` (22
+  cotations ordonnées — indispensable, `"6C+" > "6B"` est faux en comparaison de
+  texte), `climbSummary`, `climbLabel`, `climbLoad`.
+- **AUCUNE nouvelle clé localStorage** : les blocs vivent dans l'entrée de séance
+  existante (`blocs: [{ cotation, issue }]`, `issue` ∈ flash/essais/echec), à
+  côté de `duration` et `rpe`, exactement comme `exercices` pour la muscu. Le
+  champ est **omis** quand aucun bloc n'est saisi — une séance sans blocs reste
+  bit pour bit ce qu'elle était avant V5.
+- **Métriques dérivées, jamais stockées** : volume (nb de blocs), intensité
+  (cotation max et **médiane**), réussite (flash/essais/échec). Choix explicites :
+  les échecs comptent dans le **volume** (ils chargent le tendon autant, sinon
+  plus) mais pas dans l'intensité réussie — d'où `max`/`mediane` sur les blocs
+  réussis et `max_tente` à part. La médiane d'un nombre pair prend l'élément
+  inférieur du milieu : « 6A½ » n'existe pas, la valeur affichée doit rester une
+  vraie cotation.
+- **Saisie pensée pour la salle** (`BlocsField`) : une issue « armée » en haut
+  (défaut « après essais », le cas fréquent), puis une grille de 22 cotations à
+  taper — chaque tap ajoute un bloc et la case affiche son compteur. Récap groupé
+  par (cotation, issue) avec des boutons **−/+** pour ajuster une quantité d'un
+  pouce, c'est le « plusieurs blocs d'un coup » demandé. Jamais de champ texte
+  libre.
+- **Le vrai bénéfice — recommandeur** : `climbLoad` classe la dernière séance en
+  légère (≤ 8 blocs) / normale / grosse (≥ 18) et **module la pénalité** sur
+  Upper et Escalade (4 / 8 / 14 au lieu du forfait 8), avec une raison chiffrée
+  (« Escalade hier : 22 blocs (max 6C) — grosse session, tirage lourd sur le
+  coude »). **Mesuré dans l'aperçu, même situation par ailleurs** : Upper 47
+  (session légère) vs 43 (séance sans blocs, comportement d'origine) vs 37
+  (grosse session, où Lower passe devant). Croisé avec la douleur de coude réelle
+  (V1), c'est la première fois que la charge de tirage est évaluée sur des faits.
+- **Pas de charge supposée quand la donnée manque** : `climbLoad` renvoie `null`
+  si la séance n'a pas de blocs (tout l'historique d'avant V5), et le
+  comportement forfaitaire d'origine s'applique alors tel quel — vérifié.
+- **Coach IA** : `autresSeances` porte le **résumé** (`blocs: {n, max, mediane,
+  max_tente, flash, essais, echec}`) avec sa légende, jamais la liste brute —
+  sur une séance de 20 blocs elle coûterait des tokens pour un signal que le JS
+  calcule exactement.
+- « Dernières séances » affiche « 60′ · RPE 7 · 5 blocs · 6C max ».
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
