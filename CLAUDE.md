@@ -3,6 +3,20 @@
 Ce fichier est lu automatiquement à chaque session Claude Code. Il remplace
 le besoin de recoller le contexte à chaque fois.
 
+## Travaux planifiés → `ROADMAP.md`
+
+Les chantiers **à venir** sont décrits dans `ROADMAP.md` à la racine du dépôt
+(étapes V1 à V7 : douleurs coude/genou, sauvegarde externe, progression par
+exercice, records, escalade/bloc, correction d'aliment, TDEE adaptatif). Ce
+fichier-ci ne décrit que ce qui est **déjà livré**.
+
+`ROADMAP.md` n'est PAS chargé automatiquement : quand Yoann dit « GO V1 » (ou
+demande n'importe quelle étape V), **le lire d'abord**, puis suivre l'étape telle
+qu'elle y est spécifiée. Il contient pour chaque étape les décisions déjà prises,
+les pièges identifiés et les tests attendus — ne pas les rouvrir sans raison.
+À la fin d'une étape : cocher son état dans le tableau de `ROADMAP.md`, et
+documenter le livré ici, dans CLAUDE.md.
+
 ## Qui je suis (Yoann)
 
 43 ans, athlète (musculation / basket / escalade), en phase de sèche.
