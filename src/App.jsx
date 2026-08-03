@@ -13,6 +13,7 @@ import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
 import { store, getSync, exportData, importData } from "./store.js";
 import { isBackupStale, daysSinceBackup, scheduleBackupReminder } from "./cloudBackup.js";
+import { exoProgress, exerciseList, exerciseSessions, exerciseTrend, isTimeMode, setLabel } from "./training.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 import { updateDashboardWidget } from "./widgetSync.js";
@@ -31,7 +32,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor } from "./nutrition/foodStore.js";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.43.0";
+const APP_VERSION = "3.44.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -1647,8 +1648,111 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
 /* ============================================================
    TAB — SÉANCES
    ============================================================ */
+/* ============================================================
+   ÉCRAN — PROGRESSION PAR EXERCICE (V3)
+   `exoProgress` était calculé pour le Coach IA et n'apparaissait nulle part à l'écran :
+   l'app avait des courbes pour le poids, le sommeil, les pas, la douleur et les calories,
+   mais aucune pour l'entraînement, qui est pourtant son cœur.
+   ============================================================ */
+const trendColor = (key) => (key === "up" ? C.accent : key === "down" ? C.danger : C.muted);
+
+function ExerciseDetail({ training, nom, onBack }) {
+  const sessions = useMemo(() => exerciseSessions(training, nom), [training, nom]);
+  const mode = sessions[sessions.length - 1]?.mode;
+  const temps = isTimeMode(mode);
+  const trend = exerciseTrend(sessions);
+  // Grandeur tracée : les secondes en gainage, le volume (charge × reps) sinon — voir
+  // `setScore`. Pas de 1RM estimé, décision explicite (tendinopathie en rééducation).
+  const data = sessions.map((s) => ({ date: fmt(s.date), v: s.score, label: setLabel(s.best, s.mode) }));
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <ScreenHeader title={nom} subtitle={`${sessions.length} séance${sessions.length > 1 ? "s" : ""} · ${temps ? "tenue la plus longue" : "meilleure série"}`}
+        right={<Btn variant="ghost" onClick={onBack}><X size={16} /></Btn>} />
+
+      <Card>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+          <Label>{temps ? "Tenue · secondes" : "Volume · charge × reps"}</Label>
+          <span style={{ fontSize: 11, fontFamily: C.mono, fontWeight: 800, color: trendColor(trend.key) }}>{trend.label}</span>
+        </div>
+        {data.length > 1 ? (
+          <div style={{ height: 150 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data} margin={{ top: 4, right: 6, left: -18, bottom: 0 }}>
+                <CartesianGrid stroke={C.divider} vertical={false} />
+                <XAxis dataKey="date" tick={chartAxis} interval="preserveEnd" />
+                <YAxis tick={chartAxis} />
+                {/* Le tooltip montre la série lisible (« 60 kg × 8 »), pas le volume brut :
+                    c'est le chiffre qu'on reconnaît, le volume n'est qu'une échelle. */}
+                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle}
+                  formatter={(v, n, item) => [item.payload.label, temps ? "tenue" : "meilleure série"]} />
+                <Line type="monotone" dataKey="v" stroke={C.accent} strokeWidth={2.5} dot={{ r: 3, fill: C.text }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : <Empty>Une seule séance — la courbe apparaîtra à la deuxième.</Empty>}
+      </Card>
+
+      <Card style={{ padding: "6px 14px" }}>
+        <Label style={{ padding: "10px 0 6px", letterSpacing: 1.5 }}>Séance par séance</Label>
+        {sessions.slice().reverse().map((s, i) => (
+          <div key={i} style={{ padding: "9px 0", borderTop: `1px solid ${C.divider}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <span style={{ fontSize: 12, color: C.text, fontWeight: 700, fontFamily: C.mono }}>{fmt(s.date)}</span>
+              <span style={{ fontSize: 12, color: C.accent, fontWeight: 800, fontFamily: C.mono }}>{setLabel(s.best, s.mode)}</span>
+            </div>
+            <div style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono, marginTop: 3 }}>
+              {s.series.map((x, j) => (
+                <span key={j}>{j > 0 ? " · " : ""}{isTimeMode(s.mode) ? `${x.val}s` : `${x.poids}×${x.val}`}{x.leg ? ` ${x.leg}` : ""}</span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </Card>
+    </div>
+  );
+}
+
+function ProgressScreen({ training, onBack }) {
+  const [sel, setSel] = useState(null);
+  const list = useMemo(() => exerciseList(training), [training]);
+  if (sel) return <ExerciseDetail training={training} nom={sel} onBack={() => setSel(null)} />;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <ScreenHeader title="Progression" subtitle="par exercice · meilleure série de chaque séance"
+        right={<Btn variant="ghost" onClick={onBack}><X size={16} /></Btn>} />
+      <Card style={{ padding: "6px 14px" }}>
+        {list.length ? list.map((e) => {
+          // Tendance calculée par exercice : c'est l'information qu'on vient chercher, la
+          // liste seule ne dirait pas si ça monte ou si ça stagne.
+          const t = exerciseTrend(exerciseSessions(training, e.nom));
+          return (
+            <div key={e.nom} onClick={() => setSel(e.nom)} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "11px 0", borderTop: `1px solid ${C.divider}`, cursor: "pointer", gap: 10,
+            }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, color: C.text, fontWeight: 700 }}>{e.nom}</div>
+                <div style={{ fontSize: 10, color: C.muted, fontFamily: C.mono, marginTop: 2 }}>
+                  {e.count} séance{e.count > 1 ? "s" : ""} · dernière {fmt(e.last)}
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                <span style={{ fontSize: 10, fontFamily: C.mono, fontWeight: 800, color: trendColor(t.key) }}>{t.label}</span>
+                <ChevronRight size={13} color={C.dim} />
+              </div>
+            </div>
+          );
+        }) : <Empty>Aucun exercice enregistré pour l'instant — valide une séance de muscu et il apparaîtra ici.</Empty>}
+      </Card>
+    </div>
+  );
+}
+
 function TrainTab({ training, save, hsrWeek, setHsrWeek }) {
   const [open, setOpen] = useState(null);
+  const [progress, setProgress] = useState(false);
   const [date, setDate] = useState(today());
   const [startTime, setStartTime] = useState(() => new Date().toTimeString().slice(0, 5));
   const [duration, setDuration] = useState(60);
@@ -1688,6 +1792,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek }) {
 
   const vol = {};
   training.filter((t) => daysBetween(t.date, today()) <= 14).forEach((t) => { vol[t.type] = (vol[t.type] || 0) + 1; });
+  const exoCount = useMemo(() => exerciseList(training).length, [training]);
 
   if (open && TEMPLATES[open]?.kind === "muscu") {
     return (
@@ -1695,6 +1800,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek }) {
         onSave={saveMuscu} onCancel={() => { setOpen(null); setEditing(null); }} initial={editing} />
     );
   }
+  if (progress) return <ProgressScreen training={training} onBack={() => setProgress(false)} />;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1748,6 +1854,19 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek }) {
           </div>
         </Card>
       )}
+
+      {/* Progression par exercice */}
+      <Card accentLeft onClick={() => setProgress(true)} style={{ padding: "13px 14px", cursor: "pointer" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <Label style={{ letterSpacing: 1.5 }}>Progression par exercice</Label>
+            <Body style={{ marginTop: 3 }}>
+              {exoCount ? `${exoCount} exercice${exoCount > 1 ? "s" : ""} suivi${exoCount > 1 ? "s" : ""} · courbe et tendance` : "Aucune séance de muscu enregistrée pour l'instant."}
+            </Body>
+          </div>
+          <ChevronRight size={15} color={C.accent} />
+        </div>
+      </Card>
 
       {/* Semaine HSR */}
       <Card>
@@ -2717,39 +2836,15 @@ export default function App({ silent = false } = {}) {
       // produire le sien indépendamment (les deux pouvaient se contredire avant ce couplage).
       const reco = recommendSessions({ training, knee, elbow, sleep, targets });
 
-      // --- progression par exercice, calculée ici plutôt qu'envoyée en brut ---
+      // --- progression par exercice, calculée plutôt qu'envoyée en brut ---
       // Le dump des séries brutes sur 14 jours était le plus gros poste du prompt (mesuré :
       // il pesait pour l'essentiel des 7 457 tokens d'entrée) pour le signal le plus faible —
       // on demandait au modèle de faire de l'arithmétique dans une réponse de 500 mots, ce
       // qu'il survolait forcément. Le JS sait le faire exactement et gratuitement : on
       // n'envoie plus que la meilleure série par séance et la tendance qui en découle.
-      const bestSet = (ex) => {
-        const done = (ex.series || []).filter((s) => s.fait && (+s.poids > 0 || +s.val > 0));
-        if (!done.length) return null;
-        // « meilleure » = charge la plus lourde, puis le plus de reps à charge égale.
-        const b = done.reduce((a, s) => (+s.poids > +a.poids || (+s.poids === +a.poids && +s.val > +a.val) ? s : a), done[0]);
-        return { poids: +b.poids || 0, val: +b.val || 0 };
-      };
-      const exoProgress = (() => {
-        const byExo = {};
-        last14(training).filter((s) => s.exercices).forEach((s) => {
-          s.exercices.forEach((e) => {
-            const b = bestSet(e);
-            if (!b) return;
-            (byExo[e.nom] ||= []).push({ d: s.date, ...b });
-          });
-        });
-        return Object.entries(byExo).map(([nom, hist]) => {
-          const h = hist.slice(-3); // 3 dernières séances suffisent pour lire une tendance
-          const last = h[h.length - 1], prev = h.length > 1 ? h[h.length - 2] : null;
-          // Volume = charge × reps : capte une progression même quand le poids ne bouge pas.
-          const vol = (x) => x.poids * x.val;
-          const tendance = !prev ? "1re fois"
-            : vol(last) > vol(prev) ? "hausse"
-            : vol(last) < vol(prev) ? "baisse" : "stable";
-          return { exo: nom, series_max: h.map((x) => `${x.d.slice(5)} ${x.poids}x${x.val}`), tendance };
-        });
-      })();
+      // Le calcul vit dans `src/training.js` depuis V3 : l'écran de progression lit
+      // exactement les mêmes fonctions, sur tout l'historique au lieu de 14 jours.
+      const exoProgressData = exoProgress(last14(training));
 
       // Séances non-muscu : durée et RPE suffisent, il n'y a pas de séries à analyser.
       const autresSeances = last14(training).filter((s) => !s.exercices)
@@ -2882,8 +2977,8 @@ ${JSON.stringify(summary)}
 JOUR PAR JOUR — pour corréler apports et variations de poids (rétention d'eau via sodium/glucides vs vraie perte de masse grasse). Clés : d=date, p=poids, kc=kcal, P/G/L=protéines/glucides/lipides, F=fibres, eau=ml, pas, cible_kc=cible kcal du jour. Un champ absent = pas de donnée ce jour-là :
 ${JSON.stringify(merged)}
 
-PROGRESSION PAR EXERCICE (14 j) — déjà calculée, ne refais pas l'arithmétique. "series_max" = meilleure série de chaque séance au format "MM-JJ poidsXreps" ; "tendance" compare le volume (charge × reps) de la dernière séance à la précédente :
-${JSON.stringify(exoProgress)}
+PROGRESSION PAR EXERCICE (14 j) — déjà calculée, ne refais pas l'arithmétique. "series_max" = meilleure série de chaque séance au format "MM-JJ poidsXreps" (ou "MM-JJ Ns" pour les exercices en gainage, mesurés en secondes) ; "tendance" compare le volume (charge × reps, ou les secondes en gainage) de la dernière séance à la précédente :
+${JSON.stringify(exoProgressData)}
 ${autresSeances.length ? `Séances sans séries (basket/escalade) : ${JSON.stringify(autresSeances)}` : ""}
 ${notesTxt ? `\nNOTES DE CONTEXTE écrites par Yoann (14 j, ex. alcool, insomnie, petite blessure) — à prendre en compte activement dans l'analyse :\n${notesTxt}\n` : ""}
 ${(journal || "").trim() ? `CARNET DE BORD — état que TU as écrit à la fin de ta dernière analyse. C'est ta mémoire : appuie-toi dessus pour enchaîner (a-t-il appliqué ce que tu avais demandé ? où en est la progression ?) au lieu de repartir de zéro.\n${journal.trim()}\n` : "CARNET DE BORD : vide, c'est ta première analyse. Tu le créeras en fin de réponse.\n"}

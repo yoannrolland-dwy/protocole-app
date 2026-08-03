@@ -10,7 +10,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 |---|---|---|---|
 | V1 | Douleurs : harmoniser coude et genou | moyen | ✅ 03/08/2026 (v3.42.0) |
 | V2 | Sauvegarde régulière hors du téléphone | petit | ✅ 03/08/2026 (v3.43.0) |
-| V3 | Progression visible par exercice | moyen | à faire |
+| V3 | Progression visible par exercice | moyen | ✅ 03/08/2026 (v3.44.0) |
 | V4 | Détection de record sur une série | petit | à faire |
 | V5 | Escalade : suivi des blocs | moyen | à faire |
 | V6 | Corriger les valeurs d'un aliment | petit | à faire |

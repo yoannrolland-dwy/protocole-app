@@ -847,6 +847,47 @@ ce point unique de défaillance, sans backend et sans OAuth (les deux écartés 
   réactivé côté Android, et de toute façon **jamais** comme la sauvegarde
   principale.
 
+### V3 — Progression visible par exercice (03/08/2026, v3.44.0)
+
+`exoProgress` était calculé pour le Coach IA et n'apparaissait **nulle part à
+l'écran** : l'app avait des courbes pour le poids, le sommeil, les pas, la
+douleur et les calories, mais aucune pour l'entraînement, qui est son cœur.
+
+- **Nouveau module `src/training.js`**, sans aucune dépendance React/`ui.jsx`
+  (donc testable seul en Node) : `bestSet`, `exoProgress`, `exerciseList`,
+  `exerciseSessions`, `exerciseTrend`, `setScore`, `setLabel`, `isTimeMode`.
+- **Fenêtre passée par l'appelant, pas en paramètre** : les fonctions reçoivent
+  une liste de séances **déjà filtrée** (Coach IA : `last14(training)` ; écran :
+  tout l'historique). Impossible de se tromper de périmètre, et les fonctions
+  restent pures.
+- **Non-régression vérifiée par diff**, pas à l'œil : un script a comparé la
+  sortie de l'ancienne closure de `buildPrompt` (copiée verbatim) à celle du
+  module extrait, sur un jeu de séances synthétique couvrant 4 séances d'un même
+  exercice (donc `slice(-3)`), un exo par jambe, un exo sans série cochée et une
+  séance non-muscu. **Sortie identique au caractère près pour les exercices en
+  reps.**
+- **Bug trouvé par ce test et corrigé — le seul écart volontaire au prompt** :
+  en mode « temps » (gainage), le volume `charge × reps` valait toujours 0 (la
+  charge est nulle), donc **TOUS les exercices de gainage étaient annoncés
+  « stable » au coach**, y compris une planche passée de 60 s à 55 s. Ils sont
+  désormais comparés en **secondes**, et affichés `60s` au lieu de `0x60` (que le
+  modèle pouvait lire comme une charge nulle). Sans cette correction, l'écran
+  aurait dit « baisse » là où le coach disait « stable » — deux vérités pour le
+  même historique.
+- **Écran « Progression par exercice »** : carte d'entrée dans l'onglet Séances →
+  liste des exercices déjà réalisés (le plus récent en tête, avec tendance) →
+  détail (courbe + toutes les séries séance par séance, jambe G/D comprise).
+- **Ce qui est tracé : le volume de la meilleure série** (charge × reps), ou les
+  **secondes** en mode temps. Le tooltip montre la série lisible (« 60 kg × 8 »,
+  « 60 s »), pas le volume brut. **Pas de 1RM estimé, volontairement** : les
+  formules type Epley n'ont aucun sens sur un protocole HSR à tempo 6 s et
+  amplitude 10-60°, et pousser un 1RM sur un tendon en rééducation est
+  contre-indiqué — ne pas ajouter sans demande explicite.
+- **Un exercice ouvert mais sans série cochée n'existe pas** pour cet écran (ni
+  dans la liste, ni dans le compteur) : ce n'est pas une performance à zéro,
+  c'est une absence de performance. Une seule séance → message dédié au lieu
+  d'une courbe à un point.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
