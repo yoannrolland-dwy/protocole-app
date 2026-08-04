@@ -17,7 +17,8 @@ import { Capacitor } from "@capacitor/core";
 import { C, Btn, Label, Body, Empty, Stepper, TextInput, inputStyle } from "../ui.jsx";
 import { searchCiqual, normalize } from "./ciqual.js";
 import { searchOFF, getOFFByBarcode } from "./off.js";
-import { suggestions, searchBoost, MACROS, newQuickRef, portionsFor, compileRecipe, recipeAsFood, isRecipeRef } from "./foodStore.js";
+import { suggestions, searchBoost, MACROS, newQuickRef, portionsFor, compileRecipe, recipeAsFood, isRecipeRef,
+         applyOverride } from "./foodStore.js";
 import { scanBarcode } from "./scan.js";
 
 const OFF_DEBOUNCE_MS = 700;
@@ -295,11 +296,19 @@ function RecipeBuilder({ onSave, onBack }) {
 // Portions nommées (M4) : "1 pot = 125 g" plutôt que retaper les grammes à chaque fois.
 // Rangées par `ref` dans foodStore (foodPortions), donc apprises une fois pour toutes
 // les saisies futures de cet aliment précis.
-function QtyPanel({ food, initialQ, portions, onSavePortion, onRemovePortion, onAdd, onBack }) {
+function QtyPanel({ food, initialQ, portions, onSavePortion, onRemovePortion, onAdd, onBack,
+                    override, onSaveOverride, onClearOverride }) {
   const [q, setQ] = useState(initialQ ?? 100);
   const [addingPortion, setAddingPortion] = useState(false);
   const [portionLabel, setPortionLabel] = useState("");
+  const [fixing, setFixing] = useState(false);
   const k = q / 100;
+  // Valeurs AFFICHÉES = snapshot + corrections. `food.per100` n'est jamais modifié : c'est
+  // lui qui part dans `onAdd`, donc une nouvelle ligne stocke toujours la valeur d'origine
+  // et la correction reste une couche réversible, y compris sur les saisies futures.
+  const shown = applyOverride(food.per100, override);
+  const isFixed = (m) => override && override[m] !== undefined && override[m] !== null;
+  const anyFixed = MACROS.some(isFixed);
   // `int` pour les calories : cohérent avec amounts() dans foodStore, où une décimale de
   // kcal a été jugée trompeuse.
   const amount = (v, int = false) =>
@@ -375,34 +384,106 @@ function QtyPanel({ food, initialQ, portions, onSavePortion, onRemovePortion, on
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
           <Label>Apport</Label>
           <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-            <span style={{ fontFamily: C.mono, fontSize: 26, fontWeight: 800, color: C.accent }}>{amount(food.per100.kcal, true)}</span>
-            <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>kcal</span>
+            <span style={{ fontFamily: C.mono, fontSize: 26, fontWeight: 800, color: C.accent }}>{amount(shown.kcal, true)}</span>
+            <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>kcal{isFixed("kcal") ? "*" : ""}</span>
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
           {["prot", "gluc", "lip", "fib"].map((m) => (
             <div key={m} style={{ textAlign: "center" }}>
-              <div style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 800, color: C.text }}>{amount(food.per100[m])}</div>
+              {/* Marqueur discret : une valeur corrigée passe en accent et porte un *.
+                  Une correction ne doit jamais être invisible. */}
+              <div style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 800, color: isFixed(m) ? C.accent : C.text }}>
+                {amount(shown[m])}{isFixed(m) ? "*" : ""}
+              </div>
               <div style={{ fontSize: 8.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.8, marginTop: 2 }}>{MACRO_LABEL[m]}</div>
             </div>
           ))}
         </div>
-        {MACROS.some((m) => food.per100[m] === null || food.per100[m] === undefined) && (
+        {MACROS.some((m) => shown[m] === null || shown[m] === undefined) && (
           <Body style={{ fontSize: 10, color: C.dim, marginTop: 9 }}>
-            Certaines valeurs sont absentes {isRecipeRef(food.ref) ? "d'un des ingrédients de cette recette" : food.ref.startsWith("off:") ? "de la fiche Open Food Facts" : "de la table CIQUAL"} et ne seront pas comptées.
+            Certaines valeurs sont absentes {isRecipeRef(food.ref) ? "d'un des ingrédients de cette recette" : food.ref.startsWith("off:") ? "de la fiche Open Food Facts" : "de la table CIQUAL"} et ne seront pas comptées. Tu peux les corriger ci-dessous.
+          </Body>
+        )}
+        {anyFixed && (
+          <Body style={{ fontSize: 10, color: C.accent, marginTop: 9 }}>
+            * valeur corrigée par toi — appliquée à cet aliment partout, y compris dans les repas déjà enregistrés.
           </Body>
         )}
       </div>
+
+      {onSaveOverride && (fixing ? (
+        <OverridePanel food={food} shown={shown} override={override}
+          onSave={(patch) => { onSaveOverride(food.ref, patch); setFixing(false); }}
+          onClear={() => { onClearOverride(food.ref); setFixing(false); }}
+          onCancel={() => setFixing(false)} />
+      ) : (
+        <button onClick={() => setFixing(true)} style={{
+          background: "none", border: "none", cursor: "pointer", padding: 0,
+          fontSize: 11, color: C.muted, textDecoration: "underline", textAlign: "left",
+        }}>Corriger les valeurs de cet aliment{anyFixed ? " (déjà corrigé)" : ""}</button>
+      ))}
 
       <Btn variant="primary" onClick={() => onAdd(food, q)}>Ajouter</Btn>
     </div>
   );
 }
 
+/**
+ * Éditeur de correction (V6). Toujours exprimé POUR 100 g, comme les tables source — c'est
+ * ce qui est écrit sur l'emballage, et ça évite d'avoir à re-convertir selon la quantité
+ * affichée juste au-dessus.
+ * Un champ laissé vide = pas de correction sur cette macro : la valeur d'origine reprend
+ * la main. C'est ce qui rend la correction réversible macro par macro.
+ */
+function OverridePanel({ food, shown, override, onSave, onClear, onCancel }) {
+  const init = {};
+  for (const m of MACROS) init[m] = override?.[m] ?? (shown[m] === null || shown[m] === undefined ? "" : String(shown[m]));
+  const [v, setV] = useState(init);
+  const set = (m, val) => setV((p) => ({ ...p, [m]: val.replace(",", ".") }));
+
+  return (
+    <div style={{ background: C.bg, border: `1.5px solid ${C.accent}`, borderRadius: 8, padding: 12 }}>
+      <Label style={{ marginBottom: 4 }}>Corriger · valeurs pour 100 g</Label>
+      <Body style={{ fontSize: 10, color: C.dim, marginBottom: 10 }}>
+        S'applique partout où cet aliment apparaît, y compris dans les repas déjà enregistrés.
+        Champ vide = on garde la valeur d'origine.
+      </Body>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6 }}>
+        {MACROS.map((m) => (
+          <div key={m}>
+            <div style={{ fontSize: 8.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 3, textAlign: "center" }}>
+              {m === "kcal" ? "kcal" : MACRO_LABEL[m]}
+            </div>
+            <input value={v[m]} onChange={(e) => set(m, e.target.value)} inputMode="decimal" placeholder="—"
+              style={{ ...inputStyle(false), padding: "7px 4px", fontSize: 12, textAlign: "center", width: "100%" }} />
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+        <Btn variant="primary" style={{ flex: 1 }} onClick={() => {
+          // On ne retient que ce qui DIFFÈRE réellement de la valeur d'origine : recopier
+          // la valeur de la table à l'identique ne doit pas créer une fausse « correction »
+          // (qui s'afficherait en accent et survivrait à une mise à jour de la table).
+          const patch = {};
+          for (const m of MACROS) {
+            const s = String(v[m]).trim();
+            patch[m] = s === "" || Number(s) === food.per100[m] ? null : Number(s);
+          }
+          onSave(patch);
+        }}>Enregistrer</Btn>
+        {override && <Btn variant="danger" onClick={onClear}>Tout annuler</Btn>}
+        <Btn variant="ghost" onClick={onCancel}>Fermer</Btn>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- feuille principale ---------- */
 export default function FoodSearch({
-  meal, mealLabel, date, log, pins, muted, portions, recipes,
+  meal, mealLabel, date, log, pins, muted, portions, recipes, overrides,
   onAdd, onTogglePin, onMute, onSavePortion, onRemovePortion, onCreateRecipe, onRemoveRecipe,
+  onSaveOverride, onClearOverride,
   onClose, startFree = false,
 }) {
   const [q, setQ] = useState("");
@@ -475,6 +556,7 @@ export default function FoodSearch({
         ) : sel ? (
           <QtyPanel food={sel} initialQ={sel.lastQ ?? sel.defaultQ}
             portions={portionsFor(portions, sel.ref)} onSavePortion={onSavePortion} onRemovePortion={onRemovePortion}
+            override={overrides?.[sel.ref]} onSaveOverride={onSaveOverride} onClearOverride={onClearOverride}
             onAdd={onAdd} onBack={() => setSel(null)} />
         ) : (
           <>

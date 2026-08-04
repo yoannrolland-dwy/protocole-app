@@ -994,12 +994,52 @@ comptaient pareil.
   calcule exactement.
 - « Dernières séances » affiche « 60′ · RPE 7 · 4 blocs · Rouge 1 max ».
 
+### V6 — Corriger les valeurs d'un aliment (03/08/2026, v3.48.0)
+
+Répond au `+?` : un produit Open Food Facts sans teneur en fibres affichait un
+total honnête mais définitivement incomplet, sans aucun moyen de le corriger.
+
+- **Nouvelle clé `foodOverrides`** (`{ [ref]: { kcal?, prot?, gluc?, lip?, fib? } }`,
+  partielle), ajoutée à `DATA_KEYS`. La perdre rendrait tout l'historique corrigé
+  silencieusement faux — elle est encore moins optionnelle que les autres.
+- **Rétroactif — confirmé explicitement par Yoann le 03/08/2026** (la roadmap
+  laissait la décision ouverte). Une correction s'applique **à la lecture**, donc
+  partout, y compris aux repas déjà enregistrés.
+- **Couche séparée, jamais écrite dans le journal** : `resolveLog(log, overrides)`
+  produit un journal résolu ; `useFoodLog` garde l'état brut (`raw`) pour toutes
+  les **écritures** et n'expose que le résolu en **lecture**. Conséquence : les
+  `per100` d'origine ne sont jamais touchés, donc retirer une correction rend leur
+  valeur d'origine à toutes les lignes. **Piège évité au passage** : si les
+  mutations partaient du journal résolu, la première modification d'une ligne
+  figerait la valeur corrigée et la correction cesserait d'être réversible.
+- Ce n'est **pas** un reniement du snapshot figé à la saisie (M1) : celui-ci
+  existe pour se protéger d'une source EXTERNE qui change sous les pieds, pas pour
+  empêcher Yoann de corriger sa propre donnée quand il sait qu'elle est fausse.
+  `onAdd` envoie toujours le `per100` **d'origine**, même quand l'écran affiche la
+  valeur corrigée — sinon les saisies futures figeraient la correction.
+- **Saisie** : lien « Corriger les valeurs de cet aliment » dans la fiche
+  (`QtyPanel`) → 5 champs **pour 100 g** (comme les tables source et l'emballage).
+  Champ vide = pas de correction sur cette macro. Une valeur retapée **identique**
+  à celle de la table n'est pas enregistrée comme correction — sinon elle
+  s'afficherait en accent et survivrait à une mise à jour de la table.
+- **Marqueur visuel** (une correction ne doit jamais être invisible) : valeur en
+  accent + `*` dans la fiche, phrase explicative, et `*` accent après le nom de
+  l'aliment sur chaque ligne du journal.
+- **LE PIÈGE, vérifié explicitement** : la dérivation M6 tourne sur le journal
+  résolu, donc `macroLog` est mis à jour rétroactivement — mais `deriveMacroLog`
+  ne renvoie **que les dates présentes dans `foodLog`**. Testé bout en bout avec un
+  historique Cronometer seedé au 15/07 (`source: "healthconnect"`) : après
+  correction des fibres, la date historique est **identique au bit près**, les
+  deux dates du journal passent de `+?` à 7 g et 3,5 g, et le `foodLog` stocké
+  garde ses `fib: null`. 11 assertions supplémentaires sur les fonctions pures.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
    `trainingLog`, `kneeLog`, `elbowLog`, `macroLog`, `noteLog`, `stepsLog`, `targets`,
    `phase`, `hsrWeek`, `apiKey`, `model`, `coachProfile`, `coachJournal`,
-   `foodLog`, `foodPins`, `foodMuted`, `foodPortions`, `foodRecipes` —
+   `foodLog`, `foodPins`, `foodMuted`, `foodPortions`, `foodRecipes`,
+   `foodOverrides` —
    préfixées `protocole:` dans `store.js`)
    sans écrire une migration. Casser une clé = perdre l'historique de
    l'utilisateur, ce qui est la pire chose possible ici.

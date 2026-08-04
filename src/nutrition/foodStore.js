@@ -8,7 +8,7 @@
 // Connect est coupée (healthSync.js) : `foodLog` est désormais l'unique écrivain des
 // macros au quotidien. L'eau reste une exception partagée (voir plus bas), inchangée.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { store } from "../store.js";
 import { today as todayKey } from "../ui.jsx";
 
@@ -70,6 +70,47 @@ export function makeEntry({ date, meal, food, q }) {
     },
     at: new Date().toISOString(),
   };
+}
+
+// --- Corrections de valeurs (V6, 03/08/2026) -------------------------------------
+//
+// Répond au « +? » : un produit Open Food Facts sans teneur en fibres affichait un total
+// honnête mais définitivement incomplet, sans aucun moyen de le corriger.
+//
+// Une correction est une COUCHE SÉPARÉE (`foodOverrides`, clé → `{kcal?, prot?, ...}`
+// partielle), appliquée À LA LECTURE et jamais écrite dans les lignes du journal. Donc :
+// - **rétroactive** (choix confirmé par Yoann le 03/08/2026) : les totaux passés qui
+//   contiennent l'aliment deviennent justes, le « +? » disparaît de tout l'historique ;
+// - **réversible** : retirer la correction rend leur valeur d'origine à toutes les lignes,
+//   puisque leur `per100` d'origine n'a jamais été touché.
+//
+// Ce n'est pas un reniement du snapshot figé à la saisie (M1) : celui-ci existe pour se
+// protéger d'une source EXTERNE qui change sous les pieds, pas pour empêcher Yoann de
+// corriger sa propre donnée quand il sait qu'elle est fausse.
+
+/** Champs réellement corrigés pour un `ref` (pour le marqueur visuel). */
+export function correctedFields(overrides, ref) {
+  const ov = overrides?.[ref];
+  return ov ? MACROS.filter((m) => ov[m] !== undefined && ov[m] !== null) : [];
+}
+
+/** `per100` d'origine + corrections. Une valeur non corrigée reste celle du snapshot. */
+export function applyOverride(per100, ov) {
+  if (!ov) return per100;
+  const out = { ...per100 };
+  for (const m of MACROS) if (ov[m] !== undefined && ov[m] !== null) out[m] = ov[m];
+  return out;
+}
+
+/**
+ * Journal résolu : les corrections sont appliquées à la volée, les lignes stockées ne
+ * changent jamais. Tout ce qui LIT le journal (totaux, dérivation vers `macroLog`,
+ * habituels, copie de repas) doit passer par ce journal-là ; tout ce qui l'ÉCRIT doit
+ * partir des lignes brutes. C'est `useFoodLog` qui garantit cette séparation.
+ */
+export function resolveLog(log, overrides) {
+  if (!overrides || !Object.keys(overrides).length) return log;
+  return log.map((e) => (overrides[e.ref] ? { ...e, per100: applyOverride(e.per100, overrides[e.ref]) } : e));
 }
 
 // Valeurs réelles d'une ligne = per100 × quantité / 100. `null` reste `null` : une donnée
@@ -295,11 +336,16 @@ export function searchBoost(log, { meal, date = todayKey() } = {}) {
 // --- Hook de persistance ------------------------------------------------------
 
 export function useFoodLog() {
-  const [log, setLog] = useState([]);
+  // `raw` = ce qui est stocké (snapshots d'origine intacts). `log` = ce que voit le reste
+  // de l'app (corrections appliquées). Les mutations partent TOUJOURS de `raw` : sans ça,
+  // la première modification d'une ligne figerait la valeur corrigée dans le journal et la
+  // correction cesserait d'être réversible.
+  const [raw, setLog] = useState([]);
   const [pins, setPins] = useState([]);
   const [muted, setMuted] = useState([]);
   const [portions, setPortions] = useState({});
   const [recipes, setRecipes] = useState([]);
+  const [overrides, setOverrides] = useState({});
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -309,23 +355,49 @@ export function useFoodLog() {
       setMuted(await store.get("foodMuted", []));
       setPortions(await store.get("foodPortions", {}));
       setRecipes(await store.get("foodRecipes", []));
+      setOverrides(await store.get("foodOverrides", {}));
       setReady(true);
     })();
   }, []);
 
   const write = (next) => { setLog(next); store.set("foodLog", next); };
+  const log = useMemo(() => resolveLog(raw, overrides), [raw, overrides]);
 
   return {
     log,
+    overrides,
     pins,
     muted,
     portions,
     recipes,
     ready,
-    add: (e) => write([...log, e]),
-    addMany: (es) => write([...log, ...es]),
-    update: (id, patch) => write(log.map((e) => (e.id === id ? { ...e, ...patch } : e))),
-    remove: (id) => write(log.filter((e) => e.id !== id)),
+    add: (e) => write([...raw, e]),
+    addMany: (es) => write([...raw, ...es]),
+    update: (id, patch) => write(raw.map((e) => (e.id === id ? { ...e, ...patch } : e))),
+    remove: (id) => write(raw.filter((e) => e.id !== id)),
+    /**
+     * Enregistre/retire une correction pour un `ref`. `patch` ne porte que les champs
+     * touchés ; une valeur `null` efface la correction de ce champ et rend sa valeur
+     * d'origine à toutes les lignes concernées. Le `ref` disparaît de la table quand il
+     * n'a plus aucune correction — pas d'entrée vide qui traînerait dans l'export.
+     */
+    saveOverride: (ref, patch) => {
+      const merged = { ...(overrides[ref] || {}) };
+      for (const [m, v] of Object.entries(patch)) {
+        if (v === null || v === undefined || v === "") delete merged[m];
+        else merged[m] = Number(v);
+      }
+      const next = { ...overrides };
+      if (Object.keys(merged).length) next[ref] = merged; else delete next[ref];
+      setOverrides(next);
+      store.set("foodOverrides", next);
+    },
+    clearOverride: (ref) => {
+      const next = { ...overrides };
+      delete next[ref];
+      setOverrides(next);
+      store.set("foodOverrides", next);
+    },
     togglePin: (ref) => {
       const next = pins.includes(ref) ? pins.filter((r) => r !== ref) : [...pins, ref];
       setPins(next);

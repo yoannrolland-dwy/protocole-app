@@ -13,7 +13,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | V3 | Progression visible par exercice | moyen | ✅ 03/08/2026 (v3.44.0) |
 | V4 | Détection de record sur une série | petit | ✅ 03/08/2026 (v3.45.0) |
 | V5 | Escalade : suivi des blocs | moyen | ✅ 03/08/2026 (v3.47.0, cotations par couleur) |
-| V6 | Corriger les valeurs d'un aliment | petit | à faire |
+| V6 | Corriger les valeurs d'un aliment | petit | ✅ 03/08/2026 (v3.48.0, rétroactif) |
 | V7 | Dépense énergétique adaptative (TDEE calculé) | gros | à faire |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il
@@ -344,7 +344,7 @@ valeur, donc le `+?` est définitif sur les produits habituels.
 - Marqueur visuel discret sur les valeurs corrigées : une correction ne doit jamais
   être invisible, elle doit rester auditable et réversible.
 
-### Décision à confirmer avant de coder
+### Décision à confirmer avant de coder — TRANCHÉE : rétroactif (03/08/2026)
 
 `per100` est **figé à la saisie** (snapshot), décision prise à M1 pour que
 l'historique reste reproductible si un produit OFF est corrigé ou disparaît.

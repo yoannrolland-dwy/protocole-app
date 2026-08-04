@@ -42,7 +42,7 @@ function MacroTile({ m, value, target, missing }) {
   );
 }
 
-function EntryRow({ e, onUpdate, onRemove }) {
+function EntryRow({ e, onUpdate, onRemove, corrected = false }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState(e.q);
   const [meal, setMeal] = useState(e.meal);
@@ -55,7 +55,11 @@ function EntryRow({ e, onUpdate, onRemove }) {
     <div style={{ borderBottom: `1px solid ${C.divider}` }}>
       <div onClick={() => setOpen(!open)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 0", cursor: "pointer" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, color: C.text, fontWeight: 600, lineHeight: 1.35 }}>{e.name}</div>
+          {/* Astérisque accent = valeurs corrigées à la main (V6). Une correction
+              rétroactive ne doit jamais être invisible sur les lignes qu'elle modifie. */}
+          <div style={{ fontSize: 12, color: C.text, fontWeight: 600, lineHeight: 1.35 }}>
+            {e.name}{corrected && <span title="valeurs corrigées" style={{ color: C.accent, fontWeight: 800 }}> *</span>}
+          </div>
           <div style={{ display: "flex", gap: 9, marginTop: 2, fontFamily: C.mono, fontSize: 10, color: C.muted }}>
             <span>{isQuick ? "portion" : `${e.q} g`}</span>
             <span>P{a.prot ?? "—"}</span>
@@ -357,7 +361,8 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
               </div>
             )}
             {entries.map((e) => (
-              <EntryRow key={e.id} e={e} onUpdate={food.update} onRemove={food.remove} />
+              <EntryRow key={e.id} e={e} onUpdate={food.update} onRemove={food.remove}
+                corrected={!!food.overrides?.[e.ref]} />
             ))}
             {copyMeal === meal.key ? (
               <CopyPanel
@@ -399,7 +404,10 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
           muted={food.muted}
           portions={food.portions}
           recipes={food.recipes}
+          overrides={food.overrides}
           onAdd={add}
+          onSaveOverride={food.saveOverride}
+          onClearOverride={food.clearOverride}
           onTogglePin={food.togglePin}
           onMute={food.muteFromSuggestions}
           onSavePortion={food.savePortion}
