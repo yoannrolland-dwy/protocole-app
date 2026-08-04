@@ -90,7 +90,10 @@ class RestAlarmReceiver : BroadcastReceiver() {
                         .build()
                 )
             }
-            player.setVolume(1f, 1f)
+            // Volume divisé par deux (04/08/2026, demande explicite) : le son à pleine
+            // intensité était trop fort en salle. Reste au-dessus du volume alarme/média du
+            // téléphone (ce setVolume() n'est qu'une atténuation relative sur ce flux-là).
+            player.setVolume(0.5f, 0.5f)
             val afd = context.resources.openRawResourceFd(R.raw.alarm)
             player.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
             afd.close()

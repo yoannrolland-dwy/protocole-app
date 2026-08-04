@@ -36,7 +36,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor, totals as foodTotals, resolveLog as resolveFoodLog } from "./nutrition/foodStore.js";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.49.0";
+const APP_VERSION = "3.50.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -1402,19 +1402,22 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
       if (audioRef.current.state === "suspended") audioRef.current.resume();
     } catch { /* audio indispo */ }
   };
+  // Volume et durée divisés par deux (04/08/2026, demande explicite, même changement que
+  // l'alarme native) : gain de crête 0,35 -> 0,175, espacement et durée des 3 impulsions
+  // réduits de moitié (~0,57 s -> ~0,29 s au total).
   const beep = () => {
     try {
       const ctx = audioRef.current;
       if (ctx) {
         const now = ctx.currentTime;
-        [0, 0.2, 0.4].forEach((t) => {
+        [0, 0.1, 0.2].forEach((t) => {
           const o = ctx.createOscillator(); const g = ctx.createGain();
           o.type = "sine"; o.frequency.value = 880;
           o.connect(g); g.connect(ctx.destination);
           g.gain.setValueAtTime(0.0001, now + t);
-          g.gain.exponentialRampToValueAtTime(0.35, now + t + 0.02);
-          g.gain.exponentialRampToValueAtTime(0.0001, now + t + 0.16);
-          o.start(now + t); o.stop(now + t + 0.17);
+          g.gain.exponentialRampToValueAtTime(0.175, now + t + 0.01);
+          g.gain.exponentialRampToValueAtTime(0.0001, now + t + 0.08);
+          o.start(now + t); o.stop(now + t + 0.085);
         });
       }
     } catch { /* ignore */ }
@@ -1530,10 +1533,10 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
         <span style={{ fontFamily: C.mono, fontSize: 13, color: recs.has(si) ? C.accent : C.muted, fontWeight: 700 }}>
           {n + 1}{recs.has(si) && <span style={{ fontSize: 11 }}>★</span>}
         </span>
-        <TextInput value={s.poids} inputMode="decimal" placeholder="kg"
-          onChange={(ev) => upd(ei, si, "poids", ev.target.value.replace(",", "."))} style={{ padding: "7px 8px" }} />
         <TextInput value={s.val} inputMode="numeric" placeholder={e.mode === "temps" ? "sec" : e.target}
           onChange={(ev) => upd(ei, si, "val", ev.target.value)} style={{ padding: "7px 8px" }} />
+        <TextInput value={s.poids} inputMode="decimal" placeholder="kg"
+          onChange={(ev) => upd(ei, si, "poids", ev.target.value.replace(",", "."))} style={{ padding: "7px 8px" }} />
         <button onClick={() => toggle(ei, si)} style={{
           background: "none", border: "none", cursor: "pointer", padding: 0,
           color: s.fait ? C.accent : C.dim, display: "flex", justifyContent: "center",
@@ -1608,7 +1611,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
 
                 <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 7, fontSize: 9,
                   color: C.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: "10px 0 6px", fontWeight: 700 }}>
-                  <span>Sér</span><span>Poids</span><span>{e.mode === "temps" ? "Sec" : "Reps"}</span><span /><span />
+                  <span>Sér</span><span>{e.mode === "temps" ? "Sec" : "Reps"}</span><span>Poids</span><span /><span />
                 </div>
 
                 {e.perLeg ? ["G", "D"].map((leg) => (

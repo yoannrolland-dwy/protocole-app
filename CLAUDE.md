@@ -1094,6 +1094,28 @@ antérieures au module Repas) le permet — pas besoin d'attendre que tout vienn
   carte Macros et prompt Coach IA (`buildBriefing`) affichent **exactement le même chiffre**
   (2803 kcal/j, fiabilité faible, 28 j, déficit −598).
 
+### Réglages divers (04/08/2026, v3.50.0)
+
+Quatre demandes ponctuelles, hors chantier V, groupées dans une même livraison :
+
+- **Orientation verrouillée en portrait** : `android:screenOrientation="portrait"` sur
+  `MainActivity` dans `AndroidManifest.xml`. Vérifié dans le manifeste fusionné généré par
+  Gradle après `cap sync` — le réglage n'est pas perdu au sync.
+- **Carnet de musculation : reps/temps à gauche, poids à droite** (inversion de l'ordre
+  précédent). Uniquement les DEUX colonnes de saisie et l'en-tête (`Sér | Reps/Sec | Poids`)
+  — le mapping des données (`poids`/`val`) est inchangé, seul l'ordre visuel bouge. Les
+  labels texte ailleurs (« dernière fois : 32 kg × 8 », `★ record :`, l'historique
+  "progression") gardent leur format `poids × val`, non demandés, non touchés.
+- **Alarme de fin de repos, volume ET durée divisés par deux** :
+  - Native (`RestAlarmReceiver.kt`) : `alarm.wav` était en réalité **deux moitiés de 1,6 s
+    strictement identiques** concaténées (vérifié échantillon par échantillon) — la
+    moitié coupée est donc un point de boucle naturel, aucune coupure audible. Fichier
+    tronqué à 1,6 s. `player.setVolume(1f,1f)` → `0.5f,0.5f`.
+  - PWA (`beep()` dans `App.jsx`, Web Audio) : gain de crête 0,35 → 0,175, espacement et
+    durée des 3 impulsions réduits de moitié (~0,57 s → ~0,29 s au total). Même logique
+    que le natif, pour que les deux environnements restent cohérents.
+  - Vibration non touchée (pas demandé) : `longArrayOf(0,400,200,400,200,600)` inchangé.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
