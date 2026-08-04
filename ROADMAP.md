@@ -14,7 +14,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | V4 | Détection de record sur une série | petit | ✅ 03/08/2026 (v3.45.0) |
 | V5 | Escalade : suivi des blocs | moyen | ✅ 03/08/2026 (v3.47.0, cotations par couleur) |
 | V6 | Corriger les valeurs d'un aliment | petit | ✅ 03/08/2026 (v3.48.0, rétroactif) |
-| V7 | Dépense énergétique adaptative (TDEE calculé) | gros | à faire |
+| V7 | Dépense énergétique adaptative (TDEE calculé) | gros | ✅ 04/08/2026 (v3.49.0) |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il
 alimente le recommandeur + le Coach IA. V2 tôt parce que c'est une protection, pas
@@ -373,7 +373,12 @@ propriété la plus importante à ne pas casser.
 
 ## V7 — Dépense énergétique adaptative (TDEE calculé)
 
-*À lancer quand il y aura au moins 2-3 semaines de journal alimentaire complet.*
+> **Note du 04/08/2026** : cette étape prévoyait d'attendre 2-3 semaines de journal
+> alimentaire. Yoann a demandé de ne pas attendre — l'algorithme a un garde-fou intégré
+> ("pas assez de données" plutôt qu'un chiffre non fiable), donc rien ne se serait affiché
+> de trompeur en construisant maintenant. Livrée en v3.49.0, utilise déjà tout l'historique
+> disponible (macroLog compris pour les dates antérieures au module Repas). Voir CLAUDE.md
+> pour le détail.
 
 ### Objectif
 

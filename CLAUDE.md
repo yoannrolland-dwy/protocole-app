@@ -1033,6 +1033,67 @@ total honnête mais définitivement incomplet, sans aucun moyen de le corriger.
   deux dates du journal passent de `+?` à 7 g et 3,5 g, et le `foodLog` stocké
   garde ses `fib: null`. 11 assertions supplémentaires sur les fonctions pures.
 
+### V7 — Dépense énergétique adaptative (04/08/2026, v3.49.0)
+
+Livrée **immédiatement en usage réel**, pas seulement le code : demande explicite de Yoann
+("je veux qu'il commence tout de suite, j'ai bien rempli le journal") après que la roadmap
+avait suggéré d'attendre 2-3 semaines. Décision : ne rien retarder — l'algorithme a de toute
+façon un garde-fou intégré (`"pas assez de données"` plutôt qu'un chiffre non fiable), donc
+le construire maintenant ne peut rien afficher de trompeur ; il commence juste à produire un
+vrai chiffre dès que l'historique réel (poids + macros, `macroLog` compris pour les dates
+antérieures au module Repas) le permet — pas besoin d'attendre que tout vienne de `foodLog`.
+
+- **Nouveau module `src/tdee.js`**, pur (testable en Node, aucune dépendance React/ui.jsx) :
+  `computeTDEE`, `mergeKcalSeries`, `smoothedWeightSeries`, `trendAt`, `realDeficit`.
+  **Aucune nouvelle clé localStorage** : c'est un calcul, jamais une donnée stockée.
+- **Tendance de poids** : moyenne mobile **exponentielle** (jamais le brut), demi-vie 7 j
+  (réagit en ~7-10 j comme demandé), alpha ajusté à l'écart réel entre deux pesées
+  (`1-(1-alpha)^gap`) pour qu'un trou de plusieurs jours ne fige pas artificiellement la
+  tendance. Calculée sur **tout l'historique disponible** (pas seulement la fenêtre
+  retenue) : sans préchauffe avant la fenêtre, le décalage inhérent à toute EMA fausserait
+  la pente sur une perte linéaire — vérifié par test (60 j d'historique, écart au résultat
+  théorique de la roadmap sous 15 kcal).
+- **Fenêtre** : cherche la PLUS LONGUE parmi [28, 21, 14] jours qui atteint 70 % de jours
+  avec des apports loggés (jamais moins de 14, jamais un chiffre en dessous de ce seuil).
+  Un utilisateur avec beaucoup d'historique mais un début de saisie irrégulier obtient donc
+  un résultat sur une fenêtre plus courte mais fiable, plutôt qu'un "pas assez de données"
+  à tort.
+- **Source des kcal — jamais 4/4/9 par défaut** : `mergeKcalSeries` utilise les kcal
+  **réelles** de `foodLog` (CIQUAL/OFF, réglement UE 1169/2011, fibres comprises, **et les
+  corrections V6 appliquées** — `tdeeNow` résout `foodOverrides` avant de sommer) pour
+  chaque date qui y figure, et ne se rabat sur le 4/4/9 de `macroLog` que pour les dates
+  antérieures au module Repas (historique Cronometer/Health Connect). Une journée dont
+  AUCUNE entrée n'a de kcal connue reste absente plutôt que comptée à 0 (`totals()` sinon
+  renverrait 0 pour un jour entièrement inconnu, ce qui biaiserait la moyenne).
+- **Piège de la sèche traité, pas seulement documenté** : une fenêtre qui chevauche les 21
+  premiers jours de la sèche en cours (`targets.cut.start`) est **toujours** plafonnée à
+  fiabilité "faible", quelle que soit la qualité des données par ailleurs — le coefficient
+  7700 kcal/kg ne vaut pas pour de l'eau/glycogène. Dès qu'assez de jours POST-phase
+  existent (≥14 après `cutStart+21`), la fenêtre choisie les **préfère** et exclut
+  entièrement la phase hydrique. **État réel au 04/08/2026** (8 jours après le début de la
+  sèche du 27/07) : la fenêtre chevauche forcément encore la phase hydrique, donc la carte
+  affiche "fiabilité faible" — normal et attendu, pas un bug.
+- **Aucun ajustement automatique des cibles** (décision confirmée de la roadmap) : l'app
+  affiche le chiffre et le déficit réel, l'arbitrage reste à Yoann et au Coach IA.
+- **Affichage** : carte "Dépense estimée" dans l'onglet Macros (`TdeeCard`), sous la
+  tendance calories 14 j. Chiffre + badge de fiabilité coloré (accent/ambre/muted) + jours
+  de fenêtre + déficit réel contre la cible **d'aujourd'hui** (jamais celle de la date
+  parcourue dans le sélecteur, qui peut être un jour passé) + note explicite si la fenêtre
+  chevauche la perte hydrique.
+- **Coach IA** : `summary.depense_estimee` (`kcal_j`, `fiabilite`, `fenetre_jours`,
+  `deficit_reel_vs_cible`, `chevauche_perte_eau`), calculé par `tdeeNow` — **la même
+  fonction que la carte de l'onglet Macros**, jamais deux chiffres différents pour la même
+  réalité. Consigne explicite : utiliser ce déficit plutôt que l'estimer à la louche, et le
+  nuancer explicitement si la fiabilité est faible ou si la fenêtre chevauche la perte
+  d'eau. `"pas assez de données"` si le calcul est insuffisant — jamais un chiffre inventé.
+- **Testé** : 15 assertions en Node sur `tdee.js` (formule vérifiée sur l'exemple exact de
+  la roadmap, jours manquants ignorés sans fausser la moyenne, <14 j → insuffisant, kcal
+  réelles prioritaires sur le 4/4/9, chevauchement de la phase hydrique plafonné, fenêtre
+  post-phase préférée dès qu'assez de recul) + vérification bout en bout dans l'aperçu avec
+  un historique synthétique réaliste (30 j de poids/macros, 4 j de vrai `foodLog`) :
+  carte Macros et prompt Coach IA (`buildBriefing`) affichent **exactement le même chiffre**
+  (2803 kcal/j, fiabilité faible, 28 j, déficit −598).
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,

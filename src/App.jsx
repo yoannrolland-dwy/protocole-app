@@ -17,6 +17,7 @@ import { exoProgress, exerciseList, exerciseSessions, exerciseTrend, isTimeMode,
          beats, recordToBeat, recordsBySession, painOutOfBase } from "./training.js";
 import { COLORS, LEVELS, gradeIndex, makeGrade, gradeLabel, gradeColor, ISSUES,
          climbSummary, climbLabel, climbLoad } from "./climbing.js";
+import { computeTDEE, mergeKcalSeries, realDeficit, MIN_WINDOW_DAYS as MIN_TDEE_DAYS } from "./tdee.js";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 import { updateDashboardWidget } from "./widgetSync.js";
@@ -32,10 +33,10 @@ import {
 // propre clé `foodLog` et ne reçoit d'ici que les cibles, en lecture. Ni `macroLog` ni
 // healthSync.js ne sont concernés tant que la bascule (M6) n'est pas décidée.
 import NutritionTab from "./nutrition/NutritionTab.jsx";
-import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor } from "./nutrition/foodStore.js";
+import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor, totals as foodTotals, resolveLog as resolveFoodLog } from "./nutrition/foodStore.js";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.48.0";
+const APP_VERSION = "3.49.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -2272,10 +2273,60 @@ function PainTab({ knee, elbow, save, hsrWeek }) {
   );
 }
 
+// Couleur par palier de fiabilité — mêmes seuils visuels que la douleur (accent = bon,
+// ambre = à nuancer, danger = à prendre avec de grosses pincettes). "Faible" n'utilise pas
+// le rouge : ce n'est pas une alerte, juste une estimation à ne pas trop croire.
+const TDEE_RELIABILITY_COLOR = { fiable: C.accent, moyenne: "#e8a33d", faible: C.muted };
+const TDEE_RELIABILITY_LABEL = { fiable: "fiable", moyenne: "moyenne", faible: "faible" };
+
+/**
+ * Carte "Dépense estimée" (V7). Jamais un chiffre non fiable : tant qu'il n'y a pas assez
+ * de recul (14 j mini, 70 % des apports loggés), affiche pourquoi plutôt qu'un nombre.
+ */
+function TdeeCard({ result, deficitReel }) {
+  if (result.status !== "ok") {
+    return (
+      <Card>
+        <Label style={{ marginBottom: 6 }}>Dépense estimée</Label>
+        <Body style={{ fontSize: 11, color: C.dim }}>
+          Pas encore assez de données ({result.reason}). Il faut au moins {MIN_TDEE_DAYS} jours
+          de pesées et d'apports enregistrés, avec au moins 70 % des jours loggés.
+        </Body>
+      </Card>
+    );
+  }
+  const col = TDEE_RELIABILITY_COLOR[result.reliability];
+  return (
+    <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+        <Label>Dépense estimée</Label>
+        <span style={{ fontSize: 10, fontFamily: C.mono, fontWeight: 800, color: col, textTransform: "uppercase" }}>
+          fiabilité {TDEE_RELIABILITY_LABEL[result.reliability]}
+        </span>
+      </div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+        <span style={{ fontFamily: C.mono, fontSize: 24, fontWeight: 800, color: C.text }}>{result.tdee}</span>
+        <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>kcal/j · sur {result.days} j</span>
+      </div>
+      <Body style={{ fontSize: 11, marginTop: 6 }}>
+        Déficit réel actuel : <span style={{ color: deficitReel < 0 ? C.accent : C.danger, fontFamily: C.mono, fontWeight: 800 }}>
+          {deficitReel > 0 ? "+" : ""}{deficitReel} kcal/j
+        </span> contre la cible affichée.
+      </Body>
+      {result.overlapsWater && (
+        <Body style={{ fontSize: 10, color: C.dim, marginTop: 6 }}>
+          Fenêtre chevauchant la perte d'eau/glycogène du début de sèche (~21 premiers jours) —
+          la dépense réelle est probablement plus proche de la fourchette basse.
+        </Body>
+      )}
+    </Card>
+  );
+}
+
 /* ============================================================
    TAB — MACROS
    ============================================================ */
-function MacroTab({ macros, targets, save, training }) {
+function MacroTab({ macros, targets, save, training, weight }) {
   const [date, setDate] = useState(today());
   const at = targetsForDate(date, targets);
   const cur = macros.find((m) => m.date === date) || {};
@@ -2318,6 +2369,16 @@ function MacroTab({ macros, targets, save, training }) {
   }));
   const kcalTarget = Math.round(at.protein * 4 + at.carbs * 4 + at.fat * 9);
   const kcalPct = Math.min(100, (kcal / kcalTarget) * 100);
+
+  // Dépense énergétique adaptative (V7). Calculée à chaque montage de l'onglet — le journal
+  // Repas et ses corrections vivent dans un autre onglet (un seul monté à la fois), donc un
+  // remount suffit à rester à jour, sans mémoïsation ni dépendance fragile sur `foodLog`.
+  // Toujours ancrée sur AUJOURD'HUI (l'estimation porte sur la dépense réelle actuelle),
+  // jamais sur la date parcourue dans le sélecteur ci-dessous.
+  const tdeeToday = tdeeNow({ foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}), macros, weight, targets });
+  const atToday = targetsForDate(today(), targets);
+  const kcalTargetToday = Math.round(atToday.protein * 4 + atToday.carbs * 4 + atToday.fat * 9);
+  const deficitReel = tdeeToday.status === "ok" ? realDeficit(kcalTargetToday, tdeeToday.tdee) : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -2385,6 +2446,9 @@ function MacroTab({ macros, targets, save, training }) {
           </div>
         ) : <Empty>Aucune donnée.</Empty>}
       </Card>
+
+      {/* Dépense énergétique adaptative (V7) */}
+      <TdeeCard result={tdeeToday} deficitReel={deficitReel} />
 
       {/* Saisie */}
       <Card>
@@ -2764,6 +2828,28 @@ const targetsForDate = (d, base) => {
   return { ...base, protein, carbs, fat, fiber };
 };
 
+/**
+ * Dépense énergétique adaptative (V7) — calculée "maintenant", factorisée pour que l'écran
+ * Macros et le Coach IA appellent EXACTEMENT le même calcul (jamais deux chiffres
+ * différents pour la même réalité). `foodLog`/`overrides` doivent être lus fraîchement par
+ * l'appelant (getSync), jamais mis en cache, pour ne jamais rater une correction ou un
+ * repas ajouté entre deux appels — même principe que `buildPrompt`.
+ */
+function tdeeNow({ foodLog, overrides, macros, weight, targets }) {
+  const resolved = resolveFoodLog(foodLog, overrides);
+  const foodKcalByDate = {};
+  for (const d of new Set(resolved.map((e) => e.date))) {
+    // Un jour où AUCUNE entrée n'a de kcal connue reste absent (repli 4/4/9 le cas échéant)
+    // plutôt que faussement compté à 0 — `totals()` sinon renverrait 0 pour une journée
+    // entièrement inconnue, ce qui biaiserait la moyenne vers le bas.
+    const t = foodTotals(foodEntriesFor(resolved, d));
+    if (t.missing.kcal === 0) foodKcalByDate[d] = t.kcal;
+  }
+  const kcalByDate = mergeKcalSeries(foodKcalByDate, macros);
+  const cutStart = targets.cut?.enabled !== false && targets.cut?.start ? targets.cut.start : null;
+  return computeTDEE({ weightLog: weight, kcalByDate, today: today(), cutStart });
+}
+
 export default function App({ silent = false } = {}) {
   const [tab, setTab] = useState("dash");
   const [showSettings, setShowSettings] = useState(false);
@@ -3007,6 +3093,9 @@ export default function App({ silent = false } = {}) {
       // Lu au moment de l'analyse (pas une copie chargée au montage de l'app) : un repas
       // ajouté dans l'onglet Repas pendant la session en cours doit être vu immédiatement.
       const foodLog = getSync("foodLog", []);
+      // Dépense adaptative (V7) : mêmes données, même calcul que la carte de l'onglet
+      // Macros (`tdeeNow`) — jamais deux chiffres différents pour la même réalité.
+      const tdeeResult = tdeeNow({ foodLog, overrides: getSync("foodOverrides", {}), macros, weight, targets });
       const tgtW = phaseTarget(phase, targets);
       const win = (arr, a, b) => arr.filter((e) => { const d = daysBetween(e.date, today()); return d >= a && d <= b; });
       const avgKey = (arr, k) => { const v = arr.map((e) => e[k]).filter((x) => x != null); return v.length ? round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
@@ -3108,6 +3197,14 @@ export default function App({ silent = false } = {}) {
           alternatives: reco.suggestions.slice(1).map((s) => ({ type: s.type, score: s.score })),
           a_eviter: reco.avoid.map((a) => ({ type: a.type, motif: a.reason })),
         },
+        // Dépense adaptative (V7) : le JS peut désormais donner un déficit EXACT au lieu
+        // que le coach l'estime à la louche à partir du poids et des apports. `null` tant
+        // qu'il n'y a pas assez de recul — jamais un chiffre non fiable.
+        depense_estimee: tdeeResult.status === "ok" ? {
+          kcal_j: tdeeResult.tdee, fiabilite: tdeeResult.reliability, fenetre_jours: tdeeResult.days,
+          deficit_reel_vs_cible: realDeficit(Math.round(atToday.protein * 4 + atToday.carbs * 4 + atToday.fat * 9), tdeeResult.tdee),
+          chevauche_perte_eau: tdeeResult.overlapsWater,
+        } : { statut: "pas assez de données" },
       };
 
       const notesTxt = last14(notes).map((n) => `${n.date} : ${n.text}`).join("\n")
@@ -3173,7 +3270,7 @@ ${notesTxt ? `\nNOTES DE CONTEXTE écrites par Yoann (14 j, ex. alcool, insomnie
 ${(journal || "").trim() ? `CARNET DE BORD — état que TU as écrit à la fin de ta dernière analyse. C'est ta mémoire : appuie-toi dessus pour enchaîner (a-t-il appliqué ce que tu avais demandé ? où en est la progression ?) au lieu de repartir de zéro.\n${journal.trim()}\n` : "CARNET DE BORD : vide, c'est ta première analyse. Tu le créeras en fin de réponse.\n"}
 Structure ta réponse en deux temps :
 1. **Aujourd'hui / les prochaines 24h** : à partir du bloc TEMPS RÉEL, dis-lui concrètement quoi faire (ou éviter) MAINTENANT — séance, nutrition, hydratation, récupération, douleurs (genou ET coude) — en te basant sur ce qui s'est passé hier et sur les notes de contexte. \`repas_hier\`/\`repas_aujourdhui\` donnent le détail réel des aliments par repas (pas seulement les totaux macros) : commente la COMPOSITION si elle appelle un conseil concret (répartition protéique entre repas, repas trop pauvre/trop riche en fibres, timing autour de l'entraînement) — pas une simple relecture de la liste. Le champ \`recommandeur\` (dans RÉSUMÉ 14 JOURS) donne déjà un verdict calculé sur la séance du jour (score + motif, alternatives, à éviter) : appuie-toi dessus au lieu d'en recalculer un autre de ton côté — commente-le, nuance-le ou signale un désaccord argumenté si tu vois un facteur qu'il ignore, mais ne propose pas une séance différente sans le dire explicitement.
-2. **Tendance de fond (14 jours)** : ce qui se dessine sur la durée et ce qu'il faut ajuster pour la semaine à venir, EN CORRÉLANT explicitement poids, kcal, macros, fibres et eau à partir du dataset JOUR PAR JOUR (ex. un pic de poids coïncide-t-il avec un pic de glucides/sodium la veille plutôt qu'un vrai surplus calorique ? un manque de fibres ou d'eau coïncide-t-il avec une stagnation ?).
+2. **Tendance de fond (14 jours)** : ce qui se dessine sur la durée et ce qu'il faut ajuster pour la semaine à venir, EN CORRÉLANT explicitement poids, kcal, macros, fibres et eau à partir du dataset JOUR PAR JOUR (ex. un pic de poids coïncide-t-il avec un pic de glucides/sodium la veille plutôt qu'un vrai surplus calorique ? un manque de fibres ou d'eau coïncide-t-il avec une stagnation ?). Le champ \`depense_estimee\` (dans RÉSUMÉ 14 JOURS) donne déjà la dépense énergétique réelle calculée par le JS (tendance de poids lissée vs apports réels) avec sa fiabilité et sa fenêtre : utilise CE chiffre pour le déficit plutôt que d'en estimer un toi-même à la louche à partir du poids et des apports bruts. S'il chevauche la perte hydrique du début de sèche (\`chevauche_perte_eau\`) ou si la fiabilité est "faible", dis-le explicitement et nuance en conséquence — ne présente jamais ce chiffre comme définitif dans ce cas. S'il vaut "pas assez de données", n'invente pas de dépense chiffrée.
 Traite explicitement CHAQUE domaine : poids (bruit quotidien vs moyenne glissante), macros (protéines jour le jour, reste en moyenne 7j), eau (jours de basket +1L), sommeil (impact récup), pas quotidiens (corrélation activité/résultat), séances (équilibre Upper/Lower, progressive overload exercice par exercice, respect coude/escalade), douleurs genou ET coude (Silbernagel sur les deux tendons, priorité absolue si l'un des deux a flambé — le coude conditionne l'escalade et le tirage, le genou le Lower et le basket).
 Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reciter les données brutes (cite seulement les chiffres qui appuient un conseil) : va droit aux conseils, en bullet points courts. Limite stricte : 500 mots maximum au total — écourte les détails plutôt que de laisser une section inachevée, et termine toujours par une phrase de conclusion complète. Ce n'est pas un avis médical.
 
@@ -3275,7 +3372,7 @@ Fais-moi une revue de fond : tendances sur la durée, corrélations entre apport
             {tab === "steps" && <StepsTab {...{ steps, save }} />}
             {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, elbow }} />}
             {tab === "pain" && <PainTab {...{ knee, elbow, save, hsrWeek }} />}
-            {tab === "macro" && <MacroTab {...{ macros, targets, save, training }} />}
+            {tab === "macro" && <MacroTab {...{ macros, targets, save, training, weight }} />}
             {tab === "food" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} />}
           </>
         )}
