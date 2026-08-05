@@ -30,6 +30,7 @@ import React, { useState, useRef } from "react";
 import { ChevronLeft, Sparkles, Plus, Check, Camera, X, Link } from "lucide-react";
 import { C, Btn, Label, Body, inputStyle } from "../ui.jsx";
 import { callClaude, costCents } from "../claudeApi.js";
+import { fileToImagePayload } from "./imageUtils.js";
 
 function extractJson(raw) {
   let s = raw.trim();
@@ -41,33 +42,8 @@ function extractJson(raw) {
   return JSON.parse(s);
 }
 
-// Jusqu'à 4 photos (une carte a souvent plusieurs pages/faces). Redimensionnées côté client
-// (1600px de long, JPEG ~82%) avant envoi : une photo de téléphone brute pèse plusieurs Mo,
-// inutile en tokens et en temps de requête pour lire du texte sur une carte.
+// Jusqu'à 4 photos (une carte a souvent plusieurs pages/faces).
 const MAX_PHOTOS = 4;
-
-function fileToImagePayload(file, maxDim = 1600, quality = 0.82) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Lecture du fichier impossible"));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error("Image illisible"));
-      img.onload = () => {
-        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-        const w = Math.round(img.width * scale) || 1;
-        const h = Math.round(img.height * scale) || 1;
-        const canvas = document.createElement("canvas");
-        canvas.width = w; canvas.height = h;
-        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-        const jpeg = canvas.toDataURL("image/jpeg", quality);
-        resolve({ dataUrl: jpeg, base64: jpeg.split(",")[1], mediaType: "image/jpeg" });
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
 
 const SYSTEM_PROMPT = `Tu es un nutritionniste qui aide à choisir un repas au restaurant à partir d'une carte.
 On te donne la carte (en texte, en photo, et/ou via un lien internet à lire avec l'outil web_fetch)

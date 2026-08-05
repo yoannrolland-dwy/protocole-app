@@ -12,7 +12,7 @@
 // secondes d'utilisation normale.
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Search, X, ChevronLeft, Star, PencilLine, Trash2, ScanBarcode, ChefHat, Utensils, Plus } from "lucide-react";
+import { Search, X, ChevronLeft, Star, PencilLine, Trash2, ScanBarcode, ChefHat, Utensils, Camera, Plus } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { C, Btn, Label, Body, Empty, Stepper, TextInput, inputStyle } from "../ui.jsx";
 import { searchCiqual, normalize, getCiqual } from "./ciqual.js";
@@ -21,6 +21,7 @@ import { suggestions, searchBoost, MACROS, newQuickRef, portionsFor, compileReci
          applyOverride } from "./foodStore.js";
 import { scanBarcode } from "./scan.js";
 import RestaurantMenu from "./RestaurantMenu.jsx";
+import PhotoDish from "./PhotoDish.jsx";
 
 const OFF_DEBOUNCE_MS = 700;
 
@@ -587,6 +588,9 @@ export default function FoodSearch({
   // Carte resto (05/08/2026) : au même niveau que "Saisie libre"/"Nouvelle recette", pas un
   // bouton séparé dans l'onglet Repas — demandé explicitement après une première version.
   const [resto, setResto] = useState(false);
+  // Photo d'un plat (05/08/2026) : logge ce qui est SERVI (une seule photo suffit, pas de
+  // menu à lire) — même registre que Carte resto mais un plat unique, pas de suggestions.
+  const [photoMode, setPhotoMode] = useState(false);
   // Recette en cours de modification (V8) — `null` = on en crée une nouvelle.
   const [editingRecipe, setEditingRecipe] = useState(null);
   // idle | scanning | lookup | notfound | error — distinct de offState : le scan peut
@@ -656,6 +660,8 @@ export default function FoodSearch({
         ) : resto ? (
           <RestaurantMenu apiKey={apiKey} model={model} remaining={remaining} meal={meal}
             onLogDishes={onLogDishes} onBack={() => setResto(false)} />
+        ) : photoMode ? (
+          <PhotoDish apiKey={apiKey} model={model} onAdd={onAdd} onBack={() => setPhotoMode(false)} />
         ) : sel ? (
           <QtyPanel food={sel} initialQ={sel.lastQ ?? sel.defaultQ}
             portions={portionsFor(portions, sel.ref)} onSavePortion={onSavePortion} onRemovePortion={onRemovePortion}
@@ -726,18 +732,22 @@ export default function FoodSearch({
 
             {!showSugg && <OffSection offState={offState} offResults={offResults} onPick={setSel} />}
 
-            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-              <Btn variant="plain" onClick={() => setFree(true)} style={{ flex: 1 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
+              <Btn variant="plain" onClick={() => setFree(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
                 <PencilLine size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
                 Saisie libre
               </Btn>
-              <Btn variant="plain" onClick={() => setBuilding(true)} style={{ flex: 1 }}>
+              <Btn variant="plain" onClick={() => setBuilding(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
                 <ChefHat size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
                 Nouvelle recette
               </Btn>
-              <Btn variant="plain" onClick={() => setResto(true)} style={{ flex: 1 }}>
+              <Btn variant="plain" onClick={() => setResto(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
                 <Utensils size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
                 Carte resto
+              </Btn>
+              <Btn variant="plain" onClick={() => setPhotoMode(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
+                <Camera size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
+                Photo d'un plat
               </Btn>
             </div>
             <Body style={{ fontSize: 9.5, color: C.dim, marginTop: 10, textAlign: "center" }}>
