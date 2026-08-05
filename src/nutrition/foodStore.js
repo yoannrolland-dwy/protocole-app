@@ -231,10 +231,21 @@ export function portionsFor(portions, ref) {
 // pour référence mais ne sont PAS des lignes de journal : seule la recette compilée
 // en est une une fois ajoutée à un repas.
 //
+// Chaque ingrédient garde SON PROPRE `per100` figé (V8, 05/08/2026) — indispensable
+// pour pouvoir recalculer le total en modifiant la recette plus tard (ajout/retrait/
+// changement de quantité) sans redemander à CIQUAL/OFF, et cohérent avec le principe
+// M1 (per100 figé à la saisie, pas résolu à la lecture) : une recette n'est pas censée
+// changer de composition silencieusement si la table source est mise à jour.
+//
 // Une macro devient `null` sur toute la recette si NE SERAIT-CE QU'UN ingrédient avec
 // une quantité > 0 a cette macro absente — additionner un nombre et une inconnue ne
 // peut pas donner un vrai total, mieux vaut l'avouer que d'afficher un chiffre faux.
-export function compileRecipe(name, ingredients) {
+// `existing` (V8, 05/08/2026) : passé lors d'une MODIFICATION de recette déjà enregistrée —
+// on garde son `id`/`createdAt` d'origine (le `ref` `recipe:<id>` reste stable, comme un
+// aliment CIQUAL dont la fiche serait corrigée) plutôt que d'en générer une nouvelle. Les
+// entrées de journal déjà loguées avec cette recette gardent leur `per100` figé à la saisie
+// (M1) : modifier une recette ne réécrit jamais rétroactivement ce qui a déjà été mangé.
+export function compileRecipe(name, ingredients, existing) {
   const totalWeight = ingredients.reduce((s, i) => s + i.q, 0);
   const per100 = {};
   for (const m of MACROS) {
@@ -249,12 +260,12 @@ export function compileRecipe(name, ingredients) {
       : Math.round((sum / totalWeight) * 100 * 10) / 10;
   }
   return {
-    id: newId(),
+    id: existing?.id ?? newId(),
     name: name.trim(),
     totalWeight,
-    ingredients: ingredients.map((i) => ({ ref: i.ref, name: i.name, q: i.q })),
+    ingredients: ingredients.map((i) => ({ ref: i.ref, name: i.name, q: i.q, per100: i.per100 })),
     per100,
-    createdAt: new Date().toISOString(),
+    createdAt: existing?.createdAt ?? new Date().toISOString(),
   };
 }
 
@@ -435,6 +446,11 @@ export function useFoodLog() {
     },
     removeRecipe: (id) => {
       const next = recipes.filter((r) => r.id !== id);
+      setRecipes(next);
+      store.set("foodRecipes", next);
+    },
+    updateRecipe: (r) => {
+      const next = recipes.map((x) => (x.id === r.id ? r : x));
       setRecipes(next);
       store.set("foodRecipes", next);
     },

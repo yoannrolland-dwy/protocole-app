@@ -414,6 +414,7 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
           onRemovePortion={food.removePortion}
           onCreateRecipe={food.addRecipe}
           onRemoveRecipe={food.removeRecipe}
+          onUpdateRecipe={food.updateRecipe}
           onClose={closeSearch}
           startFree={quickAdd}
         />

@@ -751,6 +751,27 @@ coaching dans le module — le jugement reste au Coach IA).
     n'indiquait qu'on avait changé de jour. Réutilise la même logique que
     le sous-titre en haut d'écran (`date === today() ? "aujourd'hui" :
     fmt(date)`).
+- **Modifier une recette déjà enregistrée (05/08/2026, v3.51.0)** : jusqu'ici seule la
+  suppression totale d'une recette était possible — corriger un ingrédient obligeait à tout
+  ressaisir. `compileRecipe(name, ingredients, existing)` accepte désormais un troisième
+  argument optionnel : passé, il conserve l'`id`/`createdAt` d'origine (le `ref`
+  `recipe:<id>` reste stable) au lieu d'en générer une nouvelle. Nouveau `updateRecipe` dans
+  `useFoodLog()`, icône crayon à côté de la corbeille sur chaque ligne de "Vos recettes"
+  (`Row` gagne un `onEdit`). `RecipeBuilder` accepte un `recipe` optionnel qui préremplit nom
+  et ingrédients et bascule les libellés ("Modifier la recette" / "Enregistrer les
+  modifications"). **Nouveau aussi : modifier la quantité d'un ingrédient déjà dans la
+  recette** (jusque-là on ne pouvait que le retirer et en rajouter un autre) — taper sur la
+  ligne d'un ingrédient ouvre un `Stepper` dédié, distinct d'`IngredientPicker` qui sert à en
+  AJOUTER un nouveau.
+  **Bug trouvé et corrigé pendant le test** : `compileRecipe` ne stockait que
+  `{ref, name, q}` par ingrédient, jamais son `per100` — en rouvrant une recette pour la
+  modifier, impossible de recalculer le total (affichait "— kcal"), et sauvegarder l'aurait
+  silencieusement corrompue (toutes les macros à `null`). Chaque ingrédient garde désormais
+  son propre `per100` figé, cohérent avec le principe M1 (figé à la saisie, jamais résolu à
+  la lecture) : une recette ne doit pas changer de composition si la table CIQUAL est mise à
+  jour derrière. **Testé dans l'aperçu** : création, modification du nom et remplacement d'un
+  ingrédient (pomme → banane, total recalculé en direct), édition de quantité seule,
+  sauvegarde confirmée en PLACE (une seule recette après modification, pas de doublon).
 
 ## Chantier V — étapes livrées
 

@@ -98,7 +98,7 @@ const val = (v, suffix = "") => (v === null || v === undefined ? "—" : `${v}${
 // Un badge honnête plutôt que de faire passer une donnée manquante pour un vrai zéro.
 const missingCount = (food) => MACROS.filter((m) => food.per100[m] === null || food.per100[m] === undefined).length;
 
-function Row({ food, onClick, pinned, onPin, onRemove }) {
+function Row({ food, onClick, pinned, onPin, onRemove, onEdit }) {
   const incomplete = food.ref.startsWith("off:") && missingCount(food) > 0;
   return (
     <div style={{
@@ -131,6 +131,13 @@ function Row({ food, onClick, pinned, onPin, onRemove }) {
           color: pinned ? C.accent : C.dim,
         }}>
           <Star size={15} fill={pinned ? C.accent : "none"} />
+        </button>
+      )}
+      {onEdit && (
+        <button onClick={onEdit} style={{
+          background: "none", border: "none", cursor: "pointer", padding: 6, color: C.dim,
+        }}>
+          <PencilLine size={14} />
         </button>
       )}
       {onRemove && (
@@ -241,10 +248,15 @@ function IngredientPicker({ onAdd, onCancel }) {
   );
 }
 
-function RecipeBuilder({ onSave, onBack }) {
-  const [name, setName] = useState("");
-  const [ingredients, setIngredients] = useState([]);
+// `recipe` (V8, 05/08/2026) : passé pour MODIFIER une recette existante (nom + ingrédients,
+// quantité de chaque ingrédient comprise) plutôt que d'en créer une nouvelle — jusqu'ici
+// seule la suppression totale était possible, sans aucun moyen de corriger un ingrédient
+// sans tout ressaisir depuis zéro.
+function RecipeBuilder({ recipe, onSave, onBack }) {
+  const [name, setName] = useState(recipe?.name ?? "");
+  const [ingredients, setIngredients] = useState(recipe?.ingredients ?? []);
   const [picking, setPicking] = useState(false);
+  const [editingIndex, setEditingIndex] = useState(null);
   const compiled = useMemo(() => compileRecipe(name || "?", ingredients), [name, ingredients]);
   const ok = name.trim().length > 0 && ingredients.length > 0;
 
@@ -253,20 +265,34 @@ function RecipeBuilder({ onSave, onBack }) {
       onAdd={(ing) => { setIngredients([...ingredients, ing]); setPicking(false); }} />;
   }
 
+  // Réglage de la quantité d'un ingrédient DÉJÀ dans la recette — distinct d'IngredientPicker,
+  // qui sert à en ajouter un nouveau. Même Stepper que partout ailleurs dans l'app.
+  if (editingIndex !== null) {
+    const ing = ingredients[editingIndex];
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <Label style={{ fontSize: 11 }}>{ing.name}</Label>
+        <Stepper value={ing.q} step={10} unit="g" min={1} int
+          set={(v) => setIngredients(ingredients.map((x, j) => (j === editingIndex ? { ...x, q: v } : x)))} />
+        <Btn variant="primary" onClick={() => setEditingIndex(null)}>OK</Btn>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <button onClick={onBack} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", padding: 4 }}>
           <ChevronLeft size={20} />
         </button>
-        <Label style={{ fontSize: 11 }}>Nouvelle recette</Label>
+        <Label style={{ fontSize: 11 }}>{recipe ? "Modifier la recette" : "Nouvelle recette"}</Label>
       </div>
       <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom (ex. Mon shaker du matin)" />
 
       {ingredients.map((ing, i) => (
-        <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 2px", borderBottom: `1px solid ${C.divider}` }}>
+        <div key={i} onClick={() => setEditingIndex(i)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 2px", borderBottom: `1px solid ${C.divider}`, cursor: "pointer" }}>
           <span style={{ fontSize: 12, color: C.text }}>{ing.name} <span style={{ color: C.muted, fontFamily: C.mono, fontSize: 10.5 }}>· {ing.q}g</span></span>
-          <button onClick={() => setIngredients(ingredients.filter((_, j) => j !== i))} style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", padding: 6 }}>
+          <button onClick={(e) => { e.stopPropagation(); setIngredients(ingredients.filter((_, j) => j !== i)); }} style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", padding: 6 }}>
             <Trash2 size={13} />
           </button>
         </div>
@@ -287,7 +313,9 @@ function RecipeBuilder({ onSave, onBack }) {
         </div>
       )}
 
-      <Btn variant="primary" disabled={!ok} onClick={() => onSave(name.trim(), ingredients)}>Enregistrer la recette</Btn>
+      <Btn variant="primary" disabled={!ok} onClick={() => onSave(name.trim(), ingredients)}>
+        {recipe ? "Enregistrer les modifications" : "Enregistrer la recette"}
+      </Btn>
     </div>
   );
 }
@@ -482,7 +510,7 @@ function OverridePanel({ food, shown, override, onSave, onClear, onCancel }) {
 /* ---------- feuille principale ---------- */
 export default function FoodSearch({
   meal, mealLabel, date, log, pins, muted, portions, recipes, overrides,
-  onAdd, onTogglePin, onMute, onSavePortion, onRemovePortion, onCreateRecipe, onRemoveRecipe,
+  onAdd, onTogglePin, onMute, onSavePortion, onRemovePortion, onCreateRecipe, onRemoveRecipe, onUpdateRecipe,
   onSaveOverride, onClearOverride,
   onClose, startFree = false,
 }) {
@@ -492,6 +520,8 @@ export default function FoodSearch({
   // passer par la recherche — la friction visée est justement d'éviter la recherche.
   const [free, setFree] = useState(startFree);
   const [building, setBuilding] = useState(false);
+  // Recette en cours de modification (V8) — `null` = on en crée une nouvelle.
+  const [editingRecipe, setEditingRecipe] = useState(null);
   // idle | scanning | lookup | notfound | error — distinct de offState : le scan peut
   // échouer avant même d'atteindre OFF (module Play Services, annulation).
   const [scanState, setScanState] = useState("idle");
@@ -544,12 +574,15 @@ export default function FoodSearch({
 
       <div style={{ flex: 1, overflowY: "auto", padding: 14 }}>
         {building ? (
-          <RecipeBuilder onBack={() => setBuilding(false)} onSave={(name, ingredients) => {
-            const r = compileRecipe(name, ingredients);
-            onCreateRecipe(r);
-            setBuilding(false);
-            setSel(recipeAsFood(r));
-          }} />
+          <RecipeBuilder recipe={editingRecipe}
+            onBack={() => { setBuilding(false); setEditingRecipe(null); }}
+            onSave={(name, ingredients) => {
+              const r = compileRecipe(name, ingredients, editingRecipe);
+              if (editingRecipe) onUpdateRecipe(r); else onCreateRecipe(r);
+              setBuilding(false);
+              setEditingRecipe(null);
+              setSel(recipeAsFood(r));
+            }} />
         ) : free ? (
           <FreeEntry onAdd={onAdd} onBack={() => setFree(false)}
             backLabel={startFree ? "Macro rapide" : "Saisie libre"} />
@@ -600,6 +633,7 @@ export default function FoodSearch({
                 {matchedRecipes.map((r) => (
                   <Row key={`recipe:${r.id}`} food={recipeAsFood(r)}
                     onClick={() => setSel(recipeAsFood(r))}
+                    onEdit={() => { setEditingRecipe(r); setBuilding(true); }}
                     onRemove={() => onRemoveRecipe(r.id)} />
                 ))}
               </>
