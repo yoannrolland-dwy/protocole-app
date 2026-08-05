@@ -15,11 +15,11 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Search, X, ChevronLeft, Star, PencilLine, Trash2, ScanBarcode, ChefHat, Utensils, Camera, Plus } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { C, Btn, Label, Body, Empty, Stepper, TextInput, inputStyle } from "../ui.jsx";
-import { searchCiqual, normalize, getCiqual } from "./ciqual.js";
-import { searchOFF, getOFFByBarcode } from "./off.js";
+import { searchCiqual, normalize, getCiqual } from "@rawcare/core/nutrition/ciqual";
+import { searchOFF, getOFFByBarcode } from "@rawcare/core/nutrition/off";
 import { suggestions, searchBoost, MACROS, newQuickRef, portionsFor, compileRecipe, recipeAsFood, isRecipeRef,
          applyOverride } from "./foodStore.js";
-import { scanBarcode } from "./scan.js";
+import { scanBarcode } from "@rawcare/core/nutrition/scan";
 import RestaurantMenu from "./RestaurantMenu.jsx";
 import PhotoDish from "./PhotoDish.jsx";
 

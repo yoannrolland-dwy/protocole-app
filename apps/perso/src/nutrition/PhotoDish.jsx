@@ -17,7 +17,7 @@ import React, { useState, useRef } from "react";
 import { ChevronLeft, Sparkles, Plus, Camera, X } from "lucide-react";
 import { C, Btn, Label, Body, inputStyle } from "../ui.jsx";
 import { callClaude, costCents } from "../claudeApi.js";
-import { fileToImagePayload } from "./imageUtils.js";
+import { fileToImagePayload } from "@rawcare/core/nutrition/imageUtils";
 import { newQuickRef } from "./foodStore.js";
 
 const MAX_PHOTOS = 3;

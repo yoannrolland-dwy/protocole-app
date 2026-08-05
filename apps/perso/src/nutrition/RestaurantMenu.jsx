@@ -30,7 +30,7 @@ import React, { useState, useRef } from "react";
 import { ChevronLeft, Sparkles, Plus, Check, Camera, X, Link } from "lucide-react";
 import { C, Btn, Label, Body, inputStyle } from "../ui.jsx";
 import { callClaude, costCents } from "../claudeApi.js";
-import { fileToImagePayload } from "./imageUtils.js";
+import { fileToImagePayload } from "@rawcare/core/nutrition/imageUtils";
 
 function extractJson(raw) {
   let s = raw.trim();
