@@ -836,6 +836,24 @@ coaching dans le module — le jugement reste au Coach IA).
   navigateur) ; cible passée de 2205 à 2275 kcal (35 g fibres × 2, cohérent partout). Le
   widget écran d'accueil (Android natif) utilise le même helper mais n'a pas pu être vérifié
   hors du téléphone — à confirmer visuellement après installation.
+- **Barre collante pour signaler le jour affiché dans Repas (05/08/2026, v3.52.0)** : remonté
+  par Yoann — le sous-titre "aujourd'hui"/date et la date en estompé à côté de chaque repas
+  (03/08/2026) se perdaient dès qu'il scrollait, aucun repère ne restait visible. Nouvelle
+  barre `position: sticky, top: 0` juste sous le `ScreenHeader`, visible UNIQUEMENT quand
+  `date !== today()` : texte accent citron directionnel ("← Hier · dim. 2 août",
+  "jeu. 6 août · demain →", ou "Il y a N jours"/"Dans N jours" au-delà de ±1) + bouton
+  "Aujourd'hui" pour revenir en un tap. Fond `C.accentRow` (jeton déjà utilisé ailleurs pour
+  un état actif/sélectionné, pas une nouvelle couleur), bordure accent, bleed horizontal en
+  marge négative pour occuper toute la largeur malgré le padding du conteneur.
+  **Volontairement PAS une pastille flottante** : le minuteur de repos a déjà expérimenté une
+  pastille épinglée en permanence et l'a abandonnée explicitement ("ça gênait le scroll",
+  voir plus haut) — même piège évité ici en repositionnant l'info existante plutôt qu'en
+  ajoutant un élément flottant nouveau. Écart de jours calculé en arithmétique locale pure
+  (`new Date(y, m-1, d)`, même famille que `shiftDateKey`), jamais un aller-retour par un
+  instant UTC. **Testé dans l'aperçu** (mobile 375×812) : label et flèche corrects pour "il y
+  a 3 jours" et "demain", barre confirmée toujours visible après un scroll profond jusqu'au
+  bas de la liste des repas, bouton "Aujourd'hui" ramène bien à `today()` et fait disparaître
+  la barre.
 
 ## Chantier V — étapes livrées
 

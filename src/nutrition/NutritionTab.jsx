@@ -8,7 +8,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Plus, Trash2, ChevronDown, ChevronRight, Droplet, Zap, Copy } from "lucide-react";
-import { C, Card, Label, Body, Btn, Empty, Stepper, DateField, ScreenHeader, Pills, today, fmt, upsert, shiftDateKey } from "../ui.jsx";
+import { C, Card, Label, Body, Btn, Empty, Stepper, DateField, ScreenHeader, Pills, today, fmt, longDate, upsert, shiftDateKey } from "../ui.jsx";
 import {
   MEALS, useFoodLog, makeEntry, amounts, entriesFor, totals, isQuickRef,
   copySourceCandidates, copyEntries, deriveMacroLog,
@@ -271,6 +271,22 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
     setDate((d) => shiftDateKey(d, dx < 0 ? 1 : -1));
   };
 
+  // Barre collante (05/08/2026) : le sous-titre + la date à côté de chaque repas se
+  // perdaient dès qu'on scrollait un peu — remonté par Yoann. `position: sticky` plutôt
+  // qu'une pastille flottante, volontairement : le minuteur de repos a déjà expérimenté une
+  // pastille épinglée en permanence et l'a abandonnée ("ça gênait le scroll"), même piège à
+  // éviter ici. Écart de jours en arithmétique locale pure (mêmes `new Date(y,m-1,d)` que
+  // `shiftDateKey`), jamais un aller-retour par un instant UTC.
+  const dayDiff = (key) => {
+    const [y, m, d] = key.split("-").map(Number);
+    const [ty, tm, td] = today().split("-").map(Number);
+    return Math.round((new Date(y, m - 1, d) - new Date(ty, tm - 1, td)) / 86400000);
+  };
+  const diff = dayDiff(date);
+  const dayLabel = diff < 0
+    ? `${diff === -1 ? "Hier" : `Il y a ${-diff} jours`} · ${longDate(date)}`
+    : `${longDate(date)} · ${diff === 1 ? "demain" : `dans ${diff} jours`}`;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}
       onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
@@ -278,6 +294,24 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
         title="Nutrition"
         subtitle={date === today() ? "aujourd'hui" : fmt(date)}
       />
+
+      {diff !== 0 && (
+        <div style={{
+          position: "sticky", top: 0, zIndex: 5,
+          margin: "0 -16px", padding: "9px 16px",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+          background: C.accentRow, borderBottom: `1.5px solid ${C.accent}`,
+        }}>
+          <span style={{ fontFamily: C.mono, fontSize: 11.5, fontWeight: 700, color: C.accent }}>
+            {diff < 0 ? "← " : ""}{dayLabel}{diff > 0 ? " →" : ""}
+          </span>
+          <button onClick={() => setDate(today())} style={{
+            fontFamily: C.mono, fontSize: 9.5, fontWeight: 700, textTransform: "uppercase",
+            letterSpacing: 0.4, color: C.bg, background: C.accent, border: "none",
+            borderRadius: 5, padding: "5px 8px", cursor: "pointer",
+          }}>Aujourd'hui</button>
+        </div>
+      )}
 
       <Card>
         <DateField value={date} onChange={setDate} future />
