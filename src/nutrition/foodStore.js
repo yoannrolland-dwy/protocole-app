@@ -172,7 +172,10 @@ export function deriveMacroLog(log) {
   const dates = [...new Set(log.map((e) => e.date))];
   return dates.map((date) => {
     const t = totals(entriesFor(log, date));
-    const fields = { date, source: "foodlog" };
+    // `kcal` porte la vraie somme mesurée (chaque aliment, pas une approximation 4/4/9) —
+    // c'est ce qui permet à l'onglet Macros d'afficher exactement le même chiffre que
+    // l'onglet Repas au lieu de recalculer une estimation qui ignore les fibres (05/08/2026).
+    const fields = { date, source: "foodlog", kcal: t.kcal };
     for (const [k, name] of Object.entries(MACRO_FIELD)) fields[name] = t[k];
     return fields;
   });

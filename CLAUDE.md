@@ -809,6 +809,33 @@ coaching dans le module — le jugement reste au Coach IA).
   repliée de CHAQUE aliment individuel dans `NutritionTab.jsx` — n'affichait que P/G/L,
   fibres oubliées. Ajout de `Fib{a.fib ?? "—"}` à la ligne, même style que les trois autres
   et que le total du repas juste au-dessus.
+- **Incohérence des calories entre l'onglet Repas et l'onglet Macros (05/08/2026, v3.51.5)** :
+  Repas affichait la vraie somme mesurée par aliment (`totals().kcal`, table CIQUAL/OFF,
+  fibres comprises) tandis que Macros/Dashboard/widget recalculaient toujours via 4/4/9 pur
+  (`protein*4+carbs*4+fat*9`) à partir des macros du jour — **fibres jamais comptées**
+  (2 kcal/g, règlement UE 1169/2011), donc deux chiffres différents pour la même journée dès
+  qu'elle contient des fibres. Le même formule tronquée était dupliquée à une douzaine
+  d'endroits (Dashboard, MacroTab, widget écran d'accueil, dataset 14 jours et texte système
+  du Coach IA), y compris pour les CIBLES (pas seulement la consommation).
+  **Corrigé avec deux helpers partagés** (`App.jsx`, juste après `targetsForDate`) :
+  `kcalFromMacros(p,c,f,fib)` (4/4/9 + fibres à 2 kcal/g — même coefficient que la table
+  CIQUAL et la saisie libre de `FreeEntry`, qui l'utilisait déjà) remplace partout l'ancienne
+  formule tronquée pour les CIBLES ; `kcalOfEntry(m)` préfère la vraie valeur mesurée
+  (`m.kcal`) quand elle existe et ne retombe sur l'estimation que si elle est absente, pour la
+  CONSOMMATION. `deriveMacroLog` (bascule M6, `foodStore.js`) pousse désormais aussi `kcal`
+  (vraie somme) dans `macroLog` pour les jours alimentés par `foodLog` — jusqu'ici seuls
+  protein/carbs/fat/fiber étaient dérivés, jamais kcal, ce qui obligeait Macros à
+  recalculer une approximation alors que la vraie valeur existait déjà. Comparaison de
+  `NutritionTab` étendue à `cur.kcal !== d.kcal` pour que les jours déjà migrés avant ce
+  correctif se fassent backfiller une seule fois au prochain chargement (pas de nouvelle clé,
+  pas de migration manuelle). `tdee.js` (`kcal449`) volontairement **non touché** : repli
+  4/4/9 déjà scopé aux seules dates antérieures au module Repas, déjà testé (15 assertions),
+  aucun rapport avec cette incohérence d'affichage. **Testé dans l'aperçu** : "Pomme, sèche"
+  (252 kcal réelles, 8,7 g fibres/100 g — écart de 17 kcal avec un 4/4/9 pur) loguée dans
+  Repas, même chiffre 252 vérifié à l'identique dans Macros et le Dashboard (aperçu
+  navigateur) ; cible passée de 2205 à 2275 kcal (35 g fibres × 2, cohérent partout). Le
+  widget écran d'accueil (Android natif) utilise le même helper mais n'a pas pu être vérifié
+  hors du téléphone — à confirmer visuellement après installation.
 
 ## Chantier V — étapes livrées
 

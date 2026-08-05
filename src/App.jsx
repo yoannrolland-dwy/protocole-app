@@ -36,7 +36,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor, totals as foodTotals, resolveLog as resolveFoodLog } from "./nutrition/foodStore.js";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.51.4";
+const APP_VERSION = "3.51.5";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -936,9 +936,7 @@ function Dashboard({ weight, sleep, knee, elbow, macros, steps, targets, trainin
   const kToday = knee.find((k) => k.date === today());
   const eToday = elbow.find((k) => k.date === today());
   const mToday = macros.find((m) => m.date === today());
-  const kcalToday = mToday
-    ? Math.round((mToday.protein ?? 0) * 4 + (mToday.carbs ?? 0) * 4 + (mToday.fat ?? 0) * 9)
-    : null;
+  const kcalToday = mToday ? Math.round(kcalOfEntry(mToday)) : null;
 
   const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee, elbow, sleep, targets }), [training, knee, elbow, sleep, targets]);
 
@@ -946,7 +944,7 @@ function Dashboard({ weight, sleep, knee, elbow, macros, steps, targets, trainin
   const waterToday = mToday?.water ?? 0;
   const basketToday = training.some((t) => t.type === "Basket" && t.date === today());
   const waterTgt = targets.water + (basketToday ? 1000 : 0);
-  const kcalTgt = (() => { const a = targetsForDate(today(), targets); return Math.round(a.protein * 4 + a.carbs * 4 + a.fat * 9); })();
+  const kcalTgt = (() => { const a = targetsForDate(today(), targets); return Math.round(kcalFromMacros(a.protein, a.carbs, a.fat, a.fiber)); })();
 
   // 3 paires, toutes cliquables vers l'onglet correspondant.
   const tiles = [
@@ -2360,7 +2358,10 @@ function MacroTab({ macros, targets, save, training, weight }) {
     setF(e?.fat ?? emptyMacro(atd.fat)); setFib(e?.fiber ?? emptyMacro(atd.fiber));
     setForceManual(false);
   };
-  const kcal = p * 4 + c * 4 + f * 9;
+  // Vraie valeur mesurée (jour alimenté par foodLog) si elle existe, sinon estimation à
+  // partir des macros affichées — jamais la resommer en 4/4/9 quand la vraie valeur est là,
+  // pour que ce chiffre ne diverge jamais de celui de l'onglet Repas (05/08/2026).
+  const kcal = cur.kcal ?? kcalFromMacros(p, c, f, fib);
   const saveMacros = () => save.macros(upsert(macros, { date, protein: round(p), carbs: round(c), fat: round(f), fiber: round(fib), water, source: "manual" }));
   const addWater = (ml) => {
     const next = Math.max(0, (macros.find((m) => m.date === date)?.water ?? 0) + ml);
@@ -2368,9 +2369,9 @@ function MacroTab({ macros, targets, save, training, weight }) {
   };
   const kcalTrend = lastN(macros, 14).map((m) => ({
     date: fmt(m.date),
-    kcal: Math.round((m.protein ?? 0) * 4 + (m.carbs ?? 0) * 4 + (m.fat ?? 0) * 9),
+    kcal: Math.round(kcalOfEntry(m)),
   }));
-  const kcalTarget = Math.round(at.protein * 4 + at.carbs * 4 + at.fat * 9);
+  const kcalTarget = Math.round(kcalFromMacros(at.protein, at.carbs, at.fat, at.fiber));
   const kcalPct = Math.min(100, (kcal / kcalTarget) * 100);
 
   // Dépense énergétique adaptative (V7). Calculée à chaque montage de l'onglet — le journal
@@ -2380,7 +2381,7 @@ function MacroTab({ macros, targets, save, training, weight }) {
   // jamais sur la date parcourue dans le sélecteur ci-dessous.
   const tdeeToday = tdeeNow({ foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}), macros, weight, targets });
   const atToday = targetsForDate(today(), targets);
-  const kcalTargetToday = Math.round(atToday.protein * 4 + atToday.carbs * 4 + atToday.fat * 9);
+  const kcalTargetToday = Math.round(kcalFromMacros(atToday.protein, atToday.carbs, atToday.fat, atToday.fiber));
   const deficitReel = tdeeToday.status === "ok" ? realDeficit(kcalTargetToday, tdeeToday.tdee) : null;
 
   return (
@@ -2695,7 +2696,7 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
           <Field label="Fibres (g)"><Stepper value={cut.fiber ?? 0} set={(v) => setCut({ fiber: v })} step={1} min={0} int /></Field>
         </div>
         <Body style={{ fontSize: 10, color: C.dim, marginTop: 8, fontFamily: C.mono }}>
-          ≈ {Math.round((cut.protein ?? 0) * 4 + (cut.carbs ?? 0) * 4 + (cut.fat ?? 0) * 9)} kcal
+          ≈ {Math.round(kcalFromMacros(cut.protein, cut.carbs, cut.fat, cut.fiber))} kcal
         </Body>
       </Card>
 
@@ -2830,6 +2831,15 @@ const targetsForDate = (d, base) => {
   const { protein, carbs, fat, fiber } = base.cut;
   return { ...base, protein, carbs, fat, fiber };
 };
+
+// Calories dérivées des macros (P/G/L en 4/4/9, fibres à 2 kcal/g — règlement UE 1169/2011,
+// même coefficient que la table CIQUAL et la saisie libre de l'onglet Repas). Sert de repli
+// pour une cible (jamais de kcal réelle) ou un jour sans détail per-aliment.
+const kcalFromMacros = (p, c, f, fib = 0) => (p ?? 0) * 4 + (c ?? 0) * 4 + (f ?? 0) * 9 + (fib ?? 0) * 2;
+// Calories réelles d'un jour de macroLog quand elles existent (bascule M6, jour alimenté par
+// foodLog) — sinon repli sur l'estimation ci-dessus. Ne jamais recalculer en 4/4/9 un jour qui
+// a déjà sa vraie valeur mesurée : Repas et Macros doivent toujours afficher le même chiffre.
+const kcalOfEntry = (m) => m?.kcal ?? kcalFromMacros(m?.protein, m?.carbs, m?.fat, m?.fiber);
 
 /**
  * Dépense énergétique adaptative (V7) — calculée "maintenant", factorisée pour que l'écran
@@ -3018,13 +3028,13 @@ export default function App({ silent = false } = {}) {
     const wLast = lastN(weight, 1)[0];
     const lastNightDash = lastN(sleep, 1)[0];
     const mToday = macros.find((m) => m.date === today());
-    const kcalToday = mToday ? Math.round((mToday.protein ?? 0) * 4 + (mToday.carbs ?? 0) * 4 + (mToday.fat ?? 0) * 9) : null;
+    const kcalToday = mToday ? Math.round(kcalOfEntry(mToday)) : null;
     const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
     const waterToday = mToday?.water ?? 0;
     const basketToday = training.some((t) => t.type === "Basket" && t.date === today());
     const waterTgt = targets.water + (basketToday ? 1000 : 0);
     const at = targetsForDate(today(), targets);
-    const kcalTgt = Math.round(at.protein * 4 + at.carbs * 4 + at.fat * 9);
+    const kcalTgt = Math.round(kcalFromMacros(at.protein, at.carbs, at.fat, at.fiber));
 
     updateDashboardWidget({
       poids: { value: wLast ? `${wLast.kg} kg` : "—", note: wLast ? fmt(wLast.date) : "—" },
@@ -3205,7 +3215,7 @@ export default function App({ silent = false } = {}) {
         // qu'il n'y a pas assez de recul — jamais un chiffre non fiable.
         depense_estimee: tdeeResult.status === "ok" ? {
           kcal_j: tdeeResult.tdee, fiabilite: tdeeResult.reliability, fenetre_jours: tdeeResult.days,
-          deficit_reel_vs_cible: realDeficit(Math.round(atToday.protein * 4 + atToday.carbs * 4 + atToday.fat * 9), tdeeResult.tdee),
+          deficit_reel_vs_cible: realDeficit(Math.round(kcalFromMacros(atToday.protein, atToday.carbs, atToday.fat, atToday.fiber)), tdeeResult.tdee),
           chevauche_perte_eau: tdeeResult.overlapsWater,
         } : { statut: "pas assez de données" },
       };
@@ -3220,13 +3230,13 @@ export default function App({ silent = false } = {}) {
         const w = weight.find((e) => e.date === d);
         const m = macros.find((e) => e.date === d);
         const st = steps.find((e) => e.date === d);
-        const kcal = m ? Math.round((m.protein ?? 0) * 4 + (m.carbs ?? 0) * 4 + (m.fat ?? 0) * 9) : null;
+        const kcal = m ? Math.round(kcalOfEntry(m)) : null;
         const at = targetsForDate(d, targets);
         // Clés courtes et champs nuls omis : sur 14 lignes, les `"proteines":null` répétés
         // pesaient pour rien. Une légende explicite les abréviations dans le prompt.
         const row = { d: d.slice(5), p: w?.kg, kc: kcal, P: m?.protein, G: m?.carbs, L: m?.fat,
           F: m?.fiber, eau: m?.water, pas: st?.count,
-          cible_kc: Math.round(at.protein * 4 + at.carbs * 4 + at.fat * 9) };
+          cible_kc: Math.round(kcalFromMacros(at.protein, at.carbs, at.fat, at.fiber)) };
         Object.keys(row).forEach((k) => { if (row[k] == null) delete row[k]; });
         return row;
       });
@@ -3238,7 +3248,7 @@ export default function App({ silent = false } = {}) {
       const daysToEnd = cutOn ? daysBetween(today(), targets.cut.end) : null;
       const tempBlock = cutOn ? `
 
-OBJECTIF EN COURS — fenêtre du ${targets.cut.start} au ${targets.cut.end} (encore ${daysToEnd} j) : cibles macros actives ${atToday.protein}P/${atToday.carbs}G/${atToday.fat}L/${atToday.fiber}fibres (~${Math.round(atToday.protein * 4 + atToday.carbs * 4 + atToday.fat * 9)} kcal).` : "";
+OBJECTIF EN COURS — fenêtre du ${targets.cut.start} au ${targets.cut.end} (encore ${daysToEnd} j) : cibles macros actives ${atToday.protein}P/${atToday.carbs}G/${atToday.fat}L/${atToday.fiber}fibres (~${Math.round(kcalFromMacros(atToday.protein, atToday.carbs, atToday.fat, atToday.fiber))} kcal).` : "";
 
       // Les RÈGLES de l'objectif (projection réaliste, quand lire la balance, interdiction
       // d'ajouter du volume à impact…) vivent désormais dans le profil permanent, éditable

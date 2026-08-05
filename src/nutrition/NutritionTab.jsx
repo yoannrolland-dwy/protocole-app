@@ -190,7 +190,7 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
     let changed = false;
     for (const d of derived) {
       const cur = macros.find((m) => m.date === d.date);
-      if (!cur || cur.protein !== d.protein || cur.carbs !== d.carbs || cur.fat !== d.fat || cur.fiber !== d.fiber || cur.source !== "foodlog") {
+      if (!cur || cur.protein !== d.protein || cur.carbs !== d.carbs || cur.fat !== d.fat || cur.fiber !== d.fiber || cur.kcal !== d.kcal || cur.source !== "foodlog") {
         next = upsert(next, d);
         changed = true;
       }
@@ -205,7 +205,10 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
   const t = useMemo(() => totals(dayEntries), [dayEntries]);
 
   const tg = targetsFor(date);
-  const kcalTarget = Math.round(tg.protein * 4 + tg.carbs * 4 + tg.fat * 9);
+  // Fibres comptées (2 kcal/g, règlement UE 1169/2011) : sans ça, la cible était
+  // systématiquement sous-évaluée par rapport aux calories réelles consommées (qui, elles,
+  // comptent déjà les fibres via la table CIQUAL) — corrigé le 05/08/2026.
+  const kcalTarget = Math.round(tg.protein * 4 + tg.carbs * 4 + tg.fat * 9 + (tg.fiber ?? 0) * 2);
   const left = kcalTarget - t.kcal;
 
   // Eau : PAS une donnée du module Nutrition. `macroLog.water` existe déjà (saisie
