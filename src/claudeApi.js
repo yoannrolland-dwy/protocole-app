@@ -45,7 +45,7 @@ const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
  * pas d'analyse du tout. Les erreurs définitives (clé invalide, requête malformée) ne sont
  * jamais reprises : ça ne ferait que retarder le vrai message d'erreur.
  */
-export async function callClaude({ apiKey, model, system, user, effort, maxTokens, onRetry }) {
+export async function callClaude({ apiKey, model, system, user, effort, maxTokens, tools, onRetry }) {
   const attempt = async (m) => {
     const body = {
       model: m,
@@ -54,6 +54,7 @@ export async function callClaude({ apiKey, model, system, user, effort, maxToken
       messages: [{ role: "user", content: user }],
     };
     if (effort && SUPPORTS_EFFORT.has(m)) body.output_config = { effort };
+    if (tools) body.tools = tools;
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {

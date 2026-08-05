@@ -15,9 +15,19 @@
 // "Saisie libre"/"Nouvelle recette" (demandé le 05/08/2026, pas un bouton direct dans
 // l'onglet Repas comme la toute première version). Le repas de destination est donc déjà
 // connu (celui pour lequel "+Ajouter" a été ouvert) : pas de sélecteur de repas ici.
+//
+// Lien internet (05/08/2026) : utilise l'outil serveur `web_fetch` de Claude plutôt qu'un
+// fetch() direct depuis le navigateur — la quasi-totalité des sites resto n'autorisent pas
+// le CORS cross-origin, donc un fetch() côté app échouerait systématiquement. `web_fetch`
+// s'exécute côté serveur Anthropic (aucun blocage CORS) et renvoie son résultat DANS la même
+// réponse : pas de boucle d'outil à gérer côté client, le bloc "text" final contient déjà le
+// JSON attendu, exactement comme sans outil. Aucun header beta requis (GA sur Sonnet 5).
+// Fiabilité connue plus faible que le texte/la photo : beaucoup de cartes sont en PDF, en
+// image, ou générées par un framework JS que web_fetch ne rend pas — traité comme une
+// source parmi d'autres, pas une garantie (voir SYSTEM_PROMPT, tableaux vides si illisible).
 
 import React, { useState, useRef } from "react";
-import { ChevronLeft, Sparkles, Plus, Check, Camera, X } from "lucide-react";
+import { ChevronLeft, Sparkles, Plus, Check, Camera, X, Link } from "lucide-react";
 import { C, Btn, Label, Body, inputStyle } from "../ui.jsx";
 import { callClaude, costCents } from "../claudeApi.js";
 
@@ -60,18 +70,19 @@ function fileToImagePayload(file, maxDim = 1600, quality = 0.82) {
 }
 
 const SYSTEM_PROMPT = `Tu es un nutritionniste qui aide à choisir un repas au restaurant à partir d'une carte.
-On te donne la carte (en texte et/ou en photo) et les macros qu'il reste à l'utilisateur à consommer
-ce jour-là. Tâche :
+On te donne la carte (en texte, en photo, et/ou via un lien internet à lire avec l'outil web_fetch)
+et les macros qu'il reste à l'utilisateur à consommer ce jour-là. Tâche :
 1. Extrait chaque plat identifiable de la carte (nom repris tel quel ou reformulé brièvement s'il est
-   ambigu, lu sur la ou les photos si fournies), catégorie parmi "entree"/"plat"/"dessert"/"autre", et
-   ESTIME ses macros (kcal, prot, gluc, lip, fib en grammes) à partir de sa composition et de portions
-   restaurant françaises courantes. Ce sont des estimations, pas des valeurs mesurées : reste
-   réaliste, ne détaille pas ton raisonnement.
+   ambigu, lu sur la ou les photos ou la page web si fournies), catégorie parmi
+   "entree"/"plat"/"dessert"/"autre", et ESTIME ses macros (kcal, prot, gluc, lip, fib en grammes) à
+   partir de sa composition et de portions restaurant françaises courantes. Ce sont des estimations,
+   pas des valeurs mesurées : reste réaliste, ne détaille pas ton raisonnement.
 2. Propose 2 à 3 combinaisons adaptées à l'objectif "peu de calories, riche en protéines", chacune
    composée de EXACTEMENT deux plats de la carte : soit une entrée + un plat, soit une entrée + une
    autre entrée (jamais un plat seul, jamais dessert dans une combinaison). Les noms dans
    suggestions[].plats doivent être copiés EXACTEMENT depuis plats[].nom.
-3. N'invente aucun plat absent de la carte. Si la carte est illisible (photo floue, texte vide),
+3. N'invente aucun plat absent de la carte. Si la carte est illisible (photo floue, texte vide, page
+   web qui ne charge pas ou ne contient pas de menu exploitable — PDF, image, site trop dynamique),
    renvoie des tableaux vides plutôt que d'inventer.
 
 Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, sans balises markdown, exactement
@@ -79,12 +90,13 @@ selon ce schéma :
 {"plats":[{"nom":string,"categorie":"entree"|"plat"|"dessert"|"autre","kcal":number,"prot":number,"gluc":number,"lip":number,"fib":number}],
 "suggestions":[{"titre":string,"plats":[string,string],"kcal":number,"prot":number,"gluc":number,"lip":number,"fib":number,"pourquoi":string}]}`;
 
-function buildUserText(menuText, remaining, hasPhotos) {
+function buildUserText(menuText, remaining, hasPhotos, menuUrl) {
   const header = `RESTE À CONSOMMER CE JOUR-LÀ : ${Math.round(remaining.kcal)} kcal, ${Math.round(remaining.prot)} g protéines, ${Math.round(remaining.gluc)} g glucides, ${Math.round(remaining.lip)} g lipides, ${Math.round(remaining.fib)} g fibres.`;
-  if (hasPhotos) {
-    return `${header}\n\nLis la carte du restaurant sur la ou les photos ci-jointes.${menuText.trim() ? `\n\nNote complémentaire : ${menuText.trim()}` : ""}`;
-  }
-  return `${header}\n\nCARTE DU RESTAURANT :\n${menuText.trim()}`;
+  const parts = [header];
+  if (menuUrl.trim()) parts.push(`LIEN DE LA CARTE (utilise web_fetch pour la lire) : ${menuUrl.trim()}`);
+  if (hasPhotos) parts.push("Lis aussi la carte du restaurant sur la ou les photos ci-jointes.");
+  if (menuText.trim()) parts.push((hasPhotos || menuUrl.trim()) ? `Note complémentaire : ${menuText.trim()}` : `CARTE DU RESTAURANT :\n${menuText.trim()}`);
+  return parts.join("\n\n");
 }
 
 function MacroLine({ kcal, prot, gluc, lip, fib }) {
@@ -137,6 +149,7 @@ const CAT_ORDER = ["entree", "plat", "dessert", "autre"];
 
 export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDishes, onBack }) {
   const [menuText, setMenuText] = useState("");
+  const [menuUrl, setMenuUrl] = useState("");
   const [photos, setPhotos] = useState([]); // [{id, dataUrl, base64, mediaType}]
   const [photoErr, setPhotoErr] = useState("");
   const fileInputRef = useRef(null);
@@ -161,7 +174,7 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
   };
   const removePhoto = (id) => setPhotos((prev) => prev.filter((p) => p.id !== id));
 
-  const hasInput = menuText.trim().length > 0 || photos.length > 0;
+  const hasInput = menuText.trim().length > 0 || photos.length > 0 || menuUrl.trim().length > 0;
 
   const run = async () => {
     if (!apiKey) { setErr("Ajoute ta clé API Anthropic dans Réglages pour activer cette fonction."); setState("error"); return; }
@@ -169,14 +182,18 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
     setState("loading"); setErr(""); setProgress(""); setResult(null); setMeta(null); setLoggedKeys(new Set());
     try {
       const hasPhotos = photos.length > 0;
-      const text = buildUserText(menuText, remaining, hasPhotos);
+      const hasUrl = menuUrl.trim().length > 0;
+      const text = buildUserText(menuText, remaining, hasPhotos, menuUrl);
       const user = hasPhotos
         ? [...photos.map((p) => ({ type: "image", source: { type: "base64", media_type: p.mediaType, data: p.base64 } })),
            { type: "text", text }]
         : text;
       const askedModel = model || "claude-sonnet-5";
+      // web_fetch : outil serveur, aucun header beta requis, ne lit qu'une URL déjà présente
+      // dans le message (celle qu'on vient d'y écrire) — cf. commentaire d'en-tête du fichier.
+      const tools = hasUrl ? [{ type: "web_fetch_20260209", name: "web_fetch", max_uses: 2, max_content_tokens: 5000 }] : undefined;
       const { data, usedModel } = await callClaude({
-        apiKey, model: askedModel, system: SYSTEM_PROMPT, user,
+        apiKey, model: askedModel, system: SYSTEM_PROMPT, user, tools,
         effort: "medium", maxTokens: 3000, onRetry: setProgress,
       });
       setProgress("");
@@ -266,8 +283,18 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
         </div>
 
         {photoErr && <Body style={{ fontSize: 10, color: C.danger, marginTop: 4 }}>{photoErr}</Body>}
+
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
+          <Link size={12} color={C.muted} style={{ flexShrink: 0 }} />
+          <input type="url" inputMode="url" value={menuUrl} onChange={(e) => setMenuUrl(e.target.value)}
+            placeholder="Ou colle un lien vers le menu (site du resto)"
+            style={{ ...inputStyle(false), fontSize: 12, fontWeight: 400, width: "100%" }} />
+        </div>
+
         <Body style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>
-          Estimations IA, pas des valeurs mesurées — utile pour choisir, pas une pesée.
+          Estimations IA, pas des valeurs mesurées — utile pour choisir, pas une pesée. Un lien
+          fonctionne surtout pour un menu en texte ; les cartes en PDF/image sur le site risquent
+          de ne rien donner (utilise la photo dans ce cas).
         </Body>
       </div>
 
