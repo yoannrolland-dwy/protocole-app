@@ -348,7 +348,12 @@ function RecipeBuilder({ recipe, onSave, onBack }) {
 
       {ingredients.map((ing, i) => (
         <div key={i} onClick={() => setEditingIndex(i)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 2px", borderBottom: `1px solid ${C.divider}`, cursor: "pointer" }}>
-          <span style={{ fontSize: 12, color: C.text }}>{ing.name} <span style={{ color: C.muted, fontFamily: C.mono, fontSize: 10.5 }}>· {ing.q}g</span></span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 12, color: C.text }}>{ing.name}</div>
+            <div style={{ fontFamily: C.mono, fontSize: 10.5, color: C.muted, marginTop: 2 }}>
+              {ing.q}g · <span style={{ color: C.accent, fontWeight: 700 }}>{val(kcalFor(ing.per100, ing.q))} kcal</span>
+            </div>
+          </div>
           <button onClick={(e) => { e.stopPropagation(); setIngredients(ingredients.filter((_, j) => j !== i)); }} style={{ background: "none", border: "none", color: C.dim, cursor: "pointer", padding: 6 }}>
             <Trash2 size={13} />
           </button>

@@ -798,6 +798,12 @@ coaching dans le module — le jugement reste au Coach IA).
   Volontairement limité aux calories (pas le détail P/G/L/Fib comme `QtyPanel`) : c'est ce qui
   a été demandé, et le detail complet existe déjà une fois l'ingrédient ajouté (total de la
   recette, juste en dessous de la liste).
+- **Calories aussi sur la LISTE des ingrédients déjà ajoutés (05/08/2026, v3.51.3)** :
+  demande complémentaire — la carte v3.51.2 couvrait les deux écrans de réglage de quantité,
+  pas la liste elle-même dans `RecipeBuilder` (qui n'affichait que "Nom · 120g"). Chaque ligne
+  passe sur deux niveaux ("Nom" puis "120g · **48 kcal**" en accent, réutilisant `kcalFor`)
+  au lieu d'une seule ligne — nécessaire pour garder la place au clic vers l'éditeur de
+  quantité (`onClick` sur toute la ligne, inchangé) sans surcharger.
 
 ## Chantier V — étapes livrées
 
