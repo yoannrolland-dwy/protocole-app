@@ -16,8 +16,8 @@
 // l'onglet Repas comme la toute première version). Le repas de destination est donc déjà
 // connu (celui pour lequel "+Ajouter" a été ouvert) : pas de sélecteur de repas ici.
 
-import React, { useState } from "react";
-import { ChevronLeft, Sparkles, Plus, Check } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { ChevronLeft, Sparkles, Plus, Check, Camera, X } from "lucide-react";
 import { C, Btn, Label, Body, inputStyle } from "../ui.jsx";
 import { callClaude, costCents } from "../claudeApi.js";
 
@@ -31,32 +31,60 @@ function extractJson(raw) {
   return JSON.parse(s);
 }
 
-function buildPrompt(menuText, remaining) {
-  const system = `Tu es un nutritionniste qui aide à choisir un repas au restaurant à partir d'une carte.
-On te donne le texte brut d'une carte (entrées, plats, desserts) et les macros qu'il reste à
-l'utilisateur à consommer aujourd'hui. Tâche :
+// Jusqu'à 4 photos (une carte a souvent plusieurs pages/faces). Redimensionnées côté client
+// (1600px de long, JPEG ~82%) avant envoi : une photo de téléphone brute pèse plusieurs Mo,
+// inutile en tokens et en temps de requête pour lire du texte sur une carte.
+const MAX_PHOTOS = 4;
+
+function fileToImagePayload(file, maxDim = 1600, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Lecture du fichier impossible"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Image illisible"));
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale) || 1;
+        const h = Math.round(img.height * scale) || 1;
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        const jpeg = canvas.toDataURL("image/jpeg", quality);
+        resolve({ dataUrl: jpeg, base64: jpeg.split(",")[1], mediaType: "image/jpeg" });
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+const SYSTEM_PROMPT = `Tu es un nutritionniste qui aide à choisir un repas au restaurant à partir d'une carte.
+On te donne la carte (en texte et/ou en photo) et les macros qu'il reste à l'utilisateur à consommer
+ce jour-là. Tâche :
 1. Extrait chaque plat identifiable de la carte (nom repris tel quel ou reformulé brièvement s'il est
-   ambigu), catégorie parmi "entree"/"plat"/"dessert"/"autre", et ESTIME ses macros (kcal, prot, gluc,
-   lip, fib en grammes) à partir de sa composition et de portions restaurant françaises courantes. Ce
-   sont des estimations, pas des valeurs mesurées : reste réaliste, ne détaille pas ton raisonnement.
+   ambigu, lu sur la ou les photos si fournies), catégorie parmi "entree"/"plat"/"dessert"/"autre", et
+   ESTIME ses macros (kcal, prot, gluc, lip, fib en grammes) à partir de sa composition et de portions
+   restaurant françaises courantes. Ce sont des estimations, pas des valeurs mesurées : reste
+   réaliste, ne détaille pas ton raisonnement.
 2. Propose 2 à 3 combinaisons adaptées à l'objectif "peu de calories, riche en protéines", chacune
    composée de EXACTEMENT deux plats de la carte : soit une entrée + un plat, soit une entrée + une
    autre entrée (jamais un plat seul, jamais dessert dans une combinaison). Les noms dans
    suggestions[].plats doivent être copiés EXACTEMENT depuis plats[].nom.
-3. N'invente aucun plat absent de la carte. Si la carte est illisible ou vide, renvoie des tableaux
-   vides plutôt que d'inventer.
+3. N'invente aucun plat absent de la carte. Si la carte est illisible (photo floue, texte vide),
+   renvoie des tableaux vides plutôt que d'inventer.
 
 Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, sans balises markdown, exactement
 selon ce schéma :
 {"plats":[{"nom":string,"categorie":"entree"|"plat"|"dessert"|"autre","kcal":number,"prot":number,"gluc":number,"lip":number,"fib":number}],
 "suggestions":[{"titre":string,"plats":[string,string],"kcal":number,"prot":number,"gluc":number,"lip":number,"fib":number,"pourquoi":string}]}`;
 
-  const user = `RESTE À CONSOMMER AUJOURD'HUI : ${Math.round(remaining.kcal)} kcal, ${Math.round(remaining.prot)} g protéines, ${Math.round(remaining.gluc)} g glucides, ${Math.round(remaining.lip)} g lipides, ${Math.round(remaining.fib)} g fibres.
-
-CARTE DU RESTAURANT :
-${menuText.trim()}`;
-
-  return { system, user };
+function buildUserText(menuText, remaining, hasPhotos) {
+  const header = `RESTE À CONSOMMER CE JOUR-LÀ : ${Math.round(remaining.kcal)} kcal, ${Math.round(remaining.prot)} g protéines, ${Math.round(remaining.gluc)} g glucides, ${Math.round(remaining.lip)} g lipides, ${Math.round(remaining.fib)} g fibres.`;
+  if (hasPhotos) {
+    return `${header}\n\nLis la carte du restaurant sur la ou les photos ci-jointes.${menuText.trim() ? `\n\nNote complémentaire : ${menuText.trim()}` : ""}`;
+  }
+  return `${header}\n\nCARTE DU RESTAURANT :\n${menuText.trim()}`;
 }
 
 function MacroLine({ kcal, prot, gluc, lip, fib }) {
@@ -109,6 +137,9 @@ const CAT_ORDER = ["entree", "plat", "dessert", "autre"];
 
 export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDishes, onBack }) {
   const [menuText, setMenuText] = useState("");
+  const [photos, setPhotos] = useState([]); // [{id, dataUrl, base64, mediaType}]
+  const [photoErr, setPhotoErr] = useState("");
+  const fileInputRef = useRef(null);
   const [state, setState] = useState("idle"); // idle | loading | done | error
   const [progress, setProgress] = useState("");
   const [err, setErr] = useState("");
@@ -116,15 +147,36 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
   const [meta, setMeta] = useState(null);
   const [loggedKeys, setLoggedKeys] = useState(() => new Set());
 
+  const pickPhotos = async (e) => {
+    const files = [...(e.target.files || [])].slice(0, MAX_PHOTOS - photos.length);
+    e.target.value = ""; // permet de resélectionner le même fichier ensuite
+    if (!files.length) return;
+    setPhotoErr("");
+    try {
+      const converted = await Promise.all(files.map((f) => fileToImagePayload(f)));
+      setPhotos((prev) => [...prev, ...converted.map((p, i) => ({ id: `${Date.now()}-${i}`, ...p }))].slice(0, MAX_PHOTOS));
+    } catch {
+      setPhotoErr("Une photo n'a pas pu être lue — réessaie.");
+    }
+  };
+  const removePhoto = (id) => setPhotos((prev) => prev.filter((p) => p.id !== id));
+
+  const hasInput = menuText.trim().length > 0 || photos.length > 0;
+
   const run = async () => {
     if (!apiKey) { setErr("Ajoute ta clé API Anthropic dans Réglages pour activer cette fonction."); setState("error"); return; }
-    if (!menuText.trim()) return;
+    if (!hasInput) return;
     setState("loading"); setErr(""); setProgress(""); setResult(null); setMeta(null); setLoggedKeys(new Set());
     try {
-      const { system, user } = buildPrompt(menuText, remaining);
+      const hasPhotos = photos.length > 0;
+      const text = buildUserText(menuText, remaining, hasPhotos);
+      const user = hasPhotos
+        ? [...photos.map((p) => ({ type: "image", source: { type: "base64", media_type: p.mediaType, data: p.base64 } })),
+           { type: "text", text }]
+        : text;
       const askedModel = model || "claude-sonnet-5";
       const { data, usedModel } = await callClaude({
-        apiKey, model: askedModel, system, user,
+        apiKey, model: askedModel, system: SYSTEM_PROMPT, user,
         effort: "medium", maxTokens: 3000, onRetry: setProgress,
       });
       setProgress("");
@@ -133,7 +185,7 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
       try { parsed = extractJson(raw); }
       catch {
         console.warn("Carte resto — JSON illisible :", raw);
-        setErr("Réponse illisible. Réessaie, ou réduis/simplifie le texte collé.");
+        setErr("Réponse illisible. Réessaie, ou simplifie le texte/la photo.");
         setState("error");
         return;
       }
@@ -182,21 +234,47 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
       <div>
         <Label style={{ marginBottom: 5 }}>Carte du restaurant</Label>
         <textarea
-            value={menuText}
-            onChange={(e) => setMenuText(e.target.value)}
-            placeholder={"Colle ou tape le menu : entrées, plats, desserts…\nEx. Tartare de saumon, avocat, agrumes — 14€\nPoulet fermier rôti, légumes de saison — 19€\n…"}
-            rows={7}
-            style={{ ...inputStyle(false), fontFamily: "inherit", fontSize: 12, fontWeight: 400, resize: "vertical", width: "100%" }}
-          />
-          <Body style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>
-            Estimations IA, pas des valeurs mesurées — utile pour choisir, pas une pesée.
-          </Body>
+          value={menuText}
+          onChange={(e) => setMenuText(e.target.value)}
+          placeholder={photos.length ? "Note complémentaire (facultatif)…" : "Colle ou tape le menu : entrées, plats, desserts…\nEx. Tartare de saumon, avocat, agrumes — 14€\nPoulet fermier rôti, légumes de saison — 19€\n…"}
+          rows={photos.length ? 3 : 7}
+          style={{ ...inputStyle(false), fontFamily: "inherit", fontSize: 12, fontWeight: 400, resize: "vertical", width: "100%" }}
+        />
+
+        <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={pickPhotos} style={{ display: "none" }} />
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+          {photos.map((p) => (
+            <div key={p.id} style={{ position: "relative", width: 56, height: 56 }}>
+              <img src={p.dataUrl} alt="" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, border: `1.5px solid ${C.border}` }} />
+              <button onClick={() => removePhoto(p.id)} style={{
+                position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: "50%",
+                background: C.danger, border: "none", color: "#fff", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+              }}>
+                <X size={11} />
+              </button>
+            </div>
+          ))}
+          {photos.length < MAX_PHOTOS && (
+            <button onClick={() => fileInputRef.current?.click()} style={{
+              width: 56, height: 56, borderRadius: 6, border: `1.5px dashed ${C.border}`, background: "transparent",
+              color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Camera size={18} />
+            </button>
+          )}
         </div>
 
-        <Btn variant="primary" onClick={run} disabled={state === "loading" || !menuText.trim()} style={{ padding: "10px 0", fontSize: 12 }}>
-          <Sparkles size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
-          {state === "loading" ? (progress || "Analyse…") : "Analyser la carte"}
-        </Btn>
+        {photoErr && <Body style={{ fontSize: 10, color: C.danger, marginTop: 4 }}>{photoErr}</Body>}
+        <Body style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>
+          Estimations IA, pas des valeurs mesurées — utile pour choisir, pas une pesée.
+        </Body>
+      </div>
+
+      <Btn variant="primary" onClick={run} disabled={state === "loading" || !hasInput} style={{ padding: "10px 0", fontSize: 12 }}>
+        <Sparkles size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
+        {state === "loading" ? (progress || "Analyse…") : "Analyser la carte"}
+      </Btn>
 
         {state === "error" && <Body style={{ fontSize: 11, color: C.danger }}>{err}</Body>}
 
@@ -223,7 +301,7 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
             ))}
 
             {result.plats.length === 0 && (
-              <Body style={{ fontSize: 11, color: C.dim }}>Aucun plat reconnu dans le texte collé.</Body>
+              <Body style={{ fontSize: 11, color: C.dim }}>Aucun plat reconnu.</Body>
             )}
 
             {meta && (

@@ -231,20 +231,17 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
     setQuickAdd(false);
   };
 
-  // Carte resto (05/08/2026) : le reste de macros envoyé à l'IA est TOUJOURS celui
-  // d'aujourd'hui, jamais celui du jour affiché (`date` peut avoir été changé par le swipe
-  // ou le sélecteur) — une décision de repas au restaurant se prend forcément pour
-  // aujourd'hui, quel que soit le jour qu'on est en train de consulter dans l'onglet.
-  const todayEntries = useMemo(() => entriesFor(food.log, today()), [food.log]);
-  const todayTotals = useMemo(() => totals(todayEntries), [todayEntries]);
-  const tgToday = targetsFor(today());
-  const kcalTargetToday = Math.round(tgToday.protein * 4 + tgToday.carbs * 4 + tgToday.fat * 9 + (tgToday.fiber ?? 0) * 2);
-  const remainingToday = {
-    kcal: kcalTargetToday - todayTotals.kcal,
-    prot: tgToday.protein - todayTotals.prot,
-    gluc: tgToday.carbs - todayTotals.gluc,
-    lip: tgToday.fat - todayTotals.lip,
-    fib: (tgToday.fiber ?? 0) - todayTotals.fib,
+  // Carte resto : le reste de macros envoyé à l'IA et la date d'enregistrement sont ceux
+  // du jour AFFICHÉ (`date`), exactement comme "Ajouter"/"Saisie libre" juste à côté dans
+  // FoodSearch — pas forcément aujourd'hui. Corrigé le 05/08/2026 : la toute première
+  // version forçait `today()`, donc un test sur "demain" (navigation par date) se
+  // retrouvait silencieusement loggé sur aujourd'hui.
+  const remainingResto = {
+    kcal: kcalTarget - t.kcal,
+    prot: tg.protein - t.prot,
+    gluc: tg.carbs - t.gluc,
+    lip: tg.fat - t.lip,
+    fib: (tg.fiber ?? 0) - t.fib,
   };
   // Une estimation IA n'est pas une mesure CIQUAL/OFF : le suffixe la rend visible sur
   // chaque ligne du journal (même esprit que le `*` des corrections V6), et `newQuickRef`
@@ -255,7 +252,7 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
   // plats) perdraient silencieusement le premier — bug réel trouvé au test le 05/08/2026.
   const logRestoDishes = (items) => {
     food.addMany(items.map(({ name, macros: m, meal }) => makeEntry({
-      date: today(),
+      date,
       meal,
       food: {
         ref: newQuickRef(),
@@ -490,7 +487,7 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
           onUpdateRecipe={food.updateRecipe}
           apiKey={apiKey}
           model={model}
-          remaining={remainingToday}
+          remaining={remainingResto}
           onLogDishes={logRestoDishes}
           onClose={closeSearch}
           startFree={quickAdd}
