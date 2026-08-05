@@ -65,6 +65,7 @@ function EntryRow({ e, onUpdate, onRemove, corrected = false }) {
             <span>P{a.prot ?? "—"}</span>
             <span>G{a.gluc ?? "—"}</span>
             <span>L{a.lip ?? "—"}</span>
+            <span>Fib{a.fib ?? "—"}</span>
           </div>
         </div>
         <span style={{ fontFamily: C.mono, fontSize: 14, fontWeight: 800, color: C.accent }}>{a.kcal ?? "—"}</span>

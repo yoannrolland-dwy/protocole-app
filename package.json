@@ -1,7 +1,7 @@
 {
   "name": "protocole-pwa",
   "private": true,
-  "version": "3.51.3",
+  "version": "3.51.4",
   "type": "module",
   "scripts": {
     "dev": "vite",

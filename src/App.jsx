@@ -36,7 +36,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor, totals as foodTotals, resolveLog as resolveFoodLog } from "./nutrition/foodStore.js";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 
-const APP_VERSION = "3.51.3";
+const APP_VERSION = "3.51.4";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA

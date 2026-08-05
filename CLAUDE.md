@@ -804,6 +804,11 @@ coaching dans le module — le jugement reste au Coach IA).
   passe sur deux niveaux ("Nom" puis "120g · **48 kcal**" en accent, réutilisant `kcalFor`)
   au lieu d'une seule ligne — nécessaire pour garder la place au clic vers l'éditeur de
   quantité (`onClick` sur toute la ligne, inchangé) sans surcharger.
+- **Fibres manquantes sur chaque ligne d'aliment du journal (05/08/2026, v3.51.4)** : le
+  total d'un repas (carte "Goûter" etc.) affichait bien P/G/L/Fib, mais `EntryRow` — la ligne
+  repliée de CHAQUE aliment individuel dans `NutritionTab.jsx` — n'affichait que P/G/L,
+  fibres oubliées. Ajout de `Fib{a.fib ?? "—"}` à la ligne, même style que les trois autres
+  et que le total du repas juste au-dessus.
 
 ## Chantier V — étapes livrées
 
