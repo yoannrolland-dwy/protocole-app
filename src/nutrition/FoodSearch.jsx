@@ -12,7 +12,7 @@
 // secondes d'utilisation normale.
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Search, X, ChevronLeft, Star, PencilLine, Trash2, ScanBarcode, ChefHat, Plus } from "lucide-react";
+import { Search, X, ChevronLeft, Star, PencilLine, Trash2, ScanBarcode, ChefHat, Utensils, Plus } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { C, Btn, Label, Body, Empty, Stepper, TextInput, inputStyle } from "../ui.jsx";
 import { searchCiqual, normalize, getCiqual } from "./ciqual.js";
@@ -20,6 +20,7 @@ import { searchOFF, getOFFByBarcode } from "./off.js";
 import { suggestions, searchBoost, MACROS, newQuickRef, portionsFor, compileRecipe, recipeAsFood, isRecipeRef,
          applyOverride } from "./foodStore.js";
 import { scanBarcode } from "./scan.js";
+import RestaurantMenu from "./RestaurantMenu.jsx";
 
 const OFF_DEBOUNCE_MS = 700;
 
@@ -574,6 +575,7 @@ export default function FoodSearch({
   meal, mealLabel, date, log, pins, muted, portions, recipes, overrides,
   onAdd, onTogglePin, onMute, onSavePortion, onRemovePortion, onCreateRecipe, onRemoveRecipe, onUpdateRecipe,
   onSaveOverride, onClearOverride,
+  apiKey, model, remaining, onLogDishes,
   onClose, startFree = false,
 }) {
   const [q, setQ] = useState("");
@@ -582,6 +584,9 @@ export default function FoodSearch({
   // passer par la recherche — la friction visée est justement d'éviter la recherche.
   const [free, setFree] = useState(startFree);
   const [building, setBuilding] = useState(false);
+  // Carte resto (05/08/2026) : au même niveau que "Saisie libre"/"Nouvelle recette", pas un
+  // bouton séparé dans l'onglet Repas — demandé explicitement après une première version.
+  const [resto, setResto] = useState(false);
   // Recette en cours de modification (V8) — `null` = on en crée une nouvelle.
   const [editingRecipe, setEditingRecipe] = useState(null);
   // idle | scanning | lookup | notfound | error — distinct de offState : le scan peut
@@ -648,6 +653,9 @@ export default function FoodSearch({
         ) : free ? (
           <FreeEntry onAdd={onAdd} onBack={() => setFree(false)}
             backLabel={startFree ? "Macro rapide" : "Saisie libre"} />
+        ) : resto ? (
+          <RestaurantMenu apiKey={apiKey} model={model} remaining={remaining} meal={meal}
+            onLogDishes={onLogDishes} onBack={() => setResto(false)} />
         ) : sel ? (
           <QtyPanel food={sel} initialQ={sel.lastQ ?? sel.defaultQ}
             portions={portionsFor(portions, sel.ref)} onSavePortion={onSavePortion} onRemovePortion={onRemovePortion}
@@ -726,6 +734,10 @@ export default function FoodSearch({
               <Btn variant="plain" onClick={() => setBuilding(true)} style={{ flex: 1 }}>
                 <ChefHat size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
                 Nouvelle recette
+              </Btn>
+              <Btn variant="plain" onClick={() => setResto(true)} style={{ flex: 1 }}>
+                <Utensils size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
+                Carte resto
               </Btn>
             </div>
             <Body style={{ fontSize: 9.5, color: C.dim, marginTop: 10, textAlign: "center" }}>

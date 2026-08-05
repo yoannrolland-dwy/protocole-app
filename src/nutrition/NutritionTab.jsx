@@ -7,14 +7,13 @@
 // (healthSync.js) : `foodLog` est l'unique écrivain des macros au quotidien désormais.
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { Plus, Trash2, ChevronDown, ChevronRight, Droplet, Zap, Copy, ChefHat } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight, Droplet, Zap, Copy } from "lucide-react";
 import { C, Card, Label, Body, Btn, Empty, Stepper, DateField, ScreenHeader, Pills, today, fmt, longDate, upsert, shiftDateKey } from "../ui.jsx";
 import {
   MEALS, useFoodLog, makeEntry, amounts, entriesFor, totals, isQuickRef, newQuickRef,
   copySourceCandidates, copyEntries, deriveMacroLog,
 } from "./foodStore.js";
 import FoodSearch from "./FoodSearch.jsx";
-import RestaurantMenu from "./RestaurantMenu.jsx";
 
 const MEAL_OPTIONS = MEALS.map((m) => ({ key: m.key, label: m.label }));
 
@@ -173,7 +172,6 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
   const [quickAdd, setQuickAdd] = useState(false);
   const [copyMeal, setCopyMeal] = useState(null);
   const [duplicating, setDuplicating] = useState(false);
-  const [showResto, setShowResto] = useState(false);
   const food = useFoodLog();
 
   // BASCULE M6 : recalcule les totaux macroLog pour CHAQUE date présente dans foodLog à
@@ -331,11 +329,6 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
         title="Nutrition"
         subtitle={date === today() ? "aujourd'hui" : fmt(date)}
       />
-
-      <Btn variant="plain" onClick={() => setShowResto(true)} style={{ alignSelf: "flex-start" }}>
-        <ChefHat size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
-        Carte resto
-      </Btn>
 
       {diff !== 0 && (
         <div style={{
@@ -495,18 +488,12 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
           onCreateRecipe={food.addRecipe}
           onRemoveRecipe={food.removeRecipe}
           onUpdateRecipe={food.updateRecipe}
-          onClose={closeSearch}
-          startFree={quickAdd}
-        />
-      )}
-
-      {showResto && (
-        <RestaurantMenu
           apiKey={apiKey}
           model={model}
           remaining={remainingToday}
           onLogDishes={logRestoDishes}
-          onClose={() => setShowResto(false)}
+          onClose={closeSearch}
+          startFree={quickAdd}
         />
       )}
     </div>

@@ -9,14 +9,17 @@
 // de carte n'existe dans une base), alors que le reste du journal MESURE. Le marquage
 // "(estimé IA)" sur le nom de chaque entrée loggée le rend visible dans le journal, jamais
 // silencieux — même esprit que le `*` des corrections V6.
+//
+// Panneau EMBARQUÉ dans FoodSearch (même registre que FreeEntry/RecipeBuilder : chevron
+// retour + Label, pas de fenêtre propre) — accessible depuis "+Ajouter" au même niveau que
+// "Saisie libre"/"Nouvelle recette" (demandé le 05/08/2026, pas un bouton direct dans
+// l'onglet Repas comme la toute première version). Le repas de destination est donc déjà
+// connu (celui pour lequel "+Ajouter" a été ouvert) : pas de sélecteur de repas ici.
 
 import React, { useState } from "react";
-import { X, ChefHat, Sparkles, Plus, Check } from "lucide-react";
-import { C, Btn, Label, Body, TextInput, inputStyle, Pills } from "../ui.jsx";
-import { MEALS } from "./foodStore.js";
+import { ChevronLeft, Sparkles, Plus, Check } from "lucide-react";
+import { C, Btn, Label, Body, inputStyle } from "../ui.jsx";
 import { callClaude, costCents } from "../claudeApi.js";
-
-const MEAL_OPTIONS = MEALS.map((m) => ({ key: m.key, label: m.label }));
 
 function extractJson(raw) {
   let s = raw.trim();
@@ -104,11 +107,7 @@ function SuggestionCard({ s, dishesByName, onLog, logged }) {
 const CAT_LABEL = { entree: "Entrées", plat: "Plats", dessert: "Desserts", autre: "Autres" };
 const CAT_ORDER = ["entree", "plat", "dessert", "autre"];
 
-export default function RestaurantMenu({ apiKey, model, remaining, onLogDishes, onClose }) {
-  const [meal, setMeal] = useState(() => {
-    const h = new Date().getHours();
-    return h < 15 ? "dejeuner" : "diner";
-  });
+export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDishes, onBack }) {
   const [menuText, setMenuText] = useState("");
   const [state, setState] = useState("idle"); // idle | loading | done | error
   const [progress, setProgress] = useState("");
@@ -172,33 +171,17 @@ export default function RestaurantMenu({ apiKey, model, remaining, onLogDishes, 
     .filter((g) => g.items.length);
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, background: C.bg, zIndex: 60,
-      display: "flex", flexDirection: "column",
-      paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)",
-    }}>
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "12px 14px", borderBottom: `1.5px solid ${C.border}`,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <ChefHat size={14} color={C.accent} />
-          <Label style={{ fontSize: 11, color: C.text }}>Carte resto</Label>
-        </div>
-        <button onClick={onClose} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", padding: 4 }}>
-          <X size={20} />
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", padding: 4 }}>
+          <ChevronLeft size={20} />
         </button>
+        <Label style={{ fontSize: 11 }}>Carte resto</Label>
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-        <div>
-          <Label style={{ marginBottom: 5 }}>Repas</Label>
-          <Pills small options={MEAL_OPTIONS} value={meal} onChange={setMeal} />
-        </div>
-
-        <div>
-          <Label style={{ marginBottom: 5 }}>Carte du restaurant</Label>
-          <textarea
+      <div>
+        <Label style={{ marginBottom: 5 }}>Carte du restaurant</Label>
+        <textarea
             value={menuText}
             onChange={(e) => setMenuText(e.target.value)}
             placeholder={"Colle ou tape le menu : entrées, plats, desserts…\nEx. Tartare de saumon, avocat, agrumes — 14€\nPoulet fermier rôti, légumes de saison — 19€\n…"}
@@ -250,7 +233,6 @@ export default function RestaurantMenu({ apiKey, model, remaining, onLogDishes, 
             )}
           </>
         )}
-      </div>
     </div>
   );
 }
