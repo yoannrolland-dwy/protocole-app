@@ -788,6 +788,16 @@ coaching dans le module — le jugement reste au Coach IA).
   injoignable) reste honnêtement absent plutôt que de planter l'écran. **La recette cassée se
   répare simplement en la rouvrant en modification et en enregistrant à nouveau** (même sans
   rien changer) — pas de manipulation JSON requise.
+- **Calories affichées en réglant la quantité d'un ingrédient de recette (05/08/2026,
+  v3.51.2)** : jusqu'ici, ajouter ou modifier un ingrédient dans une recette ne montrait que
+  les grammes, sans indication de calories avant validation — contrairement à `QtyPanel`
+  (ajout d'un aliment à un repas), qui affiche déjà l'apport en direct. Nouveau composant
+  `KcalPreview` partagé, branché sur les deux écrans concernés (`IngredientPicker` en ajout,
+  et l'éditeur de quantité de `RecipeBuilder` en modification) — même formule que `amounts()`
+  dans `foodStore.js` (kcal arrondie à l'entier), recalculée à chaque changement de quantité.
+  Volontairement limité aux calories (pas le détail P/G/L/Fib comme `QtyPanel`) : c'est ce qui
+  a été demandé, et le detail complet existe déjà une fois l'ingrédient ajouté (total de la
+  recette, juste en dessous de la liste).
 
 ## Chantier V — étapes livrées
 

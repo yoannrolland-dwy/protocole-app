@@ -94,6 +94,23 @@ function OffSection({ offState, offResults, onPick }) {
 // total du jour puisse rester honnête (voir totals().missing dans foodStore).
 const val = (v, suffix = "") => (v === null || v === undefined ? "—" : `${v}${suffix}`);
 
+// Calories réelles pour une quantité donnée (05/08/2026) — demandé pour qu'un réglage de
+// quantité, que ce soit un nouvel ingrédient ou un ingrédient déjà dans la recette, montre
+// tout de suite l'impact en calories plutôt que des grammes seuls.
+const kcalFor = (per100, q) =>
+  per100?.kcal === null || per100?.kcal === undefined ? null : Math.round((per100.kcal * q) / 100);
+
+function KcalPreview({ per100, q }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+      <Label>Calories</Label>
+      <span style={{ fontFamily: C.mono, fontSize: 20, fontWeight: 800, color: C.accent }}>
+        {val(kcalFor(per100, q))}<span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}> kcal</span>
+      </span>
+    </div>
+  );
+}
+
 // OFF est crowdsourcé : beaucoup de produits n'ont pas toutes les macros renseignées.
 // Un badge honnête plutôt que de faire passer une donnée manquante pour un vrai zéro.
 const missingCount = (food) => MACROS.filter((m) => food.per100[m] === null || food.per100[m] === undefined).length;
@@ -240,6 +257,7 @@ function IngredientPicker({ onAdd, onCancel }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <Label style={{ fontSize: 11 }}>{pick.name}</Label>
         <Stepper value={grams} set={setGrams} step={10} unit="g" min={1} int />
+        <KcalPreview per100={pick.per100} q={grams} />
         <div style={{ display: "flex", gap: 8 }}>
           <Btn variant="primary" style={{ flex: 1 }} onClick={() => onAdd({ ...pick, q: Number(grams) })}>Ajouter à la recette</Btn>
           <Btn variant="ghost" onClick={() => setPick(null)}>Retour</Btn>
@@ -312,6 +330,7 @@ function RecipeBuilder({ recipe, onSave, onBack }) {
         <Label style={{ fontSize: 11 }}>{ing.name}</Label>
         <Stepper value={ing.q} step={10} unit="g" min={1} int
           set={(v) => setIngredients(ingredients.map((x, j) => (j === editingIndex ? { ...x, q: v } : x)))} />
+        <KcalPreview per100={ing.per100} q={ing.q} />
         <Btn variant="primary" onClick={() => setEditingIndex(null)}>OK</Btn>
       </div>
     );
