@@ -4,6 +4,10 @@ import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  // @rawcare/core est un paquet du même workspace npm (symlink), pas une dépendance
+  // externe : l'exclure du pré-bundling esbuild évite qu'une édition dans
+  // packages/core/src reste invisible en HMR tant que le serveur n'est pas relancé.
+  optimizeDeps: { exclude: ["@rawcare/core"] },
   plugins: [
     react(),
     tailwindcss(),

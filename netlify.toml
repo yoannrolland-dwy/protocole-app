@@ -1,23 +1,32 @@
-# Configuration Netlify — ne concerne QUE la PWA.
+# Configuration Netlify — ne concerne QUE la PWA (apps/perso).
 #
-# Contexte : le dépôt contient aussi l'app Android native (dossier `android/`), qui se
-# construit et s'installe séparément (voir CLAUDE.md). Sans ce fichier, chaque `git push`
-# déclenchait un déploiement Netlify complet, y compris quand le commit ne touchait que du
-# code natif ou de la documentation — chaque déploiement consommant des crédits.
+# Contexte : depuis la Phase 0 du chantier RawCare (monorepo npm workspaces, voir
+# CLAUDE.md), le dépôt contient plusieurs paquets — `apps/perso` (cette PWA), `apps/public`
+# (coquille vide pour l'instant) et `packages/core` (logique partagée). Le dépôt contient
+# aussi l'app Android native (`apps/perso/android/`), qui se construit et s'installe
+# séparément. Sans le filtre `ignore` ci-dessous, chaque `git push` déclencherait un
+# déploiement Netlify complet même quand le commit ne touche ni la PWA ni son cœur partagé —
+# chaque déploiement consommant des crédits (budget serré, voir CLAUDE.md).
+#
+# Pas de `base` ici volontairement : avec des workspaces npm, `base` ferait dépendre le
+# build d'un réglage "Base directory" du tableau de bord Netlify (invérifiable depuis le
+# code) pour que `@rawcare/core` se lie correctement. `command`/`publish` explicites ci-
+# dessous évitent cette dépendance : `npm install` tourne à la racine du dépôt (détectée via
+# le lockfile racine), qui est justement là où les workspaces se lient.
 
 [build]
-  # Valeurs identiques aux réglages de l'interface Netlify (explicites pour éviter toute
-  # ambiguïté sur la précédence entre netlify.toml et l'UI).
-  command = "npm run build"
-  publish = "dist"
+  command = "npm run build --workspace=apps/perso"
+  publish = "apps/perso/dist"
 
-  # Ne rebuilde que si un fichier qui finit réellement dans la PWA a changé.
-  # `git diff --quiet` sort 0 (= build annulé) si aucune différence, 1 sinon.
+  # Ne rebuilde que si un fichier qui finit réellement dans la PWA — ou dans le cœur
+  # partagé dont elle dépend — a changé. `git diff --quiet` sort 0 (= build annulé) si
+  # aucune différence, 1 sinon.
   #
-  # Volontairement absents de cette liste : android/, capacitor.config.json, CLAUDE.md,
-  # et ce fichier lui-même — modifier la config de build ne change pas le contenu publié,
-  # les nouveaux réglages s'appliqueront de toute façon au prochain build déclenché.
+  # Volontairement absents de cette liste : apps/perso/android/, capacitor.config.json,
+  # CLAUDE.md, apps/public/, et ce fichier lui-même — modifier la config de build ne change
+  # pas le contenu publié, les nouveaux réglages s'appliqueront de toute façon au prochain
+  # build déclenché.
   #
   # Échappatoire si un déploiement forcé est nécessaire : « Clear cache and deploy site »
   # dans l'interface Netlify (CACHED_COMMIT_REF vide → la commande échoue → build lancé).
-  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- src index.html vite.config.js package.json package-lock.json public"
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/perso/src apps/perso/index.html apps/perso/vite.config.js apps/perso/package.json apps/perso/public package-lock.json packages/core"

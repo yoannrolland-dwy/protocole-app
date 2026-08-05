@@ -4,7 +4,7 @@
     {
       "name": "protocole-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["run", "dev", "--workspace=apps/perso"],
       "port": 5173
     }
   ]

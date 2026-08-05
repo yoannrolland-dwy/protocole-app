@@ -1,0 +1,9 @@
+{
+  "name": "@rawcare/public",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@rawcare/core": "*"
+  }
+}

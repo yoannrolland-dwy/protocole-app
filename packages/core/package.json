@@ -1,0 +1,12 @@
+{
+  "name": "@rawcare/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.js"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.4.2"
+  }
+}
