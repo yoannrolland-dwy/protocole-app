@@ -7,13 +7,14 @@
 // (healthSync.js) : `foodLog` est l'unique écrivain des macros au quotidien désormais.
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { Plus, Trash2, ChevronDown, ChevronRight, Droplet, Zap, Copy } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight, Droplet, Zap, Copy, ChefHat } from "lucide-react";
 import { C, Card, Label, Body, Btn, Empty, Stepper, DateField, ScreenHeader, Pills, today, fmt, longDate, upsert, shiftDateKey } from "../ui.jsx";
 import {
-  MEALS, useFoodLog, makeEntry, amounts, entriesFor, totals, isQuickRef,
+  MEALS, useFoodLog, makeEntry, amounts, entriesFor, totals, isQuickRef, newQuickRef,
   copySourceCandidates, copyEntries, deriveMacroLog,
 } from "./foodStore.js";
 import FoodSearch from "./FoodSearch.jsx";
+import RestaurantMenu from "./RestaurantMenu.jsx";
 
 const MEAL_OPTIONS = MEALS.map((m) => ({ key: m.key, label: m.label }));
 
@@ -163,7 +164,7 @@ function DuplicatePanel({ entries, date, onConfirm, onClose }) {
   );
 }
 
-export default function NutritionTab({ targetsFor, macros, save, training }) {
+export default function NutritionTab({ targetsFor, macros, save, training, apiKey, model }) {
   const [date, setDate] = useState(today());
   const [openMeal, setOpenMeal] = useState(null);
   // Distinct de openMeal : "Macro rapide" ouvre la même feuille mais directement sur la
@@ -172,6 +173,7 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
   const [quickAdd, setQuickAdd] = useState(false);
   const [copyMeal, setCopyMeal] = useState(null);
   const [duplicating, setDuplicating] = useState(false);
+  const [showResto, setShowResto] = useState(false);
   const food = useFoodLog();
 
   // BASCULE M6 : recalcule les totaux macroLog pour CHAQUE date présente dans foodLog à
@@ -229,6 +231,41 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
     food.add(makeEntry({ date, meal: openMeal, food: f, q }));
     setOpenMeal(null);
     setQuickAdd(false);
+  };
+
+  // Carte resto (05/08/2026) : le reste de macros envoyé à l'IA est TOUJOURS celui
+  // d'aujourd'hui, jamais celui du jour affiché (`date` peut avoir été changé par le swipe
+  // ou le sélecteur) — une décision de repas au restaurant se prend forcément pour
+  // aujourd'hui, quel que soit le jour qu'on est en train de consulter dans l'onglet.
+  const todayEntries = useMemo(() => entriesFor(food.log, today()), [food.log]);
+  const todayTotals = useMemo(() => totals(todayEntries), [todayEntries]);
+  const tgToday = targetsFor(today());
+  const kcalTargetToday = Math.round(tgToday.protein * 4 + tgToday.carbs * 4 + tgToday.fat * 9 + (tgToday.fiber ?? 0) * 2);
+  const remainingToday = {
+    kcal: kcalTargetToday - todayTotals.kcal,
+    prot: tgToday.protein - todayTotals.prot,
+    gluc: tgToday.carbs - todayTotals.gluc,
+    lip: tgToday.fat - todayTotals.lip,
+    fib: (tgToday.fiber ?? 0) - todayTotals.fib,
+  };
+  // Une estimation IA n'est pas une mesure CIQUAL/OFF : le suffixe la rend visible sur
+  // chaque ligne du journal (même esprit que le `*` des corrections V6), et `newQuickRef`
+  // réutilise exactement le même circuit que "Macro rapide" (portion figée, pas de grammage
+  // éditable) puisqu'un plat de restaurant n'a pas de `per100` qui aurait un sens.
+  // TOUJOURS food.addMany (jamais food.add en boucle) : `add` capture `raw` par fermeture
+  // au moment du render, donc deux appels synchrones (ex. logger une suggestion à deux
+  // plats) perdraient silencieusement le premier — bug réel trouvé au test le 05/08/2026.
+  const logRestoDishes = (items) => {
+    food.addMany(items.map(({ name, macros: m, meal }) => makeEntry({
+      date: today(),
+      meal,
+      food: {
+        ref: newQuickRef(),
+        name: `${name} (estimé IA)`,
+        per100: { kcal: m.kcal, prot: m.prot, gluc: m.gluc, lip: m.lip, fib: m.fib },
+      },
+      q: 100,
+    })));
   };
   const closeSearch = () => { setOpenMeal(null); setQuickAdd(false); };
 
@@ -294,6 +331,11 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
         title="Nutrition"
         subtitle={date === today() ? "aujourd'hui" : fmt(date)}
       />
+
+      <Btn variant="plain" onClick={() => setShowResto(true)} style={{ alignSelf: "flex-start" }}>
+        <ChefHat size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
+        Carte resto
+      </Btn>
 
       {diff !== 0 && (
         <div style={{
@@ -455,6 +497,16 @@ export default function NutritionTab({ targetsFor, macros, save, training }) {
           onUpdateRecipe={food.updateRecipe}
           onClose={closeSearch}
           startFree={quickAdd}
+        />
+      )}
+
+      {showResto && (
+        <RestaurantMenu
+          apiKey={apiKey}
+          model={model}
+          remaining={remainingToday}
+          onLogDishes={logRestoDishes}
+          onClose={() => setShowResto(false)}
         />
       )}
     </div>
