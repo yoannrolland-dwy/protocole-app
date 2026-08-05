@@ -17,6 +17,9 @@ import React, { useState, useEffect } from "react";
 // aucun changement.
 import { localDateKey, today, shiftDateKey, fmt, round, longDate, byDate, upsert } from "@rawcare/core/dateUtils";
 export { localDateKey, today, shiftDateKey, fmt, round, longDate, byDate, upsert };
+// lastN/daysBetween/fmtHM : ui.jsx ne les utilise pas lui-même, simple ré-export pour que
+// App.jsx puisse continuer à tout importer depuis un seul endroit.
+export { lastN, daysBetween, fmtHM } from "@rawcare/core/dateUtils";
 
 /* ---------- jetons de design ---------- */
 export const C = {

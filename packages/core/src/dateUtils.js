@@ -31,3 +31,17 @@ export const upsert = (arr, entry) => {
   if (i >= 0) next[i] = { ...next[i], ...entry }; else next.push(entry);
   return next.sort(byDate);
 };
+
+// Trois utilitaires génériques ajoutés le 05/08/2026 (jalon 5) : utilisés à la fois par du
+// code UI (App.jsx) et par le recommandeur/l'état des zones douloureuses (pain.js,
+// recommender.js), donc partagés ici plutôt que dupliqués.
+export const lastN = (arr, n) => arr.slice(-n);
+export const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
+// heures décimales (7.5) → "7h30"
+export const fmtHM = (dec) => {
+  if (dec == null || isNaN(dec)) return "—";
+  let h = Math.floor(dec + 1e-9);
+  let m = Math.round((dec - h) * 60);
+  if (m === 60) { h += 1; m = 0; }
+  return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, "0")}`;
+};
