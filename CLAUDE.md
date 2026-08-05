@@ -69,36 +69,67 @@ versions plus anciennes que Claude connaîtrait mieux par défaut) :
   natif seulement)
 
 ### Structure des fichiers
+
+**Monorepo npm workspaces depuis le chantier RawCare Phase 0 (05/08/2026, voir plus bas).**
+La racine du dépôt ne contient plus que le manifeste de workspaces + la config partagée
+(`netlify.toml`, `CLAUDE.md`, `ROADMAP.md`) : l'app elle-même vit dans `apps/perso/`, et la
+logique métier pure (moteur de séances, TDEE, nutrition, escalade, recommandeur, prompt
+Coach IA) vit dans `packages/core/`, réutilisable par une future `apps/public`.
+
 ```
-protocole-app/
-  index.html
-  vite.config.js        # React + Tailwind v4 + PWA
-  capacitor.config.json # config app native (SystemBars insetsHandling: css)
-  package.json / package-lock.json
-  public/                # icônes PWA (icon-192, icon-512, maskable, apple-touch)
-                         # + privacypolicy.html (exigée par Health Connect)
-  src/
-    main.jsx             # point d'entrée + enregistrement service worker
-    App.jsx              # TOUT le code applicatif (~2100 lignes, un seul fichier)
-    store.js             # persistance localStorage + export/import JSON
-    healthSync.js        # synchro Health Connect (pas/sommeil/macros/eau)
-    ui.jsx               # design system "Affirmée" : jetons C + primitives,
-                         # extraits d'App.jsx le 01/08/2026 pour être partagés
-    data/ciqual.json     # table CIQUAL compactée (3178 aliments, 246 Ko)
-    nutrition/           # module Nutrition interne (onglet "Repas", bêta)
-      ciqual.js          #   chargement lazy + recherche + scoring
-      off.js             #   recherche + lecture par code-barres Open Food Facts
-      scan.js            #   scan code-barres ML Kit (M3, natif seulement)
-      foodStore.js       #   clés foodLog/foodPins, totaux, favoris dérivés
-      NutritionTab.jsx   #   l'onglet
-      FoodSearch.jsx     #   recherche (CIQUAL + OFF), quantité, saisie libre
-    index.css            # @import "tailwindcss" + resets minimaux
-  android/               # projet natif Capacitor — build/déploiement séparé
-                         # de la PWA, voir "Mise à jour de l'app native"
-    app/src/main/java/com/yoannrolland/protocole/
-      MainActivity.java
-      HealthNutritionPlugin.kt  # lecteur natif maison (macros complètes,
-                                 # voir section Health Connect)
+protocole-app/                    (racine = workspaces npm uniquement)
+  package.json                    { private:true, workspaces:["apps/*","packages/*"] }
+  package-lock.json                (unique, couvre tout le monorepo)
+  netlify.toml                     # cible apps/perso via --workspace, pas de `base`
+  packages/
+    core/                          # @rawcare/core — logique métier pure, zéro React/DOM
+      package.json                 # exports en wildcard : "./*" → "./src/*.js"
+      src/
+        dateUtils.js               # today/localDateKey/shiftDateKey/lastN/daysBetween/fmtHM...
+        training.js                # progression, records, détection de records
+        tdee.js                    # dépense énergétique adaptative (V7)
+        climbing.js                # cotation/résumé des séances d'escalade
+        pain.js                    # PAIN_FRESH_DAYS + zoneState (genou/coude)
+        recommender.js             # recommendSessions ("Prochaine séance")
+        targets.js                 # PHASES, cibles macro, fenêtre de sèche, tdeeNow
+        session/
+          templates.js             # TEMPLATES, HSR_TABLE, PERI, BASKET_PROTOCOLS...
+          perf.js                  # lastPerf/perfHistory/medianTarget (carnet muscu)
+        coach/
+          claudeApi.js             # appel API Anthropic (PRICING, callClaude)
+          prompt.js                # buildCoachPrompt/buildCoachBriefing, splitCarnet
+        nutrition/
+          ciqual.js, off.js, scan.js, imageUtils.js
+          foodStore.js             # fonctions pures (le hook useFoodLog reste dans l'app)
+        data/ciqual.json           # table CIQUAL compactée (3178 aliments, 246 Ko)
+      scripts/build-ciqual.mjs     # régénère data/ciqual.json (lancé à la main)
+  apps/
+    perso/                         # l'app perso (= tout ce qui existait avant Phase 0)
+      index.html
+      vite.config.js               # React + Tailwind v4 + PWA + optimizeDeps exclude core
+      capacitor.config.json        # config app native (SystemBars insetsHandling: css)
+      package.json                 # nom inchangé "protocole-pwa", dépend de @rawcare/core
+      public/                      # icônes PWA + privacypolicy.html (Health Connect)
+      src/
+        main.jsx                   # point d'entrée + enregistrement service worker
+        App.jsx                    # composants React + assemblage (importe @rawcare/core)
+        store.js                   # persistance localStorage + export/import JSON
+        healthSync.js              # synchro Health Connect (pas/sommeil/macros/eau)
+        ui.jsx                     # design system "Affirmée" (jetons C + primitives),
+                                    # ré-exporte dateUtils depuis @rawcare/core
+        claudeApi.js                # shim de ré-export vers @rawcare/core/coach/claudeApi
+        nutrition/
+          foodStore.js              # hook useFoodLog + ré-export du reste depuis core
+          NutritionTab.jsx, FoodSearch.jsx, RestaurantMenu.jsx, PhotoDish.jsx
+        index.css                  # @import "tailwindcss" + resets minimaux
+      android/                     # projet natif Capacitor — commandes préfixées
+                                    # apps/perso/, voir "Mise à jour de l'app native"
+        app/src/main/java/com/yoannrolland/protocole/
+          MainActivity.java
+          HealthNutritionPlugin.kt # lecteur natif maison (macros complètes,
+                                    # voir section Health Connect)
+    public/                        # apps/public — coquille inerte (Phase 2 la remplira)
+      package.json                 # name "@rawcare/public", dépend de @rawcare/core
 ```
 
 ### Design system — "Affirmée" (à respecter strictement pour toute nouvelle UI)
@@ -1219,6 +1250,80 @@ Quatre demandes ponctuelles, hors chantier V, groupées dans une même livraison
     que le natif, pour que les deux environnements restent cohérents.
   - Vibration non touchée (pas demandé) : `longArrayOf(0,400,200,400,200,600)` inchangé.
 
+## Chantier RawCare — Phase 0 (05/08/2026, v3.54.0)
+
+Première étape technique du chantier RawCare (version grand public envisagée de PROTOCOLE,
+voir mémoire `project-public-version` — feuille de route complète en 5 phases publiée en
+artifact le 05/08/2026, pas dans ce dépôt). Objectif de la Phase 0, tel que défini dans la
+feuille de route : extraire toute la logique métier pure dans un package partagé
+`packages/core`, **sans aucun changement de comportement pour l'app perso**. Pas de nouvelle
+fonctionnalité — une réorganisation de code, vérifiée à chaque étape par build + tests de
+non-régression (même méthode que V3/V7).
+
+- **Monorepo npm workspaces.** Racine du dépôt = gestionnaire de workspaces uniquement
+  (`{ private:true, workspaces:["apps/*","packages/*"] }`). L'app actuelle relocalisée telle
+  quelle dans `apps/perso/` (nom de package inchangé `protocole-pwa`, aucune fonctionnalité
+  touchée). `apps/public/` créée en coquille inerte (juste un `package.json` dépendant de
+  `@rawcare/core`, pas encore de code) — prête pour la Phase 2 sans rien engager
+  aujourd'hui. Voir la nouvelle structure de fichiers plus haut dans ce document.
+- **`packages/core` (`@rawcare/core`)** : moteur de séances (`session/templates.js`,
+  `session/perf.js`), TDEE (`tdee.js`, déjà extrait à V7), nutrition
+  (`nutrition/ciqual.js`/`off.js`/`scan.js`/`imageUtils.js`/`foodStore.js`), cotation
+  escalade (`climbing.js`, déjà extrait à V5), état des zones douloureuses (`pain.js`),
+  recommandeur (`recommender.js`), cibles macro/TDEE adaptatif (`targets.js`), construction
+  du prompt Coach IA (`coach/prompt.js`, `coach/claudeApi.js`) — exactement le périmètre
+  nommé dans la feuille de route. `PAIN_ZONES` (config d'affichage de l'onglet Douleurs)
+  reste volontairement côté app : c'est de la présentation UI, le recommandeur ne l'utilise
+  même pas.
+- **`exports` en wildcard** (`packages/core/package.json`, `"./*": "./src/*.js"`) plutôt
+  qu'une liste écrite à la main : mêmes imports `@rawcare/core/training`,
+  `@rawcare/core/coach/prompt`, etc., zéro entrée à maintenir à chaque nouveau fichier.
+- **Shims de compatibilité** pour que la quasi-totalité des fichiers de `apps/perso` n'aient
+  RIEN changé dans leurs imports : `ui.jsx` importe puis ré-exporte les utilitaires de
+  date/format (`today`, `daysBetween`, `lastN`, `fmtHM`...) depuis `@rawcare/core/dateUtils` ;
+  `src/claudeApi.js` et `src/nutrition/foodStore.js` (partie pure seulement, le hook
+  `useFoodLog` reste côté app car il dépend de `store.js`) font de même.
+- **`buildPrompt`/`buildBriefing` → `buildCoachPrompt`/`buildCoachBriefing`** (jalon le plus
+  risqué, fait en dernier) : c'étaient des fermetures sur ~13 morceaux de state React + des
+  appels directs à `getSync`, devenues des fonctions pures prenant un "sac de données" en
+  paramètre. `App.jsx` assemble ce sac (state + `getSync` frais, comme avant) dans un
+  wrapper `coach.buildPrompt`/`coach.buildBriefing` inchangé côté appelants (`CoachIA`,
+  `SettingsPanel`).
+- **Non-régression vérifiée par capture avant/après sur données réelles**, pas seulement des
+  scénarios synthétiques : dataset seedé dans `localStorage` via le navigateur d'aperçu, hash
+  + longueur de `buildPrompt("une note de test").system`, `.user` et `buildBriefing()`
+  capturés AVANT le refactor (via un hook temporaire `window.__coach_debug`, retiré avant
+  commit) puis APRÈS avec le même état — identiques au caractère près (805/8794/7560
+  caractères, mêmes hashes). Pour `recommendSessions`/`zoneState` : diff texte ligne à ligne
+  entre l'ancien bloc et le nouveau module (identique à l'export près) PUIS 9 scénarios
+  synthétiques (genou hors base, coude ambre, grosse escalade, fenêtre de sèche, sommeil
+  court, charge 3 jours, combos) exécutés en Node — comportement conforme à ce qui est
+  documenté plus haut dans ce fichier.
+- **`netlify.toml` sans `base`** : `command = "npm run build --workspace=apps/perso"`,
+  `publish = "apps/perso/dist"` plutôt qu'un `[build] base = "apps/perso"` — évite de
+  dépendre d'un réglage "Base directory" du tableau de bord Netlify, invérifiable depuis le
+  code. L'installation `npm install` de Netlify tourne à la racine du dépôt (détectée via le
+  lockfile racine), là où les workspaces npm ont besoin de tourner pour se lier. **Non
+  testé en conditions réelles à cette date** — tout ce chantier est resté sur `dev`, qui ne
+  déclenche jamais de build Netlify. Le premier `git push` sur `main` après ce chantier (à la
+  demande explicite de Yoann, comme toujours) devra être suivi via les logs de déploiement
+  Netlify ; si le `command`/`publish` ne suffit pas, il faudra ajuster depuis là. Un build
+  cassé ne remplace jamais le site en ligne — aucun risque de downtime, juste un déploiement
+  à corriger.
+- **`android/capacitor.settings.gradle`** (généré, code en dur un chemin relatif vers
+  `node_modules`) : re-régénéré via `npx cap sync android` depuis `apps/perso/` après le
+  déplacement — passe de `../node_modules/...` à `../../node_modules/...` (un niveau de
+  profondeur en plus). Vérifié par `git diff` avant de committer le fichier régénéré.
+- **`apps/perso/vite.config.js`** reçoit `optimizeDeps: { exclude: ["@rawcare/core"] }` — évite
+  un souci connu de pré-bundling esbuild qui empêcherait le rechargement à chaud quand on
+  édite un fichier de `packages/core`. Testé explicitement : édition d'un fichier core
+  pendant `npm run dev`, mise à jour visible sans redémarrage du serveur.
+- **Un dernier `npm run build --workspace=apps/perso` propre à la fin de chaque jalon**,
+  plus un test manuel dans l'aperçu (les 8 onglets, Coach IA) — aucune régression détectée à
+  aucune étape. Huit commits séparés sur `dev` (un par jalon), pour qu'un problème découvert
+  plus tard puisse être isolé au jalon précis qui l'a introduit plutôt que noyé dans un seul
+  gros commit.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
@@ -1234,10 +1339,10 @@ Quatre demandes ponctuelles, hors chantier V, groupées dans une même livraison
    prochaine restauration. **Deux exceptions volontaires**, à ne pas « corriger » :
    `lastAutoBackupDate` et `lastCloudBackup` sont des marqueurs de sauvegarde —
    les restaurer ferait croire à l'app qu'une sauvegarde vient d'avoir lieu.
-2. **Toujours vérifier que le build passe** (`npm run build`) avant de
-   considérer une modification terminée.
-3. **Bumper `APP_VERSION`** (dans `App.jsx`) et `"version"` (dans
-   `package.json`) à chaque changement livré.
+2. **Toujours vérifier que le build passe** (`npm run build --workspace=apps/perso`,
+   depuis la racine du monorepo) avant de considérer une modification terminée.
+3. **Bumper `APP_VERSION`** (dans `apps/perso/src/App.jsx`) et `"version"` (dans
+   `apps/perso/package.json`) à chaque changement livré.
 4. **Déployer sur le MÊME site Netlify existant**, jamais en créer un
    nouveau — l'URL du site est liée au localStorage de l'utilisateur.
    Le déploiement continu est déjà en place (voir plus bas), donc un
@@ -1258,8 +1363,10 @@ Quatre demandes ponctuelles, hors chantier V, groupées dans une même livraison
 - Dossier local : `/Users/yrolland/Documents/GitHub/protocole-app`.
 - **Netlify est connecté en Continuous Deployment à ce dépôt** : chaque
   `git push` sur `main` déclenche automatiquement un rebuild + redéploiement
-  sur le site existant (Build command: `npm run build`, Publish directory:
-  `dist`).
+  sur le site existant. Depuis le chantier RawCare Phase 0 (05/08/2026, monorepo) :
+  Build command `npm run build --workspace=apps/perso`, Publish directory
+  `apps/perso/dist` — géré par `netlify.toml`, voir la section RawCare Phase 0
+  plus haut pour le détail et l'avertissement sur le premier déploiement à surveiller.
 
 ### Deux branches — règle importante pour le budget Netlify
 
@@ -1302,12 +1409,15 @@ ce point en doute sans nouveau test.
 Le `git push` sur `main` ne redéploie **que la PWA** (Netlify, automatique).
 L'app native installée sur le téléphone ne se met JAMAIS à jour seule — il
 faut rebuild + réinstaller à la main à chaque changement de code qui la
-concerne :
+concerne. **Depuis le chantier RawCare Phase 0 (05/08/2026), les commandes
+tournent depuis `apps/perso/`** (l'app a été relocalisée dans le monorepo,
+`android/` avec elle) :
 ```
-npm run build
+npm run build --workspace=apps/perso
+cd apps/perso
 npx cap sync android
 cd android && ./gradlew assembleDebug
-adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 Téléphone branché en USB, débogage USB activé et autorisé sur l'appareil.
 Variables d'environnement requises (déjà ajoutées à `~/.zshrc`) :
