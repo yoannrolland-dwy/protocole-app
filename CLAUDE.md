@@ -772,6 +772,22 @@ coaching dans le module — le jugement reste au Coach IA).
   jour derrière. **Testé dans l'aperçu** : création, modification du nom et remplacement d'un
   ingrédient (pomme → banane, total recalculé en direct), édition de quantité seule,
   sauvegarde confirmée en PLACE (une seule recette après modification, pas de doublon).
+- **Bug réel remonté par Yoann le 05/08/2026 (corrigé en v3.51.1), le test ci-dessus n'avait
+  pas couvert ce cas** : le test avait couvert la création ET la modification d'une recette
+  *nouvellement créée* (donc déjà pourvue de `per100` par ingrédient), pas la modification
+  d'une recette *antérieure à v3.51.0* — celles-ci ont des ingrédients qui n'ont jamais eu de
+  `per100` stocké. Rouvrir une telle recette et l'enregistrer recalculait le total avec des
+  macros manquantes et l'écrasait avec des valeurs `null` partout — la recette affichait
+  alors 0 dans tous les repas qui l'utilisent. **Corrigé par auto-réparation** :
+  `RecipeBuilder` détecte à l'ouverture si des ingrédients n'ont pas de `per100` et les
+  re-résout silencieusement depuis leur source d'origine (`getCiqual`/`getOFFByBarcode` selon
+  le préfixe du `ref` — un ingrédient de recette vient toujours de CIQUAL ou OFF, jamais
+  d'une saisie libre ni d'une autre recette, donc toujours résoluble par ce chemin). Le total
+  se met à jour dès la résolution terminée ; enregistrer ensuite persiste enfin un `per100`
+  correct par ingrédient, réparant la recette pour de bon. Un ingrédient irrésolu (OFF
+  injoignable) reste honnêtement absent plutôt que de planter l'écran. **La recette cassée se
+  répare simplement en la rouvrant en modification et en enregistrant à nouveau** (même sans
+  rien changer) — pas de manipulation JSON requise.
 
 ## Chantier V — étapes livrées
 

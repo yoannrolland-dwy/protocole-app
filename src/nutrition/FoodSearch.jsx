@@ -15,7 +15,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Search, X, ChevronLeft, Star, PencilLine, Trash2, ScanBarcode, ChefHat, Plus } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { C, Btn, Label, Body, Empty, Stepper, TextInput, inputStyle } from "../ui.jsx";
-import { searchCiqual, normalize } from "./ciqual.js";
+import { searchCiqual, normalize, getCiqual } from "./ciqual.js";
 import { searchOFF, getOFFByBarcode } from "./off.js";
 import { suggestions, searchBoost, MACROS, newQuickRef, portionsFor, compileRecipe, recipeAsFood, isRecipeRef,
          applyOverride } from "./foodStore.js";
@@ -202,6 +202,28 @@ function FreeEntry({ onAdd, onBack, backLabel = "Saisie libre" }) {
   );
 }
 
+// Répare un ingrédient de recette créé AVANT le 05/08/2026 (v3.51.0), quand `compileRecipe`
+// ne gardait que `{ref, name, q}` par ingrédient, jamais son `per100` — rouvrir une telle
+// recette pour la modifier recalculait le total avec des macros manquantes et le sauvegardait
+// ainsi (total entier mis à `null`, affiché "0" dans les repas qui l'utilisent). Re-résout le
+// `per100` depuis la source d'origine (CIQUAL/OFF) via le `ref`, exactement ce que ferait une
+// nouvelle recherche — les ingrédients d'une recette ne viennent QUE de CIQUAL/OFF (jamais
+// d'une saisie libre ni d'une autre recette), donc toujours résolubles par ce chemin.
+async function resolveIngredient(ing) {
+  if (ing.per100) return ing;
+  const mc = /^ciqual:(\d+)$/.exec(ing.ref);
+  if (mc) {
+    const food = await getCiqual(mc[1]);
+    if (food) return { ...ing, per100: food.per100 };
+  }
+  const mo = /^off:(.+)$/.exec(ing.ref);
+  if (mo) {
+    const { item } = await getOFFByBarcode(mo[1]);
+    if (item) return { ...ing, per100: item.per100 };
+  }
+  return ing;
+}
+
 /* ---------- création d'une recette (M4) ----------
    Même recherche CIQUAL + OFF que l'écran principal (via useFoodSearch) : les ingrédients
    d'une recette sont aussi souvent des produits de marque que des aliments bruts — Yoann
@@ -257,6 +279,22 @@ function RecipeBuilder({ recipe, onSave, onBack }) {
   const [ingredients, setIngredients] = useState(recipe?.ingredients ?? []);
   const [picking, setPicking] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
+
+  // Auto-réparation (05/08/2026) : une recette créée avant v3.51.0 a des ingrédients sans
+  // `per100` stocké. Sans ce correctif, le total recalculé à l'ouverture serait "—" et
+  // "Enregistrer les modifications" écraserait la recette avec des macros à `null` partout
+  // — exactement le bug remonté par Yoann. Tourne une seule fois à l'ouverture (pas à
+  // chaque frappe), silencieux : le total se met à jour dès la résolution terminée.
+  useEffect(() => {
+    if (!recipe || !recipe.ingredients.some((i) => !i.per100)) return;
+    let cancelled = false;
+    Promise.all(recipe.ingredients.map(resolveIngredient)).then((resolved) => {
+      if (!cancelled) setIngredients(resolved);
+    }).catch(() => {}); // un ingrédient irrésolu (OFF hors-ligne) reste sans per100 — le
+    // total l'affichera honnêtement en absent plutôt que de planter cet écran.
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recipe]);
   const compiled = useMemo(() => compileRecipe(name || "?", ingredients), [name, ingredients]);
   const ok = name.trim().length > 0 && ingredients.length > 0;
 
