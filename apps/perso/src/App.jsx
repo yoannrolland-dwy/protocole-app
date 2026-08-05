@@ -14,10 +14,10 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { store, getSync, exportData, importData } from "./store.js";
 import { isBackupStale, daysSinceBackup, scheduleBackupReminder } from "./cloudBackup.js";
 import { exoProgress, exerciseList, exerciseSessions, exerciseTrend, isTimeMode, setLabel,
-         beats, recordToBeat, recordsBySession, painOutOfBase } from "./training.js";
+         beats, recordToBeat, recordsBySession, painOutOfBase } from "@rawcare/core/training";
 import { COLORS, LEVELS, gradeIndex, makeGrade, gradeLabel, gradeColor, ISSUES,
-         climbSummary, climbLabel, climbLoad } from "./climbing.js";
-import { computeTDEE, mergeKcalSeries, realDeficit, MIN_WINDOW_DAYS as MIN_TDEE_DAYS } from "./tdee.js";
+         climbSummary, climbLabel, climbLoad } from "@rawcare/core/climbing";
+import { computeTDEE, mergeKcalSeries, realDeficit, MIN_WINDOW_DAYS as MIN_TDEE_DAYS } from "@rawcare/core/tdee";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 import { updateDashboardWidget } from "./widgetSync.js";
