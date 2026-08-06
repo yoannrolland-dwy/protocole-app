@@ -1,46 +1,82 @@
 // Moteur de séances — gabarits, poids par défaut, table HSR, routines guidées, fiches
 // péri-training. Extrait de src/App.jsx (apps/perso) le 05/08/2026, chantier RawCare
-// Phase 0. Pur (aucune dépendance React/DOM), zéro changement de contenu.
+// Phase 0. Pur (aucune dépendance React/DOM).
+//
+// RawCare Phase 1, 06/08/2026 : chaque exercice gagne des métadonnées de bibliothèque
+// (`groupe`/`mouvement`/`materiel`/`tendon`) et chaque type de séance un `chargeTags` —
+// PUREMENT ADDITIF, aucun champ existant ni valeur ne change. `n`/`nom` reste l'identité
+// de l'exercice (clé dans DEFAULT_WEIGHTS/lastPerf/perfHistory et dans tout l'historique
+// trainingLog) : les nouveaux champs ne sont lus par aucun code existant, seulement prêts
+// pour une future bibliothèque d'exercices. Voir aussi `./catalog.js` (sports et types de
+// séance supplémentaires, non actifs dans apps/perso).
 
 const TEMPLATES = {
-  "Upper A": { kind: "muscu", exos: [
-    { n: "Développé incliné haltères", s: 4, r: "8-10", rest: 150, mode: "reps", c: "ouverture pecs, priorité · 1-2 reps en réserve" },
-    { n: "Rowing barre ou machine", s: 4, r: "8-10", rest: 120, mode: "reps", c: "prise pronation/neutre (coude)" },
-    { n: "Écarté poulie basse", s: 3, r: "12-15", rest: 90, mode: "reps", c: "ligne ascendante (haut des pecs)" },
-    { n: "Extension triceps poulie haute", s: 3, r: "10-12", rest: 90, mode: "reps", c: "" },
-    { n: "Élévations latérales haltères", s: 3, r: "12-15", rest: 75, mode: "reps", c: "variante haltères" },
-    { n: "Face pull", s: 3, r: "15", rest: 60, mode: "reps", c: "arrière d'épaule" },
-    { n: "Curl poignets pronation", s: 3, r: "15-20", rest: 60, mode: "reps", c: "léger, avant-bras" },
-    { n: "Core — Planche", s: 3, r: "45-60 s", rest: 60, mode: "temps", c: "finisher · anti-extension · progresser par difficulté" },
+  "Upper A": { kind: "muscu", chargeTags: ["tirage"], exos: [
+    { n: "Développé incliné haltères", s: 4, r: "8-10", rest: 150, mode: "reps", c: "ouverture pecs, priorité · 1-2 reps en réserve",
+      groupe: "pecs", mouvement: "poussee", materiel: "halteres", tendon: null },
+    { n: "Rowing barre ou machine", s: 4, r: "8-10", rest: 120, mode: "reps", c: "prise pronation/neutre (coude)",
+      groupe: "dos", mouvement: "tirage", materiel: "barre", tendon: "coude" },
+    { n: "Écarté poulie basse", s: 3, r: "12-15", rest: 90, mode: "reps", c: "ligne ascendante (haut des pecs)",
+      groupe: "pecs", mouvement: "isolation", materiel: "poulie", tendon: null },
+    { n: "Extension triceps poulie haute", s: 3, r: "10-12", rest: 90, mode: "reps", c: "",
+      groupe: "triceps", mouvement: "isolation", materiel: "poulie", tendon: null },
+    { n: "Élévations latérales haltères", s: 3, r: "12-15", rest: 75, mode: "reps", c: "variante haltères",
+      groupe: "epaules", mouvement: "isolation", materiel: "halteres", tendon: null },
+    { n: "Face pull", s: 3, r: "15", rest: 60, mode: "reps", c: "arrière d'épaule",
+      groupe: "epaules", mouvement: "tirage", materiel: "poulie", tendon: null },
+    { n: "Curl poignets pronation", s: 3, r: "15-20", rest: 60, mode: "reps", c: "léger, avant-bras",
+      groupe: "avant-bras", mouvement: "isolation", materiel: "halteres", tendon: null },
+    { n: "Core — Planche", s: 3, r: "45-60 s", rest: 60, mode: "temps", c: "finisher · anti-extension · progresser par difficulté",
+      groupe: "core", mouvement: "gainage", materiel: "aucun", tendon: null },
   ]},
-  "Upper B": { kind: "muscu", exos: [
-    { n: "Développé couché haltères", s: 4, r: "8-10", rest: 150, mode: "reps", c: "ouverture pecs, priorité" },
-    { n: "Tirage vertical prise neutre", s: 4, r: "8-10", rest: 120, mode: "reps", c: "prise neutre (coude)" },
-    { n: "Développé militaire haltères", s: 3, r: "8-10", rest: 120, mode: "reps", c: "" },
-    { n: "Rear delt machine (reverse pec deck)", s: 3, r: "12-15", rest: 75, mode: "reps", c: "arrière d'épaule" },
-    { n: "Élévations latérales poulie", s: 3, r: "12-15", rest: 75, mode: "reps", c: "variante poulie" },
-    { n: "Curl marteau (prise neutre)", s: 3, r: "10-12", rest: 75, mode: "reps", c: "prise neutre (coude)" },
-    { n: "Curl poignets supination", s: 3, r: "15-20", rest: 60, mode: "reps", c: "léger, avant-bras" },
-    { n: "Core — Crunch machine", s: 3, r: "12-15", rest: 60, mode: "reps", c: "finisher · contrôlé, 1-2 reps en réserve" },
+  "Upper B": { kind: "muscu", chargeTags: ["tirage"], exos: [
+    { n: "Développé couché haltères", s: 4, r: "8-10", rest: 150, mode: "reps", c: "ouverture pecs, priorité",
+      groupe: "pecs", mouvement: "poussee", materiel: "halteres", tendon: null },
+    { n: "Tirage vertical prise neutre", s: 4, r: "8-10", rest: 120, mode: "reps", c: "prise neutre (coude)",
+      groupe: "dos", mouvement: "tirage", materiel: "machine", tendon: "coude" },
+    { n: "Développé militaire haltères", s: 3, r: "8-10", rest: 120, mode: "reps", c: "",
+      groupe: "epaules", mouvement: "poussee", materiel: "halteres", tendon: null },
+    { n: "Rear delt machine (reverse pec deck)", s: 3, r: "12-15", rest: 75, mode: "reps", c: "arrière d'épaule",
+      groupe: "epaules", mouvement: "isolation", materiel: "machine", tendon: null },
+    { n: "Élévations latérales poulie", s: 3, r: "12-15", rest: 75, mode: "reps", c: "variante poulie",
+      groupe: "epaules", mouvement: "isolation", materiel: "poulie", tendon: null },
+    { n: "Curl marteau (prise neutre)", s: 3, r: "10-12", rest: 75, mode: "reps", c: "prise neutre (coude)",
+      groupe: "biceps", mouvement: "isolation", materiel: "halteres", tendon: "coude" },
+    { n: "Curl poignets supination", s: 3, r: "15-20", rest: 60, mode: "reps", c: "léger, avant-bras",
+      groupe: "avant-bras", mouvement: "isolation", materiel: "halteres", tendon: null },
+    { n: "Core — Crunch machine", s: 3, r: "12-15", rest: 60, mode: "reps", c: "finisher · contrôlé, 1-2 reps en réserve",
+      groupe: "core", mouvement: "isolation", materiel: "machine", tendon: null },
   ]},
-  "Lower A": { kind: "muscu", knee: true, hsr: true, exos: [
-    { n: "Iso leg extension @60° (si genou raide)", s: 5, r: "45 s", rest: 120, mode: "temps", opt: true, c: "primer antalgique · effort ~70 %" },
-    { n: "Presse à cuisses (HSR)", s: 3, r: "table HSR", rest: 180, mode: "reps", hsr: true, c: "tempo 6 s · amplitude 10-60°" },
-    { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "enchaîné" },
-    { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 120, mode: "reps", hsr: true, perLeg: true, c: "tempo 6 s · par jambe" },
-    { n: "Soulevé de terre roumain", s: 3, r: "8-10", rest: 150, mode: "reps", c: "genou peu sollicité" },
-    { n: "Core — Planche", s: 3, r: "45-60 s", rest: 60, mode: "temps", c: "finisher · pas de crunch le jour du RDL" },
+  "Lower A": { kind: "muscu", knee: true, hsr: true, chargeTags: ["genou"], exos: [
+    { n: "Iso leg extension @60° (si genou raide)", s: 5, r: "45 s", rest: 120, mode: "temps", opt: true, c: "primer antalgique · effort ~70 %",
+      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou" },
+    { n: "Presse à cuisses (HSR)", s: 3, r: "table HSR", rest: 180, mode: "reps", hsr: true, c: "tempo 6 s · amplitude 10-60°",
+      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou" },
+    { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "enchaîné",
+      groupe: "mollets", mouvement: "isolation", materiel: "machine", tendon: null },
+    { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 120, mode: "reps", hsr: true, perLeg: true, c: "tempo 6 s · par jambe",
+      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou" },
+    { n: "Soulevé de terre roumain", s: 3, r: "8-10", rest: 150, mode: "reps", c: "genou peu sollicité",
+      groupe: "ischios-fessiers", mouvement: "hanche", materiel: "barre", tendon: null },
+    { n: "Core — Planche", s: 3, r: "45-60 s", rest: 60, mode: "temps", c: "finisher · pas de crunch le jour du RDL",
+      groupe: "core", mouvement: "gainage", materiel: "aucun", tendon: null },
   ]},
-  "Lower B": { kind: "muscu", knee: true, exos: [
-    { n: "Presse à cuisses", s: 4, r: "8-10", rest: 180, mode: "reps", c: "contrôlé, reps + hautes" },
-    { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "enchaîné" },
-    { n: "Leg extension unilatérale", s: 3, r: "8-10", rest: 120, mode: "reps", perLeg: true, c: "tempo 6 s · par jambe" },
-    { n: "Hip thrust", s: 3, r: "8-10", rest: 120, mode: "reps", c: "genou-safe" },
-    { n: "Leg curl bilatéral", s: 3, r: "10-12", rest: 90, mode: "reps", c: "" },
-    { n: "Core — Crunch machine", s: 3, r: "12-15", rest: 60, mode: "reps", c: "finisher · contrôlé, 1-2 reps en réserve" },
+  "Lower B": { kind: "muscu", knee: true, chargeTags: ["genou"], exos: [
+    { n: "Presse à cuisses", s: 4, r: "8-10", rest: 180, mode: "reps", c: "contrôlé, reps + hautes",
+      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou" },
+    { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "enchaîné",
+      groupe: "mollets", mouvement: "isolation", materiel: "machine", tendon: null },
+    { n: "Leg extension unilatérale", s: 3, r: "8-10", rest: 120, mode: "reps", perLeg: true, c: "tempo 6 s · par jambe",
+      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou" },
+    { n: "Hip thrust", s: 3, r: "8-10", rest: 120, mode: "reps", c: "genou-safe",
+      groupe: "fessiers", mouvement: "hanche", materiel: "machine", tendon: null },
+    { n: "Leg curl bilatéral", s: 3, r: "10-12", rest: 90, mode: "reps", c: "",
+      groupe: "ischios", mouvement: "isolation", materiel: "machine", tendon: null },
+    { n: "Core — Crunch machine", s: 3, r: "12-15", rest: 60, mode: "reps", c: "finisher · contrôlé, 1-2 reps en réserve",
+      groupe: "core", mouvement: "isolation", materiel: "machine", tendon: null },
   ]},
-  "Basket":   { kind: "sport", knee: true, exos: [] },
-  "Escalade": { kind: "sport", climb: true, exos: [] },
+  "Basket":   { kind: "sport", knee: true, chargeTags: ["genou"], exos: [] },
+  "Escalade": { kind: "sport", climb: true, chargeTags: ["tirage"], exos: [] },
 };
 export { TEMPLATES };
 export const TYPES = Object.keys(TEMPLATES);

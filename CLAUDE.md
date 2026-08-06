@@ -1371,13 +1371,56 @@ ultérieure vu l'ampleur.
   n'a nulle part où s'accrocher pour l'instant. Cet éditeur Réglages est la brique
   nécessaire pour qu'un futur onboarding ait quelque chose à appeler, pas l'onboarding
   lui-même.
-- **Reste de la Phase 1, pas commencé** : zones de douleur généralisées, bibliothèque de
-  sports + tags de charge (généralisation de `recommendSessions`), bibliothèque d'exercices
-  (l'identité d'un exercice est aujourd'hui juste une chaîne de caractères libre, utilisée
-  comme clé dans `DEFAULT_WEIGHTS`/`lastPerf`/`perfHistory` ET dans tout `trainingLog` —
-  toute refonte devra préserver cette chaîne ou migrer l'historique), types de séance
-  (Full body, Bro split — aucune notion de "split" n'existe encore comme donnée, seulement
-  un préfixe de nom partagé entre "Upper A"/"Upper B").
+## Chantier RawCare — Phase 1, deuxième lot (06/08/2026, v3.56.0)
+
+Suite immédiate du premier lot, même session (contrainte pratique : Yoann en accès distant,
+sans PC pour reprendre plus tard). En lisant `recommendSessions` en entier (206 lignes),
+chaque type de séance a une formule de score et des conditions d'exclusion **entièrement
+sur mesure** — aucune généralisation propre du moteur de score n'est possible sans le
+réécrire, sur du code qui protège en ce moment les tendons de Yoann. Pas de pari pris sous
+contrainte de temps sur ce point précis.
+
+**Portée retenue** : enrichir le MODÈLE DE DONNÉES dans `packages/core`, sans toucher au
+moteur de score ni à l'UI active de Yoann — zéro changement de comportement pour `apps/perso`,
+vérifié par diff comme le reste de la Phase 0/1.
+
+- **Exercices existants taggés** (`packages/core/src/session/templates.js`) : chaque exercice
+  des 4 gabarits muscu de Yoann (Upper A/B, Lower A/B) gagne `groupe`/`mouvement`/`materiel`/
+  `tendon`. **L'identité de l'exercice ne change pas** (`n` reste la même chaîne — c'est la
+  clé dans `DEFAULT_WEIGHTS`/`lastPerf`/`perfHistory` et dans tout `trainingLog`, donc
+  l'historique continue de matcher à l'identique). Vérifié par diff : tous les champs déjà
+  présents (valeurs incluses) sont restés identiques, seuls des champs nouveaux ont été
+  ajoutés.
+- **`chargeTags` sur les types de séance existants** : `["tirage"]` pour Upper A/B et
+  Escalade, `["genou"]` pour Lower A/B et Basket. Les flags `knee`/`climb`/`hsr` déjà lus
+  par `recommendSessions` **restent inchangés en parallèle** — `chargeTags` est une couche
+  de métadonnées en plus, pas un remplacement du mécanisme actuel.
+- **`packages/core/src/session/catalog.js`, nouveau, jamais importé par `apps/perso`** :
+  `SPORTS_CATALOG` (Course à pied, Vélo, Foot) et `SESSION_TYPES_CATALOG` (Full body, et un
+  Bro split en 4 jours — Pecs/Triceps, Dos/Biceps, Épaules, Jambes), même forme que
+  `TEMPLATES` (`kind`/`chargeTags`/`exos` taggés). Yoann ne pratique aucun de ces sports et
+  ne suit pas ces splits : les ajouter à son picker aurait été du bruit dans SON app,
+  contraire à la règle transversale de la feuille de route ("chaque brique testée d'abord
+  SUR ton app perso comme config par défaut : ton usage quotidien ne change pas"). Ce fichier
+  prouve que le modèle de données scale au-delà des 6 types actuels ; une future
+  `apps/public` pourra le lire pour laisser un utilisateur choisir/activer ses propres
+  sports et son propre split. **Charge genou tranchée avec Yoann** : Foot et Course à pied
+  traités comme le Basket (gate dur si genou hors base), Vélo sans tag `genou` (pas
+  d'impact).
+- **Non fait, explicitement repoussé à une session dédiée** (à ne pas faire vite) :
+  - Réécriture du moteur de score de `recommendSessions` pour qu'il note génériquement
+    n'importe quel sport/type de séance à partir de `chargeTags` — actuellement il reste
+    câblé sur les 6 types nommés en dur (`isUpper`/`isLower`, littéraux `"Basket"`/
+    `"Escalade"`), donc `SPORTS_CATALOG`/`SESSION_TYPES_CATALOG` ne sont pas encore notés
+    par le recommandeur.
+  - Généralisation du stockage des zones de douleur : `PAIN_ZONES`, `kneeLog`/`elbowLog`
+    restent deux zones fixes. Passer à un nombre de zones arbitraire changerait le modèle
+    de stockage (aujourd'hui deux clés localStorage séparées) et imposerait une vraie
+    décision de migration — à prendre au calme, pas sous contrainte réseau.
+  - Activation du catalogue côté UI (picker, formulaire d'activation par utilisateur) :
+    n'a de sens qu'avec `apps/public` (Phase 2+).
+  - Rôle du Coach IA reformulé pour un public multi-utilisateur : pas de surface UI
+    multi-tenant à date pour le tester.
 
 ## Règles absolues à ne jamais casser
 
