@@ -2067,6 +2067,26 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
       </Card>
 
       <Card>
+        <Label style={{ marginBottom: 8 }}>Cibles macro de base</Label>
+        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
+          Cibles quotidiennes hors fenêtre d'objectif temporaire (ci-dessous). S'appliquent
+          partout dans l'app dès que la fenêtre est inactive ou hors période.
+        </Body>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <Field label="Protéines (g)"><Stepper value={targets.protein ?? 0} set={(v) => saveTargets({ ...targets, protein: v })} step={5} min={0} int /></Field>
+          <Field label="Glucides (g)"><Stepper value={targets.carbs ?? 0} set={(v) => saveTargets({ ...targets, carbs: v })} step={5} min={0} int /></Field>
+          <Field label="Lipides (g)"><Stepper value={targets.fat ?? 0} set={(v) => saveTargets({ ...targets, fat: v })} step={5} min={0} int /></Field>
+          <Field label="Fibres (g)"><Stepper value={targets.fiber ?? 0} set={(v) => saveTargets({ ...targets, fiber: v })} step={1} min={0} int /></Field>
+        </div>
+        <Field label="Poids de maintenance (kg)">
+          <Stepper value={targets.weightMaintenance ?? 96} set={(v) => saveTargets({ ...targets, weightMaintenance: v })} step={0.5} min={0} />
+        </Field>
+        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8, fontFamily: C.mono }}>
+          ≈ {Math.round(kcalFromMacros(targets.protein, targets.carbs, targets.fat, targets.fiber))} kcal
+        </Body>
+      </Card>
+
+      <Card>
         <Label style={{ marginBottom: 8 }}>Cible eau de base</Label>
         <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
           Cible quotidienne hors basket. +1 L automatique les jours où une séance Basket est loggée.
