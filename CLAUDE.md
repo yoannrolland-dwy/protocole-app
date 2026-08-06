@@ -2159,14 +2159,27 @@ native, plus bas.
 - **La PWA `apps/perso` n'est donc plus déployée nulle part.** Son code reste dans le
   dépôt tel quel (l'app native en dépend pour son propre build Vite — même pipeline,
   vite-plugin-pwa compris) : rien n'a été retiré, seul le déploiement public s'arrête.
-- **Reste à faire par Yoann, côté tableau de bord Netlify** (hors du champ de Claude Code) :
-  vérifier qu'aucun réglage "Build command"/"Publish directory" n'est surchargé au niveau du
-  site (sinon il primerait sur `netlify.toml`) ; ajouter les variables d'environnement
-  `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` (mêmes valeurs que
-  `apps/public/.env.local`, absentes du dépôt par sécurité) ; déclencher un déploiement une
-  fois prêt.
-- **Le déploiement reste soumis à la même règle `dev`/`main`** que toujours : ce repointage
-  vit sur `dev` tant que Yoann n'a pas explicitement demandé de fusionner sur `main`.
+- **Fait côté tableau de bord Netlify par Yoann** : Build command/Publish directory vidés
+  (remis à "Not set", `netlify.toml` fait foi), variables d'environnement
+  `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` ajoutées.
+- **Premier déploiement en échec** : `vite build` plantait sur Netlify (Linux) avec
+  `Cannot find native binding` pour `@rolldown/binding-linux-x64-gnu` (le bundler de
+  Vite 8) — bug npm connu sur les dépendances optionnelles
+  ([npm/cli#4828](https://github.com/npm/cli/issues/4828)) : `package-lock.json` avait été
+  généré sur macOS et n'embarquait pas le binaire natif Linux. Corrigé par réinstallation
+  complète (`rm -rf node_modules package-lock.json && npm install`) — le lockfile régénéré
+  référence bien tous les binaires natifs par plateforme. Si ce genre d'erreur revient après
+  un ajout de dépendance, c'est le premier réflexe à avoir (pas un problème de code).
+- **Second déploiement réussi, le 06/08/2026 : `apps/public` (RawCare) est en ligne**, sur le
+  site Netlify qui servait auparavant la PWA `apps/perso`. Chantier RawCare Phase 2 terminé
+  de bout en bout — reste seulement la Phase 3 (envoyer le lien au cercle de bêta, mesurer la
+  rétention), qui n'est pas un chantier technique.
+- **Rattrapage git au passage** : un gros backlog de travail jamais commité (remontant à
+  plusieurs sessions avant celle du déploiement) a été découvert à ce moment-là — tout
+  commité et poussé en 5 commits groupés par chantier avant de fusionner sur `main`. Depuis,
+  Claude Code demande confirmation à chaque commit, séparément d'une confirmation avant tout
+  passage en prod — ne plus jamais laisser du travail "livré" mais non commité s'accumuler
+  silencieusement.
 
 ## Workflow de déploiement (déjà en place, ne pas en proposer un autre)
 
