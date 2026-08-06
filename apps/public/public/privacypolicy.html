@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Politique de confidentialité — RawCare</title>
+  <style>
+    :root {
+      --bg: #050505; --card: #121212; --border: #2a2a2a; --accent: #d7ff3f;
+      --text: #f5f5f0; --text2: #8a8a84; --muted: #6b6b66; --dim: #4a4a46;
+      --danger: #ff3b30;
+      --mono: ui-monospace, Menlo, Monaco, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: var(--bg); color: var(--text); font-family: var(--sans);
+      line-height: 1.6; max-width: 720px; margin: 0 auto; padding: 40px 20px 80px;
+    }
+    header { margin-bottom: 32px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+    .logo { font-family: var(--mono); font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+    .logo .raw { color: var(--text2); } .logo .care { color: var(--accent); }
+    .updated { font-family: var(--mono); font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.06em; }
+    h1 { font-size: 26px; margin: 8px 0 0; }
+    h2 {
+      font-family: var(--mono); font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--accent); margin: 36px 0 10px; padding-top: 4px;
+    }
+    p, li { color: var(--text2); font-size: 14.5px; }
+    ul { padding-left: 20px; margin: 8px 0; }
+    li { margin-bottom: 6px; }
+    strong { color: var(--text); }
+    a { color: var(--accent); }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 16px 18px; margin: 10px 0;
+    }
+    .note { font-size: 13px; color: var(--dim); }
+    code { font-family: var(--mono); font-size: 13px; background: var(--card); padding: 1px 5px; border-radius: 4px; }
+    footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--border); font-family: var(--mono); font-size: 12px; color: var(--dim); }
+    footer a { color: var(--muted); }
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo"><span class="raw">raw</span><span class="care">CARE</span></div>
+  <div class="updated">Dernière mise à jour : 06/08/2026</div>
+  <h1>Politique de confidentialité</h1>
+</header>
+
+<p>
+  RawCare est un projet personnel — un carnet de suivi musculation, nutrition et récupération,
+  développé et opéré par <strong>Yoann</strong>, à titre individuel (pas de société, pas
+  d'activité commerciale). Cette page explique quelles données sont collectées quand vous
+  utilisez l'application, pourquoi, et comment les faire supprimer.
+</p>
+<div class="card">
+  <p style="margin:0">
+    <strong>Contact pour toute question ou demande sur vos données :</strong><br />
+    <a href="mailto:yoann.rolland@gmail.com">yoann.rolland@gmail.com</a>
+  </p>
+</div>
+
+<h2>Qui a accès à l'application</h2>
+<p>
+  RawCare est en bêta fermée : les comptes sont créés à la main par Yoann, il n'y a pas
+  d'inscription libre. Si vous avez un compte, c'est que vous avez été invité·e directement.
+</p>
+
+<h2>Données collectées</h2>
+<p>Selon ce que vous choisissez de renseigner dans l'application :</p>
+<ul>
+  <li><strong>Compte</strong> : votre adresse email (gérée par le service d'authentification Supabase).</li>
+  <li><strong>Données de suivi sportif</strong> : poids, sommeil, pas, séances d'entraînement (types, séries, charges), escalade.</li>
+  <li><strong>Données de santé</strong> (catégorie particulière au sens du RGPD) : les zones de douleur/gêne que vous choisissez de suivre (le cas échéant), avec vos relevés associés.</li>
+  <li><strong>Nutrition</strong> : repas et macronutriments que vous enregistrez.</li>
+  <li><strong>Préférences</strong> : sports pratiqués, cibles nutritionnelles, échelle d'escalade choisie.</li>
+  <li><strong>Clé API Anthropic</strong> (optionnel) : si vous l'ajoutez pour utiliser le Coach IA — voir plus bas.</li>
+</ul>
+<p class="note">
+  Tout est saisi manuellement par vous. RawCare ne lit aucune donnée depuis d'autres
+  applications ou capteurs.
+</p>
+
+<h2>Pourquoi ces données sont collectées</h2>
+<p>
+  Uniquement pour faire fonctionner l'application : afficher votre historique, calculer vos
+  tendances, et — si vous le souhaitez — générer une analyse via le Coach IA. Ces données ne
+  sont <strong>jamais</strong> revendues, partagées à des fins publicitaires, ni utilisées
+  pour du profilage commercial. Aucun outil d'analyse d'audience tiers (Google Analytics ou
+  équivalent) n'est intégré à l'application.
+</p>
+
+<h2>Où et comment vos données sont stockées</h2>
+<p>
+  Les données sont hébergées chez <strong>Supabase</strong> (base de données PostgreSQL
+  managée), sur des serveurs situés dans l'<strong>Union européenne</strong>. L'accès est
+  protégé par des règles de sécurité au niveau des lignes (Row Level Security) : chaque
+  compte ne peut techniquement lire ou écrire que ses propres données, jamais celles d'un
+  autre utilisateur.
+</p>
+
+<h2>Coach IA — partage avec Anthropic</h2>
+<p>
+  Le Coach IA est une fonctionnalité entièrement <strong>optionnelle</strong>. Elle ne
+  s'active que si vous ajoutez votre propre clé API Anthropic dans l'application.
+</p>
+<ul>
+  <li>Si vous l'utilisez, les données affichées au moment de l'analyse (poids, macros, séances,
+    douleurs suivies récentes, etc.) sont envoyées <strong>directement depuis votre
+    navigateur</strong> vers l'API d'Anthropic — jamais via un serveur intermédiaire de
+    RawCare, qui n'y a donc pas accès.</li>
+  <li>Cet envoi se fait sous votre propre compte et votre propre clé API Anthropic : c'est
+    votre relation contractuelle avec Anthropic qui s'applique à ces données, pas celle de
+    RawCare. Voir la
+    <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener">politique
+    de confidentialité d'Anthropic</a>.</li>
+  <li>Le Coach IA ne remplace pas un avis médical ou un kinésithérapeute — voir le rappel
+    affiché dans l'application.</li>
+  <li>Sans clé API ajoutée, aucune donnée n'est jamais envoyée à Anthropic : l'application
+    fonctionne entièrement sans cette fonctionnalité.</li>
+</ul>
+
+<h2>Combien de temps vos données sont conservées</h2>
+<p>
+  Tant que votre compte existe. RawCare étant en bêta fermée, un compte reste actif tant que
+  vous ne demandez pas sa suppression.
+</p>
+
+<h2>Vos droits</h2>
+<p>
+  Conformément au RGPD, vous pouvez demander à tout moment, par email à l'adresse ci-dessus :
+</p>
+<ul>
+  <li><strong>l'accès</strong> à l'ensemble de vos données ;</li>
+  <li><strong>la rectification</strong> d'une donnée inexacte (possible aussi directement
+    dans l'application pour la plupart des champs) ;</li>
+  <li><strong>l'effacement</strong> de votre compte et de toutes vos données ;</li>
+  <li><strong>la portabilité</strong> de vos données dans un format exploitable.</li>
+</ul>
+<p class="note">
+  À ce stade de la bêta, ces demandes sont traitées manuellement par Yoann (pas encore de
+  bouton "supprimer mon compte" en libre-service dans l'application) — traitées dans les
+  meilleurs délais, sous 30 jours au maximum.
+</p>
+
+<h2>Cookies et stockage local</h2>
+<p>
+  L'application utilise le stockage local de votre navigateur uniquement à des fins
+  techniques (maintenir votre session connectée). Aucun cookie publicitaire, aucun traceur
+  tiers.
+</p>
+
+<h2>Mineurs</h2>
+<p>RawCare n'est pas destinée aux personnes de moins de 16 ans.</p>
+
+<h2>Modifications de cette politique</h2>
+<p>
+  Cette page peut évoluer avec l'application. La date de dernière mise à jour figure en haut
+  de page.
+</p>
+
+<footer>
+  RawCare — projet personnel, bêta fermée · <a href="/mentionslegales.html">Mentions légales</a>
+</footer>
+</body>
+</html>

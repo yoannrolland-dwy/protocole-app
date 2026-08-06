@@ -1,32 +1,36 @@
-# Configuration Netlify — ne concerne QUE la PWA (apps/perso).
+# Configuration Netlify — ne concerne QUE apps/public (RawCare).
 #
-# Contexte : depuis la Phase 0 du chantier RawCare (monorepo npm workspaces, voir
-# CLAUDE.md), le dépôt contient plusieurs paquets — `apps/perso` (cette PWA), `apps/public`
-# (coquille vide pour l'instant) et `packages/core` (logique partagée). Le dépôt contient
-# aussi l'app Android native (`apps/perso/android/`), qui se construit et s'installe
-# séparément. Sans le filtre `ignore` ci-dessous, chaque `git push` déclencherait un
-# déploiement Netlify complet même quand le commit ne touche ni la PWA ni son cœur partagé —
-# chaque déploiement consommant des crédits (budget serré, voir CLAUDE.md).
+# Historique (06/08/2026) : ce site servait auparavant la PWA d'apps/perso. Yoann n'utilise
+# plus que l'app Android native en perso (aucun couplage avec la PWA — voir CLAUDE.md,
+# section "Mise à jour de l'app Android native" : le service worker est désenregistré côté
+# natif au démarrage) et a choisi de réutiliser ce même site/URL pour apps/public plutôt que
+# d'en créer un nouveau. La PWA d'apps/perso n'est donc plus déployée nulle part ; son code
+# reste dans le dépôt (l'app native en dépend pour son propre build Vite), simplement plus
+# publié sur aucun site.
 #
 # Pas de `base` ici volontairement : avec des workspaces npm, `base` ferait dépendre le
 # build d'un réglage "Base directory" du tableau de bord Netlify (invérifiable depuis le
 # code) pour que `@rawcare/core` se lie correctement. `command`/`publish` explicites ci-
 # dessous évitent cette dépendance : `npm install` tourne à la racine du dépôt (détectée via
 # le lockfile racine), qui est justement là où les workspaces se lient.
+#
+# Variables d'environnement requises côté tableau de bord Netlify (jamais committées) :
+# VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY — mêmes valeurs que apps/public/.env.local,
+# voir apps/public/.env.example pour le détail.
 
 [build]
-  command = "npm run build --workspace=apps/perso"
-  publish = "apps/perso/dist"
+  command = "npm run build --workspace=apps/public"
+  publish = "apps/public/dist"
 
-  # Ne rebuilde que si un fichier qui finit réellement dans la PWA — ou dans le cœur
+  # Ne rebuilde que si un fichier qui finit réellement dans apps/public — ou dans le cœur
   # partagé dont elle dépend — a changé. `git diff --quiet` sort 0 (= build annulé) si
   # aucune différence, 1 sinon.
   #
-  # Volontairement absents de cette liste : apps/perso/android/, capacitor.config.json,
-  # CLAUDE.md, apps/public/, et ce fichier lui-même — modifier la config de build ne change
-  # pas le contenu publié, les nouveaux réglages s'appliqueront de toute façon au prochain
-  # build déclenché.
+  # Volontairement absents de cette liste : apps/perso/ (plus déployée sur ce site),
+  # CLAUDE.md, et ce fichier lui-même — modifier la config de build ne change pas le
+  # contenu publié, les nouveaux réglages s'appliqueront de toute façon au prochain build
+  # déclenché.
   #
   # Échappatoire si un déploiement forcé est nécessaire : « Clear cache and deploy site »
   # dans l'interface Netlify (CACHED_COMMIT_REF vide → la commande échoue → build lancé).
-  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/perso/src apps/perso/index.html apps/perso/vite.config.js apps/perso/package.json apps/perso/public package-lock.json packages/core"
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/public/src apps/public/index.html apps/public/vite.config.js apps/public/package.json apps/public/public package-lock.json packages/core"
