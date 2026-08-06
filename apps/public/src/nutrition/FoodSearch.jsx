@@ -4,19 +4,23 @@
 // Scan de code-barres (Lot C, 06/08/2026) : via BarcodeScanner.jsx (paquet `barcode-detector`
 // web, pas le pont natif @capacitor-mlkit d'apps/perso) — voir ce fichier pour le détail.
 //
-// Reste une limitation dure par rapport à apps/perso (voir CLAUDE.md) : pas de Carte resto
-// ni Photo d'un plat (appellent l'API Anthropic — Lot D, pas encore livré à ce commit).
+// Carte resto / Photo d'un plat (Lot D, 06/08/2026) : port quasi verbatim de
+// RestaurantMenu.jsx/PhotoDish.jsx — `apiKey`/`model` déjà collectés à l'onboarding, aucun
+// nouveau champ nécessaire.
+//
 // Le reste — recherche CIQUAL + Open Food Facts, saisie libre, recettes, portions
 // nommées, corrections V6 — est un port quasi verbatim.
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Search, X, ChevronLeft, Star, PencilLine, Trash2, ChefHat, Plus, ScanBarcode } from "lucide-react";
+import { Search, X, ChevronLeft, Star, PencilLine, Trash2, ChefHat, Plus, ScanBarcode, Utensils, Camera } from "lucide-react";
 import { C, Btn, Label, Body, Empty, Stepper, TextInput, inputStyle } from "../ui.jsx";
 import { searchCiqual, normalize, getCiqual } from "@rawcare/core/nutrition/ciqual";
 import { searchOFF, getOFFByBarcode } from "@rawcare/core/nutrition/off";
 import { suggestions, searchBoost, MACROS, newQuickRef, portionsFor, compileRecipe, recipeAsFood, isRecipeRef,
          applyOverride } from "./foodStore.js";
 import BarcodeScanner from "./BarcodeScanner.jsx";
+import RestaurantMenu from "./RestaurantMenu.jsx";
+import PhotoDish from "./PhotoDish.jsx";
 
 const OFF_DEBOUNCE_MS = 700;
 
@@ -515,12 +519,19 @@ export default function FoodSearch({
   meal, mealLabel, date, log, pins, muted, portions, recipes, overrides,
   onAdd, onTogglePin, onMute, onSavePortion, onRemovePortion, onCreateRecipe, onRemoveRecipe, onUpdateRecipe,
   onSaveOverride, onClearOverride,
+  apiKey, model, remaining, onLogDishes,
   onClose, startFree = false,
 }) {
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(null);
   const [free, setFree] = useState(startFree);
   const [building, setBuilding] = useState(false);
+  // Carte resto (Lot D) : au même niveau que "Saisie libre"/"Nouvelle recette", pas un
+  // bouton direct dans l'onglet Repas.
+  const [resto, setResto] = useState(false);
+  // Photo d'un plat (Lot D) : logge ce qui est SERVI (une seule photo suffit) — même
+  // registre que Carte resto mais un plat unique, pas de suggestions.
+  const [photoMode, setPhotoMode] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState(null);
   // Scan code-barres web (Lot C) : idle | scanning | lookup | notfound | error — même
   // machine à états que le scan natif d'apps/perso (scanState distinct d'offState : le scan
@@ -585,6 +596,11 @@ export default function FoodSearch({
         ) : free ? (
           <FreeEntry onAdd={onAdd} onBack={() => setFree(false)}
             backLabel={startFree ? "Macro rapide" : "Saisie libre"} />
+        ) : resto ? (
+          <RestaurantMenu apiKey={apiKey} model={model} remaining={remaining} meal={meal}
+            onLogDishes={onLogDishes} onBack={() => setResto(false)} />
+        ) : photoMode ? (
+          <PhotoDish apiKey={apiKey} model={model} onAdd={onAdd} onBack={() => setPhotoMode(false)} />
         ) : sel ? (
           <QtyPanel food={sel} initialQ={sel.lastQ ?? sel.defaultQ}
             portions={portionsFor(portions, sel.ref)} onSavePortion={onSavePortion} onRemovePortion={onRemovePortion}
@@ -661,6 +677,14 @@ export default function FoodSearch({
               <Btn variant="plain" onClick={() => setBuilding(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
                 <ChefHat size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
                 Nouvelle recette
+              </Btn>
+              <Btn variant="plain" onClick={() => setResto(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
+                <Utensils size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
+                Carte resto
+              </Btn>
+              <Btn variant="plain" onClick={() => setPhotoMode(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
+                <Camera size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
+                Photo d'un plat
               </Btn>
             </div>
             <Body style={{ fontSize: 9.5, color: C.dim, marginTop: 10, textAlign: "center" }}>

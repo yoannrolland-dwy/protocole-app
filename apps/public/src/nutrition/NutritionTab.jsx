@@ -3,8 +3,9 @@
 // écrans apps/public ({ data, update, error }) et au backend Supabase — voir foodStore.js
 // pour le point d'architecture (dérivation macroLog combinée en un seul update()).
 //
-// Deux limitations dures par rapport à apps/perso (voir CLAUDE.md) : pas de scan
-// code-barres, pas de Carte resto ni Photo d'un plat (retirés de FoodSearch.jsx).
+// Scan code-barres (Lot C) et Carte resto/Photo d'un plat (Lot D, 06/08/2026) désormais
+// portés — `apiKey`/`model` lus directement depuis `data` (déjà collectés à l'onboarding),
+// comme CoachIA.jsx. `remainingResto`/`logRestoDishes` : port direct d'apps/perso.
 
 import React, { useState, useMemo, useRef } from "react";
 import { Plus, Trash2, ChevronDown, ChevronRight, Droplet, Zap, Copy } from "lucide-react";
@@ -14,7 +15,7 @@ import { today, fmt, longDate, upsert, shiftDateKey } from "@rawcare/core/dateUt
 import { C, Card, Label, Body, Btn, Empty, Stepper, DateField, ScreenHeader, Pills } from "../ui.jsx";
 import {
   MEALS, useFoodLog, makeEntry, amounts, entriesFor, totals, isQuickRef,
-  copySourceCandidates, copyEntries,
+  copySourceCandidates, copyEntries, newQuickRef,
 } from "./foodStore.js";
 import FoodSearch from "./FoodSearch.jsx";
 
@@ -161,6 +162,8 @@ export default function NutritionTab({ data, update, error: loadError }) {
   const macros = data?.macroLog || [];
   const training = data?.trainingLog || [];
   const targets = mergeTargets(data?.targets);
+  const apiKey = data?.apiKey || "";
+  const model = data?.model || "claude-sonnet-5";
 
   const [date, setDate] = useState(today());
   const [openMeal, setOpenMeal] = useState(null);
@@ -191,6 +194,32 @@ export default function NutritionTab({ data, update, error: loadError }) {
     food.add(makeEntry({ date, meal: openMeal, food: f, q }));
     setOpenMeal(null);
     setQuickAdd(false);
+  };
+
+  // Carte resto : reste de macros du jour AFFICHÉ (`date`), pas forcément aujourd'hui — même
+  // logique qu'apps/perso (bug historique corrigé le 05/08/2026 : la toute première version
+  // forçait today()).
+  const remainingResto = {
+    kcal: kcalTarget - t.kcal,
+    prot: tg.protein - t.prot,
+    gluc: tg.carbs - t.gluc,
+    lip: tg.fat - t.lip,
+    fib: (tg.fiber ?? 0) - t.fib,
+  };
+  // TOUJOURS food.addMany (jamais food.add en boucle) : deux appels synchrones perdraient
+  // silencieusement le premier (fermeture React périmée) — bug réel trouvé côté apps/perso
+  // le 05/08/2026, food.addMany est le seul chemin sûr pour un ajout multiple.
+  const logRestoDishes = (items) => {
+    food.addMany(items.map(({ name, macros: m, meal }) => makeEntry({
+      date,
+      meal,
+      food: {
+        ref: newQuickRef(),
+        name: `${name} (estimé IA)`,
+        per100: { kcal: m.kcal, prot: m.prot, gluc: m.gluc, lip: m.lip, fib: m.fib },
+      },
+      q: 100,
+    })));
   };
 
   const closeSearch = () => { setOpenMeal(null); setQuickAdd(false); };
@@ -404,6 +433,10 @@ export default function NutritionTab({ data, update, error: loadError }) {
           onCreateRecipe={food.addRecipe}
           onRemoveRecipe={food.removeRecipe}
           onUpdateRecipe={food.updateRecipe}
+          apiKey={apiKey}
+          model={model}
+          remaining={remainingResto}
+          onLogDishes={logRestoDishes}
           onClose={closeSearch}
           startFree={quickAdd}
         />
