@@ -14,20 +14,25 @@ import RoutinePlayer from "./RoutinePlayer.jsx";
 // options guidées de onboarding.js — Genou/Coude/Autre), au lieu des deux zones fixes
 // genou/coude d'apps/perso. `data.painLogs` remplace `kneeLog`/`elbowLog` : une map
 // `{ [zoneKey]: [...entrées] }`, une entrée par zone présente dans `data.painZones`.
-// Table HSR + routines guidées restent réservées à la zone dont le `gateTag === "genou"`
+// Table HSR + routines guidées restent réservées à la zone dont le `gateTag` couvre "genou"
 // (portées par `zone.hsr`/`zone.routines`, copiées depuis le preset à l'onboarding) — même
 // convention qu'apps/perso, ce sont des outils propres au tendon quadricipital.
-// Ajout/suppression d'une zone : géré depuis Onboarding.jsx (bouton « Préférences »), pas ici
-// — cet écran ne fait que lire/écrire le journal des zones déjà choisies.
+// Ajout/suppression d'une zone : géré depuis Onboarding.jsx (bouton « Réglages »), pas ici —
+// cet écran ne fait que lire/écrire le journal des zones déjà choisies.
+//
+// `gateTag` (Lot E, 06/08/2026) : chaîne (Genou/Coude, presets figés) OU tableau (zone
+// "Autre" avec gate choisi librement — voir Onboarding.jsx) — `hasGate` gère les deux formes.
+
+const hasGate = (zone, tag) => zone.gateTag === tag || (Array.isArray(zone.gateTag) && zone.gateTag.includes(tag));
 
 const alertTextFor = (zone) => {
-  if (zone.gateTag === "genou") return "Décharge : pas de basket ni de séance jambes tant que la douleur n'est pas revenue à sa base.";
-  if (zone.gateTag === "tirage") return "Décharge du tirage : pas d'escalade ni de haut du corps tant que la douleur n'est pas revenue à sa base.";
+  if (hasGate(zone, "genou")) return "Décharge : pas de basket ni de séance jambes tant que la douleur n'est pas revenue à sa base.";
+  if (hasGate(zone, "tirage")) return "Décharge du tirage : pas d'escalade ni de haut du corps tant que la douleur n'est pas revenue à sa base.";
   return "Signal à surveiller — ajuste ton activité selon ta sensation.";
 };
 const subFor = (zone) => {
-  if (zone.gateTag === "genou") return "protocole HSR · règle de Silbernagel";
-  if (zone.gateTag === "tirage") return "règle de Silbernagel";
+  if (hasGate(zone, "genou")) return "protocole HSR · règle de Silbernagel";
+  if (hasGate(zone, "tirage")) return "règle de Silbernagel";
   return "suivi seul, sans effet sur les suggestions";
 };
 

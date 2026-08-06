@@ -105,6 +105,28 @@ export function buildZones(zoneDefs, logs, t0) {
   }));
 }
 
+/**
+ * Fusionne N états de zone partageant le même `gateTag` (RawCare, chantier "parité
+ * apps/public", Lot E, 06/08/2026) — nécessaire depuis que `gateTag` peut être choisi
+ * librement par l'utilisateur (`apps/public/src/Onboarding.jsx`) : deux zones différentes
+ * ("Genou gauche" et "Genou droit", par ex.) peuvent gater le même tag. Règle : le pire
+ * l'emporte (rouge > ambre > neutre), calculé sur les zones qui ONT une donnée fraîche
+ * (`!unknown`) si au moins une en a — une zone à jour ne doit jamais être masquée par une
+ * autre restée sans relevé. Si aucune n'a de donnée fraîche, la plus prudente des états
+ * "inconnu" l'emporte (utile pour les zones `unknownIsCaution: true`, qui doivent dominer).
+ *
+ * Avec un seul état (cas actuel d'`apps/perso`, une zone par gateTag), retourne l'état
+ * inchangé — comportement identique bit pour bit à avant cette fonction.
+ */
+export function mergeZoneStates(states) {
+  if (states.length === 1) return states[0];
+  const known = states.filter((s) => !s.unknown);
+  const pool = known.length ? known : states;
+  const rank = (s) => (s.red ? 2 : s.amber ? 1 : 0);
+  const worst = pool.reduce((a, b) => (rank(b) > rank(a) ? b : a));
+  return { ...worst, unknown: known.length === 0 };
+}
+
 // Config des deux zones réelles de Yoann, seule utilisée aujourd'hui (par `recommender.js`
 // et `coach/prompt.js`) — aucun seuil précisé, donc les défauts de `zoneState` s'appliquent
 // à l'identique de l'ancien comportement figé. Une future `apps/public` construirait sa

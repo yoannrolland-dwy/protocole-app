@@ -15,7 +15,7 @@
 // magnitudes de pénalité par type).
 
 import { today, byDate, daysBetween, fmtHM } from "./dateUtils.js";
-import { buildZones, DEFAULT_ZONES } from "./pain.js";
+import { buildZones, DEFAULT_ZONES, mergeZoneStates } from "./pain.js";
 import { TEMPLATES } from "./session/templates.js";
 import { climbLoad } from "./climbing.js";
 import { isCutWindow } from "./targets.js";
@@ -91,8 +91,18 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   // Le genou est un gate dur : pas de donnée fraîche ⇒ prudence par défaut. Le coude ne
   // module que des scores tant qu'une douleur réelle n'est pas notée (silencieux sinon).
   const z = zones ?? buildZones(DEFAULT_ZONES, { knee, elbow }, t0);
-  const K = z.find((zn) => zn.gateTag === "genou")?.state ?? NEUTRAL_ZONE;
-  const E = z.find((zn) => zn.gateTag === "tirage")?.state ?? NEUTRAL_ZONE;
+  // `gateTag` peut être une chaîne (DEFAULT_ZONES, une zone par gate) ou un tableau (zones
+  // libres d'apps/public, Lot E : un utilisateur peut choisir "genou"+"tirage" sur une même
+  // zone, ou aucun tag pour un suivi pur) — `matchesTag` gère les deux formes, `null`/absent
+  // ne matchant jamais rien. Plusieurs zones peuvent gater le même tag (ex. "Genou gauche"/
+  // "Genou droit") : `mergeZoneStates` les combine (le pire l'emporte), et redonne l'état
+  // inchangé pour un unique élément — comportement bit pour bit identique à avant sur
+  // DEFAULT_ZONES, qui n'a qu'une zone par gate.
+  const matchesTag = (gateTag, tag) => gateTag === tag || (Array.isArray(gateTag) && gateTag.includes(tag));
+  const kneeZones = z.filter((zn) => matchesTag(zn.gateTag, "genou"));
+  const tirageZones = z.filter((zn) => matchesTag(zn.gateTag, "tirage"));
+  const K = kneeZones.length ? mergeZoneStates(kneeZones.map((zn) => zn.state)) : NEUTRAL_ZONE;
+  const E = tirageZones.length ? mergeZoneStates(tirageZones.map((zn) => zn.state)) : NEUTRAL_ZONE;
   const { unknown: kneeUnknown, painLast, flagged7, red: kneeRed, amber: kneeAmber, note: kneeNote } = K;
   const kLast = K.last;
   const elbowRed = E.red, elbowAmber = E.amber;

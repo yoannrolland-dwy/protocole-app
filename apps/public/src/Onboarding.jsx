@@ -28,6 +28,15 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
   const [painZones, setPainZones] = useState(data?.painZones || []);
   const [addingOther, setAddingOther] = useState(false);
   const [otherName, setOtherName] = useState("");
+  // Gate au choix pour une zone "Autre" (Lot E, 06/08/2026) : quelles catégories de séance
+  // cette zone doit pénaliser/écarter dans le recommandeur — genou (impact : Lower/Basket),
+  // tirage (haut du corps : Upper/Escalade), les deux, ou aucun (suivi pur). Ce n'est pas un
+  // protocole kiné par tendon — la règle de Silbernagel (péremption, seuils) est déjà
+  // générique côté packages/core/src/pain.js, identique quelle que soit la zone.
+  const [otherGates, setOtherGates] = useState([]);
+  const toggleGate = (tag) => {
+    setOtherGates((gs) => (gs.includes(tag) ? gs.filter((g) => g !== tag) : [...gs, tag]));
+  };
   // `mergeTargets` neutralise toujours `cut` (voir defaultTargets.js) : rouvrir Préférences
   // et enregistrer répare aussi, en base, un compte dont `targets.cut` porterait encore
   // l'ancien bug (fenêtre de sèche de Yoann héritée avant le correctif du 06/08/2026).
@@ -44,7 +53,7 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
 
   const addPreset = (presetKey) => {
     const preset = PAIN_ZONE_PRESETS.find((p) => p.preset === presetKey);
-    if (preset.freeName) { setAddingOther(true); return; }
+    if (preset.freeName) { setOtherGates([]); setAddingOther(true); return; }
     if (painZones.some((z) => z.key === preset.key)) return; // déjà ajoutée
     setPainZones((zs) => [...zs, {
       key: preset.key, label: preset.label, gateTag: preset.gateTag,
@@ -55,10 +64,10 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
   const confirmOther = () => {
     if (!otherName.trim()) return;
     setPainZones((zs) => [...zs, {
-      key: newZoneKey(), label: otherName.trim(), gateTag: null, unknownIsCaution: false,
-      hsr: false, routines: false, coachClause: null,
+      key: newZoneKey(), label: otherName.trim(), gateTag: otherGates.length ? otherGates : null,
+      unknownIsCaution: false, hsr: false, routines: false, coachClause: null,
     }]);
-    setOtherName(""); setAddingOther(false);
+    setOtherName(""); setOtherGates([]); setAddingOther(false);
   };
   const removeZone = (key) => setPainZones((zs) => zs.filter((z) => z.key !== key));
 
@@ -99,8 +108,8 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
       <Card>
         <Label style={{ marginBottom: 8 }}>Zone(s) de douleur — optionnel</Label>
         <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
-          Genou/Coude influencent les suggestions du recommandeur. « Autre » est un suivi
-          libre, sans effet sur les suggestions.
+          Genou/Coude influencent déjà les suggestions du recommandeur. Pour « Autre », tu
+          choisis toi-même ce qu'elle doit affecter — ou rien, pour un suivi pur.
         </Body>
         {painZones.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
@@ -116,9 +125,25 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
           </div>
         )}
         {addingOther ? (
-          <div style={{ display: "flex", gap: 6 }}>
-            <TextInput value={otherName} onChange={(e) => setOtherName(e.target.value)} placeholder="Nom de la zone (ex. Épaule)" style={{ flex: 1 }} />
-            <Btn variant="primary" disabled={!otherName.trim()} onClick={confirmOther} style={{ padding: "0 14px" }}>OK</Btn>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <TextInput value={otherName} onChange={(e) => setOtherName(e.target.value)} placeholder="Nom de la zone (ex. Épaule)" />
+            <div>
+              <Body style={{ fontSize: 10, color: C.dim, marginBottom: 6 }}>
+                Cette zone doit-elle influencer le recommandeur ?
+              </Body>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <button onClick={() => toggleGate("genou")} style={chip(otherGates.includes("genou"))}>
+                  Genou (impact : Lower/Basket)
+                </button>
+                <button onClick={() => toggleGate("tirage")} style={chip(otherGates.includes("tirage"))}>
+                  Tirage (haut du corps : Upper/Escalade)
+                </button>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <Btn variant="primary" disabled={!otherName.trim()} onClick={confirmOther} style={{ flex: 1 }}>Ajouter</Btn>
+              <Btn variant="ghost" onClick={() => { setAddingOther(false); setOtherName(""); setOtherGates([]); }}>Annuler</Btn>
+            </div>
           </div>
         ) : (
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
