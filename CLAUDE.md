@@ -1324,11 +1324,66 @@ non-régression (même méthode que V3/V7).
   plus tard puisse être isolé au jalon précis qui l'a introduit plutôt que noyé dans un seul
   gros commit.
 
+## Chantier RawCare — Phase 1, premier lot (06/08/2026, v3.55.0)
+
+Suite de la Phase 0. La feuille de route Phase 1 ("Généraliser le cœur") compte 7
+sous-chantiers ; deux touchent le moteur du recommandeur lui-même (zones de douleur,
+sports/tags de charge) et un troisième nécessite un système d'identité pour les exercices
+(bibliothèque d'exercices) — trois redesigns substantiels et imbriqués, sur du code qui
+protège en ce moment les tendons de Yoann. Décision prise avec Yoann le 06/08/2026 :
+commencer par le lot contenu et à faible risque ci-dessous, traiter le reste (zones de
+douleur, sports, bibliothèque d'exercices, types de séance) dans une session dédiée
+ultérieure vu l'ampleur.
+
+- **Sélecteur de cotation escalade** (`packages/core/src/climbing.js`) : devient un registre
+  de schémas (`SCHEMES.gym` / `SCHEMES.fontainebleau`) au lieu d'une échelle unique codée en
+  dur. `gradeIndex`/`climbSummary`/`climbLabel`/`climbLoad` prennent désormais le schéma en
+  paramètre explicite (jamais d'état module global). Le schéma "gym" (couleur de salle,
+  6 couleurs × 5 niveaux) reste le défaut et reproduit l'ancien comportement à l'identique —
+  vérifié par script Node comparant ancien/nouveau sur plusieurs scénarios de blocs.
+  Fontainebleau : 23 cotations standard (3 → 8c+), notation universellement connue.
+- **Nouveau réglage `climbScheme`** (chaîne `"gym"` par défaut, ajouté à `DATA_KEYS`) :
+  sélecteur `Pills` dans les Réglages. **Aucune migration de données** : un bloc déjà logué
+  sous un schéma devient simplement hors échelle sous l'autre (compte dans le volume de la
+  séance, pas dans le classement par niveau) — même traitement qu'un bloc mal saisi,
+  mécanisme déjà existant depuis V5, pas de code nouveau pour ce cas.
+- **`BlocsField` à deux modes de rendu** : grille couleur × niveau si le schéma expose
+  `colors`/`levels` (cas "gym", inchangé visuellement) ; sinon liste de puces en `flex-wrap`,
+  une par cotation (cas "fontainebleau"). Le swatch couleur du récapitulatif ne s'affiche
+  qu'en mode grille (`scheme.gradeColor` renvoie `null` pour Fontainebleau de toute façon).
+- **`recommendSessions`/`buildCoachPrompt`/`buildCoachBriefing` scheme-aware** : nouveau
+  paramètre `scheme` (aucun autre changement de logique). Le paragraphe d'instruction du
+  Coach IA sur l'échelle de cotation devient conditionnel : texte identique à l'existant si
+  `scheme.id === "gym"`, note courte ("échelle Fontainebleau standard") sinon — plus de mise
+  en garde "ne pas convertir en Fontainebleau" hors du cas où c'est réellement le schéma actif.
+  Vérifié par diff sur les 9 scénarios synthétiques de Phase 0 (recommandeur) et par capture
+  hash avant/après sur données réelles seedées (Coach IA), schéma "gym" — identique au
+  caractère près dans les deux cas.
+- **Cibles macro de base éditables** : nouvelle carte "Cibles macro de base" dans les
+  Réglages (protéines/glucides/lipides/fibres/poids de maintenance), même pattern que les
+  éditeurs eau/fenêtre de sèche déjà en place. Comble le seul vrai manque trouvé à
+  l'exploration : ces champs n'avaient aucun éditeur nulle part, seuls des défauts codés en
+  dur dans `DEFAULT_TARGETS`. Aucun changement de `packages/core` requis —
+  `targetsForDate`/`phaseTarget`/`kcalFromMacros` lisaient déjà ces champs.
+  **Précision de périmètre** : la feuille de route parle de cibles "configurables à
+  l'onboarding", mais aucun flux de première ouverture n'existe encore (ni côté
+  `apps/perso`, ni côté `apps/public` qui est toujours une coquille vide) — un onboarding
+  n'a nulle part où s'accrocher pour l'instant. Cet éditeur Réglages est la brique
+  nécessaire pour qu'un futur onboarding ait quelque chose à appeler, pas l'onboarding
+  lui-même.
+- **Reste de la Phase 1, pas commencé** : zones de douleur généralisées, bibliothèque de
+  sports + tags de charge (généralisation de `recommendSessions`), bibliothèque d'exercices
+  (l'identité d'un exercice est aujourd'hui juste une chaîne de caractères libre, utilisée
+  comme clé dans `DEFAULT_WEIGHTS`/`lastPerf`/`perfHistory` ET dans tout `trainingLog` —
+  toute refonte devra préserver cette chaîne ou migrer l'historique), types de séance
+  (Full body, Bro split — aucune notion de "split" n'existe encore comme donnée, seulement
+  un préfixe de nom partagé entre "Upper A"/"Upper B").
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
    `trainingLog`, `kneeLog`, `elbowLog`, `macroLog`, `noteLog`, `stepsLog`, `targets`,
-   `phase`, `hsrWeek`, `apiKey`, `model`, `coachProfile`, `coachJournal`,
+   `phase`, `hsrWeek`, `climbScheme`, `apiKey`, `model`, `coachProfile`, `coachJournal`,
    `foodLog`, `foodPins`, `foodMuted`, `foodPortions`, `foodRecipes`,
    `foodOverrides` —
    préfixées `protocole:` dans `store.js`)
