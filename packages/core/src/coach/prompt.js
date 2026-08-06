@@ -10,7 +10,7 @@
 
 import { today, byDate, daysBetween, shiftDateKey, round, lastN } from "../dateUtils.js";
 import { recommendSessions } from "../recommender.js";
-import { buildZones } from "../pain.js";
+import { buildZones, DEFAULT_ZONES } from "../pain.js";
 import { exoProgress } from "../training.js";
 import { climbSummary } from "../climbing.js";
 import { PHASES, phaseTarget, targetsForDate, kcalFromMacros, kcalOfEntry, isCutWindow, tdeeNow } from "../targets.js";
@@ -112,7 +112,7 @@ export function buildCoachPrompt(data, note) {
   // sur les zones (RawCare Phase 1, 06/08/2026) plutôt qu'écrite en dur pour exactement
   // deux zones — chaque zone porte sa propre `coachClause` (packages/core/src/pain.js).
   // Produit un texte identique au caractère près pour les 2 zones actuelles (genou, coude).
-  const zonesForCoach = buildZones({ knee, elbow }, today());
+  const zonesForCoach = buildZones(DEFAULT_ZONES, { knee, elbow }, today());
   const zoneCount = (n) => (n === 1 ? "Une tendinopathie en rééduc" : n === 2 ? "Deux tendinopathies en rééduc" : `${n} tendinopathies en rééduc`);
   const frenchList = (arr) => (arr.length <= 1 ? (arr[0] || "") : `${arr.slice(0, -1).join(", ")} et ${arr[arr.length - 1]}`);
   const tendinopathiesClause = zonesForCoach.length

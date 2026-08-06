@@ -1467,6 +1467,44 @@ plus un blocage pour ce lot.
   — toujours pour les mêmes raisons (décision de migration à ne pas presser, pas de
   consommateur avant `apps/public`).
 
+## Chantier RawCare — Phase 1, quatrième lot (06/08/2026, v3.58.0)
+
+Reprend le point resté délibérément hors scope au lot précédent : `zoneState`/`buildZones`
+(`packages/core/src/pain.js`) prenaient exactement 2 zones nommées "genou"/"coude" en dur,
+avec des seuils Silbernagel (péremption, seuil rouge, seuil ambre) figés en constantes.
+Généralisés en un **cadre** — N zones arbitraires, chacune avec ses propres seuils réglables
+— pour coller à l'ambition de la feuille de route ("cadre configurable libre ... zéro zone
+par défaut"), sans toucher au stockage.
+
+- **`zoneState(log, t0, label, opts)`** accepte désormais `freshDays`/`redPainThreshold`/
+  `amberPainThreshold`/`flaggedWindowDays` en plus de `unknownIsCaution`, tous optionnels
+  avec une valeur par défaut identique à l'ancien comportement figé (3 j / 6 / 4 / 6 j) —
+  une zone qui ne les précise pas se comporte donc à l'identique.
+- **`buildZones(zoneDefs, logs, t0)`** remplace `buildZones({knee, elbow}, t0)` : prend une
+  liste de définitions de zone (`key`/`label`/`gateTag`/`unknownIsCaution`/`coachClause` +
+  seuils optionnels) et une map `{[key]: journal}`, au lieu d'exactement deux journaux nommés.
+- **Nouveau `DEFAULT_ZONES`** (`packages/core/src/pain.js`) : la config des deux zones
+  réelles de Yoann (genou, coude), désormais consommée par `recommender.js` et
+  `coach/prompt.js` via `buildZones(DEFAULT_ZONES, { knee, elbow }, t0)` — **aucun changement
+  de comportement pour `apps/perso`**, qui continue de fournir exactement les mêmes deux
+  journaux `kneeLog`/`elbowLog` qu'avant.
+- **Stockage toujours pas migré, volontairement** : `apps/perso` n'a aucune notion de zone
+  dynamique, aucune UI, aucune clé nouvelle. La question kneeLog/elbowLog figés vs stockage
+  arbitraire reste hors scope — c'est une décision de migration de données, pas un prérequis
+  pour que le moteur sache gérer N zones. Une future `apps/public` construirait sa propre
+  liste de zones (nom libre, seuils choisis par l'utilisateur, zéro zone par défaut) sans
+  passer par `DEFAULT_ZONES`.
+- **Vérifié par diff caractère près** : script Node capturant `recommendSessions(...)` et
+  `buildZones(...)` sur 6 scénarios (vide, genou rouge, genou hors base, coude ambre, coude
+  rouge, combo 3 séances + sommeil court) avant/après le refactor — sortie identique au bit
+  près. Build `apps/perso` propre, testé dans l'aperçu (Dashboard, carte « Prochaine
+  séance ») sans erreur console.
+- **Ce qui reste, inchangé par rapport aux lots précédents** : stockage dynamique réel des
+  zones (clé arbitraire côté `apps/perso`/`apps/public`), bibliothèque d'exercices avec
+  système d'identité (au-delà du `n`/`nom` actuel, qui reste la clé de tout l'historique),
+  activation du catalogue côté UI, rôle du Coach IA pour un public multi-utilisateur — tous
+  attendent un vrai consommateur (`apps/public`, Phase 2).
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,

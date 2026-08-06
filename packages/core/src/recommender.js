@@ -15,7 +15,7 @@
 // magnitudes de pénalité par type).
 
 import { today, byDate, daysBetween, fmtHM } from "./dateUtils.js";
-import { buildZones } from "./pain.js";
+import { buildZones, DEFAULT_ZONES } from "./pain.js";
 import { TEMPLATES } from "./session/templates.js";
 import { climbLoad } from "./climbing.js";
 import { isCutWindow } from "./targets.js";
@@ -75,11 +75,12 @@ export function recommendSessions({ training, knee, elbow, sleep, targets, schem
     ? `Escalade ${dClimb === 0 ? "aujourd'hui" : "hier"} : ${climbLast.n} blocs${climbLast.max ? ` (max ${scheme.gradeLabel(climbLast.max)})` : ""} — ${climbLast.level === "grosse" ? "grosse session, tirage lourd sur le coude" : climbLast.level === "legere" ? "session légère, impact limité sur le coude" : "charge de tirage normale"}.`
     : "Escalade récente : allège le tirage (coude).";
 
-  // Zones de douleur, génériques par tag de charge (RawCare Phase 1) — mêmes deux journaux
-  // qu'aujourd'hui (knee/elbow), regroupés par `buildZones` (packages/core/src/pain.js).
+  // Zones de douleur, génériques par tag de charge (RawCare Phase 1) — `buildZones`
+  // (packages/core/src/pain.js) sait désormais gérer N zones arbitraires ; `apps/perso`
+  // continue de fournir exactement les deux mêmes journaux (knee/elbow) via `DEFAULT_ZONES`.
   // Le genou est un gate dur : pas de donnée fraîche ⇒ prudence par défaut. Le coude ne
   // module que des scores tant qu'une douleur réelle n'est pas notée (silencieux sinon).
-  const zones = buildZones({ knee, elbow }, t0);
+  const zones = buildZones(DEFAULT_ZONES, { knee, elbow }, t0);
   const K = zones.find((z) => z.gateTag === "genou").state;
   const E = zones.find((z) => z.gateTag === "tirage").state;
   const { unknown: kneeUnknown, painLast, flagged7, red: kneeRed, amber: kneeAmber, note: kneeNote } = K;
