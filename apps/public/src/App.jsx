@@ -1,54 +1,47 @@
-import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient.js";
+import { useAuth } from "./useAuth.js";
+import LoginScreen from "./LoginScreen.jsx";
+import Home from "./Home.jsx";
+import { C } from "./ui.js";
 
-// Écran de vérification de branchement Supabase — RawCare Phase 2, premier jalon.
-// `getSession()` ne touche à aucune table : ça suffit pour valider que l'URL + la clé
-// publique pointent vers un vrai projet Supabase joignable, avant de construire l'auth et
-// le schéma par-dessus. Sera remplacé par l'écran de connexion réel une fois le schéma et
-// le flux d'auth de la bêta décidés.
+// RawCare Phase 2 : orchestration minimale des états d'auth. Pas de router — un seul écran
+// affiché à la fois selon l'état de connexion, suffisant tant qu'il n'y a qu'un écran
+// post-connexion (Home). Un vrai router viendra avec les premiers vrais écrans de données.
 export default function App() {
-  const [status, setStatus] = useState(supabase ? "checking" : "unconfigured");
-  const [detail, setDetail] = useState("");
+  if (!supabase) {
+    return (
+      <Centered>
+        <p style={{ color: C.secondary }}>
+          Pas encore configuré — renseigner <code>apps/public/.env.local</code>{" "}
+          (voir <code>.env.example</code>).
+        </p>
+      </Centered>
+    );
+  }
 
-  useEffect(() => {
-    if (!supabase) return;
-    supabase.auth.getSession()
-      .then(({ error }) => {
-        if (error) { setStatus("error"); setDetail(error.message); }
-        else setStatus("ok");
-      })
-      .catch((e) => { setStatus("error"); setDetail(String(e?.message || e)); });
-  }, []);
+  const { session, loading } = useAuth();
 
+  if (loading) {
+    return <Centered><p style={{ color: C.secondary }}>Chargement…</p></Centered>;
+  }
+  if (!session) {
+    return <LoginScreen />;
+  }
+  return <Home session={session} />;
+}
+
+function Centered({ children }) {
   return (
     <div style={{
       minHeight: "100%", display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", gap: 16, padding: 24,
-      fontFamily: "ui-monospace, Menlo, Monaco, monospace", textAlign: "center",
+      fontFamily: C.mono, textAlign: "center",
     }}>
       <div style={{ fontSize: 28, fontWeight: 700 }}>
-        <span style={{ color: "#8a8a84" }}>raw</span><span style={{ color: "#d7ff3f" }}>CARE</span>
+        <span style={{ color: C.secondary }}>raw</span><span style={{ color: C.accent }}>CARE</span>
       </div>
-      <div style={{
-        border: "1px solid #2a2a2a", background: "#121212", borderRadius: 10,
-        padding: "16px 20px", maxWidth: 420,
-      }}>
-        {status === "unconfigured" && (
-          <p style={{ color: "#8a8a84" }}>
-            Pas encore configuré — renseigner <code>apps/public/.env.local</code>{" "}
-            (voir <code>.env.example</code>).
-          </p>
-        )}
-        {status === "checking" && <p style={{ color: "#8a8a84" }}>Connexion à Supabase…</p>}
-        {status === "ok" && (
-          <p style={{ color: "#d7ff3f" }}>✓ Connexion Supabase OK — projet joignable.</p>
-        )}
-        {status === "error" && (
-          <>
-            <p style={{ color: "#ff3b30" }}>✗ Échec de connexion Supabase.</p>
-            <p style={{ color: "#6b6b66", fontSize: 12, marginTop: 8 }}>{detail}</p>
-          </>
-        )}
+      <div style={{ border: `1px solid ${C.border}`, background: C.card, borderRadius: 10, padding: "16px 20px", maxWidth: 420 }}>
+        {children}
       </div>
     </div>
   );

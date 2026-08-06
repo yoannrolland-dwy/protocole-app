@@ -1505,6 +1505,50 @@ par défaut"), sans toucher au stockage.
   activation du catalogue côté UI, rôle du Coach IA pour un public multi-utilisateur — tous
   attendent un vrai consommateur (`apps/public`, Phase 2).
 
+## Chantier RawCare — Phase 2, premier et deuxième jalons (06/08/2026, apps/public v0.1.0)
+
+Premier code réel dans `apps/public` (jusque-là une coquille inerte). Projet Supabase créé
+par Yoann (organisation `yoannrolland-dwy's Org`, projet `rawCARE`, région UE). Bêta fermée :
+comptes créés à la main par Yoann dans le dashboard Supabase, **pas d'inscription libre**.
+
+- **Choix de schéma : une seule table `user_data`** (`user_id uuid primary key references
+  auth.users`, `data jsonb`) plutôt qu'une table par type de donnée. La colonne `data`
+  reprend exactement la forme de l'export JSON actuel de `apps/perso`
+  (`{weightLog, trainingLog, macroLog, ...}` — les mêmes clés que `DATA_KEYS` dans
+  `apps/perso/src/store.js`). Décision motivée par "backend minimal, sans sur-construire"
+  (feuille de route) : `packages/core` consomme déjà ces objets JS tels quels, donc zéro
+  couche de transformation ; et la sécurité se résume à UNE règle simple à auditer
+  (`auth.uid() = user_id`) plutôt qu'à répéter la même règle sur 21 tables. SQL exécuté par
+  Yoann dans l'éditeur SQL Supabase (RLS activé, policies select/insert/update scopées à
+  `auth.uid()`, pas de policy delete pour l'instant).
+- **`apps/public/src/supabaseClient.js`** : lit `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`
+  depuis `.env.local` (gitignored, `.env.example` committé comme modèle). `createClient`
+  lève une exception SYNCHRONE si l'URL est vide — `supabase` reste `null` tant que les
+  variables ne sont pas renseignées plutôt que de planter l'app au chargement (piège trouvé
+  et corrigé pendant ce jalon).
+- **Auth email/mot de passe** (`LoginScreen.jsx`, `useAuth.js`) : pas de lien "créer un
+  compte" (bêta fermée). `useAuth` s'appuie uniquement sur
+  `supabase.auth.onAuthStateChange`, qui couvre à la fois l'état initial et les changements
+  ultérieurs — pas besoin d'un `getSession()` séparé en plus.
+- **`userData.js`** : `loadUserData`/`saveUserData`, upsert d'une ligne vide au premier
+  login (un nouveau bêta-testeur n'a par définition aucune donnée).
+- **`Home.jsx`** : écran minimal avec un champ "note de test" qui écrit dans
+  `data.testNote` — sert uniquement à prouver le trajet complet (connexion → écriture →
+  relecture après un vrai rechargement de page), pas une fonctionnalité. **Testé de bout en
+  bout avec le vrai compte de Yoann** : connexion, session qui survit à un F5, note
+  sauvegardée relue après rechargement complet, déconnexion — les quatre confirmés dans le
+  navigateur d'aperçu.
+- **`apps/public/src/ui.js`** : sous-ensemble minimal des jetons "Affirmée" (couleurs,
+  inputs, boutons) — à étoffer avec les vrais écrans, pas une réplique complète de
+  `apps/perso/src/ui.jsx` à ce stade.
+- **Port de dev dédié (5174)**, distinct de `apps/perso` (5173), pour pouvoir lancer les
+  deux en parallèle sans conflit — nouvelle entrée `rawcare-public-dev` dans
+  `.claude/launch.json`.
+- **Non fait à ce stade, volontairement** : aucun vrai écran de données (séances, macros,
+  douleurs...), pas de synchro avec `packages/core` au-delà de la preuve de trajet, pas de
+  déploiement (`apps/public` ne tourne qu'en local pour l'instant, aucun site Netlify créé
+  pour elle).
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
