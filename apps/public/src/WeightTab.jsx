@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from "recharts";
 import { Plus, Trash2 } from "lucide-react";
-import { PHASES, phaseTarget, DEFAULT_TARGETS } from "@rawcare/core/targets";
+import { PHASES } from "@rawcare/core/targets";
+import { mergeTargets, phaseTarget, phaseTargetField } from "./defaultTargets.js";
 import {
   C, today, fmt, round, upsert, lastN,
   Card, Label, Body, Big, Empty, Btn, Stepper, DateField, Pills, ScreenHeader,
@@ -18,7 +19,7 @@ import {
 export default function WeightTab({ data, update, error: loadError }) {
   const weight = data?.weightLog || [];
   const phase = data?.phase || "seche";
-  const targets = { ...DEFAULT_TARGETS, ...(data?.targets || {}) };
+  const targets = mergeTargets(data?.targets);
   const tgtW = phaseTarget(phase, targets);
 
   const [date, setDate] = useState(today());
@@ -32,6 +33,16 @@ export default function WeightTab({ data, update, error: loadError }) {
 
   const setPhase = async (p) => {
     try { await update({ phase: p }); } catch (e) { setSaveError(String(e.message || e)); }
+  };
+
+  // Bug remonté le 06/08/2026 : "le poids cible reste à 93kg" quoi qu'on change en
+  // Préférences — aucun champ ne permettait de le modifier (le core ne rend éditable que la
+  // cible de Maintenance, Sèche/Prise étant fixées à 93/95 pour l'usage perso de Yoann,
+  // voir defaultTargets.js). Éditable ici, au plus près de son usage (comme sur apps/perso,
+  // la carte Phase vit dans l'écran Poids).
+  const setTargetWeight = async (v) => {
+    try { await update({ targets: { ...targets, [phaseTargetField(phase)]: v } }); }
+    catch (e) { setSaveError(String(e.message || e)); }
   };
 
   const pickDate = (d) => {
@@ -110,6 +121,10 @@ export default function WeightTab({ data, update, error: loadError }) {
         <Label style={{ marginBottom: 8 }}>Phase</Label>
         <Pills options={Object.entries(PHASES).map(([k, v]) => ({ key: k, label: v.label }))} value={phase} onChange={setPhase} small />
         <Body style={{ marginTop: 8, fontSize: 11 }}>{PHASES[phase].msg}</Body>
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.divider}` }}>
+          <Label style={{ marginBottom: 6 }}>Poids cible — {PHASES[phase].label} (kg)</Label>
+          <Stepper value={tgtW} set={setTargetWeight} step={0.5} unit="kg" min={0} />
+        </div>
       </Card>
 
       <Card style={{ padding: "6px 14px" }}>

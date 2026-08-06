@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { DEFAULT_TARGETS, kcalFromMacros } from "@rawcare/core/targets";
+import { kcalFromMacros } from "@rawcare/core/targets";
+import { mergeTargets } from "./defaultTargets.js";
 import { C, Card, Label, Body, Btn, Field, Stepper, Pills, TextInput, ScreenHeader } from "./ui.jsx";
 import { SPORT_FAMILIES, PAIN_ZONE_PRESETS, newZoneKey } from "./onboarding.js";
 
@@ -27,7 +28,10 @@ export default function Onboarding({ data, update, onClose }) {
   const [painZones, setPainZones] = useState(data?.painZones || []);
   const [addingOther, setAddingOther] = useState(false);
   const [otherName, setOtherName] = useState("");
-  const [targets, setTargets] = useState({ ...DEFAULT_TARGETS, ...(data?.targets || {}) });
+  // `mergeTargets` neutralise toujours `cut` (voir defaultTargets.js) : rouvrir Préférences
+  // et enregistrer répare aussi, en base, un compte dont `targets.cut` porterait encore
+  // l'ancien bug (fenêtre de sèche de Yoann héritée avant le correctif du 06/08/2026).
+  const [targets, setTargets] = useState(mergeTargets(data?.targets));
   const [climbScheme, setClimbScheme] = useState(data?.climbScheme || "gym");
   const [apiKey, setApiKey] = useState(data?.apiKey || "");
   const [model, setModel] = useState(data?.model || "claude-sonnet-5");
@@ -138,6 +142,11 @@ export default function Onboarding({ data, update, onClose }) {
         <Field label="Poids de maintenance (kg)">
           <Stepper value={targets.weightMaintenance ?? 80} set={(v) => setTargets({ ...targets, weightMaintenance: v })} step={0.5} min={0} />
         </Field>
+        <Body style={{ fontSize: 10, color: C.dim, marginTop: 6 }}>
+          Ne sert de cible poids que si tu choisis la phase "Maintenance" dans l'onglet
+          Poids. Les phases Sèche/Prise ont chacune leur propre cible, éditable directement
+          dans l'onglet Poids (93/95 kg par défaut).
+        </Body>
         <Body style={{ fontSize: 10, color: C.dim, marginTop: 8, fontFamily: C.mono }}>
           ≈ {Math.round(kcalFromMacros(targets.protein, targets.carbs, targets.fat, targets.fiber))} kcal
         </Body>

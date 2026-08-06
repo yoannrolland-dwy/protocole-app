@@ -8,7 +8,8 @@
 
 import React, { useState, useMemo, useRef } from "react";
 import { Plus, Trash2, ChevronDown, ChevronRight, Droplet, Zap, Copy } from "lucide-react";
-import { DEFAULT_TARGETS, targetsForDate, kcalFromMacros } from "@rawcare/core/targets";
+import { kcalFromMacros } from "@rawcare/core/targets";
+import { mergeTargets, targetsForDate } from "../defaultTargets.js";
 import { today, fmt, longDate, upsert, shiftDateKey } from "@rawcare/core/dateUtils";
 import { C, Card, Label, Body, Btn, Empty, Stepper, DateField, ScreenHeader, Pills } from "../ui.jsx";
 import {
@@ -159,7 +160,7 @@ function DuplicatePanel({ entries, date, onConfirm, onClose }) {
 export default function NutritionTab({ data, update, error: loadError }) {
   const macros = data?.macroLog || [];
   const training = data?.trainingLog || [];
-  const targets = { ...DEFAULT_TARGETS, ...(data?.targets || {}) };
+  const targets = mergeTargets(data?.targets);
 
   const [date, setDate] = useState(today());
   const [openMeal, setOpenMeal] = useState(null);

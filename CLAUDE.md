@@ -2104,6 +2104,72 @@ périmètre change (public élargi, monétisation).
   email pour l'instant, dit explicitement dans la politique) ; déploiement d'`apps/public`
   (dernier chantier avant la Phase 3).
 
+## Chantier RawCare — Correctifs post-retours bêta (06/08/2026)
+
+Après la mise en prod, retour de Yoann sur `apps/public` en le montrant à ses connaissances :
+« j'ai l'impression que l'app n'est pas fini [...] trop downgradé [...] plein de bugs ». Deux
+catégories distinctes : un gros backlog de fonctionnalités (scan code-barres, Carte resto/
+Photo d'un plat, catalogue de sports étendu, zones de douleur libres, Réglages complet,
+Dashboard complet — **non traité ici**, chantier séparé à planifier) et quatre bugs concrets,
+tous corrigés dans cette session.
+
+- **« Le poids cible reste à 93kg » / « Les macros restent à 2420kcal » — même cause
+  racine.** `packages/core/src/targets.js` porte les cibles PERSONNELLES de Yoann :
+  `PHASES.seche.target`/`PHASES.prise.target` fixés à 93/95 (corrects pour lui, décision
+  documentée), et surtout `DEFAULT_TARGETS.cut` = SA fenêtre de sèche réelle en cours
+  (`enabled: true`, dates 27/07→18/08, cibles 220g/2275kcal). Ces deux constantes sont
+  légitimes pour `apps/perso` (un seul utilisateur, lui) mais `apps/public` les servait
+  telles quelles à tout compte, sans aucune UI pour les changer — d'où l'impression que
+  « changer les paramètres ne fait rien ».
+  - **Un premier correctif (même session, avant ce retour) s'est révélé insuffisant** :
+    `apps/public/src/defaultTargets.js` avait déjà été créé avec `cut.enabled: false` en
+    repli, mais ça ne joue que pour un compte qui n'a ENCORE rien en `data.targets` — celui
+    de Yoann avait déjà fait l'onboarding public AVANT ce correctif, donc `cut.enabled: true`
+    était déjà écrit en dur dans son `data.targets` en base (confirmé par une requête directe
+    à l'API REST Supabase depuis le navigateur d'aperçu) : un objet stocké écrase le défaut
+    entièrement au merge (`{...DEFAULT_TARGETS, ...data.targets}`, pas une fusion profonde),
+    donc le bug persistait malgré le premier correctif.
+  - **Fix définitif** : `defaultTargets.js` exporte désormais `mergeTargets(stored)`, point
+    d'entrée UNIQUE pour lire `data.targets` dans tout `apps/public` (remplace les fusions
+    manuelles `{...DEFAULT_TARGETS, ...(data?.targets||{})}` dupliquées dans `WeightTab.jsx`/
+    `MacroTab.jsx`/`NutritionTab.jsx`/`CoachIA.jsx`/`Home.jsx`/`Onboarding.jsx`) — force
+    `cut.enabled: false` INCONDITIONNELLEMENT, quoi qu'il y ait en base. `targetsForDate`
+    local (utilisé par `MacroTab`/`NutritionTab`) fait la même chose en deuxième filet.
+    Repose sur le fait qu'apps/public n'a de toute façon aucune UI pour éditer une fenêtre de
+    sèche — ce champ ne doit jamais s'appliquer ici, point final. Rouvrir Préférences et
+    enregistrer répare aussi, en base, un compte encore porteur de l'ancien bug (`Onboarding`
+    initialise son état via `mergeTargets` puis sauvegarde tel quel).
+  - **`PHASES.seche.target`/`PHASES.prise.target` (93/95 kg) rendus éditables pour
+    `apps/public`**, alors qu'ils sont fixes dans le core : nouveaux champs
+    `weightCutTarget`/`weightBulkTarget` dans `DEFAULT_TARGETS` local (valeurs de départ =
+    93/95, identiques au core, donc rien ne change tant que l'utilisateur n'édite pas),
+    `phaseTarget`/`phaseTargetField` locaux qui lisent le bon champ selon la phase (au lieu
+    d'utiliser la fonction figée du core). `WeightTab.jsx` gagne un Stepper "Poids cible —
+    {Phase} (kg)" dans la carte Phase, pour LES TROIS phases (le core n'en rend éditable
+    qu'une, Maintenance).
+  - **Vérifié en conditions réelles** avec le compte de Yoann : cible Macros passée de
+    220g/2275kcal (fenêtre de sèche fantôme) à 105g/1269kcal (ses vraies cibles de base) dès
+    le rechargement ; Stepper "Poids cible — Sèche" testé (93 → 93.5 kg, round-trip Supabase
+    confirmé après rechargement complet), puis remis à 93 pour ne pas altérer sa vraie
+    donnée. Build `apps/perso` ET `apps/public` propres — `packages/core/src/targets.js`
+    n'a pas été touché, aucun risque pour `apps/perso`.
+- **« Dans les cibles macro, quand le chiffre dépasse la centaine, on ne le voit plus
+  trop… que 2 chiffres sur 3 »** : bug CSS classique de flexbox — un enfant flex refuse par
+  défaut de rétrécir sous la taille de son contenu (`min-width: auto`), ce qui coupait
+  l'input d'un `Stepper` à 3 chiffres (ex. "220") dans une grille 2 colonnes étroite
+  (Préférences, Macros). Corrigé dans `apps/public/src/ui.jsx` (`minWidth: 0` sur le
+  conteneur flex ET l'input, `flexShrink: 0` sur les boutons +/− et l'unité). **Mêmes
+  bugs partout où `Stepper` est utilisé** (Poids, Séances/HSR, Repas…), pas seulement les
+  écrans remontés. `apps/public/src/ui.jsx` étant une copie verbatim d'`apps/perso/src/
+  ui.jsx` (documenté ainsi depuis le jalon "Poids/Sommeil/Pas à parité"), le même correctif a
+  été appliqué aux DEUX fichiers pour ne pas les faire diverger, même si Yoann n'a pas
+  remonté ce bug côté `apps/perso` (latent mais bien présent : même code, même défaut CSS).
+  Vérifié visuellement dans l'aperçu (375 px) : "105", "95", "45", "32" désormais lisibles en
+  entier dans la grille 2 colonnes de Préférences.
+- **Retiré au passage (pas remonté par Yoann, trouvé en lisant `Home.jsx`)** : la carte
+  "Note de test (round-trip user_data)", reste de debug des tout premiers jalons apps/public,
+  toujours affichée à un vrai bêta-testeur — supprimée avec son état et sa fonction `save()`.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,

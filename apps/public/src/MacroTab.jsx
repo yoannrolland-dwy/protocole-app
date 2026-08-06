@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { ResponsiveContainer, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from "recharts";
 import { Droplet, ChevronDown, ChevronRight, Zap, Plus, Trash2 } from "lucide-react";
-import { DEFAULT_TARGETS, targetsForDate, kcalFromMacros, kcalOfEntry, tdeeNow } from "@rawcare/core/targets";
+import { kcalFromMacros, kcalOfEntry, tdeeNow } from "@rawcare/core/targets";
+import { mergeTargets, targetsForDate } from "./defaultTargets.js";
 import { realDeficit, MIN_WINDOW_DAYS } from "@rawcare/core/tdee";
 import { PERI, BASKET_PROTOCOLS } from "@rawcare/core/session/templates";
 import { today, fmt, round, upsert, lastN } from "@rawcare/core/dateUtils";
@@ -66,7 +67,7 @@ export default function MacroTab({ data, update, error: loadError }) {
   const macros = data?.macroLog || [];
   const training = data?.trainingLog || [];
   const weight = data?.weightLog || [];
-  const targets = { ...DEFAULT_TARGETS, ...(data?.targets || {}) };
+  const targets = mergeTargets(data?.targets);
 
   const [date, setDate] = useState(today());
   const at = targetsForDate(date, targets);

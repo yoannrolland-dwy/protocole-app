@@ -1,11 +1,11 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { AlertTriangle } from "lucide-react";
 import { recommendSessions } from "@rawcare/core/recommender";
 import { buildZones } from "@rawcare/core/pain";
 import { SCHEMES } from "@rawcare/core/climbing";
-import { DEFAULT_TARGETS } from "@rawcare/core/targets";
+import { mergeTargets } from "./defaultTargets.js";
 import { today } from "@rawcare/core/dateUtils";
-import { C, Card, Label, Body, Field, Btn, inputStyle } from "./ui.jsx";
+import { C, Card, Label, Body } from "./ui.jsx";
 import { familyOf } from "./onboarding.js";
 import CoachIA from "./CoachIA.jsx";
 
@@ -15,29 +15,13 @@ import CoachIA from "./CoachIA.jsx";
 // IA public (06/08/2026) : carte CoachIA juste en dessous, même emplacement qu'apps/perso
 // (Dashboard, pas un onglet séparé). Pas de grille de tuiles complète (poids/pas/eau...) —
 // hors scope, jalon Dashboard séparé si voulu plus tard.
+// La carte "Note de test (round-trip user_data)" (preuve de trajet Supabase des tout
+// premiers jalons) a été retirée le 06/08/2026 : un reste de debug resté visible pour de
+// vrais bêta-testeurs, jamais censé rester après les premiers jalons.
 export default function Home({ session, data, update, error: loadError }) {
-  const [note, setNote] = useState(data?.testNote || "");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [saveError, setSaveError] = useState("");
-
-  const save = async () => {
-    setSaving(true);
-    setSaved(false);
-    setSaveError("");
-    try {
-      await update({ testNote: note });
-      setSaved(true);
-    } catch (e) {
-      setSaveError(String(e.message || e));
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const training = data?.trainingLog || [];
   const sleep = data?.sleepLog || [];
-  const targets = { ...DEFAULT_TARGETS, ...(data?.targets || {}) };
+  const targets = mergeTargets(data?.targets);
   const activeSports = data?.activeSports || [];
   const scheme = SCHEMES[data?.climbScheme] || SCHEMES.gym;
 
@@ -94,23 +78,7 @@ export default function Home({ session, data, update, error: loadError }) {
 
       <CoachIA data={data} update={update} error={loadError} />
 
-      <Card>
-        <Field label="Note de test (round-trip user_data)">
-          <input value={note} onChange={(e) => setNote(e.target.value)} style={inputStyle(false)}
-            placeholder="Tape quelque chose, sauvegarde, recharge la page…" />
-        </Field>
-        <Btn variant="primary" onClick={save} disabled={saving} style={{ width: "100%", marginTop: 12 }}>
-          {saving ? "Sauvegarde…" : "Sauvegarder"}
-        </Btn>
-        {saved && !saveError && (
-          <p style={{ color: C.accent, fontSize: 12, marginTop: 10 }}>
-            ✓ Sauvegardé — recharge la page pour vérifier que ça tient.
-          </p>
-        )}
-        {(saveError || loadError) && (
-          <p style={{ color: C.danger, fontSize: 12, marginTop: 10 }}>{saveError || loadError}</p>
-        )}
-      </Card>
+      {loadError && <p style={{ color: C.danger, fontSize: 12 }}>{loadError}</p>}
     </div>
   );
 }

@@ -124,17 +124,21 @@ export function Stepper({ value, set, step = 1, unit = "", min = 0, max = null, 
     color: C.accent, width: 38, height: 36, fontSize: 18, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" };
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <button onClick={() => bump(-step)} style={sq}>–</button>
-      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 5 }}>
+      <button onClick={() => bump(-step)} style={{ ...sq, flexShrink: 0 }}>–</button>
+      {/* `minWidth: 0` sur les deux : par défaut un enfant flex refuse de rétrécir sous la
+          taille de son contenu (min-width: auto), ce qui coupait les chiffres d'une valeur
+          à 3 chiffres (ex. 220) dans une grille 2 colonnes étroite (Préférences/Macros) —
+          trouvé le 06/08/2026, l'input semblait "n'afficher que 2 chiffres sur 3". */}
+      <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 5 }}>
         <input type="text" inputMode="decimal" value={txt}
           onChange={(e) => setTxt(e.target.value.replace(",", "."))}
           onFocus={() => setFoc(true)}
           onBlur={(e) => { setFoc(false); commit(e.target.value); }}
           onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-          style={{ ...inputStyle(foc), textAlign: "center", fontSize: 16 }} />
-        {unit && <span style={{ fontSize: 12, color: C.muted, fontWeight: 700 }}>{unit}</span>}
+          style={{ ...inputStyle(foc), minWidth: 0, textAlign: "center", fontSize: 16 }} />
+        {unit && <span style={{ fontSize: 12, color: C.muted, fontWeight: 700, flexShrink: 0 }}>{unit}</span>}
       </div>
-      <button onClick={() => bump(step)} style={sq}>+</button>
+      <button onClick={() => bump(step)} style={{ ...sq, flexShrink: 0 }}>+</button>
     </div>
   );
 }
