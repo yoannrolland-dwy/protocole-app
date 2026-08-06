@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--workspace=apps/perso"],
       "port": 5173
+    },
+    {
+      "name": "rawcare-public-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--workspace=apps/public"],
+      "port": 5174
     }
   ]
 }
