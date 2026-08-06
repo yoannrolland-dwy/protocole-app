@@ -1,20 +1,22 @@
 // Écran de recherche et d'ajout d'un aliment (feuille plein écran) — port depuis
 // apps/perso/src/nutrition/FoodSearch.jsx (RawCare Phase 2, jalon Repas).
 //
-// Deux limitations dures par rapport à apps/perso (voir CLAUDE.md) :
-// - pas de scan code-barres (@capacitor-mlkit/barcode-scanning, natif seulement) ;
-// - pas de Carte resto ni Photo d'un plat (appellent l'API Anthropic avec une clé que
-//   apps/public ne stocke pas encore).
+// Scan de code-barres (Lot C, 06/08/2026) : via BarcodeScanner.jsx (paquet `barcode-detector`
+// web, pas le pont natif @capacitor-mlkit d'apps/perso) — voir ce fichier pour le détail.
+//
+// Reste une limitation dure par rapport à apps/perso (voir CLAUDE.md) : pas de Carte resto
+// ni Photo d'un plat (appellent l'API Anthropic — Lot D, pas encore livré à ce commit).
 // Le reste — recherche CIQUAL + Open Food Facts, saisie libre, recettes, portions
 // nommées, corrections V6 — est un port quasi verbatim.
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Search, X, ChevronLeft, Star, PencilLine, Trash2, ChefHat, Plus } from "lucide-react";
+import { Search, X, ChevronLeft, Star, PencilLine, Trash2, ChefHat, Plus, ScanBarcode } from "lucide-react";
 import { C, Btn, Label, Body, Empty, Stepper, TextInput, inputStyle } from "../ui.jsx";
 import { searchCiqual, normalize, getCiqual } from "@rawcare/core/nutrition/ciqual";
 import { searchOFF, getOFFByBarcode } from "@rawcare/core/nutrition/off";
 import { suggestions, searchBoost, MACROS, newQuickRef, portionsFor, compileRecipe, recipeAsFood, isRecipeRef,
          applyOverride } from "./foodStore.js";
+import BarcodeScanner from "./BarcodeScanner.jsx";
 
 const OFF_DEBOUNCE_MS = 700;
 
@@ -520,7 +522,23 @@ export default function FoodSearch({
   const [free, setFree] = useState(startFree);
   const [building, setBuilding] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState(null);
+  // Scan code-barres web (Lot C) : idle | scanning | lookup | notfound | error — même
+  // machine à états que le scan natif d'apps/perso (scanState distinct d'offState : le scan
+  // peut échouer avant même d'atteindre OFF — caméra refusée, code illisible).
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanState, setScanState] = useState("idle");
+  const [scanCode, setScanCode] = useState(null);
+  const canScan = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
   const inputRef = useRef(null);
+
+  const onScanDetected = async (code) => {
+    setScanOpen(false);
+    setScanCode(code);
+    setScanState("lookup");
+    const { item, notFound, error } = await getOFFByBarcode(code);
+    if (item) { setSel(item); setScanState("idle"); }
+    else setScanState(error ? "error" : "notfound");
+  };
 
   const boost = useMemo(() => searchBoost(log, { meal, date }), [log, meal, date]);
   const sugg = useMemo(() => suggestions(log, { meal, pins, muted, date }), [log, meal, pins, muted, date]);
@@ -581,7 +599,30 @@ export default function FoodSearch({
                   placeholder="Rechercher un aliment…"
                   style={{ ...inputStyle(false), paddingLeft: 32, fontFamily: "inherit", fontWeight: 600 }} />
               </div>
+              {canScan && (
+                <button onClick={() => { setScanState("idle"); setScanOpen(true); }} disabled={scanState === "lookup"} style={{
+                  background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 6,
+                  width: 40, color: scanState === "lookup" ? C.dim : C.accent, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <ScanBarcode size={18} />
+                </button>
+              )}
             </div>
+
+            {scanState === "lookup" && (
+              <Body style={{ fontSize: 11, color: C.dim, padding: "0 0 10px" }}>Recherche du produit scanné…</Body>
+            )}
+            {scanState === "notfound" && (
+              <Body style={{ fontSize: 11, color: C.dim, padding: "0 0 10px" }}>
+                Code {scanCode} inconnu d'Open Food Facts. Cherchez-le à la main ou utilisez la saisie libre.
+              </Body>
+            )}
+            {scanState === "error" && (
+              <Body style={{ fontSize: 11, color: C.dim, padding: "0 0 10px" }}>
+                Erreur réseau pendant la recherche du produit scanné — réessayez.
+              </Body>
+            )}
 
             {matchedRecipes.length > 0 && (
               <>
@@ -629,6 +670,8 @@ export default function FoodSearch({
           </>
         )}
       </div>
+
+      {scanOpen && <BarcodeScanner onDetect={onScanDetected} onClose={() => setScanOpen(false)} />}
     </div>
   );
 }
