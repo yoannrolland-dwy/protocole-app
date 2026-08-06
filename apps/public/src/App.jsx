@@ -86,7 +86,7 @@ function Authenticated({ session }) {
         ) : needsOnboarding ? (
           <Onboarding data={data} update={update} />
         ) : tab === "home" ? (
-          <Home session={session} data={data} update={update} error={error} />
+          <Home session={session} data={data} update={update} error={error} setTab={setTab} />
         ) : tab === "weight" ? (
           <WeightTab data={data} update={update} error={error} />
         ) : tab === "sleep" ? (
