@@ -1,16 +1,33 @@
-// RECOMMANDEUR — historique des séances + état du genou et du coude.
+// RECOMMANDEUR — historique des séances + état des zones de douleur (genou, coude).
 // Sort des suggestions classées ET des séances à éviter.
 //
-// Extrait de src/App.jsx (apps/perso) le 05/08/2026, chantier RawCare Phase 0. Pur,
-// contenu inchangé — vérifié par diff sur plusieurs scénarios synthétiques avant et après
-// l'extraction (genou hors base, coude ambre, grosse séance d'escalade, fenêtre de sèche,
-// sommeil court, charge 3 jours élevée).
+// RawCare Phase 1 (06/08/2026) : le gate/la pénalité par zone de douleur, et l'historique
+// d'exposition, sont désormais génériques par TAG de charge (`chargeTags` sur les types de
+// séance, packages/core/src/session/templates.js) plutôt que câblés sur les noms "genou"/
+// "coude" — un futur sport taggé "genou" ou "tirage" (voir session/catalog.js) hérite déjà
+// du cooldown et du gate dur sans nouvelle branche de code, juste une ligne dans
+// AMBER_PENALTY et un `chargeTags` sur son type. Le texte des raisons affichées et le score
+// de base par type de séance restent en revanche écrits à la main : ce sont des conseils en
+// langage naturel propres à chaque sport (la formulation diffère volontairement d'un type à
+// l'autre), pas des données interchangeables — les généraliser ferait perdre la nuance
+// voulue. Vérifié par diff caractère près sur les scénarios de la Phase 0 + des scénarios
+// ciblant spécifiquement chaque nuance non généralisée (cooldown genou, exclusions croisées,
+// magnitudes de pénalité par type).
 
 import { today, byDate, daysBetween, fmtHM } from "./dateUtils.js";
-import { zoneState } from "./pain.js";
+import { buildZones } from "./pain.js";
 import { TEMPLATES } from "./session/templates.js";
 import { climbLoad } from "./climbing.js";
 import { isCutWindow } from "./targets.js";
+
+// Pénalité (score) quand la zone associée à ce tag est ambre, par type de séance porteur du
+// tag. Magnitude différente par type (l'escalade pèse plus lourd sur le coude que l'Upper, à
+// volume égal — prises fermées, à-coups) : une future entrée pour un nouveau sport taggé
+// "genou"/"tirage" s'ajoute ici, pas dans une nouvelle branche de recommendSessions.
+const AMBER_PENALTY = {
+  genou: { "Lower A": 10, "Lower B": 10, "Basket": 8 },
+  tirage: { "Upper A": 10, "Upper B": 10, "Escalade": 12 },
+};
 
 export function recommendSessions({ training, knee, elbow, sleep, targets, scheme }) {
   const t0 = today();
@@ -24,6 +41,10 @@ export function recommendSessions({ training, knee, elbow, sleep, targets, schem
     const hits = training.filter(pred);
     return hits.length ? daysBetween(hits[hits.length - 1].date, t0) : Infinity;
   };
+  // Généralisé sur les tags de charge : "depuis combien de jours un type taggé `tag` n'a
+  // pas été fait" — remplace le flag `knee` figé sur Lower/Basket, marche pour n'importe
+  // quel type taggé "genou"/"tirage", y compris au catalogue.
+  const daysSinceTag = (tag) => daysSince((t) => TEMPLATES[t.type]?.chargeTags?.includes(tag));
   const ago = (d) => (isFinite(d) ? (d === 0 ? "aujourd'hui" : d === 1 ? "hier" : `il y a ${d} j`) : "jamais fait");
   const cap = (d) => (isFinite(d) ? Math.min(d, 7) : 7);
 
@@ -38,7 +59,7 @@ export function recommendSessions({ training, knee, elbow, sleep, targets, schem
   const dLower = daysSince(isLower);
   const dBasket = daysSince((t) => t.type === "Basket");
   const dClimb = daysSince((t) => t.type === "Escalade");
-  const dKnee = daysSince((t) => TEMPLATES[t.type]?.knee); // Lower + Basket
+  const dKnee = daysSinceTag("genou"); // Lower + Basket (et tout futur sport taggé "genou")
 
   // Charge de la dernière séance d'escalade (V5) : jusqu'ici la pénalité « escalade
   // récente » était FORFAITAIRE — une heure tranquille et une grosse session de blocs
@@ -54,11 +75,13 @@ export function recommendSessions({ training, knee, elbow, sleep, targets, schem
     ? `Escalade ${dClimb === 0 ? "aujourd'hui" : "hier"} : ${climbLast.n} blocs${climbLast.max ? ` (max ${scheme.gradeLabel(climbLast.max)})` : ""} — ${climbLast.level === "grosse" ? "grosse session, tirage lourd sur le coude" : climbLast.level === "legere" ? "session légère, impact limité sur le coude" : "charge de tirage normale"}.`
     : "Escalade récente : allège le tirage (coude).";
 
-  // État du genou (bas du corps) et du coude (tirage) — même lecture, deux réglages.
+  // Zones de douleur, génériques par tag de charge (RawCare Phase 1) — mêmes deux journaux
+  // qu'aujourd'hui (knee/elbow), regroupés par `buildZones` (packages/core/src/pain.js).
   // Le genou est un gate dur : pas de donnée fraîche ⇒ prudence par défaut. Le coude ne
   // module que des scores tant qu'une douleur réelle n'est pas notée (silencieux sinon).
-  const K = zoneState(knee, t0, "genou", { unknownIsCaution: true });
-  const E = zoneState(elbow, t0, "coude", { unknownIsCaution: false });
+  const zones = buildZones({ knee, elbow }, t0);
+  const K = zones.find((z) => z.gateTag === "genou").state;
+  const E = zones.find((z) => z.gateTag === "tirage").state;
   const { unknown: kneeUnknown, painLast, flagged7, red: kneeRed, amber: kneeAmber, note: kneeNote } = K;
   const kLast = K.last;
   const elbowRed = E.red, elbowAmber = E.amber;
@@ -96,7 +119,7 @@ export function recommendSessions({ training, knee, elbow, sleep, targets, schem
   const upperToday = todayTypes.some((x) => x.startsWith("Upper"));
   const lowerToday = todayTypes.some((x) => x.startsWith("Lower"));
   const climbToday = todayTypes.includes("Escalade");
-  const kneeToday = todayTypes.some((x) => TEMPLATES[x]?.knee);
+  const kneeToday = todayTypes.some((x) => TEMPLATES[x]?.chargeTags?.includes("genou"));
 
   // variante la moins récente
   const variant = (a, b) => {
@@ -122,7 +145,7 @@ export function recommendSessions({ training, knee, elbow, sleep, targets, schem
     let upScore = 20 + (2 - upper7) * 12 + cap(dUpper);
     let upReason = `Upper ${upper7}/2 cette semaine · dernier ${ago(dUpper)}.`;
     if (kneeRed) { upScore += 18; upReason += " Genou à ménager → c'est l'option sûre, jambes au repos."; }
-    if (elbowAmber) { upScore -= 10; upReason += ` ${elbowWhy} → charge de tirage prudente, prises neutres/pronation.`; }
+    if (elbowAmber) { upScore -= AMBER_PENALTY.tirage["Upper A"]; upReason += ` ${elbowWhy} → charge de tirage prudente, prises neutres/pronation.`; }
     if (dClimb <= 1) { upScore -= climbPen; upReason += ` ${climbWhy}`; }
     if (dUpper === 0) { upScore -= 32; upReason = `Haut du corps déjà fait aujourd'hui (${upper7}/2 cette semaine) — à reprendre après récupération.`; }
     upScore = fatigueScore(upScore);
@@ -139,7 +162,7 @@ export function recommendSessions({ training, knee, elbow, sleep, targets, schem
     push(avoid, "Lower A / B", 0, "Expo genou hier (Lower ou basket) — laisser ~48 h au tendon.");
   } else {
     const loV = variant("Lower A", "Lower B");
-    let loScore = 20 + (2 - lower7) * 12 + cap(dLower) - (kneeAmber ? 10 : 0);
+    let loScore = 20 + (2 - lower7) * 12 + cap(dLower) - (kneeAmber ? AMBER_PENALTY.genou["Lower A"] : 0);
     let loReason = `Lower ${lower7}/2 cette semaine · dernier ${ago(dLower)}.`;
     if (kneeUnknown) loReason += ` ${kneeNote} Charge prudente, tempo 6 s.`;
     else if (kneeAmber) loReason += ` Genou sensible (${painLast}/10${flagged7 ? `, ${flagged7} j hors base` : ""}) → charge prudente, tempo 6 s.`;
@@ -156,7 +179,7 @@ export function recommendSessions({ training, knee, elbow, sleep, targets, schem
   } else if (upperToday) {
     push(avoid, "Basket", 0, "Musculation (Upper) déjà faite aujourd'hui — basket déconseillé le même jour (fatigue générale).");
   } else {
-    let bScore = 10 + cap(dBasket) - (kneeAmber ? 8 : 0) - (dKnee <= 1 ? 6 : 0);
+    let bScore = 10 + cap(dBasket) - (kneeAmber ? AMBER_PENALTY.genou["Basket"] : 0) - (dKnee <= 1 ? 6 : 0);
     let bReason = `${basket7}× cette semaine · dernier ${ago(dBasket)}. Passer par l'échauffement guidé.`;
     if (kneeUnknown) bReason += ` ${kneeNote}`;
     else if (kneeAmber) bReason += " Genou sensible : réduire le volume de sauts.";
@@ -178,7 +201,7 @@ export function recommendSessions({ training, knee, elbow, sleep, targets, schem
     if (lowerToday) cReason += " Lower déjà fait aujourd'hui : bon jour pour l'escalade (pas de conflit coude).";
     // Pénalité plus lourde que sur Upper : à volume égal, l'escalade est la sollicitation
     // la plus intense du tendon distal du biceps (prises fermées, à-coups, blocages).
-    if (elbowAmber) { cScore -= 12; cReason += ` ${elbowWhy} → volume de tirage à réduire.`; }
+    if (elbowAmber) { cScore -= AMBER_PENALTY.tirage["Escalade"]; cReason += ` ${elbowWhy} → volume de tirage à réduire.`; }
     if (cutOn) { cScore -= 8; cReason += " Fenêtre de sèche : pas de volume tirage en plus de l'habituel."; }
     cScore = fatigueScore(cScore);
     const cFat = fatigueReason(); if (cFat) cReason += ` ${cFat}`;

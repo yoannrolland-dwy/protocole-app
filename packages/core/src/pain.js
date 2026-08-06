@@ -48,3 +48,29 @@ export function zoneState(log, t0, label, { unknownIsCaution }) {
   const redWhy = red ? (last.baseline === false ? "pas revenu à la base sous 24 h" : `douleur ${last.pain}/10`) : null;
   return { last, age, fresh, unknown, painLast, flagged7, red, amber, note, redWhy };
 }
+
+/**
+ * RawCare Phase 1 (06/08/2026) : regroupe les zones de douleur en une liste, pour que
+ * `recommendSessions` (packages/core/src/recommender.js) puisse gater/pénaliser par TAG de
+ * charge (`gateTag`) plutôt que par nom de zone codé en dur. Aucun changement de stockage :
+ * construite ici à partir des deux mêmes journaux `knee`/`elbow` qu'aujourd'hui — ajouter une
+ * vraie 3ᵉ zone dynamique resterait une décision de stockage séparée, non prise ici.
+ *
+ * `gateTag` fait le lien avec `chargeTags` sur les types de séance
+ * (packages/core/src/session/templates.js) : le genou gate/pénalise tout type taggé
+ * `"genou"`, le coude tout type taggé `"tirage"`.
+ *
+ * `coachClause` : description courte de la contrainte de rééducation propre à la zone,
+ * utilisée par `buildCoachPrompt` (packages/core/src/coach/prompt.js) pour construire la
+ * phrase "Deux tendinopathies en rééduc : ..." du system prompt sans la répéter en dur.
+ */
+export function buildZones({ knee, elbow }, t0) {
+  return [
+    { key: "knee", label: "genou", gateTag: "genou", unknownIsCaution: true,
+      coachClause: "tendon quadricipital (HSR, tempo 6 s, règle de Silbernagel : douleur ≤ 3-5/10 tolérée si retour à la base sous 24 h)",
+      state: zoneState(knee, t0, "genou", { unknownIsCaution: true }) },
+    { key: "elbow", label: "coude", gateTag: "tirage", unknownIsCaution: false,
+      coachClause: "distale du biceps (prises neutres/pronation privilégiées, supination limitée)",
+      state: zoneState(elbow, t0, "coude", { unknownIsCaution: false }) },
+  ];
+}

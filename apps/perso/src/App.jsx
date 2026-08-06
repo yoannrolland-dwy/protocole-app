@@ -42,7 +42,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.56.0";
+const APP_VERSION = "3.57.0";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA

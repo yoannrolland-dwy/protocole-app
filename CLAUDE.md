@@ -1407,20 +1407,65 @@ vérifié par diff comme le reste de la Phase 0/1.
   sports et son propre split. **Charge genou tranchée avec Yoann** : Foot et Course à pied
   traités comme le Basket (gate dur si genou hors base), Vélo sans tag `genou` (pas
   d'impact).
-- **Non fait, explicitement repoussé à une session dédiée** (à ne pas faire vite) :
-  - Réécriture du moteur de score de `recommendSessions` pour qu'il note génériquement
-    n'importe quel sport/type de séance à partir de `chargeTags` — actuellement il reste
-    câblé sur les 6 types nommés en dur (`isUpper`/`isLower`, littéraux `"Basket"`/
-    `"Escalade"`), donc `SPORTS_CATALOG`/`SESSION_TYPES_CATALOG` ne sont pas encore notés
-    par le recommandeur.
-  - Généralisation du stockage des zones de douleur : `PAIN_ZONES`, `kneeLog`/`elbowLog`
-    restent deux zones fixes. Passer à un nombre de zones arbitraire changerait le modèle
-    de stockage (aujourd'hui deux clés localStorage séparées) et imposerait une vraie
-    décision de migration — à prendre au calme, pas sous contrainte réseau.
-  - Activation du catalogue côté UI (picker, formulaire d'activation par utilisateur) :
-    n'a de sens qu'avec `apps/public` (Phase 2+).
-  - Rôle du Coach IA reformulé pour un public multi-utilisateur : pas de surface UI
-    multi-tenant à date pour le tester.
+- **Non fait à ce lot, repris au lot suivant** : réécriture du moteur de score de
+  `recommendSessions` pour qu'il note génériquement n'importe quel sport à partir de
+  `chargeTags` — voir le lot suivant, qui l'a fait.
+
+## Chantier RawCare — Phase 1, troisième lot (06/08/2026, v3.57.0)
+
+Suite immédiate du deuxième lot, même session (contrainte pratique : Yoann en accès distant,
+sans PC pour reprendre plus tard). Reprend le point explicitement repoussé au lot précédent :
+le moteur de score de `recommendSessions`, câblé en dur sur les 6 types nommés
+(`isUpper`/`isLower`, littéraux `"Basket"`/`"Escalade"`).
+
+**Reconsidération par rapport au lot précédent** : la question du stockage des zones de
+douleur (deux clés `kneeLog`/`elbowLog` figées vs stockage dynamique) semblait bloquer cette
+généralisation. En relisant `recommendSessions` en entier, ce n'est pas le cas : le moteur
+peut devenir générique sur un **tableau de zones** en interne, tout en restant appelé avec
+exactement les deux zones actuelles, construites à partir des mêmes `kneeLog`/`elbowLog`
+qu'aujourd'hui. **Aucun changement de stockage, aucune migration** — cette question reste
+repoussée (toujours pour la même raison : décision à prendre au calme), mais elle n'était
+plus un blocage pour ce lot.
+
+- **`packages/core/src/pain.js`, nouvelle fonction `buildZones({ knee, elbow }, t0)`** :
+  regroupe les deux zones en une liste (`{ key, label, gateTag, unknownIsCaution,
+  coachClause, state }`), `state` étant le `zoneState(...)` déjà existant et inchangé.
+  `gateTag` fait le lien avec `chargeTags` sur `TEMPLATES` : le genou gate/pénalise tout
+  type taggé `"genou"`, le coude tout type taggé `"tirage"`.
+- **`packages/core/src/recommender.js` généralisé par tag, pas par nom** :
+  - `dKnee`/`kneeToday` (exposition récente au tag "genou") passent de
+    `TEMPLATES[t.type]?.knee` (un flag dédié) à `TEMPLATES[t.type]?.chargeTags?.includes("genou")`
+    — un futur sport du catalogue taggé "genou" (Foot, Course à pied) hériterait déjà du
+    cooldown 48h et du gate dur sans toucher au recommandeur.
+  - Nouvelle table `AMBER_PENALTY` (magnitude de pénalité par zone ambre × type porteur du
+    tag : `Lower A/B` -10, `Basket` -8 pour "genou" ; `Upper A/B` -10, `Escalade` -12 pour
+    "tirage") remplace les constantes éparpillées dans le code — ajouter un sport genou/
+    tirage plus tard est une ligne dans cette table, pas une nouvelle branche.
+  - **Ce qui reste explicitement du code dédié, pas généralisé** (parce que ce sont des
+    comportements de sport, pas des règles de zone) : la modulation de pénalité par
+    `climbLoad` (volume réel de blocs, propre à l'escalade), le choix de variante A/B
+    (`variant()`), les exclusions croisées "déjà fait aujourd'hui" entre types de même tag,
+    et **tout le texte des raisons affichées** (langage naturel propre à chaque sport,
+    volontairement différent d'un type à l'autre — le généraliser aurait fait perdre la
+    nuance voulue).
+- **`packages/core/src/coach/prompt.js`** : la phrase "Deux tendinopathies en rééduc : ..."
+  du system prompt, câblée en dur pour exactement 2 zones, est reconstruite en itérant sur
+  `buildZones(...)` (chaque zone porte sa propre `coachClause`) — produit un texte
+  identique au caractère près pour les 2 zones actuelles.
+- **Vérification, la plus poussée du chantier RawCare à ce jour** : 18 scénarios de diff
+  (les 9 de la Phase 0 + 9 nouveaux ciblant spécifiquement chaque nuance non généralisée :
+  cooldown genou via Lower ET via Basket, magnitudes de pénalité Lower≠Basket et
+  Upper≠Escalade, exclusions croisées tirage/genou) — identiques au caractère près entre
+  l'ancien `recommendSessions` et le nouveau. Capture hash avant/après pour
+  `buildCoachPrompt`/`buildCoachBriefing` sur données réelles seedées — un premier écart
+  observé s'est révélé être une comparaison contre une capture périmée (données de séances
+  sorties de la fenêtre de 7 jours entre deux captures à plusieurs heures d'écart dans la
+  même session, pas une régression) : reconfirmé par une capture avant/après refaite dos à
+  dos, identique.
+- **Ce qui reste, inchangé par rapport au lot précédent** : stockage dynamique des zones de
+  douleur, activation du catalogue côté UI, rôle du Coach IA pour un public multi-utilisateur
+  — toujours pour les mêmes raisons (décision de migration à ne pas presser, pas de
+  consommateur avant `apps/public`).
 
 ## Règles absolues à ne jamais casser
 

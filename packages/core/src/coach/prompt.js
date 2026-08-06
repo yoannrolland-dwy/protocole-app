@@ -10,6 +10,7 @@
 
 import { today, byDate, daysBetween, shiftDateKey, round, lastN } from "../dateUtils.js";
 import { recommendSessions } from "../recommender.js";
+import { buildZones } from "../pain.js";
 import { exoProgress } from "../training.js";
 import { climbSummary } from "../climbing.js";
 import { PHASES, phaseTarget, targetsForDate, kcalFromMacros, kcalOfEntry, isCutWindow, tdeeNow } from "../targets.js";
@@ -106,6 +107,16 @@ export function buildCoachPrompt(data, note) {
   // et injecté dans le prompt pour que le coach commente/valide UN seul avis au lieu de
   // produire le sien indépendamment (les deux pouvaient se contredire avant ce couplage).
   const reco = recommendSessions({ training, knee, elbow, sleep, targets, scheme });
+
+  // Phrase "Deux tendinopathies en rééduc : ..." du system prompt, construite en itérant
+  // sur les zones (RawCare Phase 1, 06/08/2026) plutôt qu'écrite en dur pour exactement
+  // deux zones — chaque zone porte sa propre `coachClause` (packages/core/src/pain.js).
+  // Produit un texte identique au caractère près pour les 2 zones actuelles (genou, coude).
+  const zonesForCoach = buildZones({ knee, elbow }, today());
+  const zoneCount = (n) => (n === 1 ? "Une tendinopathie en rééduc" : n === 2 ? "Deux tendinopathies en rééduc" : `${n} tendinopathies en rééduc`);
+  const frenchList = (arr) => (arr.length <= 1 ? (arr[0] || "") : `${arr.slice(0, -1).join(", ")} et ${arr[arr.length - 1]}`);
+  const tendinopathiesClause = zonesForCoach.length
+    ? `${zoneCount(zonesForCoach.length)} : ${frenchList(zonesForCoach.map((z) => z.coachClause))}. ` : "";
 
   // --- progression par exercice, calculée plutôt qu'envoyée en brut ---
   // Le dump des séries brutes sur 14 jours était le plus gros poste du prompt (mesuré :
@@ -249,7 +260,7 @@ ${profile.trim()}` : "";
   // un jour, et plus propre en attendant. Les consignes de sortie restent en fin de
   // message utilisateur, là où elles ont fait leurs preuves (l'historique de troncatures
   // de ce module ne justifie pas de les déplacer maintenant).
-  const system = `Tu es le coach personnel tout-en-un de Yoann, 43 ans, athlète (muscu/basket/escalade) : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. Phase ${PHASES[phase].label}, poids cible ${tgtW} kg. Deux tendinopathies en rééduc : tendon quadricipital (HSR, tempo 6 s, règle de Silbernagel : douleur ≤ 3-5/10 tolérée si retour à la base sous 24 h) et distale du biceps (prises neutres/pronation privilégiées, supination limitée). Protéines hautes prioritaires. Escalade = volume tirage, jamais empilée le jour d'un Upper ; ne pas cumuler les expositions genou.${tempBlock}${profileBlock}`;
+  const system = `Tu es le coach personnel tout-en-un de Yoann, 43 ans, athlète (muscu/basket/escalade) : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. Phase ${PHASES[phase].label}, poids cible ${tgtW} kg. ${tendinopathiesClause}Protéines hautes prioritaires. Escalade = volume tirage, jamais empilée le jour d'un Upper ; ne pas cumuler les expositions genou.${tempBlock}${profileBlock}`;
 
   // Le paragraphe sur l'échelle de cotation dépend du schéma actif (RawCare Phase 1,
   // 06/08/2026) : "gym" est propre à la salle de l'utilisateur, donc l'explication complète
