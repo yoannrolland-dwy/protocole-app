@@ -88,7 +88,7 @@ export const mealsFor = (log, date) => {
  */
 export function buildCoachPrompt(data, note) {
   const { weight, sleep, training, knee, elbow, macros, notes, steps, targets, phase,
-    foodLog, foodOverrides, profile, journal } = data;
+    foodLog, foodOverrides, profile, journal, scheme } = data;
 
   // Dépense adaptative (V7) : mêmes données, même calcul que la carte de l'onglet
   // Macros (`tdeeNow`) — jamais deux chiffres différents pour la même réalité.
@@ -105,7 +105,7 @@ export function buildCoachPrompt(data, note) {
   // Verdict du recommandeur ("Prochaine séance") : recalculé ici avec les mêmes données,
   // et injecté dans le prompt pour que le coach commente/valide UN seul avis au lieu de
   // produire le sien indépendamment (les deux pouvaient se contredire avant ce couplage).
-  const reco = recommendSessions({ training, knee, elbow, sleep, targets });
+  const reco = recommendSessions({ training, knee, elbow, sleep, targets, scheme });
 
   // --- progression par exercice, calculée plutôt qu'envoyée en brut ---
   // Le dump des séries brutes sur 14 jours était le plus gros poste du prompt (mesuré :
@@ -123,7 +123,7 @@ export function buildCoachPrompt(data, note) {
   // coûterait des tokens pour un signal que le JS calcule exactement.
   const autresSeances = last14(training).filter((s) => !s.exercices)
     .map((s) => ({ d: s.date.slice(5), t: s.type, ...(s.duration != null ? { min: s.duration } : {}), ...(s.rpe != null ? { rpe: s.rpe } : {}),
-      ...(climbSummary(s.blocs) ? { blocs: climbSummary(s.blocs) } : {}) }));
+      ...(climbSummary(s.blocs, scheme) ? { blocs: climbSummary(s.blocs, scheme) } : {}) }));
 
   // --- temps réel : hier vs aujourd'hui, avec deltas explicites ---
   const findDay = (arr, d) => arr.find((e) => e.date === d);
@@ -251,6 +251,15 @@ ${profile.trim()}` : "";
   // de ce module ne justifie pas de les déplacer maintenant).
   const system = `Tu es le coach personnel tout-en-un de Yoann, 43 ans, athlète (muscu/basket/escalade) : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. Phase ${PHASES[phase].label}, poids cible ${tgtW} kg. Deux tendinopathies en rééduc : tendon quadricipital (HSR, tempo 6 s, règle de Silbernagel : douleur ≤ 3-5/10 tolérée si retour à la base sous 24 h) et distale du biceps (prises neutres/pronation privilégiées, supination limitée). Protéines hautes prioritaires. Escalade = volume tirage, jamais empilée le jour d'un Upper ; ne pas cumuler les expositions genou.${tempBlock}${profileBlock}`;
 
+  // Le paragraphe sur l'échelle de cotation dépend du schéma actif (RawCare Phase 1,
+  // 06/08/2026) : "gym" est propre à la salle de l'utilisateur, donc l'explication complète
+  // (ordre des couleurs, mise en garde anti-Fontainebleau) reste nécessaire. Un schéma
+  // standard comme Fontainebleau est une notation déjà connue du modèle, aucune mise en
+  // garde à faire.
+  const cotationInstr = scheme.id === "gym"
+    ? `Les cotations sont celles de SA SALLE, au format "couleur-niveau", ordonnées ainsi : jaune < vert < bleu < rouge < noir < violet, et 1 à 5 dans chaque couleur (5 = le plus dur). Ne pas les convertir en Fontainebleau.`
+    : `Les cotations sont en échelle ${scheme.label} standard.`;
+
   const user = `TEMPS RÉEL — hier vs aujourd'hui (regarde d'abord ça, c'est le plus actionnable) :
 ${JSON.stringify(realtime)}
 
@@ -262,7 +271,7 @@ ${JSON.stringify(merged)}
 
 PROGRESSION PAR EXERCICE (14 j) — déjà calculée, ne refais pas l'arithmétique. "series_max" = meilleure série de chaque séance au format "MM-JJ poidsXreps" (ou "MM-JJ Ns" pour les exercices en gainage, mesurés en secondes) ; "tendance" compare le volume (charge × reps, ou les secondes en gainage) de la dernière séance à la précédente :
 ${JSON.stringify(exoProgressData)}
-${autresSeances.length ? `Séances sans séries (basket/escalade) : ${JSON.stringify(autresSeances)}\nPour l'escalade (bloc en salle), "blocs" résume la séance : n=nombre de blocs (le proxy de charge sur le tendon du coude), max/mediane=cotations réussies, max_tente=le plus dur essayé, puis la répartition flash/essais/echec. Les cotations sont celles de SA SALLE, au format "couleur-niveau", ordonnées ainsi : jaune < vert < bleu < rouge < noir < violet, et 1 à 5 dans chaque couleur (5 = le plus dur). Ne pas les convertir en Fontainebleau.` : ""}
+${autresSeances.length ? `Séances sans séries (basket/escalade) : ${JSON.stringify(autresSeances)}\nPour l'escalade (bloc en salle), "blocs" résume la séance : n=nombre de blocs (le proxy de charge sur le tendon du coude), max/mediane=cotations réussies, max_tente=le plus dur essayé, puis la répartition flash/essais/echec. ${cotationInstr}` : ""}
 ${notesTxt ? `\nNOTES DE CONTEXTE écrites par Yoann (14 j, ex. alcool, insomnie, petite blessure) — à prendre en compte activement dans l'analyse :\n${notesTxt}\n` : ""}
 ${(journal || "").trim() ? `CARNET DE BORD — état que TU as écrit à la fin de ta dernière analyse. C'est ta mémoire : appuie-toi dessus pour enchaîner (a-t-il appliqué ce que tu avais demandé ? où en est la progression ?) au lieu de repartir de zéro.\n${journal.trim()}\n` : "CARNET DE BORD : vide, c'est ta première analyse. Tu le créeras en fin de réponse.\n"}
 Structure ta réponse en deux temps :

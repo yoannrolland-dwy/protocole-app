@@ -58,9 +58,12 @@ export const store = {
 // de douleur réel du genou, pour un gain purement esthétique. L'UI et le recommandeur
 // sont écrits génériquement (PAIN_ZONES / zoneState dans App.jsx) pour qu'une 3e zone ne
 // coûte qu'une ligne — l'élégance de la clé unique sans son risque.
+// `climbScheme` (RawCare Phase 1, 06/08/2026) : système de cotation escalade actif
+// ("gym" | "fontainebleau"), voir packages/core/src/climbing.js. Chaîne simple, "gym" par
+// défaut si absente (comportement de toujours, aucune migration nécessaire).
 export const DATA_KEYS = [
   "weightLog", "sleepLog", "trainingLog", "kneeLog", "elbowLog", "macroLog", "noteLog", "stepsLog",
-  "targets", "phase", "hsrWeek", "model",
+  "targets", "phase", "hsrWeek", "model", "climbScheme",
   "coachProfile", "coachJournal",
   "foodLog", "foodPins", "foodMuted", "foodPortions", "foodRecipes", "foodOverrides",
 ];

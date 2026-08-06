@@ -9,10 +9,10 @@
 import { today, byDate, daysBetween, fmtHM } from "./dateUtils.js";
 import { zoneState } from "./pain.js";
 import { TEMPLATES } from "./session/templates.js";
-import { climbLoad, gradeLabel } from "./climbing.js";
+import { climbLoad } from "./climbing.js";
 import { isCutWindow } from "./targets.js";
 
-export function recommendSessions({ training, knee, elbow, sleep, targets }) {
+export function recommendSessions({ training, knee, elbow, sleep, targets, scheme }) {
   const t0 = today();
   const isUpper = (t) => t.type === "Upper A" || t.type === "Upper B";
   const isLower = (t) => t.type === "Lower A" || t.type === "Lower B";
@@ -46,12 +46,12 @@ export function recommendSessions({ training, knee, elbow, sleep, targets }) {
   // (tout l'historique d'avant V5), et le comportement forfaitaire d'origine s'applique
   // alors tel quel : pas de charge supposée à partir d'une donnée absente.
   const lastClimb = training.filter((t) => t.type === "Escalade").slice(-1)[0];
-  const climbLast = dClimb <= 1 ? climbLoad(lastClimb) : null;
+  const climbLast = dClimb <= 1 ? climbLoad(lastClimb, scheme) : null;
   // Pénalité modulée : une session légère pèse moins qu'un forfait, une grosse pèse plus.
   const CLIMB_PEN = { legere: 4, normale: 8, grosse: 14 };
   const climbPen = climbLast ? CLIMB_PEN[climbLast.level] : 8;
   const climbWhy = climbLast
-    ? `Escalade ${dClimb === 0 ? "aujourd'hui" : "hier"} : ${climbLast.n} blocs${climbLast.max ? ` (max ${gradeLabel(climbLast.max)})` : ""} — ${climbLast.level === "grosse" ? "grosse session, tirage lourd sur le coude" : climbLast.level === "legere" ? "session légère, impact limité sur le coude" : "charge de tirage normale"}.`
+    ? `Escalade ${dClimb === 0 ? "aujourd'hui" : "hier"} : ${climbLast.n} blocs${climbLast.max ? ` (max ${scheme.gradeLabel(climbLast.max)})` : ""} — ${climbLast.level === "grosse" ? "grosse session, tirage lourd sur le coude" : climbLast.level === "legere" ? "session légère, impact limité sur le coude" : "charge de tirage normale"}.`
     : "Escalade récente : allège le tirage (coude).";
 
   // État du genou (bas du corps) et du coude (tirage) — même lecture, deux réglages.

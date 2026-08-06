@@ -15,8 +15,7 @@ import { store, getSync, exportData, importData } from "./store.js";
 import { isBackupStale, daysSinceBackup, scheduleBackupReminder } from "./cloudBackup.js";
 import { exoProgress, exerciseList, exerciseSessions, exerciseTrend, isTimeMode, setLabel,
          beats, recordToBeat, recordsBySession, painOutOfBase } from "@rawcare/core/training";
-import { COLORS, LEVELS, gradeIndex, makeGrade, gradeLabel, gradeColor, ISSUES,
-         climbSummary, climbLabel, climbLoad } from "@rawcare/core/climbing";
+import { SCHEMES, gradeIndex, ISSUES, climbSummary, climbLabel } from "@rawcare/core/climbing";
 import { realDeficit, MIN_WINDOW_DAYS as MIN_TDEE_DAYS } from "@rawcare/core/tdee";
 import { TEMPLATES, TYPES, DEFAULT_WEIGHTS, HSR_TABLE, hsrForWeek, hsrParse, parseSecs,
          ROUTINES, PERI, BASKET_PROTOCOLS } from "@rawcare/core/session/templates";
@@ -294,7 +293,7 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
 /* ============================================================
    TAB — DASHBOARD
    ============================================================ */
-function Dashboard({ weight, sleep, knee, elbow, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings }) {
+function Dashboard({ weight, sleep, knee, elbow, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast ? round(wLast.kg - tgtW) : null;
@@ -306,7 +305,7 @@ function Dashboard({ weight, sleep, knee, elbow, macros, steps, targets, trainin
   const mToday = macros.find((m) => m.date === today());
   const kcalToday = mToday ? Math.round(kcalOfEntry(mToday)) : null;
 
-  const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee, elbow, sleep, targets }), [training, knee, elbow, sleep, targets]);
+  const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee, elbow, sleep, targets, scheme }), [training, knee, elbow, sleep, targets, scheme]);
 
   const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
   const waterToday = mToday?.water ?? 0;
@@ -1181,7 +1180,7 @@ function ProgressScreen({ training, onBack }) {
    Doit rester rapide au doigt EN SALLE : une grille de cotations à taper, jamais un champ
    texte libre, et un moyen d'ajouter plusieurs blocs de même cotation d'un coup.
    ============================================================ */
-function BlocsField({ blocs, setBlocs }) {
+function BlocsField({ blocs, setBlocs, scheme }) {
   // Issue « armée » : on choisit une fois, puis on tape les cotations. Défaut « après
   // essais », le cas le plus fréquent — flash et échec sont les exceptions.
   const [issue, setIssue] = useState("essais");
@@ -1200,14 +1199,19 @@ function BlocsField({ blocs, setBlocs }) {
     const g = groupes.find((x) => x.cotation === b.cotation && x.issue === b.issue);
     if (g) g.n += 1; else groupes.push({ cotation: b.cotation, issue: b.issue, n: 1 });
   });
-  groupes.sort((a, b) => gradeIndex(a.cotation) - gradeIndex(b.cotation)
+  groupes.sort((a, b) => gradeIndex(scheme, a.cotation) - gradeIndex(scheme, b.cotation)
     || ISSUES.findIndex((x) => x.key === a.issue) - ISSUES.findIndex((x) => x.key === b.issue));
 
-  const s = climbSummary(blocs);
+  const s = climbSummary(blocs, scheme);
   // Compte par cotation, toutes issues confondues : affiché dans la grille pour savoir où
   // on en est sans lire le récapitulatif.
   const parCotation = {};
   blocs.forEach((b) => { parCotation[b.cotation] = (parCotation[b.cotation] || 0) + 1; });
+
+  // Deux modes de saisie selon le schéma actif (RawCare Phase 1, 06/08/2026) : "gym" reste
+  // une grille couleur × niveau (la lecture du mur) ; un schéma sans colors/levels (ex.
+  // Fontainebleau) devient une liste plate de puces, une par cotation.
+  const isGrid = !!(scheme.colors && scheme.levels);
 
   return (
     <div style={{ marginTop: 12 }}>
@@ -1215,34 +1219,53 @@ function BlocsField({ blocs, setBlocs }) {
       <Pills options={ISSUES.map((i) => ({ key: i.key, label: i.label }))} value={issue} onChange={setIssue} small />
 
       <Label style={{ margin: "10px 0 6px" }}>Taper un niveau pour l'ajouter</Label>
-      {/* Une ligne par couleur de piste, du plus facile au plus dur — la lecture du mur.
-          La pastille de couleur est la seule entorse admise au « accent citron uniquement » :
-          ici la couleur EST la donnée, pas une décoration. */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-        {COLORS.map((col) => (
-          <div key={col.key} style={{ display: "grid", gridTemplateColumns: "62px repeat(5, 1fr)", gap: 5, alignItems: "center" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
-              <span style={{ width: 10, height: 10, borderRadius: 3, background: col.hex, flexShrink: 0,
-                border: col.key === "noir" ? `1px solid ${C.border}` : "none" }} />
-              <span style={{ fontSize: 9.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.3, fontWeight: 700 }}>{col.label}</span>
-            </span>
-            {LEVELS.map((lv) => {
-              const g = makeGrade(col.key, lv);
-              const n = parCotation[g] || 0;
-              return (
-                <button key={lv} onClick={() => add(g)} style={{
-                  padding: "8px 2px", borderRadius: 6, cursor: "pointer", fontFamily: C.mono,
-                  fontSize: 12, fontWeight: 800,
-                  background: n ? C.accentRow : C.card, color: n ? C.accent : C.muted,
-                  border: `1.5px solid ${n ? C.accent : C.border}`,
-                }}>
-                  {lv}{n > 0 && <span style={{ fontSize: 9, marginLeft: 1 }}>×{n}</span>}
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </div>
+      {isGrid ? (
+        /* Une ligne par couleur de piste, du plus facile au plus dur — la lecture du mur.
+           La pastille de couleur est la seule entorse admise au « accent citron uniquement » :
+           ici la couleur EST la donnée, pas une décoration. */
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          {scheme.colors.map((col) => (
+            <div key={col.key} style={{ display: "grid", gridTemplateColumns: `62px repeat(${scheme.levels.length}, 1fr)`, gap: 5, alignItems: "center" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+                <span style={{ width: 10, height: 10, borderRadius: 3, background: col.hex, flexShrink: 0,
+                  border: col.key === "noir" ? `1px solid ${C.border}` : "none" }} />
+                <span style={{ fontSize: 9.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.3, fontWeight: 700 }}>{col.label}</span>
+              </span>
+              {scheme.levels.map((lv) => {
+                const g = scheme.makeGrade(col.key, lv);
+                const n = parCotation[g] || 0;
+                return (
+                  <button key={lv} onClick={() => add(g)} style={{
+                    padding: "8px 2px", borderRadius: 6, cursor: "pointer", fontFamily: C.mono,
+                    fontSize: 12, fontWeight: 800,
+                    background: n ? C.accentRow : C.card, color: n ? C.accent : C.muted,
+                    border: `1.5px solid ${n ? C.accent : C.border}`,
+                  }}>
+                    {lv}{n > 0 && <span style={{ fontSize: 9, marginLeft: 1 }}>×{n}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* Schéma sans grille (ex. Fontainebleau) : une puce par cotation, ordre croissant. */
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {scheme.grades.map((g) => {
+            const n = parCotation[g] || 0;
+            return (
+              <button key={g} onClick={() => add(g)} style={{
+                padding: "8px 10px", borderRadius: 6, cursor: "pointer", fontFamily: C.mono,
+                fontSize: 12, fontWeight: 800,
+                background: n ? C.accentRow : C.card, color: n ? C.accent : C.muted,
+                border: `1.5px solid ${n ? C.accent : C.border}`,
+              }}>
+                {g}{n > 0 && <span style={{ fontSize: 9, marginLeft: 2 }}>×{n}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {groupes.length > 0 && (
         <div style={{ marginTop: 10 }}>
@@ -1252,9 +1275,9 @@ function BlocsField({ blocs, setBlocs }) {
               padding: "6px 0", borderTop: `1px solid ${C.divider}`,
             }}>
               <span style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: C.mono, fontSize: 12, color: C.text, fontWeight: 700 }}>
-                <span style={{ width: 9, height: 9, borderRadius: 3, background: gradeColor(g.cotation) || C.dim,
-                  border: g.cotation.startsWith("noir") ? `1px solid ${C.border}` : "none" }} />
-                {gradeLabel(g.cotation)}
+                {isGrid && <span style={{ width: 9, height: 9, borderRadius: 3, background: scheme.gradeColor(g.cotation) || C.dim,
+                  border: g.cotation.startsWith("noir") ? `1px solid ${C.border}` : "none" }} />}
+                {scheme.gradeLabel(g.cotation)}
                 <span style={{ color: g.issue === "echec" ? C.danger : C.muted, fontWeight: 400, marginLeft: 2, fontFamily: "inherit" }}>
                   {ISSUES.find((i) => i.key === g.issue)?.label}
                 </span>
@@ -1269,7 +1292,7 @@ function BlocsField({ blocs, setBlocs }) {
           ))}
           <div style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono, marginTop: 8 }}>
             {s.n} bloc{s.n > 1 ? "s" : ""}
-            {s.max ? ` · max ${gradeLabel(s.max)} · médiane ${gradeLabel(s.mediane)}` : " · aucun réussi"}
+            {s.max ? ` · max ${scheme.gradeLabel(s.max)} · médiane ${scheme.gradeLabel(s.mediane)}` : " · aucun réussi"}
             {` · ${s.flash} flash / ${s.essais} essais / ${s.echec} échec${s.echec > 1 ? "s" : ""}`}
           </div>
         </div>
@@ -1283,7 +1306,7 @@ const blocStep = {
   fontFamily: "inherit", lineHeight: 1,
 };
 
-function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow }) {
+function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow, scheme }) {
   const [open, setOpen] = useState(null);
   const [progress, setProgress] = useState(false);
   const [date, setDate] = useState(today());
@@ -1389,7 +1412,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow }) {
             <Field label="Durée (min)"><Stepper value={duration} set={setDuration} step={5} min={0} int /></Field>
           </div>
           <Field label="RPE"><Stepper value={rpe} set={setRpe} step={1} min={1} max={10} int /></Field>
-          {open === "Escalade" && <BlocsField blocs={blocs} setBlocs={setBlocs} />}
+          {open === "Escalade" && <BlocsField blocs={blocs} setBlocs={setBlocs} scheme={scheme} />}
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <Btn variant="primary" onClick={() => logSession(open)} style={{ flex: 1 }}>
               <CheckCircle2 size={14} style={{ display: "inline", marginRight: 4 }} />{editing ? "Enregistrer les modifications" : "Enregistrer"}
@@ -1445,7 +1468,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow }) {
               <span style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono }}>
                 {t.exercices
                   ? `${t.exercices.length} exos · ${t.exercices.reduce((a, e) => a + (e.series?.length || 0), 0)} séries`
-                  : `${t.duration != null ? t.duration + "′" : ""}${t.rpe != null ? ` · RPE ${t.rpe}` : ""}${climbLabel(t.blocs) ? ` · ${climbLabel(t.blocs)}` : ""}`}
+                  : `${t.duration != null ? t.duration + "′" : ""}${t.rpe != null ? ` · RPE ${t.rpe}` : ""}${climbLabel(t.blocs, scheme) ? ` · ${climbLabel(t.blocs, scheme)}` : ""}`}
               </span>
               <button onClick={(ev) => { ev.stopPropagation(); save.training(training.filter((x) => x !== t)); }}
                 style={{ background: "none", border: "none", cursor: "pointer", color: C.dim, padding: 0 }}>
@@ -1913,7 +1936,7 @@ function MacroTab({ macros, targets, save, training, weight }) {
    ============================================================ */
 function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync, onHealthSync,
                          coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, saveTargets, buildBriefing,
-                         lastAutoBackup, lastCloudBackup, onCloudBackupDone }) {
+                         lastAutoBackup, lastCloudBackup, onCloudBackupDone, climbScheme, setClimbScheme }) {
   const [k, setK] = useState(apiKey);
   const [m, setM] = useState(model);
   const [msg, setMsg] = useState("");
@@ -2030,6 +2053,17 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
         ) : (
           <Body style={{ fontSize: 11, color: C.muted }}>Vide — il se remplira à ta prochaine analyse.</Body>
         )}
+      </Card>
+
+      <Card>
+        <Label style={{ marginBottom: 8 }}>Système de cotation escalade</Label>
+        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
+          "Couleur de salle" reste la valeur par défaut. Changer de système n'efface rien :
+          les blocs déjà enregistrés dans l'ancien système restent comptés dans le volume de
+          la séance, juste hors échelle pour le classement par niveau.
+        </Body>
+        <Pills options={[{ key: "gym", label: "Couleur de salle" }, { key: "fontainebleau", label: "Fontainebleau" }]}
+          value={climbScheme} onChange={setClimbScheme} />
       </Card>
 
       <Card>
@@ -2179,6 +2213,7 @@ export default function App({ silent = false } = {}) {
   const [targets, setTargets] = useState(DEFAULT_TARGETS);
   const [phase, setPhaseState] = useState("seche");
   const [hsrWeek, setHsrWeekState] = useState(1);
+  const [climbScheme, setClimbSchemeState] = useState("gym");
   const [apiKey, setApiKeyState] = useState("");
   const [model, setModelState] = useState("claude-sonnet-5");
   const [coachProfile, setCoachProfileState] = useState("");
@@ -2204,6 +2239,7 @@ export default function App({ silent = false } = {}) {
       setTargets({ ...DEFAULT_TARGETS, ...storedTargets, cut: { ...DEFAULT_TARGETS.cut, ...(storedTargets.cut || {}) } });
       setPhaseState(await store.get("phase", "seche"));
       setHsrWeekState(await store.get("hsrWeek", 1));
+      setClimbSchemeState(await store.get("climbScheme", "gym"));
       setApiKeyState(await store.get("apiKey", ""));
       setModelState(await store.get("model", "claude-sonnet-5"));
       // Profil : amorcé une seule fois avec les règles auparavant codées en dur, pour que
@@ -2367,6 +2403,11 @@ export default function App({ silent = false } = {}) {
   };
   const setPhase = (v) => { setPhaseState(v); store.set("phase", v); };
   const setHsrWeek = (v) => { setHsrWeekState(v); store.set("hsrWeek", v); };
+  const setClimbScheme = (v) => { setClimbSchemeState(v); store.set("climbScheme", v); };
+  // Objet schéma dérivé, recalculé seulement quand le réglage change — passé partout où
+  // packages/core/src/climbing.js est consommé (BlocsField, historique, recommandeur, Coach
+  // IA). Repli sur "gym" si une valeur invalide traînait dans le stockage.
+  const scheme = SCHEMES[climbScheme] || SCHEMES.gym;
   const setApiKey = (v) => { setApiKeyState(v); store.set("apiKey", v); };
   const setModel = (v) => { setModelState(v); store.set("model", v); };
   const setCoachProfile = (v) => { setCoachProfileState(v); store.set("coachProfile", v); };
@@ -2390,13 +2431,13 @@ export default function App({ silent = false } = {}) {
       buildCoachPrompt({
         weight, sleep, training, knee, elbow, macros, notes, steps, targets, phase,
         foodLog: getSync("foodLog", []), foodOverrides: getSync("foodOverrides", {}),
-        profile, journal,
+        profile, journal, scheme,
       }, note),
     buildBriefing: () =>
       buildCoachBriefing({
         weight, sleep, training, knee, elbow, macros, notes, steps, targets, phase,
         foodLog: getSync("foodLog", []), foodOverrides: getSync("foodOverrides", {}),
-        profile: coachProfile, journal: coachJournal,
+        profile: coachProfile, journal: coachJournal, scheme,
       }),
     apiKey, model,
   };
@@ -2448,14 +2489,14 @@ export default function App({ silent = false } = {}) {
       {/* Contenu */}
       <main style={{ flex: 1, overflowY: "auto", padding: "14px 16px 24px" }}>
         {loading ? <Empty>Chargement…</Empty> : showSettings ? (
-          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
+          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, climbScheme, setClimbScheme }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, elbow, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup }} openSettings={() => setShowSettings(true)} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, elbow, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme }} openSettings={() => setShowSettings(true)} />}
             {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
             {tab === "sleep" && <SleepTab {...{ sleep, save }} />}
             {tab === "steps" && <StepsTab {...{ steps, save }} />}
-            {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, elbow }} />}
+            {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, elbow, scheme }} />}
             {tab === "pain" && <PainTab {...{ knee, elbow, save, hsrWeek }} />}
             {tab === "macro" && <MacroTab {...{ macros, targets, save, training, weight }} />}
             {tab === "food" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} apiKey={apiKey} model={model} />}
