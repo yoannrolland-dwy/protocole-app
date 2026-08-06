@@ -28,6 +28,7 @@ const TABS = [
   { key: "pain", label: "Douleurs" },
   { key: "macros", label: "Macros" },
   { key: "food", label: "Repas" },
+  { key: "settings", label: "Réglages" },
 ];
 
 export default function App() {
@@ -57,10 +58,6 @@ function Authenticated({ session }) {
   const userId = session.user.id;
   const { data, status, error, update } = useUserData(userId);
   const [tab, setTab] = useState("home");
-  // Bouton "Préférences" (06/08/2026, chantier onboarding) : rouvre le même formulaire
-  // qu'au premier login, préempli, pour éditer sports/zones/macros/climbScheme/clé API sans
-  // construire un écran Réglages complet — voir Onboarding.jsx.
-  const [editingPrefs, setEditingPrefs] = useState(false);
   // Gate de première ouverture : tant que `data.onboarded` n'est pas vrai, l'onboarding
   // remplace tout le reste (même principe que `!session` → LoginScreen). `status ===
   // "loading"` passe avant : `data` est encore `null` au tout premier rendu.
@@ -73,24 +70,14 @@ function Authenticated({ session }) {
           <div style={{ fontSize: 20, fontWeight: 700 }}>
             <span style={{ color: C.text2 }}>raw</span><span style={{ color: C.accent }}>CARE</span>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            {!needsOnboarding && (
-              <button onClick={() => setEditingPrefs(true)} style={{
-                background: "none", border: `1px solid ${C.border}`, color: C.text2,
-                borderRadius: 8, padding: "6px 12px", fontFamily: C.mono, fontSize: 12, cursor: "pointer",
-              }}>
-                Préférences
-              </button>
-            )}
-            <button onClick={() => supabase.auth.signOut()} style={{
-              background: "none", border: `1px solid ${C.border}`, color: C.text2,
-              borderRadius: 8, padding: "6px 12px", fontFamily: C.mono, fontSize: 12, cursor: "pointer",
-            }}>
-              Se déconnecter
-            </button>
-          </div>
+          <button onClick={() => supabase.auth.signOut()} style={{
+            background: "none", border: `1px solid ${C.border}`, color: C.text2,
+            borderRadius: 8, padding: "6px 12px", fontFamily: C.mono, fontSize: 12, cursor: "pointer",
+          }}>
+            Se déconnecter
+          </button>
         </div>
-        {!needsOnboarding && !editingPrefs && <NavBar tab={tab} setTab={setTab} />}
+        {!needsOnboarding && <NavBar tab={tab} setTab={setTab} />}
       </div>
 
       <div style={{ width: "100%", maxWidth: 420, padding: "16px 24px 24px", boxSizing: "border-box" }}>
@@ -98,8 +85,6 @@ function Authenticated({ session }) {
           <p style={{ color: C.text2, fontSize: 13 }}>Chargement…</p>
         ) : needsOnboarding ? (
           <Onboarding data={data} update={update} />
-        ) : editingPrefs ? (
-          <Onboarding data={data} update={update} onClose={() => setEditingPrefs(false)} />
         ) : tab === "home" ? (
           <Home session={session} data={data} update={update} error={error} />
         ) : tab === "weight" ? (
@@ -114,8 +99,10 @@ function Authenticated({ session }) {
           <PainTab data={data} update={update} error={error} />
         ) : tab === "macros" ? (
           <MacroTab data={data} update={update} error={error} />
-        ) : (
+        ) : tab === "food" ? (
           <NutritionTab data={data} update={update} error={error} />
+        ) : (
+          <Onboarding data={data} update={update} mode="settings" />
         )}
       </div>
 

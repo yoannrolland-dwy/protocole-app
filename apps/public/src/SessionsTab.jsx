@@ -108,7 +108,7 @@ export default function SessionsTab({ data, update, error: loadError }) {
       <ScreenHeader title="Séances" subtitle="carnet · progressive overload" />
 
       {activeTypes.length === 0 && (
-        <Empty>Aucun sport activé — choisis-en au moins un depuis « Préférences ».</Empty>
+        <Empty>Aucun sport activé — choisis-en au moins un depuis « Réglages ».</Empty>
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>

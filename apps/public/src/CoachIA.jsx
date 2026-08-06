@@ -73,7 +73,7 @@ export default function CoachIA({ data, update, error: loadError }) {
 
   const run = async () => {
     if (!apiKey) {
-      setErr("Ajoute ta clé API Anthropic depuis « Préférences » pour activer l'analyse.");
+      setErr("Ajoute ta clé API Anthropic depuis « Réglages » pour activer l'analyse.");
       setState("error"); return;
     }
     await saveNote(note);
@@ -195,7 +195,7 @@ export default function CoachIA({ data, update, error: loadError }) {
       {state === "idle" && (
         <Body style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>
           Analyse tes 14 derniers jours (poids, macros, eau, séances, sommeil, douleurs suivies), au jour le
-          jour et sur la semaine glissante. Nécessite ta clé API (Préférences).
+          jour et sur la semaine glissante. Nécessite ta clé API (Réglages).
         </Body>
       )}
 

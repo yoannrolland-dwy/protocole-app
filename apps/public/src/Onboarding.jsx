@@ -23,7 +23,7 @@ const chip = (on) => ({
   border: `1.5px solid ${on ? C.accent : C.border}`, fontFamily: "inherit",
 });
 
-export default function Onboarding({ data, update, onClose }) {
+export default function Onboarding({ data, update, onClose, mode = "onboarding" }) {
   const [activeSports, setActiveSports] = useState(data?.activeSports || []);
   const [painZones, setPainZones] = useState(data?.painZones || []);
   const [addingOther, setAddingOther] = useState(false);
@@ -76,7 +76,11 @@ export default function Onboarding({ data, update, onClose }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader title="Bienvenue" subtitle="quelques réglages avant de commencer" />
+      {mode === "settings" ? (
+        <ScreenHeader title="Réglages" subtitle="sports, zones de douleur, cibles macro, Coach IA" />
+      ) : (
+        <ScreenHeader title="Bienvenue" subtitle="quelques réglages avant de commencer" />
+      )}
 
       <Card>
         <Label style={{ marginBottom: 8 }}>Sports pratiqués</Label>
@@ -176,7 +180,7 @@ export default function Onboarding({ data, update, onClose }) {
 
       <div style={{ display: "flex", gap: 8 }}>
         <Btn variant="primary" onClick={finish} disabled={saving} style={{ flex: 1 }}>
-          {saving ? "Enregistrement…" : "Terminer"}
+          {saving ? "Enregistrement…" : mode === "settings" ? "Enregistrer" : "Terminer"}
         </Btn>
         {onClose && <Btn variant="ghost" onClick={onClose} disabled={saving}>Annuler</Btn>}
       </div>

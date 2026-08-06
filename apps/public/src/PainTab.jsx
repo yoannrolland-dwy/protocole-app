@@ -75,7 +75,7 @@ export default function PainTab({ data, update, error: loadError }) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <ScreenHeader title="Douleurs" subtitle="aucune zone suivie" />
-        <Empty>Aucune zone de douleur activée — ajoutes-en une depuis « Préférences » si tu veux en suivre une.</Empty>
+        <Empty>Aucune zone de douleur activée — ajoutes-en une depuis « Réglages » si tu veux en suivre une.</Empty>
       </div>
     );
   }
