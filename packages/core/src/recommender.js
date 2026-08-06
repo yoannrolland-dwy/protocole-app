@@ -29,7 +29,17 @@ const AMBER_PENALTY = {
   tirage: { "Upper A": 10, "Upper B": 10, "Escalade": 12 },
 };
 
-export function recommendSessions({ training, knee, elbow, sleep, targets, scheme }) {
+// État neutre pour un gate ("genou"/"tirage") sans zone correspondante dans `zones` — cas
+// normal pour un utilisateur apps/public qui n'a suivi qu'une seule zone, ou aucune. Ne
+// gate/pénalise rien, silencieux (RawCare, onboarding — 06/08/2026).
+const NEUTRAL_ZONE = { unknown: false, painLast: null, flagged7: 0, red: false, amber: false, note: null, redWhy: null };
+
+// `zones` (RawCare, onboarding — 06/08/2026) : résultat déjà construit de `buildZones(zoneDefs,
+// logs, t0)`, optionnel et additif. Absent (apps/perso, coach/prompt.js) → comportement
+// identique bit pour bit à avant : `buildZones(DEFAULT_ZONES, {knee, elbow}, t0)` en interne.
+// Fourni (apps/public) → zones dynamiques de l'utilisateur, potentiellement 0 à N zones,
+// gate "genou"/"tirage" absent toléré via NEUTRAL_ZONE plutôt qu'un crash.
+export function recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme }) {
   const t0 = today();
   const isUpper = (t) => t.type === "Upper A" || t.type === "Upper B";
   const isLower = (t) => t.type === "Lower A" || t.type === "Lower B";
@@ -80,9 +90,9 @@ export function recommendSessions({ training, knee, elbow, sleep, targets, schem
   // continue de fournir exactement les deux mêmes journaux (knee/elbow) via `DEFAULT_ZONES`.
   // Le genou est un gate dur : pas de donnée fraîche ⇒ prudence par défaut. Le coude ne
   // module que des scores tant qu'une douleur réelle n'est pas notée (silencieux sinon).
-  const zones = buildZones(DEFAULT_ZONES, { knee, elbow }, t0);
-  const K = zones.find((z) => z.gateTag === "genou").state;
-  const E = zones.find((z) => z.gateTag === "tirage").state;
+  const z = zones ?? buildZones(DEFAULT_ZONES, { knee, elbow }, t0);
+  const K = z.find((zn) => zn.gateTag === "genou")?.state ?? NEUTRAL_ZONE;
+  const E = z.find((zn) => zn.gateTag === "tirage")?.state ?? NEUTRAL_ZONE;
   const { unknown: kneeUnknown, painLast, flagged7, red: kneeRed, amber: kneeAmber, note: kneeNote } = K;
   const kLast = K.last;
   const elbowRed = E.red, elbowAmber = E.amber;
