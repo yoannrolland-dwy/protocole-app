@@ -1,94 +1,116 @@
-import { useEffect, useState } from "react";
-import { supabase } from "./supabaseClient.js";
-import { loadUserData, saveUserData } from "./userData.js";
-import { C, inputStyle, buttonPrimary, labelStyle } from "./ui.js";
+import { useState, useMemo } from "react";
+import { AlertTriangle } from "lucide-react";
+import { recommendSessions } from "@rawcare/core/recommender";
+import { buildZones } from "@rawcare/core/pain";
+import { SCHEMES } from "@rawcare/core/climbing";
+import { DEFAULT_TARGETS } from "@rawcare/core/targets";
+import { today } from "@rawcare/core/dateUtils";
+import { C, Card, Label, Body, Field, Btn, inputStyle } from "./ui.jsx";
+import { familyOf } from "./onboarding.js";
+import CoachIA from "./CoachIA.jsx";
 
-// Écran post-connexion — RawCare Phase 2, deuxième jalon. Volontairement minimal : le but
-// ici n'est pas encore une vraie fonctionnalité, c'est de PROUVER que le trajet complet
-// marche (connexion → lecture user_data → écriture → relecture après rechargement), avant
-// de construire les vrais écrans (séances, macros...) par-dessus. Le champ "note de test"
-// écrit dans data.testNote et se recharge après un F5 : si la valeur survit, RLS + schéma
-// fonctionnent réellement, pas juste en théorie.
-export default function Home({ session }) {
-  const userId = session.user.id;
-  const [data, setData] = useState(null);
-  const [note, setNote] = useState("");
-  const [status, setStatus] = useState("loading");
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    loadUserData(userId)
-      .then((d) => { setData(d); setNote(d.testNote || ""); setStatus("ready"); })
-      .catch((e) => { setError(String(e.message || e)); setStatus("error"); });
-  }, [userId]);
+// Écran d'accueil — RawCare Phase 2. Depuis le chantier onboarding (06/08/2026) : carte
+// "Prochaine séance" (port du bloc apps/perso Dashboard, App.jsx:400-425), alimentée par
+// `recommendSessions` avec les zones/sports choisis à l'onboarding. Depuis le chantier Coach
+// IA public (06/08/2026) : carte CoachIA juste en dessous, même emplacement qu'apps/perso
+// (Dashboard, pas un onglet séparé). Pas de grille de tuiles complète (poids/pas/eau...) —
+// hors scope, jalon Dashboard séparé si voulu plus tard.
+export default function Home({ session, data, update, error: loadError }) {
+  const [note, setNote] = useState(data?.testNote || "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const save = async () => {
-    setStatus("saving");
-    setError("");
+    setSaving(true);
+    setSaved(false);
+    setSaveError("");
     try {
-      const next = { ...data, testNote: note };
-      await saveUserData(userId, next);
-      setData(next);
-      setStatus("saved");
+      await update({ testNote: note });
+      setSaved(true);
     } catch (e) {
-      setError(String(e.message || e));
-      setStatus("error");
+      setSaveError(String(e.message || e));
+    } finally {
+      setSaving(false);
     }
   };
 
+  const training = data?.trainingLog || [];
+  const sleep = data?.sleepLog || [];
+  const targets = { ...DEFAULT_TARGETS, ...(data?.targets || {}) };
+  const activeSports = data?.activeSports || [];
+  const scheme = SCHEMES[data?.climbScheme] || SCHEMES.gym;
+
+  const { suggestions, avoid } = useMemo(() => {
+    const zones = buildZones(data?.painZones || [], data?.painLogs || {}, today());
+    const r = recommendSessions({ training, zones, sleep, targets, scheme });
+    // Ne jamais suggérer/écarter un sport non activé — familyOf renvoie null pour "Repos /
+    // mobilité" (toujours gardé) et gère les types combinés d'`avoid` ("Upper A / B").
+    const keep = (x) => { const f = familyOf(x.type); return !f || activeSports.includes(f); };
+    return { suggestions: r.suggestions.filter(keep), avoid: r.avoid.filter(keep) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [training, sleep, targets, scheme, activeSports, data?.painZones, data?.painLogs]);
+
   return (
-    <div style={{
-      minHeight: "100%", display: "flex", flexDirection: "column",
-      alignItems: "center", padding: 24, fontFamily: C.mono,
-    }}>
-      <div style={{
-        width: "100%", maxWidth: 420, display: "flex",
-        justifyContent: "space-between", alignItems: "center", marginBottom: 24,
-      }}>
-        <div style={{ fontSize: 20, fontWeight: 700 }}>
-          <span style={{ color: C.secondary }}>raw</span><span style={{ color: C.accent }}>CARE</span>
-        </div>
-        <button onClick={() => supabase.auth.signOut()} style={{
-          background: "none", border: `1px solid ${C.border}`, color: C.secondary,
-          borderRadius: 8, padding: "6px 12px", fontFamily: C.mono, fontSize: 12, cursor: "pointer",
-        }}>
-          Se déconnecter
-        </button>
-      </div>
-
-      <div style={{
-        width: "100%", maxWidth: 420, background: C.card, border: `1px solid ${C.border}`,
-        borderRadius: 10, padding: 20, marginBottom: 16,
-      }}>
-        <p style={{ color: C.secondary, fontSize: 13, margin: 0 }}>Connecté en tant que</p>
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <Card>
+        <p style={{ color: C.text2, fontSize: 13, margin: 0 }}>Connecté en tant que</p>
         <p style={{ color: C.text, fontSize: 14, margin: "4px 0 0" }}>{session.user.email}</p>
-      </div>
+      </Card>
 
-      <div style={{
-        width: "100%", maxWidth: 420, background: C.card, border: `1px solid ${C.border}`,
-        borderRadius: 10, padding: 20,
-      }}>
-        <label style={labelStyle}>Note de test (round-trip user_data)</label>
-        {status === "loading" && <p style={{ color: C.secondary, fontSize: 13 }}>Chargement…</p>}
-        {status !== "loading" && (
-          <>
-            <input value={note} onChange={(e) => setNote(e.target.value)} style={inputStyle}
-              placeholder="Tape quelque chose, sauvegarde, recharge la page…" />
-            <button onClick={save} disabled={status === "saving"}
-              style={{ ...buttonPrimary, marginTop: 12, opacity: status === "saving" ? 0.6 : 1 }}>
-              {status === "saving" ? "Sauvegarde…" : "Sauvegarder"}
-            </button>
-            {status === "saved" && (
-              <p style={{ color: C.accent, fontSize: 12, marginTop: 10 }}>
-                ✓ Sauvegardé — recharge la page pour vérifier que ça tient.
-              </p>
-            )}
-            {status === "error" && (
-              <p style={{ color: C.danger, fontSize: 12, marginTop: 10 }}>{error}</p>
-            )}
-          </>
+      {suggestions.length > 0 && (
+        <Card accentLeft style={{ padding: "13px 14px" }}>
+          <Label style={{ letterSpacing: 1.5, marginBottom: 5 }}>Prochaine séance</Label>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginBottom: 3 }}>
+            <div style={{ fontSize: 16, color: C.text, fontWeight: 800 }}>{suggestions[0]?.type}</div>
+            <div style={{ fontFamily: C.mono, fontSize: 10, color: C.dim }}>{suggestions[0]?.score}</div>
+          </div>
+          <Body>{suggestions[0]?.reason}</Body>
+          {suggestions.slice(1).map((r) => (
+            <div key={r.type} style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.divider}` }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                <div style={{ fontSize: 12, color: C.text2, fontWeight: 700 }}>{r.type}</div>
+                <div style={{ fontFamily: C.mono, fontSize: 9.5, color: C.dim }}>{r.score}</div>
+              </div>
+              <div style={{ fontSize: 10.5, color: C.dim, lineHeight: 1.4, marginTop: 1 }}>{r.reason}</div>
+            </div>
+          ))}
+          {avoid.length > 0 && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.divider}` }}>
+              <Label style={{ color: C.danger, marginBottom: 6 }}>À éviter aujourd'hui</Label>
+              {avoid.map((a) => (
+                <div key={a.type} style={{ display: "flex", gap: 7, alignItems: "flex-start", marginBottom: 5 }}>
+                  <AlertTriangle size={12} color={C.danger} style={{ marginTop: 2, flexShrink: 0 }} />
+                  <div>
+                    <span style={{ fontSize: 11.5, color: C.dangerText, fontWeight: 700 }}>{a.type}</span>
+                    <div style={{ fontSize: 10.5, color: C.dim, lineHeight: 1.4 }}>{a.reason}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      <CoachIA data={data} update={update} error={loadError} />
+
+      <Card>
+        <Field label="Note de test (round-trip user_data)">
+          <input value={note} onChange={(e) => setNote(e.target.value)} style={inputStyle(false)}
+            placeholder="Tape quelque chose, sauvegarde, recharge la page…" />
+        </Field>
+        <Btn variant="primary" onClick={save} disabled={saving} style={{ width: "100%", marginTop: 12 }}>
+          {saving ? "Sauvegarde…" : "Sauvegarder"}
+        </Btn>
+        {saved && !saveError && (
+          <p style={{ color: C.accent, fontSize: 12, marginTop: 10 }}>
+            ✓ Sauvegardé — recharge la page pour vérifier que ça tient.
+          </p>
         )}
-      </div>
+        {(saveError || loadError) && (
+          <p style={{ color: C.danger, fontSize: 12, marginTop: 10 }}>{saveError || loadError}</p>
+        )}
+      </Card>
     </div>
   );
 }
