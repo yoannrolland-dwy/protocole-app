@@ -27,6 +27,15 @@ export default defineConfig({
         orientation: "portrait",
         start_url: "/",
         scope: "/",
+        // Absentes jusqu'ici — sans icônes 192/512, Chrome Android juge le site "non
+        // installable" et ne propose jamais l'ajout à l'écran d'accueil (peu importe le
+        // code de service worker). Mêmes fichiers que Protocole (apps/perso), à la demande
+        // de Yoann — voir apps/public/public/.
+        icons: [
+          { src: "icon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "icon-512.png", sizes: "512x512", type: "image/png" },
+          { src: "icon-512-maskable.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        ],
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,png,svg,woff2}"],
