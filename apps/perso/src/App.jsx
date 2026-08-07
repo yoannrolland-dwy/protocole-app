@@ -21,7 +21,7 @@ import { TEMPLATES, TYPES, DEFAULT_WEIGHTS, HSR_TABLE, hsrForWeek, hsrParse, par
          ROUTINES, PERI, BASKET_PROTOCOLS } from "@rawcare/core/session/templates";
 import { refSet, lastPerf, perfHistory, lastExerciseSets, medianTarget } from "@rawcare/core/session/perf";
 import { recommendSessions } from "@rawcare/core/recommender";
-import { PHASES, phaseTarget, DEFAULT_TARGETS, isCutWindow, targetsForDate,
+import { PHASES, phaseTarget as phaseTargetCore, DEFAULT_TARGETS, isCutWindow, targetsForDate,
          kcalFromMacros, kcalOfEntry, tdeeNow } from "@rawcare/core/targets";
 import { buildCoachPrompt, buildCoachBriefing, splitCarnet, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
 import { syncHealthConnect } from "./healthSync.js";
@@ -42,7 +42,18 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.58.0";
+const APP_VERSION = "3.59.0";
+
+// Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
+// 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
+// `targets.weightCutTarget`/`weightBulkTarget` prennent le dessus s'ils sont définis, sinon
+// repli sur les constantes du core — comportement inchangé tant que rien n'est édité. Même
+// principe que `weightMaintenance`, déjà éditable côté core pour la phase Maintenance.
+const phaseTarget = (phase, targets) => {
+  if (phase === "seche" && targets.weightCutTarget != null) return targets.weightCutTarget;
+  if (phase === "prise" && targets.weightBulkTarget != null) return targets.weightBulkTarget;
+  return phaseTargetCore(phase, targets);
+};
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -293,7 +304,7 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
 /* ============================================================
    TAB — DASHBOARD
    ============================================================ */
-function Dashboard({ weight, sleep, knee, elbow, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme }) {
+function Dashboard({ weight, sleep, knee, elbow, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast ? round(wLast.kg - tgtW) : null;
@@ -432,13 +443,6 @@ function Dashboard({ weight, sleep, knee, elbow, macros, steps, targets, trainin
 
       {/* Coach IA */}
       <CoachIA coach={coach} todayNote={todayNote} saveNote={saveNote} saveJournal={saveJournal} />
-
-      {/* Phase */}
-      <Card>
-        <Label style={{ marginBottom: 8 }}>Phase</Label>
-        <Pills options={Object.entries(PHASES).map(([k, v]) => ({ key: k, label: v.label }))} value={phase} onChange={setPhase} small />
-        <Body style={{ marginTop: 8, fontSize: 11 }}>{PHASES[phase].msg}</Body>
-      </Card>
 
       <Body style={{ fontSize: 10, color: C.dim, textAlign: "center", padding: "0 8px" }}>
         Outil de suivi personnel, pas un avis médical. Douleur aiguë ou persistante → kiné.
@@ -1936,7 +1940,7 @@ function MacroTab({ macros, targets, save, training, weight }) {
    ============================================================ */
 function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync, onHealthSync,
                          coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, saveTargets, buildBriefing,
-                         lastAutoBackup, lastCloudBackup, onCloudBackupDone, climbScheme, setClimbScheme }) {
+                         lastAutoBackup, lastCloudBackup, onCloudBackupDone, climbScheme, setClimbScheme, phase, setPhase }) {
   const [k, setK] = useState(apiKey);
   const [m, setM] = useState(model);
   const [msg, setMsg] = useState("");
@@ -2067,6 +2071,12 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
       </Card>
 
       <Card>
+        <Label style={{ marginBottom: 8 }}>Phase</Label>
+        <Pills options={Object.entries(PHASES).map(([k, v]) => ({ key: k, label: v.label }))} value={phase} onChange={setPhase} small />
+        <Body style={{ marginTop: 8, fontSize: 11 }}>{PHASES[phase].msg}</Body>
+      </Card>
+
+      <Card>
         <Label style={{ marginBottom: 8 }}>Cibles macro de base</Label>
         <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
           Cibles quotidiennes hors fenêtre d'objectif temporaire (ci-dessous). S'appliquent
@@ -2078,12 +2088,24 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
           <Field label="Lipides (g)"><Stepper value={targets.fat ?? 0} set={(v) => saveTargets({ ...targets, fat: v })} step={5} min={0} int /></Field>
           <Field label="Fibres (g)"><Stepper value={targets.fiber ?? 0} set={(v) => saveTargets({ ...targets, fiber: v })} step={1} min={0} int /></Field>
         </div>
-        <Field label="Poids de maintenance (kg)">
-          <Stepper value={targets.weightMaintenance ?? 96} set={(v) => saveTargets({ ...targets, weightMaintenance: v })} step={0.5} min={0} />
-        </Field>
-        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8, fontFamily: C.mono }}>
+        <Body style={{ fontSize: 10, color: C.dim, marginTop: -2, marginBottom: 8, fontFamily: C.mono }}>
           ≈ {Math.round(kcalFromMacros(targets.protein, targets.carbs, targets.fat, targets.fiber))} kcal
         </Body>
+        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 8 }}>
+          Poids cible par phase — pilote la tuile Poids et le sous-titre de l'onglet Poids
+          selon la phase active ci-dessus.
+        </Body>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <Field label="Sèche (kg)">
+            <Stepper value={targets.weightCutTarget ?? PHASES.seche.target} set={(v) => saveTargets({ ...targets, weightCutTarget: v })} step={0.5} min={0} />
+          </Field>
+          <Field label="Maintenance (kg)">
+            <Stepper value={targets.weightMaintenance ?? 96} set={(v) => saveTargets({ ...targets, weightMaintenance: v })} step={0.5} min={0} />
+          </Field>
+          <Field label="Prise (kg)">
+            <Stepper value={targets.weightBulkTarget ?? PHASES.prise.target} set={(v) => saveTargets({ ...targets, weightBulkTarget: v })} step={0.5} min={0} />
+          </Field>
+        </div>
       </Card>
 
       <Card>
@@ -2509,10 +2531,10 @@ export default function App({ silent = false } = {}) {
       {/* Contenu */}
       <main style={{ flex: 1, overflowY: "auto", padding: "14px 16px 24px" }}>
         {loading ? <Empty>Chargement…</Empty> : showSettings ? (
-          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, climbScheme, setClimbScheme }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
+          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, climbScheme, setClimbScheme, phase, setPhase }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, elbow, macros, steps, targets, training, phase, setPhase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme }} openSettings={() => setShowSettings(true)} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, elbow, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme }} openSettings={() => setShowSettings(true)} />}
             {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
             {tab === "sleep" && <SleepTab {...{ sleep, save }} />}
             {tab === "steps" && <StepsTab {...{ steps, save }} />}
