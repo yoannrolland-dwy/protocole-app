@@ -247,12 +247,17 @@ async function resolveIngredient(ing) {
    Même recherche CIQUAL + OFF que l'écran principal (via useFoodSearch) : les ingrédients
    d'une recette sont aussi souvent des produits de marque que des aliments bruts — Yoann
    mange surtout à code-barres (retour du 02/08/2026), pas de raison de s'en priver ici. */
-function IngredientPicker({ onAdd, onCancel }) {
+function IngredientPicker({ onAdd, onCancel, log, pins, muted }) {
   const [q, setQ] = useState("");
   const [pick, setPick] = useState(null);
   const [grams, setGrams] = useState(100);
   const { results, offResults, offState } = useFoodSearch(q, { limit: 15 });
   const showEmpty = q.trim().length >= 2 && results.length === 0;
+  const showSugg = q.trim().length < 2;
+  // Favoris/aliments habituels (07/08/2026, retour de Yoann) : jusqu'ici IngredientPicker
+  // n'affichait QUE la recherche textuelle, contrairement à l'écran principal — pas de
+  // `meal` ici (un ingrédient de recette n'est pas lié à un repas précis).
+  const sugg = useMemo(() => suggestions(log || [], { pins, muted }), [log, pins, muted]);
 
   if (pick) {
     return (
@@ -274,8 +279,11 @@ function IngredientPicker({ onAdd, onCancel }) {
         <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher un ingrédient…" style={{ flex: 1 }} />
         <Btn variant="ghost" onClick={onCancel} style={{ padding: "0 10px" }}>Annuler</Btn>
       </div>
+      {showSugg && sugg.length > 0 && (
+        <Label style={{ marginTop: 4, marginBottom: 2 }}>Vos aliments habituels</Label>
+      )}
       {showEmpty && <Empty>Aucun résultat dans CIQUAL.</Empty>}
-      {results.map((f) => (
+      {(showSugg ? sugg : results).map((f) => (
         <div key={f.ref} onClick={() => { setPick(f); setGrams(100); }} style={{
           padding: "8px 2px", borderBottom: `1px solid ${C.divider}`, cursor: "pointer",
         }}>
@@ -283,7 +291,7 @@ function IngredientPicker({ onAdd, onCancel }) {
           <div style={{ fontFamily: C.mono, fontSize: 10, color: C.muted, marginTop: 2 }}>{val(f.per100.kcal)} kcal /100 g</div>
         </div>
       ))}
-      {q.trim().length >= 2 && (
+      {!showSugg && q.trim().length >= 2 && (
         <OffSection offState={offState} offResults={offResults} onPick={(f) => { setPick(f); setGrams(100); }} />
       )}
     </div>
@@ -294,7 +302,7 @@ function IngredientPicker({ onAdd, onCancel }) {
 // quantité de chaque ingrédient comprise) plutôt que d'en créer une nouvelle — jusqu'ici
 // seule la suppression totale était possible, sans aucun moyen de corriger un ingrédient
 // sans tout ressaisir depuis zéro.
-function RecipeBuilder({ recipe, onSave, onBack }) {
+function RecipeBuilder({ recipe, onSave, onBack, log, pins, muted }) {
   const [name, setName] = useState(recipe?.name ?? "");
   const [ingredients, setIngredients] = useState(recipe?.ingredients ?? []);
   const [picking, setPicking] = useState(false);
@@ -319,7 +327,7 @@ function RecipeBuilder({ recipe, onSave, onBack }) {
   const ok = name.trim().length > 0 && ingredients.length > 0;
 
   if (picking) {
-    return <IngredientPicker onCancel={() => setPicking(false)}
+    return <IngredientPicker onCancel={() => setPicking(false)} log={log} pins={pins} muted={muted}
       onAdd={(ing) => { setIngredients([...ingredients, ing]); setPicking(false); }} />;
   }
 
@@ -645,7 +653,7 @@ export default function FoodSearch({
 
       <div style={{ flex: 1, overflowY: "auto", padding: 14 }}>
         {building ? (
-          <RecipeBuilder recipe={editingRecipe}
+          <RecipeBuilder recipe={editingRecipe} log={log} pins={pins} muted={muted}
             onBack={() => { setBuilding(false); setEditingRecipe(null); }}
             onSave={(name, ingredients) => {
               const r = compileRecipe(name, ingredients, editingRecipe);

@@ -322,15 +322,37 @@ const score = (s) => s.freq + 2 * s.mealFreq + Math.max(0, 14 - s.days);
  * `muted` retire un aliment de CETTE liste — pas de foodLog : demandé pour désencombrer
  * "Vos aliments habituels" (un essai raté, un aliment qu'on ne mange plus), sans jamais
  * toucher à l'historique réel des jours déjà enregistrés.
+ *
+ * Deux correctifs du 07/08/2026 (retour direct de Yoann, « des favoris disparaissent ») :
+ * - **Pas de limite** (`limit` par défaut infini) : l'ancien plafond de 25 pouvait couper
+ *   des aliments réellement logués souvent dès que plus de 25 refs distincts apparaissaient
+ *   dans la fenêtre de 60 j — `usageStats` la borne déjà, un second plafond était de trop.
+ * - **Un aliment ÉPINGLÉ ne doit jamais disparaître**, même sans occurrence dans les 60
+ *   derniers jours : `usageStats` (fenêtrée) l'aurait sinon simplement omis, comme
+ *   n'importe quel aliment ancien — c'était la cause la plus probable de la disparition
+ *   observée. L'épinglage est une intention manuelle et durable, pas un signal de
+ *   fréquence récente : on va chercher sa dernière occurrence dans TOUT l'historique.
+ * - **Tri par repas** (point b, même retour) : les aliments épinglés d'abord, puis ceux
+ *   déjà logués À CE repas précis (`mealFreq > 0`), puis le reste — un aliment très
+ *   fréquent à un AUTRE repas ne doit plus passer devant un vrai habitué de celui-ci.
  */
-export function suggestions(log, { meal, pins = [], muted = [], limit = 25, date = todayKey() } = {}) {
+export function suggestions(log, { meal, pins = [], muted = [], limit = Infinity, date = todayKey() } = {}) {
   const stats = usageStats(log, { meal, date });
   const pinned = new Set(pins);
   const hidden = new Set(muted);
+  for (const ref of pinned) {
+    if (stats.has(ref) || hidden.has(ref)) continue;
+    const last = [...log].reverse().find((e) => e.ref === ref);
+    if (last) stats.set(ref, { ref, name: last.name, per100: last.per100, freq: 0, mealFreq: 0, days: Infinity, lastQ: last.q });
+  }
   return [...stats.values()]
     .filter((s) => !hidden.has(s.ref))
     .map((s) => ({ ...s, _s: score(s) + (pinned.has(s.ref) ? 1000 : 0) }))
-    .sort((a, b) => b._s - a._s)
+    .sort((a, b) => {
+      const tier = (s) => (pinned.has(s.ref) ? 0 : meal && s.mealFreq > 0 ? 1 : 2);
+      const ta = tier(a), tb = tier(b);
+      return ta !== tb ? ta - tb : b._s - a._s;
+    })
     .slice(0, limit)
     .map((s) => ({ ref: s.ref, name: s.name, per100: s.per100, lastQ: s.lastQ, pinned: pinned.has(s.ref) }));
 }
