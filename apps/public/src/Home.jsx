@@ -7,7 +7,7 @@ import { kcalFromMacros, kcalOfEntry } from "@rawcare/core/targets";
 import { mergeTargets, phaseTarget, targetsForDate } from "./defaultTargets.js";
 import { today, fmt, fmtHM, lastN, round } from "@rawcare/core/dateUtils";
 import { C, Card, Label, Body } from "./ui.jsx";
-import { familyOf } from "./onboarding.js";
+import { familyOf, FAMILY_TYPES, CATALOG_SPORT_TYPES } from "./onboarding.js";
 import CoachIA from "./CoachIA.jsx";
 
 // Écran d'accueil — RawCare Phase 2. Depuis le chantier onboarding (06/08/2026) : carte
@@ -86,7 +86,11 @@ export default function Home({ session, data, update, error: loadError, setTab }
 
   const { suggestions, avoid } = useMemo(() => {
     const zones = buildZones(data?.painZones || [], data?.painLogs || {}, today());
-    const r = recommendSessions({ training, zones, sleep, targets, scheme });
+    // Lot F : sports du catalogue étendu réellement actifs pour cet utilisateur — absent
+    // pour un compte n'ayant coché ni Course à pied, ni Vélo, ni Foot, donc aucun des trois
+    // blocs de score dédiés ne s'exécute (voir recommender.js).
+    const extraSports = activeSports.flatMap((f) => FAMILY_TYPES[f] || []).filter((t) => CATALOG_SPORT_TYPES.includes(t));
+    const r = recommendSessions({ training, zones, sleep, targets, scheme, extraSports });
     // Ne jamais suggérer/écarter un sport non activé — familyOf renvoie null pour "Repos /
     // mobilité" (toujours gardé) et gère les types combinés d'`avoid` ("Upper A / B").
     const keep = (x) => { const f = familyOf(x.type); return !f || activeSports.includes(f); };

@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { ChevronRight, CheckCircle2, Trash2 } from "lucide-react";
 import { TEMPLATES, TYPES, hsrForWeek } from "@rawcare/core/session/templates";
+import { SPORTS_CATALOG } from "@rawcare/core/session/catalog";
 import { exerciseList, recordsBySession, painOutOfBase } from "@rawcare/core/training";
 import { SCHEMES, climbLabel } from "@rawcare/core/climbing";
 import { today, fmt, round, byDate, daysBetween, lastN } from "@rawcare/core/dateUtils";
@@ -18,6 +19,12 @@ import ProgressScreen from "./ProgressScreen.jsx";
 // familles actives de l'utilisateur (`data.activeSports`, voir onboarding.js), `climbScheme`
 // est lu depuis `data.climbScheme` (plus figé sur "gym"), et `painOutOfBase` lit
 // `data.painLogs` (N zones dynamiques) au lieu des `kneeLog`/`elbowLog` fixes d'apps/perso.
+//
+// Lot F (06/08/2026) : `SPORTS_CATALOG` (Course à pied/Vélo/Foot) s'ajoute à `TEMPLATES` pour
+// le picker et le lookup "type → gabarit" (`templateOf`) — ces trois sports n'ont pas de
+// carnet série par série (`exos: []`), ils se loguent comme Basket (durée + RPE).
+
+const templateOf = (type) => TEMPLATES[type] ?? SPORTS_CATALOG[type];
 
 export default function SessionsTab({ data, update, error: loadError }) {
   const training = data?.trainingLog || [];
@@ -27,6 +34,7 @@ export default function SessionsTab({ data, update, error: loadError }) {
   const activeSports = data?.activeSports || [];
   const activeTypes = activeSports.flatMap((fam) => FAMILY_TYPES[fam] || []);
   const scheme = SCHEMES[data?.climbScheme] || SCHEMES.gym;
+  const allTypes = useMemo(() => [...TYPES, ...Object.keys(SPORTS_CATALOG)], []);
 
   const [open, setOpen] = useState(null);
   const [progress, setProgress] = useState(false);
@@ -95,7 +103,7 @@ export default function SessionsTab({ data, update, error: loadError }) {
   const records = useMemo(() => recordsBySession(training), [training]);
   const painRed = painOutOfBase(painLogList, date);
 
-  if (open && TEMPLATES[open]?.kind === "muscu") {
+  if (open && templateOf(open)?.kind === "muscu") {
     return (
       <MuscuLogger key={editing?.id || `new-${open}`} type={open} training={training} hsrWeek={hsrWeek} date={date} onDate={setDate}
         onSave={saveMuscu} onCancel={() => { setOpen(null); setEditing(null); }} initial={editing} painRed={painRed} />
@@ -112,7 +120,7 @@ export default function SessionsTab({ data, update, error: loadError }) {
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        {TYPES.filter((type) => activeTypes.includes(type)).map((type) => {
+        {allTypes.filter((type) => activeTypes.includes(type)).map((type) => {
           const sel = open === type;
           return (
             <button key={type} onClick={() => pickType(type)} style={{
@@ -131,7 +139,7 @@ export default function SessionsTab({ data, update, error: loadError }) {
         })}
       </div>
 
-      {open && TEMPLATES[open].kind !== "muscu" && (
+      {open && templateOf(open).kind !== "muscu" && (
         <Card style={{ borderColor: C.accent }}>
           <div style={{ fontSize: 14, color: C.accent, fontWeight: 800, textTransform: "uppercase", marginBottom: 8 }}>
             {open}{editing && <span style={{ fontSize: 11, textTransform: "none", marginLeft: 6 }}>(modification)</span>}
@@ -139,6 +147,8 @@ export default function SessionsTab({ data, update, error: loadError }) {
           <Body style={{ marginBottom: 12 }}>
             {open === "Escalade"
               ? "Compte comme volume tirage — jamais un jour Upper, pour protéger le coude."
+              : open === "Vélo"
+              ? "Genou-friendly, mouvement contrôlé — jamais écarté par le recommandeur."
               : "Échauffement recommandé avant impact."}
           </Body>
           <div style={{ marginBottom: 10 }}><DateField value={date} onChange={setDate} /></div>

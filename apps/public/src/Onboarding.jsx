@@ -94,7 +94,7 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
       <Card>
         <Label style={{ marginBottom: 8 }}>Sports pratiqués</Label>
         <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
-          Seuls ces trois-là sont pleinement pris en charge par le recommandeur pour l'instant.
+          Tous pris en charge par le recommandeur — chacun influence tes suggestions du jour.
         </Body>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {SPORT_FAMILIES.map((f) => (

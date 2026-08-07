@@ -13,10 +13,20 @@
 // voulue. Vérifié par diff caractère près sur les scénarios de la Phase 0 + des scénarios
 // ciblant spécifiquement chaque nuance non généralisée (cooldown genou, exclusions croisées,
 // magnitudes de pénalité par type).
-
+//
+// RawCare, chantier "parité apps/public", Lot F (06/08/2026) : le catalogue étendu
+// (session/catalog.js — Course à pied/Vélo/Foot) rejoint le scoring via le nouveau paramètre
+// optionnel `extraSports` (liste de noms). Absent (tous les appels apps/perso +
+// coach/prompt.js) → aucun bloc supplémentaire ne s'exécute, sortie identique bit pour bit à
+// avant ce lot. Chaque sport reste un bloc de score ÉCRIT À LA MAIN (même principe que
+// Basket/Escalade ci-dessus) — "généraliser les sports" veut dire "un bloc de plus par
+// sport activé", pas une boucle générique sur le catalogue. Vérifié par diff caractère près :
+// sans `extraSports`, identique à avant ; avec, scénarios dédiés (genou hors base, cut
+// window, exclusions croisées avec Basket sur le tag "genou" partagé).
 import { today, byDate, daysBetween, fmtHM } from "./dateUtils.js";
 import { buildZones, DEFAULT_ZONES, mergeZoneStates } from "./pain.js";
 import { TEMPLATES } from "./session/templates.js";
+import { SPORTS_CATALOG } from "./session/catalog.js";
 import { climbLoad } from "./climbing.js";
 import { isCutWindow } from "./targets.js";
 
@@ -25,7 +35,7 @@ import { isCutWindow } from "./targets.js";
 // volume égal — prises fermées, à-coups) : une future entrée pour un nouveau sport taggé
 // "genou"/"tirage" s'ajoute ici, pas dans une nouvelle branche de recommendSessions.
 const AMBER_PENALTY = {
-  genou: { "Lower A": 10, "Lower B": 10, "Basket": 8 },
+  genou: { "Lower A": 10, "Lower B": 10, "Basket": 8, "Course à pied": 8, "Foot": 10 },
   tirage: { "Upper A": 10, "Upper B": 10, "Escalade": 12 },
 };
 
@@ -39,7 +49,7 @@ const NEUTRAL_ZONE = { unknown: false, painLast: null, flagged7: 0, red: false, 
 // identique bit pour bit à avant : `buildZones(DEFAULT_ZONES, {knee, elbow}, t0)` en interne.
 // Fourni (apps/public) → zones dynamiques de l'utilisateur, potentiellement 0 à N zones,
 // gate "genou"/"tirage" absent toléré via NEUTRAL_ZONE plutôt qu'un crash.
-export function recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme }) {
+export function recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme, extraSports }) {
   const t0 = today();
   const isUpper = (t) => t.type === "Upper A" || t.type === "Upper B";
   const isLower = (t) => t.type === "Lower A" || t.type === "Lower B";
@@ -51,10 +61,16 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
     const hits = training.filter(pred);
     return hits.length ? daysBetween(hits[hits.length - 1].date, t0) : Infinity;
   };
+  // `chargeTags` d'un type de séance, TEMPLATES (6 types apps/perso) OU SPORTS_CATALOG
+  // (Lot F : Course à pied/Vélo/Foot, jamais dans TEMPLATES) — un type présent dans les deux
+  // n'existe pas, donc l'ordre du `??` n'a pas d'incidence. Sans ce fallback, une séance
+  // "Foot" ne serait jamais reconnue comme exposition genou pour le cooldown/l'exclusion
+  // croisée avec Lower/Basket.
+  const chargeTagsOf = (type) => TEMPLATES[type]?.chargeTags ?? SPORTS_CATALOG[type]?.chargeTags;
   // Généralisé sur les tags de charge : "depuis combien de jours un type taggé `tag` n'a
   // pas été fait" — remplace le flag `knee` figé sur Lower/Basket, marche pour n'importe
   // quel type taggé "genou"/"tirage", y compris au catalogue.
-  const daysSinceTag = (tag) => daysSince((t) => TEMPLATES[t.type]?.chargeTags?.includes(tag));
+  const daysSinceTag = (tag) => daysSince((t) => chargeTagsOf(t.type)?.includes(tag));
   const ago = (d) => (isFinite(d) ? (d === 0 ? "aujourd'hui" : d === 1 ? "hier" : `il y a ${d} j`) : "jamais fait");
   const cap = (d) => (isFinite(d) ? Math.min(d, 7) : 7);
 
@@ -64,12 +80,21 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   const lower7 = w.filter(isLower).length;
   const basket7 = w.filter((t) => t.type === "Basket").length;
   const climb7 = w.filter((t) => t.type === "Escalade").length;
+  // Lot F : toujours calculés (jamais seulement si `extraSports` les active) — inoffensif
+  // pour apps/perso, qui ne logue jamais ces types (toujours 0), et alimente honnêtement le
+  // décompte "séances sur 7 j" du bloc Repos même pour un sport désactivé après coup.
+  const run7 = w.filter((t) => t.type === "Course à pied").length;
+  const foot7 = w.filter((t) => t.type === "Foot").length;
+  const bike7 = w.filter((t) => t.type === "Vélo").length;
 
   const dUpper = daysSince(isUpper);
   const dLower = daysSince(isLower);
   const dBasket = daysSince((t) => t.type === "Basket");
   const dClimb = daysSince((t) => t.type === "Escalade");
-  const dKnee = daysSinceTag("genou"); // Lower + Basket (et tout futur sport taggé "genou")
+  const dRun = daysSince((t) => t.type === "Course à pied");
+  const dFoot = daysSince((t) => t.type === "Foot");
+  const dBike = daysSince((t) => t.type === "Vélo");
+  const dKnee = daysSinceTag("genou"); // Lower + Basket + Course à pied + Foot (tag partagé)
 
   // Charge de la dernière séance d'escalade (V5) : jusqu'ici la pénalité « escalade
   // récente » était FORFAITAIRE — une heure tranquille et une grosse session de blocs
@@ -140,7 +165,10 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   const upperToday = todayTypes.some((x) => x.startsWith("Upper"));
   const lowerToday = todayTypes.some((x) => x.startsWith("Lower"));
   const climbToday = todayTypes.includes("Escalade");
-  const kneeToday = todayTypes.some((x) => TEMPLATES[x]?.chargeTags?.includes("genou"));
+  const kneeToday = todayTypes.some((x) => chargeTagsOf(x)?.includes("genou"));
+  // Sports du catalogue étendu réellement actifs pour cet utilisateur (Lot F) — absent/vide
+  // pour apps/perso, donc aucun des trois blocs ci-dessous ne pousse de suggestion/avoid.
+  const active = new Set(extraSports || []);
 
   // variante la moins récente
   const variant = (a, b) => {
@@ -229,11 +257,61 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
     push(sugg, "Escalade", cScore, cReason);
   }
 
+  // ---- COURSE À PIED ---- (Lot F, catalogue étendu : impact genou, comme Basket, mais pas
+  // de conflit "fatigue générale" avec Upper — courir n'entre pas en conflit avec du haut du
+  // corps comme le fait un sport de saut/pivot)
+  if (active.has("Course à pied")) {
+    if (kneeRed) {
+      push(avoid, "Course à pied", 0, "Impact répété sur le genou : à proscrire tant qu'il n'est pas revenu à sa base.");
+    } else if (dKnee === 0 || kneeToday) {
+      push(avoid, "Course à pied", 0, "Expo genou déjà faite aujourd'hui — deuxième dose déconseillée.");
+    } else {
+      let rScore = 10 + cap(dRun) - (kneeAmber ? AMBER_PENALTY.genou["Course à pied"] : 0) - (dKnee <= 1 ? 6 : 0);
+      let rReason = `${run7}× cette semaine · dernière ${ago(dRun)}.`;
+      if (kneeUnknown) rReason += ` ${kneeNote}`;
+      else if (kneeAmber) rReason += " Genou sensible : réduire l'allure/le volume.";
+      if (cutOn) { rScore -= 8; rReason += " Fenêtre de sèche : pas de volume à impact en plus de l'habituel."; }
+      rScore = fatigueScore(rScore);
+      const rFat = fatigueReason(); if (rFat) rReason += ` ${rFat}`;
+      push(sugg, "Course à pied", rScore, rReason);
+    }
+  }
+
+  // ---- FOOT ---- (Lot F : traité comme Basket — impact genou ET conflit fatigue générale
+  // avec Upper le même jour, même sollicitation croisée)
+  if (active.has("Foot")) {
+    if (kneeRed) {
+      push(avoid, "Foot", 0, "Sauts et changements de direction : à proscrire tant que le genou n'est pas revenu à sa base.");
+    } else if (dKnee === 0 || kneeToday) {
+      push(avoid, "Foot", 0, "Expo genou déjà faite aujourd'hui — deuxième dose déconseillée.");
+    } else if (upperToday) {
+      push(avoid, "Foot", 0, "Musculation (Upper) déjà faite aujourd'hui — foot déconseillé le même jour (fatigue générale).");
+    } else {
+      let fScore = 10 + cap(dFoot) - (kneeAmber ? AMBER_PENALTY.genou["Foot"] : 0) - (dKnee <= 1 ? 6 : 0);
+      let fReason = `${foot7}× cette semaine · dernier ${ago(dFoot)}.`;
+      if (kneeUnknown) fReason += ` ${kneeNote}`;
+      else if (kneeAmber) fReason += " Genou sensible : réduire le volume de sauts/changements d'appui.";
+      if (cutOn) { fScore -= 10; fReason += " Fenêtre de sèche : pas de volume à impact en plus de l'habituel."; }
+      fScore = fatigueScore(fScore);
+      const fFat = fatigueReason(); if (fFat) fReason += ` ${fFat}`;
+      push(sugg, "Foot", fScore, fReason);
+    }
+  }
+
+  // ---- VÉLO ---- (Lot F : aucun tag genou au catalogue — mouvement contrôlé, genou-friendly
+  // en rééduc, décision déjà actée en Phase 1 — jamais écarté, pas de pénalité de sèche)
+  if (active.has("Vélo")) {
+    let vScore = fatigueScore(8 + cap(dBike));
+    let vReason = `${bike7}× cette semaine · dernier ${ago(dBike)}. Genou-friendly, mouvement contrôlé.`;
+    const vFat = fatigueReason(); if (vFat) vReason += ` ${vFat}`;
+    push(sugg, "Vélo", vScore, vReason);
+  }
+
   // ---- REPOS ---- (jamais pénalisé par la fatigue, la sèche ou une douleur : c'est
   // l'option qui en profite)
-  let restScore = kneeRed ? 45 : (upper7 + lower7 + basket7 + climb7 >= 6 ? 22 : 5);
+  let restScore = kneeRed ? 45 : (upper7 + lower7 + basket7 + climb7 + run7 + foot7 + bike7 >= 6 ? 22 : 5);
   let restReason = kneeRed ? "Décharge : mobilité douce + routine de rééduc autonome."
-    : `${upper7 + lower7 + basket7 + climb7} séances sur 7 j — une journée creuse consolide les adaptations.`;
+    : `${upper7 + lower7 + basket7 + climb7 + run7 + foot7 + bike7} séances sur 7 j — une journée creuse consolide les adaptations.`;
   // Coude hors base : Upper ET Escalade sont écartés, il ne reste que le bas du corps —
   // le repos remonte, sans jamais atteindre le score d'un genou hors base (qui, lui,
   // écarte aussi Lower et Basket, donc ne laisse quasiment rien d'autre).
