@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Settings } from "lucide-react";
 import { supabase } from "./supabaseClient.js";
 import { useAuth } from "./useAuth.js";
 import { useUserData } from "./useUserData.js";
@@ -28,7 +29,6 @@ const TABS = [
   { key: "pain", label: "Douleurs" },
   { key: "macros", label: "Macros" },
   { key: "food", label: "Repas" },
-  { key: "settings", label: "Réglages" },
 ];
 
 export default function App() {
@@ -58,10 +58,17 @@ function Authenticated({ session }) {
   const userId = session.user.id;
   const { data, status, error, update } = useUserData(userId);
   const [tab, setTab] = useState("home");
+  // Réglages (07/08/2026) : overlay déclenché par la roue crantée du header, pas un onglet
+  // de la barre — même architecture que apps/perso (`showSettings`, séparé de `tab`, pour
+  // revenir sur le contenu déjà sélectionné en fermant/en changeant d'onglet). Avant ce
+  // changement, "Réglages" était un onglet de `TABS` au même niveau que "Poids"/"Repas" — ce
+  // n'est pas un contenu de suivi au même titre, il n'a pas sa place dans cette barre.
+  const [showSettings, setShowSettings] = useState(false);
   // Gate de première ouverture : tant que `data.onboarded` n'est pas vrai, l'onboarding
   // remplace tout le reste (même principe que `!session` → LoginScreen). `status ===
   // "loading"` passe avant : `data` est encore `null` au tout premier rendu.
   const needsOnboarding = status !== "loading" && !data?.onboarded;
+  const selectTab = (key) => { setTab(key); setShowSettings(false); };
 
   return (
     <div style={{ minHeight: "100%", display: "flex", flexDirection: "column", alignItems: "center", fontFamily: C.mono }}>
@@ -70,14 +77,24 @@ function Authenticated({ session }) {
           <div style={{ fontSize: 20, fontWeight: 700 }}>
             <span style={{ color: C.text2 }}>raw</span><span style={{ color: C.accent }}>CARE</span>
           </div>
-          <button onClick={() => supabase.auth.signOut()} style={{
-            background: "none", border: `1px solid ${C.border}`, color: C.text2,
-            borderRadius: 8, padding: "6px 12px", fontFamily: C.mono, fontSize: 12, cursor: "pointer",
-          }}>
-            Se déconnecter
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {!needsOnboarding && (
+              <button onClick={() => setShowSettings((s) => !s)} style={{
+                background: "none", border: "none", cursor: "pointer",
+                color: showSettings ? C.accent : C.dim, padding: 0, display: "flex",
+              }}>
+                <Settings size={19} />
+              </button>
+            )}
+            <button onClick={() => supabase.auth.signOut()} style={{
+              background: "none", border: `1px solid ${C.border}`, color: C.text2,
+              borderRadius: 8, padding: "6px 12px", fontFamily: C.mono, fontSize: 12, cursor: "pointer",
+            }}>
+              Se déconnecter
+            </button>
+          </div>
         </div>
-        {!needsOnboarding && <NavBar tab={tab} setTab={setTab} />}
+        {!needsOnboarding && <NavBar tab={tab} setTab={selectTab} />}
       </div>
 
       <div style={{ width: "100%", maxWidth: 420, padding: "16px 24px 24px", boxSizing: "border-box" }}>
@@ -85,8 +102,10 @@ function Authenticated({ session }) {
           <p style={{ color: C.text2, fontSize: 13 }}>Chargement…</p>
         ) : needsOnboarding ? (
           <Onboarding data={data} update={update} />
+        ) : showSettings ? (
+          <Onboarding data={data} update={update} mode="settings" onClose={() => setShowSettings(false)} />
         ) : tab === "home" ? (
-          <Home session={session} data={data} update={update} error={error} setTab={setTab} />
+          <Home session={session} data={data} update={update} error={error} setTab={selectTab} />
         ) : tab === "weight" ? (
           <WeightTab data={data} update={update} error={error} />
         ) : tab === "sleep" ? (
@@ -99,10 +118,8 @@ function Authenticated({ session }) {
           <PainTab data={data} update={update} error={error} />
         ) : tab === "macros" ? (
           <MacroTab data={data} update={update} error={error} />
-        ) : tab === "food" ? (
-          <NutritionTab data={data} update={update} error={error} />
         ) : (
-          <Onboarding data={data} update={update} mode="settings" />
+          <NutritionTab data={data} update={update} error={error} />
         )}
       </div>
 
