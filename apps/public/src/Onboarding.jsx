@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Download, Upload } from "lucide-react";
 import { kcalFromMacros, PHASES } from "@rawcare/core/targets";
 import { mergeTargets } from "./defaultTargets.js";
 import { C, Card, Label, Body, Btn, Field, Stepper, Pills, TextInput, ScreenHeader } from "./ui.jsx";
@@ -50,6 +51,7 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
   const [model, setModel] = useState(data?.model || "claude-sonnet-5");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [backupMsg, setBackupMsg] = useState("");
 
   const toggleSport = (key) => {
     setActiveSports((s) => (s.includes(key) ? s.filter((x) => x !== key) : [...s, key]));
@@ -74,6 +76,49 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
     setOtherName(""); setOtherGates([]); setAddingOther(false);
   };
   const removeZone = (key) => setPainZones((zs) => zs.filter((z) => z.key !== key));
+
+  // Sauvegarde manuelle (07/08/2026, retour de Yoann) : `data` vit déjà dans Supabase et se
+  // sauvegarde à chaque modification, mais aucune copie n'existait hors de ce backend — ni
+  // pour la portabilité RGPD déjà promise dans la politique de confidentialité, ni comme
+  // filet en cas de souci côté compte/base. Exporte `data` TEL QUEL, sauf `apiKey` (même
+  // exclusion que `exportData()` côté apps/perso, pour ne jamais faire atterrir une clé API
+  // dans un fichier qui peut finir sur Drive/par mail). `update()` fusionne par clé (voir
+  // useUserData.js), donc restaurer un export — qui ne contient jamais `apiKey` — ne touche
+  // jamais la clé actuellement configurée.
+  const doExport = () => {
+    const { apiKey: _omit, ...rest } = data || {};
+    const json = JSON.stringify({ app: "RawCare", schema: 1, exportedAt: new Date().toISOString(), data: rest }, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `rawcare-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const doImportFile = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permet de resélectionner le même fichier ensuite
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      let imported;
+      try {
+        const parsed = JSON.parse(reader.result);
+        imported = parsed && typeof parsed.data === "object" ? parsed.data : parsed;
+        if (!imported || typeof imported !== "object") throw new Error("format invalide");
+      } catch {
+        setBackupMsg("Fichier invalide.");
+        return;
+      }
+      try {
+        await update(imported);
+        setBackupMsg("Données restaurées.");
+      } catch (err) {
+        setBackupMsg(String(err.message || err));
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const finish = async () => {
     setSaving(true); setSaveError("");
@@ -219,6 +264,35 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
           </Field>
         </div>
       </Card>
+
+      {mode === "settings" && (
+        <Card>
+          <Label style={{ marginBottom: 8 }}>Sauvegarde des données</Label>
+          <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
+            Tes données sont déjà sauvegardées automatiquement à chaque modification. Ce
+            fichier est une copie manuelle en plus — pour la garder de ton côté ou la
+            récupérer si besoin.
+          </Body>
+          <Btn variant="primary" onClick={doExport} style={{ width: "100%" }}>
+            <Download size={14} style={{ display: "inline", marginRight: 4 }} />Télécharger mes données
+          </Btn>
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.divider}` }}>
+            <label>
+              <span style={{
+                display: "block", textAlign: "center", background: C.card, color: C.accent,
+                border: `1.5px solid ${C.accent}`, borderRadius: 8, padding: "9px 12px",
+                fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, cursor: "pointer",
+              }}><Upload size={14} style={{ display: "inline", marginRight: 4 }} />Restaurer un fichier</span>
+              <input type="file" accept="application/json" onChange={doImportFile} style={{ display: "none" }} />
+            </label>
+            <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
+              Écrase les données existantes clé par clé avec celles du fichier — à utiliser
+              en connaissance de cause si tu es aussi connecté ailleurs.
+            </Body>
+          </div>
+          {backupMsg && <Body style={{ fontSize: 11, color: C.accent, marginTop: 8 }}>{backupMsg}</Body>}
+        </Card>
+      )}
 
       <div style={{ display: "flex", gap: 8 }}>
         <Btn variant="primary" onClick={finish} disabled={saving} style={{ flex: 1 }}>
