@@ -23,12 +23,13 @@
 // sport activé", pas une boucle générique sur le catalogue. Vérifié par diff caractère près :
 // sans `extraSports`, identique à avant ; avec, scénarios dédiés (genou hors base, cut
 // window, exclusions croisées avec Basket sur le tag "genou" partagé).
-import { today, byDate, daysBetween, fmtHM } from "./dateUtils.js";
+import { today, byDate, daysBetween, fmtHM, shiftDateKey } from "./dateUtils.js";
 import { buildZones, DEFAULT_ZONES, mergeZoneStates } from "./pain.js";
 import { TEMPLATES } from "./session/templates.js";
 import { SPORTS_CATALOG } from "./session/catalog.js";
 import { climbLoad } from "./climbing.js";
 import { isCutWindow } from "./targets.js";
+import { exerciseSessions, exerciseTrend } from "./training.js";
 
 // Pénalité (score) quand la zone associée à ce tag est ambre, par type de séance porteur du
 // tag. Magnitude différente par type (l'escalade pèse plus lourd sur le coude que l'Upper, à
@@ -309,14 +310,66 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
 
   // ---- REPOS ---- (jamais pénalisé par la fatigue, la sèche ou une douleur : c'est
   // l'option qui en profite)
-  let restScore = kneeRed ? 45 : (upper7 + lower7 + basket7 + climb7 + run7 + foot7 + bike7 >= 6 ? 22 : 5);
+  //
+  // Demande explicite de Yoann (07/08/2026, athlète capable de s'entraîner plusieurs fois
+  // par jour) : le score ne repose plus sur le NOMBRE de séances sur 7 j glissants (une
+  // grosse journée à deux séances mais bien récupérée n'est pas une surcharge). Le
+  // déclencheur PRINCIPAL devient 3 signaux de DÉRIVE sur 2-3 jours, indépendants du
+  // nombre de jours enchaînés :
+  //   1. genou hors base (déjà géré ailleurs via kneeRed/kLast.baseline) ;
+  //   2. baisse de perf sur plusieurs exercices travaillés récemment (exerciseTrend,
+  //      déjà utilisé par l'écran Progression, jamais branché ici avant) ;
+  //   3. tendance de sommeil sur 2-3 nuits (pas juste la dernière, contrairement à
+  //      `sleepPoor` — qui reste inchangé pour le nudge des autres types de séance).
+  // Les jours consécutifs sans repos ne sont plus qu'un repère de sécurité SOFT (`streak`) :
+  // ils font monter le score mais n'y contribuent significativement que si les 3 signaux
+  // restent propres — jamais de blocage dur, jamais d'`avoid`.
+
+  const trainedDays = new Set(training.map((t) => t.date));
+  // Si aucune séance n'a encore été loguée aujourd'hui, on compte à partir d'hier (sinon
+  // un streak de 6 jours retomberait artificiellement à 0 tant que la séance du jour
+  // n'est pas saisie).
+  let streak = 0;
+  { let d = trainedDays.has(t0) ? t0 : shiftDateKey(t0, -1);
+    while (trainedDays.has(d)) { streak++; d = shiftDateKey(d, -1); } }
+
+  // Signal 2 — baisse de perf : exercices travaillés dans les 3 derniers jours (aujourd'hui
+  // compris) dont la tendance (dernière séance vs précédente, même définition que l'écran
+  // Progression) est à la baisse. Un seul exercice en baisse arrive tout le temps (fatigue
+  // locale, mauvaise nuit isolée) ; ≥ 2 est le signal d'une dérive plus large.
+  const recentExoNames = new Set();
+  within(training, 2).forEach((s) => (s.exercices || []).forEach((e) => recentExoNames.add(e.nom)));
+  const decliningExos = [...recentExoNames].filter((nom) => exerciseTrend(exerciseSessions(training, nom)).key === "down");
+  const perfDrift = decliningExos.length >= 2;
+
+  // Signal 3 — tendance de sommeil : au moins 2 nuits courtes/mauvaise qualité sur les 3
+  // derniers jours (contre une seule nuit pour `sleepPoor`, qui reste le signal utilisé par
+  // les autres types de séance, inchangé).
+  const recentNights = within(sleep || [], 2);
+  const poorNights = recentNights.filter((n) => n.hours < 6 || (n.quality != null && n.quality <= 2)).length;
+  const sleepDrift = poorNights >= 2;
+
+  const driftSignals = [kneeRed, perfDrift, sleepDrift].filter(Boolean).length;
+
+  let restScore = kneeRed ? 45 : 5;
   let restReason = kneeRed ? "Décharge : mobilité douce + routine de rééduc autonome."
-    : `${upper7 + lower7 + basket7 + climb7 + run7 + foot7 + bike7} séances sur 7 j — une journée creuse consolide les adaptations.`;
+    : `${streak} j consécutifs d'entraînement.`;
+  if (!kneeRed && perfDrift) {
+    restScore += 16;
+    restReason += ` Baisse de perf sur ${decliningExos.length} exercices récents (${decliningExos.slice(0, 2).join(", ")}) → signal de fatigue à surveiller.`;
+  }
+  if (!kneeRed && sleepDrift) {
+    restScore += 14;
+    restReason += ` ${poorNights} nuits courtes ou de mauvaise qualité sur les 3 derniers jours.`;
+  }
+  // Repère soft : ne pèse vraiment que si les 3 signaux ci-dessus restent propres — un
+  // streak de 5+ jours à signaux propres n'empêche jamais une suggestion d'entraînement,
+  // il fait juste remonter un peu le repos dans le classement.
+  if (!kneeRed && streak >= 5) { restScore += driftSignals === 0 ? 10 : 4; restReason += ` ${streak} j sans coupure.`; }
   // Coude hors base : Upper ET Escalade sont écartés, il ne reste que le bas du corps —
   // le repos remonte, sans jamais atteindre le score d'un genou hors base (qui, lui,
   // écarte aussi Lower et Basket, donc ne laisse quasiment rien d'autre).
   if (elbowRed) { restScore += 12; restReason += ` Coude hors base (${E.redWhy}) : tout le haut du corps est écarté aujourd'hui.`; }
-  if (!kneeRed && sleepPoor) { restScore += 10; restReason += ` ${sleepNote}`; }
   if (!kneeRed && loadHigh) { restScore += 8; restReason += ` ${load3} séances sur les 3 derniers jours → fatigue à surveiller.`; }
   if (!kneeRed && cutOn) { restScore += 4; restReason += " Fenêtre de sèche : le repos ne compte pas comme volume manqué."; }
   push(sugg, "Repos / mobilité", restScore, restReason);
