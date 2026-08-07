@@ -2,10 +2,10 @@ import { useState } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from "recharts";
 import { Plus, Trash2 } from "lucide-react";
 import { PHASES } from "@rawcare/core/targets";
-import { mergeTargets, phaseTarget, phaseTargetField } from "./defaultTargets.js";
+import { mergeTargets, phaseTarget } from "./defaultTargets.js";
 import {
   C, today, fmt, round, upsert, lastN,
-  Card, Label, Body, Big, Empty, Btn, Stepper, DateField, Pills, ScreenHeader,
+  Card, Label, Body, Big, Empty, Btn, Stepper, DateField, ScreenHeader,
   chartAxis, tooltipStyle, tooltipItemStyle,
 } from "./ui.jsx";
 
@@ -13,9 +13,9 @@ import {
 // cible par Phase, sélecteur de date/poids en Stepper. `data.phase`/`data.targets` sont de
 // nouveaux champs (défauts alignés sur apps/perso : phase "seche", DEFAULT_TARGETS fusionné
 // à la lecture pour rester compatible avec de futurs champs de cibles, ex. Macros).
-// apps/perso place le sélecteur de Phase sur le Dashboard, qui n'existe pas encore côté
-// apps/public — la carte Phase est donc affichée ici, là où elle sert concrètement (calcul
-// de la cible juste en dessous).
+// La carte Phase (sélecteur + poids cible par phase) a déménagé vers Réglages
+// (Onboarding.jsx, mode="settings") le 07/08/2026 — même mouvement que côté apps/perso, elle
+// vivait ici faute d'écran Réglages au moment de sa création.
 export default function WeightTab({ data, update, error: loadError }) {
   const weight = data?.weightLog || [];
   const phase = data?.phase || "seche";
@@ -30,20 +30,6 @@ export default function WeightTab({ data, update, error: loadError }) {
 
   const wLast = lastN(weight, 1)[0];
   const chartData = lastN(weight, 60).map((w) => ({ date: fmt(w.date), kg: w.kg }));
-
-  const setPhase = async (p) => {
-    try { await update({ phase: p }); } catch (e) { setSaveError(String(e.message || e)); }
-  };
-
-  // Bug remonté le 06/08/2026 : "le poids cible reste à 93kg" quoi qu'on change en
-  // Préférences — aucun champ ne permettait de le modifier (le core ne rend éditable que la
-  // cible de Maintenance, Sèche/Prise étant fixées à 93/95 pour l'usage perso de Yoann,
-  // voir defaultTargets.js). Éditable ici, au plus près de son usage (comme sur apps/perso,
-  // la carte Phase vit dans l'écran Poids).
-  const setTargetWeight = async (v) => {
-    try { await update({ targets: { ...targets, [phaseTargetField(phase)]: v } }); }
-    catch (e) { setSaveError(String(e.message || e)); }
-  };
 
   const pickDate = (d) => {
     setDate(d);
@@ -115,16 +101,6 @@ export default function WeightTab({ data, update, error: loadError }) {
           )}
         </div>
         {(saveError || loadError) && <p style={{ color: C.danger, fontSize: 12, marginTop: 10 }}>{saveError || loadError}</p>}
-      </Card>
-
-      <Card>
-        <Label style={{ marginBottom: 8 }}>Phase</Label>
-        <Pills options={Object.entries(PHASES).map(([k, v]) => ({ key: k, label: v.label }))} value={phase} onChange={setPhase} small />
-        <Body style={{ marginTop: 8, fontSize: 11 }}>{PHASES[phase].msg}</Body>
-        <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.divider}` }}>
-          <Label style={{ marginBottom: 6 }}>Poids cible — {PHASES[phase].label} (kg)</Label>
-          <Stepper value={tgtW} set={setTargetWeight} step={0.5} unit="kg" min={0} />
-        </div>
       </Card>
 
       <Card style={{ padding: "6px 14px" }}>

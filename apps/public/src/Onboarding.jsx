@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { kcalFromMacros } from "@rawcare/core/targets";
+import { kcalFromMacros, PHASES } from "@rawcare/core/targets";
 import { mergeTargets } from "./defaultTargets.js";
 import { C, Card, Label, Body, Btn, Field, Stepper, Pills, TextInput, ScreenHeader } from "./ui.jsx";
 import { SPORT_FAMILIES, PAIN_ZONE_PRESETS, newZoneKey } from "./onboarding.js";
@@ -41,6 +41,10 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
   // et enregistrer répare aussi, en base, un compte dont `targets.cut` porterait encore
   // l'ancien bug (fenêtre de sèche de Yoann héritée avant le correctif du 06/08/2026).
   const [targets, setTargets] = useState(mergeTargets(data?.targets));
+  // Carte Phase (07/08/2026) : déplacée depuis WeightTab.jsx, où elle vivait faute d'écran
+  // Réglages au moment de sa création — même raisonnement que la carte "Cibles macro de
+  // base" juste en dessous, qui vit ici pour la même raison.
+  const [phase, setPhase] = useState(data?.phase || "seche");
   const [climbScheme, setClimbScheme] = useState(data?.climbScheme || "gym");
   const [apiKey, setApiKey] = useState(data?.apiKey || "");
   const [model, setModel] = useState(data?.model || "claude-sonnet-5");
@@ -74,7 +78,7 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
   const finish = async () => {
     setSaving(true); setSaveError("");
     try {
-      await update({ activeSports, painZones, targets, climbScheme, apiKey, model, onboarded: true });
+      await update({ activeSports, painZones, targets, phase, climbScheme, apiKey, model, onboarded: true });
       onClose?.();
     } catch (e) {
       setSaveError(String(e.message || e));
@@ -161,6 +165,12 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
       </Card>
 
       <Card>
+        <Label style={{ marginBottom: 8 }}>Phase</Label>
+        <Pills options={Object.entries(PHASES).map(([k, v]) => ({ key: k, label: v.label }))} value={phase} onChange={setPhase} small />
+        <Body style={{ marginTop: 8, fontSize: 11 }}>{PHASES[phase].msg}</Body>
+      </Card>
+
+      <Card>
         <Label style={{ marginBottom: 8 }}>Cibles macro de base</Label>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
           <Field label="Protéines (g)"><Stepper value={targets.protein ?? 0} set={(v) => setTargets({ ...targets, protein: v })} step={5} min={0} int /></Field>
@@ -168,17 +178,24 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
           <Field label="Lipides (g)"><Stepper value={targets.fat ?? 0} set={(v) => setTargets({ ...targets, fat: v })} step={5} min={0} int /></Field>
           <Field label="Fibres (g)"><Stepper value={targets.fiber ?? 0} set={(v) => setTargets({ ...targets, fiber: v })} step={1} min={0} int /></Field>
         </div>
-        <Field label="Poids de maintenance (kg)">
-          <Stepper value={targets.weightMaintenance ?? 80} set={(v) => setTargets({ ...targets, weightMaintenance: v })} step={0.5} min={0} />
-        </Field>
-        <Body style={{ fontSize: 10, color: C.dim, marginTop: 6 }}>
-          Ne sert de cible poids que si tu choisis la phase "Maintenance" dans l'onglet
-          Poids. Les phases Sèche/Prise ont chacune leur propre cible, éditable directement
-          dans l'onglet Poids (93/95 kg par défaut).
-        </Body>
-        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8, fontFamily: C.mono }}>
+        <Body style={{ fontSize: 10, color: C.dim, marginTop: -2, marginBottom: 8, fontFamily: C.mono }}>
           ≈ {Math.round(kcalFromMacros(targets.protein, targets.carbs, targets.fat, targets.fiber))} kcal
         </Body>
+        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 8 }}>
+          Poids cible par phase — pilote la cible affichée dans l'onglet Poids selon la
+          phase choisie ci-dessus.
+        </Body>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <Field label="Sèche (kg)">
+            <Stepper value={targets.weightCutTarget ?? PHASES.seche.target} set={(v) => setTargets({ ...targets, weightCutTarget: v })} step={0.5} min={0} />
+          </Field>
+          <Field label="Maintenance (kg)">
+            <Stepper value={targets.weightMaintenance ?? 80} set={(v) => setTargets({ ...targets, weightMaintenance: v })} step={0.5} min={0} />
+          </Field>
+          <Field label="Prise (kg)">
+            <Stepper value={targets.weightBulkTarget ?? PHASES.prise.target} set={(v) => setTargets({ ...targets, weightBulkTarget: v })} step={0.5} min={0} />
+          </Field>
+        </div>
       </Card>
 
       {activeSports.includes("escalade") && (
