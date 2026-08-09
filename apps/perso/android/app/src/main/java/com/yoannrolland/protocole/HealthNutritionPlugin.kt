@@ -126,7 +126,7 @@ class HealthNutritionPlugin : Plugin() {
     }
 
     /**
-     * Renvoie, par date locale de réveil (yyyy-MM-dd), la durée de sommeil et une note de
+     * Renvoie, par "jour de sommeil" (yyyy-MM-dd), la durée de sommeil et une note de
      * qualité sur 4 quand Health Connect contient le détail par phase, sinon seulement la
      * période coucher→réveil (aucune qualité calculée dans ce cas).
      *
@@ -140,6 +140,16 @@ class HealthNutritionPlugin : Plugin() {
      * Health Connect n'a par ailleurs aucun champ "score" — celui de Samsung Health reste
      * propriétaire, jamais exposé. La qualité ci-dessous est un calcul maison (efficacité +
      * durée), pas une reproduction de ce score.
+     *
+     * **Nuits fractionnées (07/08/2026)** : en cas d'insomnie, l'app de sommeil peut écrire
+     * DEUX `SleepSessionRecord` pour une même nuit (réveil prolongé entre les deux) au lieu
+     * d'un seul avec des phases d'éveil internes. `out.put(...)` sur une seule clé par
+     * enregistrement écrasait silencieusement le premier segment avec le second — Yoann n'en
+     * voyait plus qu'un des deux. Les enregistrements sont désormais regroupés par "jour de
+     * sommeil" (`sleepDayOf`, fenêtre de midi la veille à midi le jour même — pas le jour
+     * calendaire de fin, qui aurait pu séparer un segment finissant juste avant minuit d'un
+     * second commençant juste après) puis SOMMÉS : durée additionnée, qualité recalculée sur
+     * l'efficacité et le temps endormi combinés des segments porteurs de phases.
      */
     @PluginMethod
     fun readSleep(call: PluginCall) {
@@ -159,42 +169,64 @@ class HealthNutritionPlugin : Plugin() {
                     .groupBy { "${it.metadata.dataOrigin.packageName}|${it.startTime}" }
                     .values.map { grp -> grp.maxByOrNull { it.metadata.lastModifiedTime }!! }
 
-                fun dayOf(instant: Instant) =
-                    instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString()
+                // Jour de sommeil = fenêtre de midi (veille) à midi (jour même), pas le jour
+                // calendaire strict : avant midi, on reste sur le jour en cours (fin de nuit) ;
+                // à partir de midi, on bascule sur le lendemain (début de nuit). Un segment qui
+                // finit à 23h50 et un autre qui commence à 00h10 tombent ainsi dans le MÊME
+                // panier au lieu d'être coupés en deux par le changement de jour calendaire.
+                fun sleepDayOf(instant: Instant): String {
+                    val zdt = instant.atZone(java.time.ZoneId.systemDefault())
+                    val d = if (zdt.hour < 12) zdt.toLocalDate() else zdt.toLocalDate().plusDays(1)
+                    return d.toString()
+                }
 
                 val out = JSObject()
-                records.forEach { r ->
-                    val periodeMin = (r.endTime.epochSecond - r.startTime.epochSecond) / 60.0
+                records.groupBy { sleepDayOf(it.endTime) }.forEach { (day, group) ->
+                    var totalHours = 0.0
+                    var asleepMinSum = 0.0
+                    var periodeMinSum = 0.0
+                    var anyStages = false
 
-                    // STAGE_TYPE_AWAKE=1, OUT_OF_BED=3, AWAKE_IN_BED=7 (androidx.health.connect) :
-                    // à exclure de la durée de sommeil réelle.
-                    val asleepMin = r.stages
-                        .filter { it.stage !in setOf(1, 3, 7) }
-                        .sumOf { (it.endTime.epochSecond - it.startTime.epochSecond) / 60.0 }
+                    group.forEach { r ->
+                        val periodeMin = (r.endTime.epochSecond - r.startTime.epochSecond) / 60.0
 
-                    val hasStages = r.stages.isNotEmpty()
-                    val hours = if (hasStages) asleepMin / 60.0 else periodeMin / 60.0
+                        // STAGE_TYPE_AWAKE=1, OUT_OF_BED=3, AWAKE_IN_BED=7 (androidx.health.connect) :
+                        // à exclure de la durée de sommeil réelle.
+                        val asleepMin = r.stages
+                            .filter { it.stage !in setOf(1, 3, 7) }
+                            .sumOf { (it.endTime.epochSecond - it.startTime.epochSecond) / 60.0 }
+
+                        val hasStages = r.stages.isNotEmpty()
+                        totalHours += if (hasStages) asleepMin / 60.0 else periodeMin / 60.0
+                        if (hasStages) {
+                            asleepMinSum += asleepMin
+                            periodeMinSum += periodeMin
+                            anyStages = true
+                        }
+                    }
 
                     // Grille calibrée sur UN point de référence réel (28/07/2026) : 92,6%
                     // d'efficacité + 6h56 de sommeil réel → Samsung Health a donné 90/100
                     // "Excellent". Le seuil de durée initial (7h) était trop strict pour ce
                     // cas — abaissé de 30 min à chaque palier. Un seul point de calibration :
                     // à resserrer si de nouveaux scores Samsung Health la contredisent.
-                    val quality: Int? = if (!hasStages) null else {
-                        val efficacite = asleepMin / periodeMin
+                    // Recalculée sur les totaux du panier (pas segment par segment) : une nuit
+                    // fractionnée doit avoir UNE seule note, pas la note du dernier segment lu.
+                    val quality: Int? = if (!anyStages || periodeMinSum <= 0) null else {
+                        val efficacite = asleepMinSum / periodeMinSum
                         when {
-                            efficacite >= 0.90 && asleepMin >= 390 -> 4  // Excellent
-                            efficacite >= 0.80 && asleepMin >= 330 -> 3  // Bon
-                            efficacite >= 0.65 || asleepMin >= 270 -> 2  // Correct
-                            else -> 1                                    // Attention requise
+                            efficacite >= 0.90 && asleepMinSum >= 390 -> 4  // Excellent
+                            efficacite >= 0.80 && asleepMinSum >= 330 -> 3  // Bon
+                            efficacite >= 0.65 || asleepMinSum >= 270 -> 2  // Correct
+                            else -> 1                                       // Attention requise
                         }
                     }
 
                     val entry = JSObject()
-                        .put("hours", hours)
-                        .put("dureeReelle", hasStages)
+                        .put("hours", totalHours)
+                        .put("dureeReelle", anyStages)
                     if (quality != null) entry.put("quality", quality)
-                    out.put(dayOf(r.endTime), entry)
+                    out.put(day, entry)
                 }
                 call.resolve(JSObject().put("days", out))
             } catch (e: Exception) {
