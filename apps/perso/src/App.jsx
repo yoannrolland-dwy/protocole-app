@@ -42,7 +42,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.60.0";
+const APP_VERSION = "3.61.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -2484,6 +2484,13 @@ export default function App({ silent = false } = {}) {
     apiKey, model,
   };
 
+  // Retour en haut au changement d'onglet (07/08/2026, retour de Yoann) : `<main>` est un
+  // conteneur scrollable UNIQUE dont le contenu change avec `tab` — React ne le démonte pas
+  // entre deux onglets, donc le navigateur conservait le scroll de l'onglet précédent au
+  // lieu de repartir du haut.
+  const mainRef = useRef(null);
+  useEffect(() => { mainRef.current?.scrollTo(0, 0); }, [tab, showSettings]);
+
   const NAV = [
     { key: "dash", label: "Bord", icon: LayoutDashboard },
     { key: "weight", label: "Poids", icon: Scale },
@@ -2529,7 +2536,7 @@ export default function App({ silent = false } = {}) {
       </header>
 
       {/* Contenu */}
-      <main style={{ flex: 1, overflowY: "auto", padding: "14px 16px 24px" }}>
+      <main ref={mainRef} style={{ flex: 1, overflowY: "auto", padding: "14px 16px 24px" }}>
         {loading ? <Empty>Chargement…</Empty> : showSettings ? (
           <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, climbScheme, setClimbScheme, phase, setPhase }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Settings } from "lucide-react";
 import { supabase } from "./supabaseClient.js";
 import { useAuth } from "./useAuth.js";
@@ -69,6 +69,11 @@ function Authenticated({ session }) {
   // "loading"` passe avant : `data` est encore `null` au tout premier rendu.
   const needsOnboarding = status !== "loading" && !data?.onboarded;
   const selectTab = (key) => { setTab(key); setShowSettings(false); };
+
+  // Retour en haut au changement d'onglet (07/08/2026, retour de Yoann) : contrairement à
+  // apps/perso (conteneur scrollable dédié), ici c'est la page/fenêtre elle-même qui
+  // scrolle — même mécanisme transposé en window.scrollTo.
+  useEffect(() => { window.scrollTo(0, 0); }, [tab, showSettings]);
 
   return (
     <div style={{ minHeight: "100%", display: "flex", flexDirection: "column", alignItems: "center", fontFamily: C.mono }}>
