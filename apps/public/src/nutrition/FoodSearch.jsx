@@ -634,6 +634,27 @@ export default function FoodSearch({
               )}
             </div>
 
+            {/* Remonté tout en haut (07/08/2026, port depuis apps/perso) : ces 4 actions
+                étaient reléguées en bas de la liste de suggestions/résultats. */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+              <Btn variant="plain" onClick={() => setFree(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
+                <PencilLine size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
+                Saisie libre
+              </Btn>
+              <Btn variant="plain" onClick={() => setBuilding(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
+                <ChefHat size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
+                Nouvelle recette
+              </Btn>
+              <Btn variant="plain" onClick={() => setResto(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
+                <Utensils size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
+                Carte resto
+              </Btn>
+              <Btn variant="plain" onClick={() => setPhotoMode(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
+                <Camera size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
+                Photo d'un plat
+              </Btn>
+            </div>
+
             {scanState === "lookup" && (
               <Body style={{ fontSize: 11, color: C.dim, padding: "0 0 10px" }}>Recherche du produit scanné…</Body>
             )}
@@ -677,24 +698,6 @@ export default function FoodSearch({
 
             {!showSugg && <OffSection offState={offState} offResults={offResults} onPick={setSel} />}
 
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
-              <Btn variant="plain" onClick={() => setFree(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
-                <PencilLine size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
-                Saisie libre
-              </Btn>
-              <Btn variant="plain" onClick={() => setBuilding(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
-                <ChefHat size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
-                Nouvelle recette
-              </Btn>
-              <Btn variant="plain" onClick={() => setResto(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
-                <Utensils size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
-                Carte resto
-              </Btn>
-              <Btn variant="plain" onClick={() => setPhotoMode(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
-                <Camera size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
-                Photo d'un plat
-              </Btn>
-            </div>
             <Body style={{ fontSize: 9.5, color: C.dim, marginTop: 10, textAlign: "center" }}>
               Table Ciqual 2020 — ANSES · Licence Ouverte 2.0<br />
               Open Food Facts · Licence Open Database (ODbL)
