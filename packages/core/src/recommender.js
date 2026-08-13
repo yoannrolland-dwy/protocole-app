@@ -144,10 +144,16 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   // gate dur), une mauvaise nuit est un facteur de prudence parmi d'autres, pas un verdict
   // de sécurité. Pas de donnée = pas de pénalité (silencieux), pour ne pas punir une simple
   // absence de saisie comme le ferait le genou.
+  //
+  // Signal = UNIQUEMENT le score de qualité, jamais la durée seule (07/08/2026, retour de
+  // Yoann) : il est short sleeper — dormir moins de 6h est normal pour lui, pas un signe de
+  // fatigue. Le score qualité (1-4, calculé nativement depuis les phases de sommeil +
+  // l'efficacité, voir HealthNutritionPlugin.kt) reste le signal fiable. Avant ce correctif,
+  // `hours < 6` déclenchait la pénalité même sur une nuit courte de bonne qualité.
   const lastNight = (sleep || []).slice().sort(byDate).pop();
   const lastNightFresh = lastNight && daysBetween(lastNight.date, t0) <= 1;
-  const sleepPoor = lastNightFresh && (lastNight.hours < 6 || (lastNight.quality != null && lastNight.quality <= 2));
-  const sleepNote = sleepPoor ? `Nuit courte (${fmtHM(lastNight.hours)}) → séance allégée ou repos conseillé.` : null;
+  const sleepPoor = lastNightFresh && lastNight.quality != null && lastNight.quality <= 2;
+  const sleepNote = sleepPoor ? `Sommeil de qualité faible (${fmtHM(lastNight.hours)}, qualité ${lastNight.quality}/4) → séance allégée ou repos conseillé.` : null;
 
   // Charge des 3 derniers jours (fatigue à court terme) — distinct du volume 7 j déjà
   // utilisé plus haut : 3 séances sur 3 jours signale une fatigue qu'une moyenne
@@ -342,11 +348,12 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   const decliningExos = [...recentExoNames].filter((nom) => exerciseTrend(exerciseSessions(training, nom)).key === "down");
   const perfDrift = decliningExos.length >= 2;
 
-  // Signal 3 — tendance de sommeil : au moins 2 nuits courtes/mauvaise qualité sur les 3
-  // derniers jours (contre une seule nuit pour `sleepPoor`, qui reste le signal utilisé par
-  // les autres types de séance, inchangé).
+  // Signal 3 — tendance de sommeil : au moins 2 nuits de mauvaise QUALITÉ sur les 3 derniers
+  // jours (contre une seule nuit pour `sleepPoor`, même signal qualité-seule, voir plus
+  // haut). Jamais la durée seule : Yoann est short sleeper, moins de 6h n'est pas un signe
+  // de fatigue pour lui — seul le score qualité (calculé nativement) est fiable.
   const recentNights = within(sleep || [], 2);
-  const poorNights = recentNights.filter((n) => n.hours < 6 || (n.quality != null && n.quality <= 2)).length;
+  const poorNights = recentNights.filter((n) => n.quality != null && n.quality <= 2).length;
   const sleepDrift = poorNights >= 2;
 
   const driftSignals = [kneeRed, perfDrift, sleepDrift].filter(Boolean).length;
