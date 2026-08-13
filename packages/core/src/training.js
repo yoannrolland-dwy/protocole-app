@@ -51,12 +51,14 @@ export function exoProgress(sessions) {
   return Object.entries(byExo).map(([nom, hist]) => {
     const h = hist.slice(-3); // 3 dernières séances suffisent pour lire une tendance
     const last = h[h.length - 1], prev = h.length > 1 ? h[h.length - 2] : null;
-    // Volume = charge × reps (ou secondes en mode temps) : capte une progression même
-    // quand le poids ne bouge pas.
-    const vol = (x) => setScore(x, x.mode);
+    // Charge d'abord (progressive overload, 07/08/2026) — même hiérarchie que `beats()`
+    // (records) : plus de poids l'emporte même avec moins de reps, à poids égal plus de
+    // reps l'emporte. Avant ce correctif, le volume brut (poids × reps) pouvait annoncer
+    // "baisse" sur une séance qui venait pourtant de battre un record de charge (ex.
+    // 40kg×10 → 45kg×6 : volume en baisse, mais c'est une progression, pas un recul).
     const tendance = !prev ? "1re fois"
-      : vol(last) > vol(prev) ? "hausse"
-      : vol(last) < vol(prev) ? "baisse" : "stable";
+      : beats(last, prev, last.mode) ? "hausse"
+      : beats(prev, last, last.mode) ? "baisse" : "stable";
     return {
       exo: nom,
       series_max: h.map((x) => `${x.d.slice(5)} ${isTimeMode(x.mode) ? `${x.val}s` : `${x.poids}x${x.val}`}`),
@@ -215,13 +217,20 @@ export function painOutOfBase(logs, date) {
  * Tendance sur les 3 dernières séances, même définition que celle envoyée au Coach IA
  * (dernière vs précédente) — l'écran et le coach ne doivent jamais dire deux choses
  * différentes du même historique.
+ *
+ * Charge d'abord (progressive overload, 07/08/2026) — même hiérarchie que `beats()`
+ * (records) : plus de poids l'emporte même avec moins de reps, à poids égal plus de reps
+ * l'emporte. Avant ce correctif, le volume brut (poids × reps) pouvait annoncer "baisse"
+ * sur une séance qui venait pourtant de battre un record de charge (ex. 40kg×10 → 45kg×6 :
+ * volume en baisse, mais c'est une progression, pas un recul) — deux verdicts contradictoires
+ * pour le même changement. `delta` reste le volume brut, purement informatif.
  */
 export function exerciseTrend(sessions) {
   const h = sessions.slice(-3);
   if (h.length < 2) return { key: "first", label: "1re fois", delta: null };
   const last = h[h.length - 1], prev = h[h.length - 2];
   const delta = last.score - prev.score;
-  if (delta > 0) return { key: "up", label: "hausse", delta };
-  if (delta < 0) return { key: "down", label: "baisse", delta };
+  if (beats(last.best, prev.best, last.mode)) return { key: "up", label: "hausse", delta };
+  if (beats(prev.best, last.best, last.mode)) return { key: "down", label: "baisse", delta };
   return { key: "flat", label: "stable", delta: 0 };
 }
