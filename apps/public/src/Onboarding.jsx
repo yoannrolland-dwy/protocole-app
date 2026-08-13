@@ -230,7 +230,10 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
           Poids cible par phase — pilote la cible affichée dans l'onglet Poids selon la
           phase choisie ci-dessus.
         </Body>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+        {/* Empilé verticalement (07/08/2026, port depuis apps/perso) : 3 Stepper sur une
+            seule ligne débordaient du cadre de la Card et laissaient le champ trop étroit
+            pour taper dedans. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <Field label="Sèche (kg)">
             <Stepper value={targets.weightCutTarget ?? PHASES.seche.target} set={(v) => setTargets({ ...targets, weightCutTarget: v })} step={0.5} min={0} />
           </Field>

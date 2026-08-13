@@ -42,7 +42,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.62.0";
+const APP_VERSION = "3.63.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -2095,7 +2095,11 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
           Poids cible par phase — pilote la tuile Poids et le sous-titre de l'onglet Poids
           selon la phase active ci-dessus.
         </Body>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+        {/* Empilé verticalement (07/08/2026, retour de Yoann) : 3 Stepper (chacun déjà
+            −/champ/+) sur une seule ligne ne tenaient pas dans la largeur d'une Card,
+            débordaient du cadre et laissaient le champ de saisie trop étroit pour taper
+            dedans. Une ligne par phase, comme suggéré. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <Field label="Sèche (kg)">
             <Stepper value={targets.weightCutTarget ?? PHASES.seche.target} set={(v) => saveTargets({ ...targets, weightCutTarget: v })} step={0.5} min={0} />
           </Field>
