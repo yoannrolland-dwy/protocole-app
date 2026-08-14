@@ -8,7 +8,7 @@
 // `buildCoachPrompt(...).system`, `.user` ET `buildCoachBriefing(...)` — les trois textes
 // exacts envoyés au modèle — identiques au caractère près.
 
-import { today, byDate, daysBetween, shiftDateKey, round, lastN } from "../dateUtils.js";
+import { today, nowHM, byDate, daysBetween, shiftDateKey, round, lastN } from "../dateUtils.js";
 import { recommendSessions } from "../recommender.js";
 import { buildZones, DEFAULT_ZONES } from "../pain.js";
 import { exoProgress } from "../training.js";
@@ -234,7 +234,7 @@ export function buildCoachPrompt(data, note) {
   const authorLabel = identity ? "l'utilisateur" : "Yoann";
 
   const realtime = {
-    hier: y, aujourdhui: today(),
+    hier: y, aujourdhui: today(), heure_analyse: nowHM(),
     poids: { hier: wYest?.kg ?? null, aujourdhui: wToday?.kg ?? null,
       delta: (wYest?.kg != null && wToday?.kg != null) ? round(wToday.kg - wYest.kg) : null },
     sommeil_nuit_derniere: sToday ? { heures: round(sToday.hours, 2), qualite: sToday.quality ?? null } : null,
@@ -338,7 +338,7 @@ ${profile.trim()}` : "";
     ? `Les cotations sont celles de SA SALLE, au format "couleur-niveau", ordonnées ainsi : jaune < vert < bleu < rouge < noir < violet, et 1 à 5 dans chaque couleur (5 = le plus dur). Ne pas les convertir en Fontainebleau.`
     : `Les cotations sont en échelle ${scheme.label} standard.`;
 
-  const user = `TEMPS RÉEL — hier vs aujourd'hui (regarde d'abord ça, c'est le plus actionnable) :
+  const user = `TEMPS RÉEL — hier vs aujourd'hui (regarde d'abord ça, c'est le plus actionnable). "heure_analyse" est l'heure EXACTE de cette analyse : les champs "_aujourdhui"/"_en_cours" (pas, macros, eau) ne couvrent que depuis ce matin jusqu'à cette heure-là, jamais la journée entière — ne les juge JAMAIS insuffisants par rapport à une cible de journée complète (3000 pas ou 600 kcal à 8h du matin, c'est juste tôt, pas un problème). Pour macros/eau spécifiquement, base-toi sur "repas_aujourdhui" (par nom de repas) plutôt que sur le total brut : avant midi seul le petit-déjeuner est normalement pris, entre midi et 15h le déjeuner s'ajoute, entre 15h et 18h le goûter, entre 19h et 22h le dîner — "Autre" est un repas flexible, jamais un repère horaire. Un repas plus tardif déjà rempli n'est pas suspect : ${authorLabel} planifie parfois ses repas à l'avance dans la journée.
 ${JSON.stringify(realtime)}
 
 RÉSUMÉ 14 JOURS (moyennes fiables, tendance de fond) :

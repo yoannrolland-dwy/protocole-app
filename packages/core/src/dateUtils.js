@@ -11,6 +11,13 @@
 export const localDateKey = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 export const today = () => localDateKey(new Date());
+// Heure locale actuelle "HH:MM" (07/08/2026) — le Coach IA n'avait jusqu'ici que la date,
+// jamais l'heure : il jugeait les données "aujourd'hui" (pas, macros, eau) par rapport à la
+// cible du jour ENTIER, même lancé à 8h du matin. Sert à situer l'analyse dans la journée.
+export const nowHM = () => {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
 // Décale une clé "YYYY-MM-DD" de `days` jours, en arithmétique LOCALE pure (construction via
 // `new Date(y, m, d)`, jamais un aller-retour par un instant UTC qui redécalerait la date
 // près de minuit selon le fuseau).
