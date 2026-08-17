@@ -210,12 +210,16 @@ class HealthNutritionPlugin : Plugin() {
                     // "Excellent". Le seuil de durée initial (7h) était trop strict pour ce
                     // cas — abaissé de 30 min à chaque palier. Un seul point de calibration :
                     // à resserrer si de nouveaux scores Samsung Health la contredisent.
+                    // Seuil "Excellent" abaissé à 6h le 14/08/2026 (retour de Yoann, short
+                    // sleeper — voir aussi le fix "durée n'est pas un signal de fatigue" dans
+                    // le recommandeur) : 6h30 était trop strict pour lui compte tenu de son
+                    // profil de sommeil normal.
                     // Recalculée sur les totaux du panier (pas segment par segment) : une nuit
                     // fractionnée doit avoir UNE seule note, pas la note du dernier segment lu.
                     val quality: Int? = if (!anyStages || periodeMinSum <= 0) null else {
                         val efficacite = asleepMinSum / periodeMinSum
                         when {
-                            efficacite >= 0.90 && asleepMinSum >= 390 -> 4  // Excellent
+                            efficacite >= 0.90 && asleepMinSum >= 360 -> 4  // Excellent
                             efficacite >= 0.80 && asleepMinSum >= 330 -> 3  // Bon
                             efficacite >= 0.65 || asleepMinSum >= 270 -> 2  // Correct
                             else -> 1                                       // Attention requise

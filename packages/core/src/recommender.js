@@ -156,10 +156,16 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   const sleepNote = sleepPoor ? `Sommeil de qualité faible (${fmtHM(lastNight.hours)}, qualité ${lastNight.quality}/4) → séance allégée ou repos conseillé.` : null;
 
   // Charge des 3 derniers jours (fatigue à court terme) — distinct du volume 7 j déjà
-  // utilisé plus haut : 3 séances sur 3 jours signale une fatigue qu'une moyenne
+  // utilisé plus haut : plusieurs séances sur 3 jours signale une fatigue qu'une moyenne
   // hebdomadaire peut masquer.
+  //
+  // Seuil relevé de 3 à 7 (14/08/2026, retour de Yoann — athlète, pas un pratiquant
+  // occasionnel) : sa normale déclarée va jusqu'à 2 séances/jour (donc 4-6 sur 3 jours),
+  // à laquelle l'ancien seuil ≥3 déclenchait quasiment en permanence — pénalisant à tort
+  // Upper/Lower/Basket/Escalade (via fatigueScore) ET gonflant Repos, même sans aucun
+  // vrai signe de fatigue. 7 ne se déclenche donc que nettement au-dessus de sa normale.
   const load3 = within(training, 2).length;
-  const loadHigh = load3 >= 3;
+  const loadHigh = load3 >= 7;
 
   // Fenêtre d'objectif (sèche avant vacances) : la règle du profil est de ne jamais AJOUTER
   // de volume à impact par rapport au rythme habituel — donc on n'interdit pas Basket/
@@ -370,9 +376,12 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
     restReason += ` ${poorNights} nuits courtes ou de mauvaise qualité sur les 3 derniers jours.`;
   }
   // Repère soft : ne pèse vraiment que si les 3 signaux ci-dessus restent propres — un
-  // streak de 5+ jours à signaux propres n'empêche jamais une suggestion d'entraînement,
-  // il fait juste remonter un peu le repos dans le classement.
-  if (!kneeRed && streak >= 5) { restScore += driftSignals === 0 ? 10 : 4; restReason += ` ${streak} j sans coupure.`; }
+  // streak à signaux propres n'empêche jamais une suggestion d'entraînement, il fait
+  // juste remonter un peu le repos dans le classement.
+  // Seuil relevé de 5 à 10 jours (14/08/2026, retour de Yoann) : 5 jours d'affilée sans
+  // coupure est courant pour un athlète qui s'entraîne quasi quotidiennement — ce n'est
+  // pas en soi un signal, seuls les 3 vrais signaux de dérive (genou/perf/sommeil) le sont.
+  if (!kneeRed && streak >= 10) { restScore += driftSignals === 0 ? 10 : 4; restReason += ` ${streak} j sans coupure.`; }
   // Coude hors base : Upper ET Escalade sont écartés, il ne reste que le bas du corps —
   // le repos remonte, sans jamais atteindre le score d'un genou hors base (qui, lui,
   // écarte aussi Lower et Basket, donc ne laisse quasiment rien d'autre).
