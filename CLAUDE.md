@@ -33,6 +33,19 @@ cosmétiques) :
   supination limitée (chin-ups). L'escalade compte comme charge de tirage
   significative pour le coude.
 
+**Deux traits physiologiques à ne jamais traiter comme des anomalies** (précisés
+le 13-17/08/2026, après que l'app les ait signalés à tort) :
+- **Short sleeper** : dormir moins de 6 h en moyenne est NORMAL pour moi, ce
+  n'est pas un signal de fatigue ni de mauvaise récupération. Le seul signal
+  fiable est le **score de qualité 1-4** (calculé depuis les phases de sommeil,
+  voir plus bas), jamais la durée seule. Le recommandeur ET le Coach IA suivent
+  cette règle — ne pas réintroduire de seuil sur les heures.
+- **Athlète, pas pratiquant occasionnel** : ma normale va jusqu'à **2 séances
+  par jour** (soit 4-6 sur 3 jours), et m'entraîner 5 jours d'affilée n'a rien
+  d'un excès. Les seuils de "charge élevée" du recommandeur sont calibrés
+  là-dessus (voir le chantier du 17/08/2026) — ne pas les rabaisser vers des
+  valeurs de sportif lambda.
+
 ## Ce qu'est l'app
 
 **PROTOCOLE** : app personnelle de suivi sport/nutrition/récupération. Un
@@ -238,11 +251,14 @@ protocole-app/                    (racine = workspaces npm uniquement)
   zone déjà travaillée le jour même) — logique validée, ne pas simplifier
   sans retester ces cas.
   **Étape 4 (30/07/2026)** : trois ajouts. (1) Nudges souples sommeil/charge
-  — une nuit courte (<6h ou qualité ≤2, sur la nuit d'hier seulement) et/ou
-  3 séances sur les 3 derniers jours retirent des points à Upper/Lower/
-  Basket/Escalade (jamais à Repos, qui en profite au contraire) ; silencieux
-  si la donnée est absente, pour ne pas punir une simple absence de saisie
-  comme le fait le genou. (2) Fenêtre de sèche (`isCutWindow`) : pénalise
+  — une mauvaise nuit et/ou une charge courte élevée retirent des points à
+  Upper/Lower/Basket/Escalade (jamais à Repos, qui en profite au contraire) ;
+  silencieux si la donnée est absente, pour ne pas punir une simple absence de
+  saisie comme le fait le genou. **Seuils révisés le 13-17/08/2026, voir le
+  chantier dédié plus bas** : le sommeil ne compte QUE par sa qualité (≤2/4),
+  jamais par la durée (short sleeper) ; la charge courte est passée de 3 à
+  **7 séances sur 3 jours** (la normale de Yoann monte à 2 séances/jour).
+  (2) Fenêtre de sèche (`isCutWindow`) : pénalise
   Basket (−10) et Escalade (−8) — les deux options à impact/tirage visées
   par la règle "pas de volume à impact en plus de l'habituel" du profil
   permanent — et bonifie Repos (+4), sans jamais les interdire (ils restent
@@ -296,8 +312,12 @@ protocole-app/                    (racine = workspaces npm uniquement)
   interne toujours en heures décimales. Moyenne 7 jours en **vraie fenêtre
   glissante** (les entrées des 7 derniers jours calendaires, pas juste les
   7 dernières nuits saisies — bug corrigé, ne pas régresser).
-- **Phase** (Sèche/Maintenance/Prise) pilote le poids cible partout (93 en
-  sèche, 95 en prise, éditable en maintenance).
+- **Phase** (Sèche/Maintenance/Prise) pilote le poids cible partout. **Depuis le
+  13/08/2026** : la carte Phase vit dans les **Réglages** (plus sur le Dashboard),
+  et les **trois** poids cibles y sont éditables — `PHASES` (`packages/core`)
+  garde 93/95 comme valeurs de DÉPART seulement, la surcouche
+  `targets.weightCutTarget`/`weightBulkTarget` (côté app) prend le dessus dès
+  qu'on édite. Voir le chantier dédié plus bas.
 - **Dates + suppression** sur les 6 onglets de saisie (Poids, Sommeil, Pas,
   Séances, Genou, Macros) — sélecteur de date avec pré-remplissage si la
   date a déjà une entrée, bouton Supprimer conditionnel.
@@ -2169,6 +2189,152 @@ tous corrigés dans cette session.
 - **Retiré au passage (pas remonté par Yoann, trouvé en lisant `Home.jsx`)** : la carte
   "Note de test (round-trip user_data)", reste de debug des tout premiers jalons apps/public,
   toujours affichée à un vrai bêta-testeur — supprimée avec son état et sa fonction `save()`.
+
+## Session d'ajustements 07-17/08/2026 (perso + public, v3.59.0 → v3.65.0)
+
+Session longue de retours d'usage réel, sans nouveau gros chantier : 13 commits, tous sur
+`dev`. **`main` n'a reçu que les 6 premiers** (jusqu'à `0c51e31`) — les 7 suivants
+(sommeil fractionné, boutons Repas, scroll onglet, progressive overload, sommeil
+short-sleeper, Stepper vertical, heure du Coach IA, seuils recommandeur) sont poussés sur
+`dev` mais **pas encore déployés sur le site public** au moment d'écrire ces lignes.
+L'app native est à jour (v3.65.0 installée).
+
+### Recommandeur — le repos ne se déclenche plus sur le volume brut
+
+Trois passes successives sur `packages/core/src/recommender.js`, la dernière étant la plus
+importante (Repos était proposé beaucoup trop souvent).
+
+- **Repos basé sur des signaux de dérive, plus sur un décompte de séances** (07/08) : le
+  score ne compte plus le NOMBRE de séances sur 7 j glissants. Trois signaux de dérive :
+  (1) genou hors base, (2) **baisse de perf sur ≥2 exercices** travaillés dans les 3
+  derniers jours (`exerciseTrend`, jamais branché au recommandeur avant), (3) **≥2 nuits
+  de mauvaise qualité** sur 3 jours. Les jours consécutifs sans coupure (`streak`) ne sont
+  plus qu'un **repère soft** : ils montent le score mais ne bloquent jamais une suggestion
+  d'entraînement, et pèsent moins dès qu'un vrai signal est déjà présent.
+- **Sommeil : la qualité seule, jamais la durée** (13/08) : `sleepPoor` et `sleepDrift`
+  déclenchaient sur `heures < 6 OU qualité ≤ 2` — le OU sur les heures pénalisait à tort
+  une nuit courte de BONNE qualité, alors que Yoann est short sleeper. Condition sur la
+  durée **entièrement retirée** des deux signaux. Le texte affiché passe de "Nuit courte"
+  à "Sommeil de qualité faible". Vérifié par script : nuit de 5 h à 4/4 donne désormais
+  exactement les mêmes scores qu'une nuit de 8 h à 4/4.
+- **Seuils recalibrés pour un athlète** (17/08, le correctif qui a vraiment réglé le
+  problème) : deux signaux génériques gonflaient Repos en continu SANS aucun vrai signe de
+  fatigue, parce qu'ils étaient calibrés pour un pratiquant occasionnel.
+  - `loadHigh` (charge 3 j) : **3 → 7 séances**. La normale déclarée de Yoann monte à
+    2 séances/jour (4-6 sur 3 j), donc l'ancien seuil se déclenchait quasi en permanence —
+    pénalisant Upper/Lower/Basket/Escalade via `fatigueScore` ET bonifiant Repos.
+  - `streak` : **5 → 10 jours** sans coupure. 5 jours d'affilée est courant pour lui.
+  - **Décision explicite de Yoann** : corriger la CAUSE (Repos sur-noté) plutôt que gonfler
+    artificiellement le score de base d'Upper/Lower — en dégonflant Repos, la muscu remonte
+    mécaniquement. Ne pas "compenser" en boostant la muscu si le sujet revient.
+
+### Sommeil — nuits fractionnées et grille de qualité
+
+`apps/perso/android/.../HealthNutritionPlugin.kt` (natif, l'app web n'a pas ce calcul) :
+
+- **Nuits fractionnées additionnées** (09/08) : en cas d'insomnie, l'app source écrit
+  parfois DEUX `SleepSessionRecord` pour une même nuit ; `out.put(...)` sur une seule clé
+  par enregistrement **écrasait silencieusement** le premier segment. Les enregistrements
+  sont regroupés par **"jour de sommeil" = fenêtre de midi la veille à midi le jour même**
+  (`sleepDayOf`) — pas le jour calendaire de fin, qui aurait séparé un segment finissant à
+  23h50 d'un second commençant à 00h10 — puis **sommés** : durée additionnée, qualité
+  recalculée sur l'efficacité et le temps endormi COMBINÉS (une nuit = une seule note).
+- **Palier "Excellent" abaissé à 6 h** (17/08) : `asleepMinSum >= 390` → `>= 360`.
+  Grille actuelle (efficacité = temps endormi ÷ temps au lit) : **4** ≥90 % et ≥6 h ·
+  **3** ≥80 % et ≥5h30 · **2** ≥65 % OU ≥4h30 · **1** sinon. Pas de phases dans Health
+  Connect ⇒ `quality: null` (aucune note inventée), seule la période brute sert de durée.
+
+### Coach IA — heure de l'analyse
+
+`packages/core/src/coach/prompt.js` + `nowHM()` dans `dateUtils.js` (14/08). Le prompt ne
+connaissait que la DATE : lancé à 8 h du matin, le modèle jugeait 3000 pas / 600 kcal
+"insuffisants" par rapport à la cible du jour ENTIER — un procès d'intention permanent.
+
+- Nouveau champ `heure_analyse` (HH:MM local) dans le bloc TEMPS RÉEL, + consigne explicite
+  de ne jamais juger les champs `_aujourdhui`/`_en_cours` contre une cible de journée
+  complète.
+- **Repères par NOM de repas** (les macros/eau peuvent être saisies à l'avance, contrairement
+  aux pas/poids/sommeil qui sont toujours à jour) : avant midi seul le petit-déjeuner est
+  attendu, midi-15 h + déjeuner, 15-18 h + goûter, 19-22 h + dîner. **"Autre" est un repas
+  flexible, jamais un repère horaire.** Un repas plus tardif déjà rempli n'est pas suspect —
+  Yoann planifie parfois ses repas à l'avance. Le trou 18-19 h est laissé au bon sens du
+  modèle, volontairement pas codé en règle rigide.
+- `buildCoachBriefing` (export claude.ai) en hérite automatiquement.
+- **Le profil permanent a été enrichi par Yoann le même jour** (dans les Réglages, pas dans
+  le code) : clause short sleeper (juger sur le score qualité, jamais la durée) + demande
+  d'analyser activement le lien nutrition/hydratation ↔ sommeil, énergie et performance.
+
+### Progressive overload — la charge prime sur le volume
+
+`packages/core/src/training.js` (13/08). `exerciseTrend()` et `exoProgress()` comparaient le
+**volume** (poids × reps) : 40 kg × 10 → 45 kg × 6 (400 → 270) s'affichait comme une
+**baisse** alors que c'est une progression. Les deux utilisent désormais la même hiérarchie
+que les records (`beats()`) : **poids plus lourd = toujours "hausse"**, peu importe les reps ;
+à poids égal seulement, les reps départagent. Corrige au passage une incohérence réelle — une
+séance pouvait afficher `★ record` ET "tendance : baisse" simultanément. Le graphique continue
+de tracer le volume, seul le verdict hausse/baisse/stable change. `delta` reste le volume
+brut, purement informatif.
+
+### UI — retours d'usage (perso + public)
+
+- **Phase déplacée du Dashboard vers les Réglages** (13/08, les deux apps) : ce n'est pas un
+  écran de suivi. Côté `apps/perso`, les poids cibles **Sèche et Prise deviennent éditables**
+  comme l'était déjà Maintenance — via une surcouche locale `targets.weightCutTarget`/
+  `weightBulkTarget` et un `phaseTarget` local dans `App.jsx` qui prend le dessus sur celui
+  du core ; **`packages/core/src/targets.js` n'est pas touché** (93/95 restent les valeurs de
+  départ). Côté `apps/public`, la carte a migré de `WeightTab.jsx` vers `Onboarding.jsx`
+  (`mode="settings"`), où les trois étaient déjà éditables.
+- **Les 3 Stepper de poids cible empilés verticalement** (13/08) : sur une seule ligne ils
+  débordaient du cadre de la Card et le champ était trop étroit pour taper dedans. Une phase
+  par ligne. Corrigé dans les DEUX apps (même code copié).
+- **Réglages d'`apps/public` : roue crantée, plus un onglet** (07/08) — icône `Settings`
+  (lucide-react, comme `apps/perso`) à côté de "Se déconnecter", ouvrant un overlay
+  (`showSettings` séparé de `tab`, même architecture que `apps/perso`).
+- **Export/import JSON dans `apps/public`** (07/08) : il n'existait AUCUNE copie des données
+  hors Supabase. Nouvelle carte "Sauvegarde des données" dans Réglages — export du `data`
+  complet **sans la clé API** (même précaution qu'`exportData()` côté perso), import qui
+  fusionne clé par clé via `update()` (donc une restauration ne touche jamais la clé API
+  configurée).
+- **Boutons d'ajout remontés en haut de l'écran Repas** (10/08) : "Saisie libre" / "Nouvelle
+  recette" / "Carte resto" / "Photo d'un plat" étaient sous la liste de résultats, donc hors
+  écran la plupart du temps. Remontés juste sous la barre de recherche, dans les deux apps.
+- **Retour en haut de page à chaque changement d'onglet** (10/08) : `apps/perso` réinitialise
+  le `scrollTop` de son `<main>` scrollable (React ne le démonte pas entre deux onglets),
+  `apps/public` fait un `window.scrollTo(0,0)` — même `useEffect([tab, showSettings])`.
+
+### Nutrition — favoris
+
+`packages/core/src/nutrition/foodStore.js` + `FoodSearch.jsx` des deux apps (07/08) :
+
+- **Favoris qui disparaissaient** : `suggestions()` avait un plafond de 25 (qui évinçait des
+  aliments réellement fréquents) ET ne cherchait que dans la fenêtre de 60 jours d'usage —
+  donc un aliment **épinglé** mais pas relogué depuis 60 j disparaissait purement et
+  simplement. Plafond **retiré** (`limit = Infinity`), et un ref épinglé absent des stats est
+  désormais retrouvé dans TOUT l'historique. L'épinglage est une intention durable, pas un
+  signal de fréquence récente.
+- **Tri par repas** : épinglés d'abord, puis les aliments déjà logués à CE repas précis
+  (`mealFreq > 0`), puis le reste — un aliment très fréquent à un AUTRE repas ne passe plus
+  devant un habitué de celui-ci.
+- **Favoris dans `IngredientPicker`** (création de recette) : il n'affichait QUE la recherche
+  textuelle, jamais les habituels à champ vide. `log`/`pins`/`muted` lui sont maintenant
+  passés (via `RecipeBuilder`) — sans `meal`, un ingrédient de recette n'étant pas lié à un
+  repas.
+
+### Chantiers évoqués mais NON faits (à reprendre)
+
+- **Bibliothèque d'exercices** (`apps/public`, identité au-delà du `nom`) : reportée à une
+  session dédiée, décision explicite de Yoann. **Devenue plus motivée depuis** : c'est le
+  prérequis pour que sa copine ait ses propres Upper/Lower sans dupliquer `TEMPLATES` en dur
+  (voir ci-dessous) — dupliquer casserait justement le "une seule app qui se met à jour pour
+  les deux".
+- **App iOS pour sa copine** (voir la mémoire `project-ios-girlfriend-app`) : chantier bloqué,
+  pas abandonné. Décisions prises : données séparées (déjà acquis gratuitement — `localStorage`
+  est par appareil), app native voulue (PWA refusée : "mon app native est bien plus complète"),
+  **pas de compte Apple Developer** (99 $/an refusé) → piste AltStore/SideStore. **Bloquant
+  réel** : Xcode n'est pas installé sur ce Mac (seulement les Command Line Tools) — CocoaPods,
+  lui, a été installé le 14/08 (`brew install cocoapods`, 1.17.0). Rien ne peut démarrer avant
+  Xcode. Risques d'AltStore/SideStore documentés avec Yoann : signature à re-valider tous les
+  7 jours, casse possible à chaque mise à jour iOS, Yoann en support technique permanent.
 
 ## Règles absolues à ne jamais casser
 
