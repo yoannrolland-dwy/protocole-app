@@ -2449,6 +2449,43 @@ toute façon pas accès à "Lower C" : `FAMILY_TYPES.musculation` dans `onboardi
   confirmer que les changements de `packages/core` ne cassent rien côté public, qui n'active
   Lower C nulle part).
 
+## Chantier RawCare — Bibliothèque d'exercices, premier lot (01/09/2026)
+
+Reprise du chantier reporté en Phase 1 ("Bibliothèque d'exercices... identité au-delà du
+nom... reportée à une session dédiée"). Cadrage fait avec Yoann avant de coder : pas de
+source externe (wger, free-exercise-db, ExerciseDB) — la vraie difficulté n'est pas la liste
+de noms d'exercices, c'est le tag `tendon` (sécurité Silbernagel), qu'aucune base externe ne
+connaît. Importer un gros catalogue non qualifié aurait donné un faux sentiment de couverture
+sécurité, pire que rien. Décision : bibliothèque construite à la main, même taxonomie
+(`groupe`/`mouvement`/`materiel`/`tendon`) que `TEMPLATES`, alimentée au fil des sessions.
+
+- **`packages/core/src/session/exercises.js`, nouveau** : `EXERCISE_LIBRARY`, liste PLATE de
+  19 exercices, **séparée de `TEMPLATES`** — décision actée avec Yoann après avoir signalé le
+  risque : renommer un exercice déjà dans un gabarit actif casse sa clé d'historique (comme
+  pour Leg curl le 01/09/2026), une bibliothèque à part évite toute migration. **Non branchée
+  à aucune UI pour l'instant** — c'est la brique de données, pas encore de bouton "remplacer
+  cet exercice" dans le carnet.
+- **Périmètre du premier lot** : les mouvements où la salle de Yoann a RÉELLEMENT les deux
+  types d'équipement (confirmé par lui, pas supposé) — Presse à cuisses, Iso leg extension
+  @60°, Leg extension unilatérale, Leg curl unilatéral, Mollets à la presse, Rowing,
+  Développé couché/incliné/militaire. Chaque paire poulie/disque partage `groupe`/`mouvement`/
+  `tendon` avec l'exercice équivalent de `TEMPLATES` (même vocabulaire de tags, pour un futur
+  matching par substitution).
+  **"machine poulie"** = câble tiré via une poulie, pile de poids intégrée. **"machine à
+  disque"** = bras de levier chargé à la main avec des disques de fonte, pas de câble.
+- **Deux exceptions volontaires, pas des oublis** : pas de version disque pour "Tirage
+  vertical" (mécaniquement toujours un câble — pas de fausse alternative inventée) ; pas de
+  version haltères pour les développés couché/incliné/militaire (existent déjà comme
+  exercices prescrits d'Upper A/B — `Développé couché haltères` etc. — un doublon ici
+  fragmenterait l'historique pour rien).
+- **Testé** : le module se charge sans erreur (19 entrées confirmées), build `apps/perso` ET
+  `apps/public` propres (fichier non importé, donc aucun changement de comportement observable
+  — rien à vérifier dans l'aperçu à ce stade).
+- **Non fait à ce stade** : aucune UI de substitution dans le carnet (`apps/perso`) ;
+  périmètre `apps/public` (identité au-delà du nom, si un jour les utilisatrices peuvent
+  créer leurs propres exercices) toujours pas retranché ; d'autres mouvements pourraient
+  rejoindre la bibliothèque au fil de l'eau, pas besoin de tout couvrir d'un coup.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
