@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Scale, Moon, Dumbbell, HeartPulse, Flame, TrendingUp, Footprints,
   Plus, AlertTriangle, CheckCircle2, Circle, Sparkles, Trash2,
   Play, Pause, SkipForward, RotateCcw, Timer, Droplet,
-  ChevronRight, ChevronDown, Zap, Settings, Download, Upload, X, Copy,
+  ChevronRight, ChevronDown, Zap, Settings, Download, Upload, X, Copy, Repeat,
 } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
@@ -20,6 +20,7 @@ import { realDeficit, MIN_WINDOW_DAYS as MIN_TDEE_DAYS } from "@rawcare/core/tde
 import { TEMPLATES, TYPES, DEFAULT_WEIGHTS, HSR_TABLE, hsrForWeek, hsrParse, parseSecs,
          ROUTINES, PERI, BASKET_PROTOCOLS } from "@rawcare/core/session/templates";
 import { refSet, lastPerf, perfHistory, lastExerciseSets, medianTarget } from "@rawcare/core/session/perf";
+import { EXERCISE_LIBRARY } from "@rawcare/core/session/exercises";
 import { recommendSessions } from "@rawcare/core/recommender";
 import { PHASES, phaseTarget as phaseTargetCore, DEFAULT_TARGETS, isCutWindow, targetsForDate,
          kcalFromMacros, kcalOfEntry, tdeeNow, weeklyWeekdayKcalTrend } from "@rawcare/core/targets";
@@ -42,7 +43,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.67.1";
+const APP_VERSION = "3.68.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -729,6 +730,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
     if (savedEx) {
       return { nom: ex.n, mode: ex.mode, perLeg: !!ex.perLeg, opt: !!ex.opt, rest: ex.rest,
         target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${ex.s} × ${ex.r}`, consigne: ex.c, def, last,
+        groupe: ex.groupe, mouvement: ex.mouvement, materiel: ex.materiel, tendon: ex.tendon, famille: ex.famille,
         series: savedEx.series.map((s) => ({ poids: s.poids, val: s.val, fait: s.fait, leg: s.leg })) };
     }
 
@@ -749,13 +751,18 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
       ? [...Array(nSeries)].map((_, k) => mk("G", k)).concat([...Array(nSeries)].map((_, k) => mk("D", k)))
       : [...Array(nSeries)].map((_, k) => mk(null, k));
     return { nom: ex.n, mode: ex.mode, perLeg: !!ex.perLeg, opt: !!ex.opt, rest: ex.rest,
-      target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${ex.s} × ${ex.r}`, consigne: ex.c, def, last, series };
+      target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${ex.s} × ${ex.r}`, consigne: ex.c, def, last,
+      groupe: ex.groupe, mouvement: ex.mouvement, materiel: ex.materiel, tendon: ex.tendon, famille: ex.famille, series };
   });
 
   const [start, setStart] = useState(() => initial?.start ?? new Date().toTimeString().slice(0, 5));
   const [exos, setExos] = useState(buildExos);
   const [open, setOpen] = useState(0);
   const [hist, setHist] = useState(null);
+  // Substitution (bibliothèque d'exercices, 01/09/2026) : index de l'exercice dont le
+  // panneau "remplacer" est ouvert, ou null. Purement une affaire de CETTE séance — Upper/
+  // Lower ne sont jamais modifiés, le remplacement se logue sous son propre nom.
+  const [subOpen, setSubOpen] = useState(null);
 
   // ---- timer (repos + maintien) ----
   const [tSecs, setTSecs] = useState(120);
@@ -832,6 +839,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
   const openExo = (ei) => {
     const next = open === ei ? -1 : ei;
     setOpen(next);
+    setSubOpen(null);
     if (next !== -1 && next !== open) setTimer(lastTimerByExo[next] ?? exos[next].rest);
   };
 
@@ -849,6 +857,35 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
     return { ...e, series: [...e.series, { poids: proto.poids ?? "", val: proto.val ?? medianTarget(e.target), fait: false, leg }] };
   }));
   const rmSet = (ei, si) => setExos((p) => p.map((e, i) => i !== ei ? e : { ...e, series: e.series.filter((_, j) => j !== si) }));
+
+  // Substitue un exercice par une alternative de la bibliothèque (même groupe/mouvement,
+  // donc même sollicitation tendon — voir CLAUDE.md). Le NOM/materiel/tendon/consigne
+  // viennent de l'alternative choisie, mais le PROTOCOLE (mode/perLeg/opt/rest/nombre de
+  // séries/cible HSR) reste celui prescrit par le gabarit : changer de machine ne doit
+  // jamais changer le tempo ni le nombre de séries d'un exercice HSR. Nouvelle recherche
+  // d'historique/poids par défaut sous le nouveau nom — série toutes remises à zéro (les
+  // valeurs cochées de l'ancien exercice n'ont aucun sens sous le nouveau nom).
+  const substitute = (ei, lib) => {
+    setExos((p) => p.map((e, i) => {
+      if (i !== ei) return e;
+      const last = lastPerf(training, lib.n);
+      const lastSets = lastExerciseSets(training, lib.n);
+      const def = DEFAULT_WEIGHTS[lib.n];
+      const medVal = medianTarget(e.target);
+      const nSeries = e.perLeg ? e.series.filter((s) => s.leg === "G").length : e.series.length;
+      const mk = (leg, k) => {
+        const pool = lastSets ? (leg == null ? lastSets : lastSets.filter((s) => s.leg === leg)) : null;
+        const prev = pool?.[k] || null;
+        return { poids: prev?.poids ?? last?.poids ?? def ?? "", val: prev?.val ?? (medVal === "" ? "" : medVal), fait: false, leg };
+      };
+      const series = e.perLeg
+        ? [...Array(nSeries)].map((_, k) => mk("G", k)).concat([...Array(nSeries)].map((_, k) => mk("D", k)))
+        : [...Array(nSeries)].map((_, k) => mk(null, k));
+      return { ...e, nom: lib.n, consigne: lib.c, groupe: lib.groupe, mouvement: lib.mouvement,
+        materiel: lib.materiel, tendon: lib.tendon, famille: lib.famille, def, last, series };
+    }));
+    setSubOpen(null);
+  };
 
   const validate = () => {
     onSave({
@@ -977,6 +1014,36 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
                     ★ record : {setLabel(refRecords[e.nom], e.mode)}
                   </Body>
                 )}
+
+                {/* Substitution (bibliothèque d'exercices, 01/09/2026) : "cette machine est
+                    prise, ou j'ai envie de varier" — cette séance seulement, jamais le
+                    gabarit. Candidats = même `famille` (mouvement précis, équipement
+                    différent) — PAS groupe/mouvement seuls : bug trouvé au test, "Presse à
+                    cuisses" et "Iso leg extension" partagent groupe+mouvement mais sont des
+                    exercices mécaniquement différents. Invisible si aucun candidat. */}
+                {(() => {
+                  const candidates = e.famille
+                    ? EXERCISE_LIBRARY.filter((l) => l.famille === e.famille && l.n !== e.nom)
+                    : [];
+                  if (!candidates.length) return null;
+                  return subOpen === ei ? (
+                    <div style={{ marginTop: 8, background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: 10 }}>
+                      <Label style={{ marginBottom: 6 }}>Remplacer par</Label>
+                      {candidates.map((c) => (
+                        <div key={c.n} onClick={() => substitute(ei, c)} style={{ padding: "7px 2px", borderBottom: `1px solid ${C.divider}`, cursor: "pointer" }}>
+                          <div style={{ fontSize: 12, color: C.text, fontWeight: 600 }}>{c.n}</div>
+                          {c.c && <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{c.c}</div>}
+                        </div>
+                      ))}
+                      <Btn variant="ghost" onClick={() => setSubOpen(null)} style={{ width: "100%", marginTop: 8, padding: "6px 0", fontSize: 10.5 }}>Annuler</Btn>
+                    </div>
+                  ) : (
+                    <div onClick={() => setSubOpen(ei)} style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 8, cursor: "pointer" }}>
+                      <Repeat size={11} color={C.muted} />
+                      <span style={{ fontSize: 10.5, color: C.muted, textDecoration: "underline" }}>Remplacer cet exercice</span>
+                    </div>
+                  );
+                })()}
 
                 <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 7, fontSize: 9,
                   color: C.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: "10px 0 6px", fontWeight: 700 }}>

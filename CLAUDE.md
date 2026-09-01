@@ -2481,12 +2481,51 @@ sécurité, pire que rien. Décision : bibliothèque construite à la main, mêm
 - **Testé** : le module se charge sans erreur (19 entrées confirmées), build `apps/perso` ET
   `apps/public` propres (fichier non importé, donc aucun changement de comportement observable
   — rien à vérifier dans l'aperçu à ce stade).
-- **Non fait à ce stade** : aucune UI de substitution dans le carnet (`apps/perso`) ;
-  périmètre `apps/public` (identité au-delà du nom, si un jour les utilisatrices peuvent
-  créer leurs propres exercices) toujours pas retranché ; d'autres mouvements pourraient
-  rejoindre la bibliothèque au fil de l'eau, pas besoin de tout couvrir d'un coup.
+- **Non fait à ce stade** : périmètre `apps/public` (identité au-delà du nom, si un jour les
+  utilisatrices peuvent créer leurs propres exercices) toujours pas retranché ; d'autres
+  mouvements pourraient rejoindre la bibliothèque au fil de l'eau, pas besoin de tout
+  couvrir d'un coup. **UI de substitution livrée au lot suivant, voir plus bas.**
 
-## Règles absolues à ne jamais casser
+## Chantier RawCare — Bibliothèque d'exercices, deuxième lot : substitution (01/09/2026)
+
+Branche le premier lot (`EXERCISE_LIBRARY`) à une vraie UI dans le carnet `apps/perso` —
+"cette machine est prise, ou j'ai envie de varier", la demande d'origine.
+
+- **Bouton "Remplacer cet exercice"** (`MuscuLogger`, App.jsx) : visible sur un exercice
+  ouvert dès qu'au moins un candidat existe dans `EXERCISE_LIBRARY`. Ouvre un panneau inline
+  listant les candidats, tap = substitution immédiate. **Portée : cette séance uniquement**,
+  jamais le gabarit — Upper/Lower ne changent jamais, le remplacement se logue sous son
+  propre nom (nouvel historique, `lastPerf`/`def` recherchés sous la nouvelle identité).
+  Le **protocole reste celui prescrit** : `mode`/`perLeg`/`opt`/`rest`/nombre de séries/cible
+  HSR viennent de l'exercice d'ORIGINE (le gabarit), jamais de la bibliothèque — changer de
+  machine ne doit jamais changer le tempo ni le nombre de séries d'un exercice HSR. Seuls
+  `nom`/`consigne`/`materiel`/`tendon`/`groupe`/`mouvement`/`famille` viennent de
+  l'alternative choisie. Séries remises à zéro (celles de l'ancien exercice n'ont aucun sens
+  sous le nouveau nom). Pas de poids par défaut fabriqué pour un exercice jamais utilisé :
+  champ vide plutôt qu'un nombre inventé (même principe que partout ailleurs dans l'app).
+- **Bug trouvé au test, corrigé avant de livrer** : le premier lot filtrait les candidats par
+  `groupe`+`mouvement` — trop large. "Presse à cuisses" et "Iso leg extension" partagent les
+  deux (`quadriceps`/`genou`) mais sont des exercices mécaniquement différents (poussée
+  composée vs isolation) ; le filtre les proposait l'un pour l'autre. **Nouveau tag
+  `famille`** (ex. `"presse-cuisses"`, `"leg-extension-unilaterale"`) posé à la fois sur
+  `EXERCISE_LIBRARY` et sur les 13 exercices concernés de `TEMPLATES` (17 occurrences, la
+  plupart dupliquées entre Lower A/B/C) — identifie le mouvement précis, substituable
+  seulement à équipement différent. Purement additif sur `TEMPLATES` (nouveau champ,
+  `n`/`s`/`r`/tout le reste inchangé) : aucun risque, aucune migration.
+- **Testé dans l'aperçu** : "Presse à cuisses" ne propose plus que ses deux variantes
+  poulie/disque (plus de contamination croisée avec Iso leg extension/Leg extension
+  unilatérale) ; substitution réelle sur "Leg extension unilatérale" → "Leg extension
+  unilatérale (poulie)" confirmée (3×8-10 conservé, "première fois" correct, consigne
+  reprise) ; aucune erreur console. Séance de test annulée, rien sauvegardé. Build
+  `apps/perso` ET `apps/public` propres.
+- **Non fait à ce stade** : le bouton n'apparaît que pour les 13 exercices déjà taggés
+  `famille` (ceux qui ont un pendant dans `EXERCISE_LIBRARY`) — les autres (Hip thrust, RDL,
+  travail de core, curls...) n'ont simplement pas de bouton, comportement honnête plutôt
+  qu'une liste vide affichée pour rien. La bibliothèque continuera de grandir au fil de
+  l'eau (lot 1) ; la question apps/public (identité au-delà du nom si un jour les
+  utilisatrices créent leurs propres exercices) reste ouverte, non retranchée.
+
+## Chantier RawCare — Bibliothèque d'exercices, premier lot (01/09/2026)
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
    `trainingLog`, `kneeLog`, `elbowLog`, `macroLog`, `noteLog`, `stepsLog`, `targets`,
