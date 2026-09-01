@@ -1743,7 +1743,7 @@ function PerformanceTab({ macros, targets, training, weight }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader title="Performance" />
+      <ScreenHeader title="TDEE" />
 
       {/* Moyenne hebdo kcal, lundi-vendredi seulement */}
       <Card>
@@ -2395,7 +2395,7 @@ export default function App({ silent = false } = {}) {
     { key: "steps", label: "Pas", icon: Footprints },
     { key: "train", label: "Séances", icon: Dumbbell },
     { key: "pain", label: "Douleurs", icon: HeartPulse },
-    { key: "perf", label: "Performance", icon: TrendingUp },
+    { key: "perf", label: "TDEE", icon: TrendingUp },
     { key: "macro", label: "Macro", icon: Flame },
   ];
 

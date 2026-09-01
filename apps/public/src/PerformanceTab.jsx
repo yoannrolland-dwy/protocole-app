@@ -81,7 +81,7 @@ export default function PerformanceTab({ data, update, error: loadError }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader title="Performance" />
+      <ScreenHeader title="TDEE" />
 
       {loadError && <p style={{ color: C.danger, fontSize: 12 }}>{loadError}</p>}
 

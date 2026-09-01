@@ -462,7 +462,7 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
       {dayEntries.length === 0 && <Empty>Aucun aliment enregistré ce jour.</Empty>}
 
       <Body style={{ fontSize: 10, color: C.dim, textAlign: "center", padding: "4px 0 2px" }}>
-        Calories et macros alimentent aussi la dépense estimée de l'onglet Performance
+        Calories et macros alimentent aussi la dépense estimée de l'onglet TDEE
         (Health Connect côté nutrition reste coupé depuis la bascule M6).
       </Body>
 

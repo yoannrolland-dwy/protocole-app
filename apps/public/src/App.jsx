@@ -27,7 +27,7 @@ const TABS = [
   { key: "steps", label: "Pas" },
   { key: "sessions", label: "Séances" },
   { key: "pain", label: "Douleurs" },
-  { key: "perf", label: "Performance" },
+  { key: "perf", label: "TDEE" },
   { key: "macro", label: "Macro" },
 ];
 
