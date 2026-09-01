@@ -2525,6 +2525,31 @@ Branche le premier lot (`EXERCISE_LIBRARY`) à une vraie UI dans le carnet `apps
   l'eau (lot 1) ; la question apps/public (identité au-delà du nom si un jour les
   utilisatrices créent leurs propres exercices) reste ouverte, non retranchée.
 
+### Correctif same-day : substitution perdue à la réouverture d'une séance (01/09/2026)
+
+Trouvé par Yoann en testant après livraison, pas au premier tour de tests : rouvrir en
+modification une séance contenant un exercice substitué le réaffichait sous son nom
+D'ORIGINE (poids par défaut, aucun historique) au lieu du nom substitué avec ses vraies
+valeurs sauvegardées — enregistrer les modifications à ce moment-là aurait donc écrasé les
+séries loguées sous le nom substitué.
+
+- **Cause** : `buildExos` retrouvait une séance déjà enregistrée en cherchant
+  `initial.exercices.find(e => e.nom === ex.n)` — `ex.n` est le nom du gabarit (« Leg
+  extension unilatérale »), mais l'entrée sauvegardée porte le nom SUBSTITUÉ (« Leg extension
+  unilatérale (poulie) ») : le match échouait silencieusement, sans erreur visible.
+- **Fix** : nouveau champ `origine` sur l'entrée sauvegardée (posé par `substitute()`, jamais
+  écrasé par une substitution suivante — garde le nom du gabarit, pas le remplacement
+  précédent) et persisté par `validate()`. `buildExos` matche désormais par
+  `e.nom === ex.n || e.origine === ex.n`, et si l'entrée retrouvée est bien substituée,
+  recalcule `consigne`/`groupe`/`mouvement`/`materiel`/`tendon`/`last`/`def` sous le nom
+  substitué (pas celui du gabarit) en recherchant l'entrée correspondante dans
+  `EXERCISE_LIBRARY`.
+- **Testé dans l'aperçu, bout en bout** : substitution "Leg extension unilatérale" →
+  "(disque)", 35 kg × 9 coché, séance validée, **réouverte en modification** — confirmée
+  rechargée sous "Leg extension unilatérale (disque)" avec "dernière fois : 35 kg × 9 · 1
+  série ✓" (pas un retour au gabarit d'origine). Aucune erreur console. Séance de test
+  annulée puis supprimée après vérification, rien de réel affecté. Build `apps/perso` propre.
+
 ## Chantier RawCare — Bibliothèque d'exercices, premier lot (01/09/2026)
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,

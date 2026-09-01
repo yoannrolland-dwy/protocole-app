@@ -43,7 +43,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.68.0";
+const APP_VERSION = "3.68.1";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -725,12 +725,23 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
 
     // Édition d'une séance déjà enregistrée : on réaffiche les séries telles
     // qu'elles ont été sauvegardées (valeurs réelles), pas des suggestions
-    // basées sur l'historique.
-    const savedEx = initial?.exercices?.find((e) => e.nom === ex.n);
+    // basées sur l'historique. Un exercice substitué (bibliothèque, 01/09/2026) est
+    // enregistré sous un AUTRE nom que celui du gabarit — sans `origine`, ce match par
+    // nom échouait silencieusement et la substitution disparaissait à la réouverture
+    // (bug trouvé et corrigé le 01/09/2026). `e.origine` porte le nom d'origine du
+    // gabarit posé par `substitute()` au moment de la sauvegarde.
+    const savedEx = initial?.exercices?.find((e) => e.nom === ex.n || e.origine === ex.n);
     if (savedEx) {
-      return { nom: ex.n, mode: ex.mode, perLeg: !!ex.perLeg, opt: !!ex.opt, rest: ex.rest,
-        target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${ex.s} × ${ex.r}`, consigne: ex.c, def, last,
-        groupe: ex.groupe, mouvement: ex.mouvement, materiel: ex.materiel, tendon: ex.tendon, famille: ex.famille,
+      const wasSubstituted = savedEx.nom !== ex.n;
+      const lib = wasSubstituted ? EXERCISE_LIBRARY.find((l) => l.n === savedEx.nom) : null;
+      const savedLast = wasSubstituted ? lastPerf(training, savedEx.nom) : last;
+      const savedDef = wasSubstituted ? DEFAULT_WEIGHTS[savedEx.nom] : def;
+      return { nom: savedEx.nom, mode: savedEx.mode ?? ex.mode, perLeg: !!savedEx.perLeg, opt: !!ex.opt, rest: ex.rest,
+        target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${ex.s} × ${ex.r}`,
+        consigne: lib ? lib.c : ex.c, def: savedDef, last: savedLast,
+        groupe: lib ? lib.groupe : ex.groupe, mouvement: lib ? lib.mouvement : ex.mouvement,
+        materiel: lib ? lib.materiel : ex.materiel, tendon: lib ? lib.tendon : ex.tendon,
+        famille: ex.famille, origine: wasSubstituted ? ex.n : undefined,
         series: savedEx.series.map((s) => ({ poids: s.poids, val: s.val, fait: s.fait, leg: s.leg })) };
     }
 
@@ -881,8 +892,12 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
       const series = e.perLeg
         ? [...Array(nSeries)].map((_, k) => mk("G", k)).concat([...Array(nSeries)].map((_, k) => mk("D", k)))
         : [...Array(nSeries)].map((_, k) => mk(null, k));
+      // `origine` garde le nom du gabarit d'ORIGINE (pas le précédent remplacement) à
+      // travers plusieurs substitutions successives — c'est lui qui permet de
+      // retrouver le bon exercice à la réouverture de la séance (voir buildExos).
       return { ...e, nom: lib.n, consigne: lib.c, groupe: lib.groupe, mouvement: lib.mouvement,
-        materiel: lib.materiel, tendon: lib.tendon, famille: lib.famille, def, last, series };
+        materiel: lib.materiel, tendon: lib.tendon, famille: lib.famille, def, last, series,
+        origine: e.origine ?? e.nom };
     }));
     setSubOpen(null);
   };
@@ -892,7 +907,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
       id: initial?.id ?? `${date}-${type}-${Date.now()}`,
       date, type, start,
       exercices: exos.map((e) => ({
-        nom: e.nom, mode: e.mode, perLeg: e.perLeg,
+        nom: e.nom, mode: e.mode, perLeg: e.perLeg, origine: e.origine,
         series: e.series
           .filter((s) => s.poids !== "" || s.val !== "" || s.fait)
           .map((s) => ({ poids: s.poids === "" ? 0 : +s.poids, val: s.val === "" ? 0 : +s.val, fait: s.fait, leg: s.leg })),
