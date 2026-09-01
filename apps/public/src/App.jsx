@@ -10,7 +10,7 @@ import SleepTab from "./SleepTab.jsx";
 import StepsTab from "./StepsTab.jsx";
 import SessionsTab from "./SessionsTab.jsx";
 import PainTab from "./PainTab.jsx";
-import MacroTab from "./MacroTab.jsx";
+import PerformanceTab from "./PerformanceTab.jsx";
 import NutritionTab from "./nutrition/NutritionTab.jsx";
 import Onboarding from "./Onboarding.jsx";
 import { C } from "./ui.jsx";
@@ -27,8 +27,8 @@ const TABS = [
   { key: "steps", label: "Pas" },
   { key: "sessions", label: "Séances" },
   { key: "pain", label: "Douleurs" },
-  { key: "macros", label: "Macros" },
-  { key: "food", label: "Repas" },
+  { key: "perf", label: "Performance" },
+  { key: "macro", label: "Macro" },
 ];
 
 export default function App() {
@@ -121,8 +121,8 @@ function Authenticated({ session }) {
           <SessionsTab data={data} update={update} error={error} />
         ) : tab === "pain" ? (
           <PainTab data={data} update={update} error={error} />
-        ) : tab === "macros" ? (
-          <MacroTab data={data} update={update} error={error} />
+        ) : tab === "perf" ? (
+          <PerformanceTab data={data} update={update} error={error} />
         ) : (
           <NutritionTab data={data} update={update} error={error} />
         )}

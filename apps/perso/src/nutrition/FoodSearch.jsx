@@ -12,7 +12,7 @@
 // secondes d'utilisation normale.
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Search, X, ChevronLeft, Star, PencilLine, Trash2, ScanBarcode, ChefHat, Utensils, Camera, Plus } from "lucide-react";
+import { Search, X, ChevronLeft, Star, PencilLine, Trash2, ScanBarcode, ChefHat, Utensils, Camera, Plus, Check } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { C, Btn, Label, Body, Empty, Stepper, TextInput, inputStyle } from "../ui.jsx";
 import { searchCiqual, normalize, getCiqual } from "@rawcare/core/nutrition/ciqual";
@@ -117,7 +117,29 @@ function KcalPreview({ per100, q }) {
 // Un badge honnête plutôt que de faire passer une donnée manquante pour un vrai zéro.
 const missingCount = (food) => MACROS.filter((m) => food.per100[m] === null || food.per100[m] === undefined).length;
 
-function Row({ food, onClick, pinned, onPin, onRemove, onEdit }) {
+// Ajout à la volée (01/09/2026) : sur "Vos aliments habituels", un + ajoute directement à
+// la dernière quantité utilisée (f.lastQ, toujours renseigné pour un aliment déjà loggé —
+// voir suggestions() dans foodStore ; 100 g de repli pour un favori jamais encore logué),
+// sans ouvrir le détail ni fermer le tiroir de recherche — le but est d'enchaîner plusieurs
+// ajouts sans revenir à l'écran précédent à chaque fois. Retour visuel bref (coche) le temps
+// qu'il n'y a pas de navigation pour confirmer l'action autrement.
+function QuickAddButton({ onAdd }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); if (done) return; onAdd(); setDone(true); setTimeout(() => setDone(false), 900); }}
+      style={{
+        background: done ? "transparent" : C.card, border: `1.5px solid ${done ? C.accent : C.border}`,
+        borderRadius: 6, padding: 6, cursor: done ? "default" : "pointer",
+        color: done ? C.accent : C.accent, display: "flex", alignItems: "center", flexShrink: 0,
+      }}
+    >
+      {done ? <Check size={14} /> : <Plus size={14} />}
+    </button>
+  );
+}
+
+function Row({ food, onClick, pinned, onPin, onRemove, onEdit, onQuickAdd }) {
   const incomplete = food.ref.startsWith("off:") && missingCount(food) > 0;
   return (
     <div style={{
@@ -166,6 +188,7 @@ function Row({ food, onClick, pinned, onPin, onRemove, onEdit }) {
           <Trash2 size={14} />
         </button>
       )}
+      {onQuickAdd && <QuickAddButton onAdd={onQuickAdd} />}
     </div>
   );
 }
@@ -212,11 +235,14 @@ function FreeEntry({ onAdd, onBack, backLabel = "Saisie libre" }) {
         <Label>Calories calculées</Label>
         <span style={{ fontFamily: C.mono, fontSize: 20, fontWeight: 800, color: C.accent }}>{kcal}</span>
       </div>
-      <Btn variant="primary" disabled={!ok} onClick={() => onAdd({
-        ref: newQuickRef(),
-        name: name.trim() || "Ajout rapide",
-        per100: { kcal, prot: num(m.prot), gluc: num(m.gluc), lip: num(m.lip), fib: num(m.fib) },
-      }, 100)}>Ajouter</Btn>
+      <Btn variant="primary" disabled={!ok} onClick={() => {
+        onAdd({
+          ref: newQuickRef(),
+          name: name.trim() || "Ajout rapide",
+          per100: { kcal, prot: num(m.prot), gluc: num(m.gluc), lip: num(m.lip), fib: num(m.fib) },
+        }, 100);
+        onBack();
+      }}>Ajouter</Btn>
     </div>
   );
 }
@@ -524,7 +550,7 @@ function QtyPanel({ food, initialQ, portions, onSavePortion, onRemovePortion, on
         }}>Corriger les valeurs de cet aliment{anyFixed ? " (déjà corrigé)" : ""}</button>
       ))}
 
-      <Btn variant="primary" onClick={() => onAdd(food, q)}>Ajouter</Btn>
+      <Btn variant="primary" onClick={() => { onAdd(food, q); onBack(); }}>Ajouter</Btn>
     </div>
   );
 }
@@ -758,7 +784,8 @@ export default function FoodSearch({
                 <Row key={f.ref + f.name} food={f} pinned={f.pinned}
                   onClick={() => setSel(f)}
                   onPin={showSugg ? () => onTogglePin(f.ref) : undefined}
-                  onRemove={showSugg ? () => onMute(f.ref) : undefined} />
+                  onRemove={showSugg ? () => onMute(f.ref) : undefined}
+                  onQuickAdd={showSugg ? () => onAdd(f, f.lastQ ?? f.defaultQ ?? 100) : undefined} />
               ))
             )}
 

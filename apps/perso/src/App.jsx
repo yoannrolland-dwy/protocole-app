@@ -4,7 +4,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Cell,
 } from "recharts";
 import {
-  LayoutDashboard, Scale, Moon, Dumbbell, HeartPulse, Utensils, Footprints, Apple,
+  LayoutDashboard, Scale, Moon, Dumbbell, HeartPulse, Flame, TrendingUp, Footprints,
   Plus, AlertTriangle, CheckCircle2, Circle, Sparkles, Trash2,
   Play, Pause, SkipForward, RotateCcw, Timer, Droplet,
   ChevronRight, ChevronDown, Zap, Settings, Download, Upload, X, Copy,
@@ -22,7 +22,7 @@ import { TEMPLATES, TYPES, DEFAULT_WEIGHTS, HSR_TABLE, hsrForWeek, hsrParse, par
 import { refSet, lastPerf, perfHistory, lastExerciseSets, medianTarget } from "@rawcare/core/session/perf";
 import { recommendSessions } from "@rawcare/core/recommender";
 import { PHASES, phaseTarget as phaseTargetCore, DEFAULT_TARGETS, isCutWindow, targetsForDate,
-         kcalFromMacros, kcalOfEntry, tdeeNow } from "@rawcare/core/targets";
+         kcalFromMacros, kcalOfEntry, tdeeNow, weeklyWeekdayKcalTrend } from "@rawcare/core/targets";
 import { buildCoachPrompt, buildCoachBriefing, splitCarnet, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
@@ -42,7 +42,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.65.0";
+const APP_VERSION = "3.66.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -1720,171 +1720,64 @@ function TdeeCard({ result, deficitReel }) {
 }
 
 /* ============================================================
-   TAB — MACROS
+   TAB — PERFORMANCE
    ============================================================ */
-function MacroTab({ macros, targets, save, training, weight }) {
-  const [date, setDate] = useState(today());
-  const at = targetsForDate(date, targets);
-  const cur = macros.find((m) => m.date === date) || {};
-  // Sur l'app native, un jour sans entrée signifie "pas encore synchronisé", pas "cible
-  // atteinte" — démarrer les compteurs à la cible y afficherait une journée à 100% qui n'a
-  // pourtant aucune donnée réelle. Sur la PWA (saisie 100% manuelle), la cible reste un
-  // point de départ pratique pour ne pas taper depuis zéro.
-  const emptyMacro = (v) => (Capacitor.isNativePlatform() ? 0 : v);
-  const [p, setP] = useState(cur.protein ?? emptyMacro(at.protein));
-  const [c, setC] = useState(cur.carbs ?? emptyMacro(at.carbs));
-  const [f, setF] = useState(cur.fat ?? emptyMacro(at.fat));
-  const [fib, setFib] = useState(cur.fiber ?? emptyMacro(at.fiber));
+function PerformanceTab({ macros, targets, training, weight }) {
   const [showPeri, setShowPeri] = useState(false);
   const [basketProto, setBasketProto] = useState("soir21h");
-  const [forceManual, setForceManual] = useState(false);
-  const water = cur.water ?? 0;
-  const basketDay = training.some((t) => t.type === "Basket" && t.date === date);
-  const waterTgt = targets.water + (basketDay ? 1000 : 0);
-  // "foodlog" (bascule M6) : ce jour vient du journal de l'onglet Repas, comme
-  // "healthconnect" venait de Health Connect — même traitement lecture seule.
-  const fromFoodLog = cur.source === "foodlog";
-  const isSynced = (cur.source === "healthconnect" || fromFoodLog) && !forceManual;
-  const pickDate = (d) => {
-    setDate(d);
-    const atd = targetsForDate(d, targets);
-    const e = macros.find((m) => m.date === d);
-    setP(e?.protein ?? emptyMacro(atd.protein)); setC(e?.carbs ?? emptyMacro(atd.carbs));
-    setF(e?.fat ?? emptyMacro(atd.fat)); setFib(e?.fiber ?? emptyMacro(atd.fiber));
-    setForceManual(false);
-  };
-  // Vraie valeur mesurée (jour alimenté par foodLog) si elle existe, sinon estimation à
-  // partir des macros affichées — jamais la resommer en 4/4/9 quand la vraie valeur est là,
-  // pour que ce chiffre ne diverge jamais de celui de l'onglet Repas (05/08/2026).
-  const kcal = cur.kcal ?? kcalFromMacros(p, c, f, fib);
-  const saveMacros = () => save.macros(upsert(macros, { date, protein: round(p), carbs: round(c), fat: round(f), fiber: round(fib), water, source: "manual" }));
-  const addWater = (ml) => {
-    const next = Math.max(0, (macros.find((m) => m.date === date)?.water ?? 0) + ml);
-    save.macros(upsert(macros, { date, water: next, source: "manual" }));
-  };
-  const kcalTrend = lastN(macros, 14).map((m) => ({
-    date: fmt(m.date),
-    kcal: Math.round(kcalOfEntry(m)),
-  }));
-  const kcalTarget = Math.round(kcalFromMacros(at.protein, at.carbs, at.fat, at.fiber));
-  const kcalPct = Math.min(100, (kcal / kcalTarget) * 100);
 
   // Dépense énergétique adaptative (V7). Calculée à chaque montage de l'onglet — le journal
   // Repas et ses corrections vivent dans un autre onglet (un seul monté à la fois), donc un
   // remount suffit à rester à jour, sans mémoïsation ni dépendance fragile sur `foodLog`.
-  // Toujours ancrée sur AUJOURD'HUI (l'estimation porte sur la dépense réelle actuelle),
-  // jamais sur la date parcourue dans le sélecteur ci-dessous.
+  // Toujours ancrée sur AUJOURD'HUI (l'estimation porte sur la dépense réelle actuelle).
   const tdeeToday = tdeeNow({ foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}), macros, weight, targets });
   const atToday = targetsForDate(today(), targets);
   const kcalTargetToday = Math.round(kcalFromMacros(atToday.protein, atToday.carbs, atToday.fat, atToday.fiber));
   const deficitReel = tdeeToday.status === "ok" ? realDeficit(kcalTargetToday, tdeeToday.tdee) : null;
 
+  // Moyenne hebdomadaire lundi-vendredi (revue du 01/09/2026) : remplace l'ancien graphique
+  // 14 jours quotidien, redondant avec l'onglet Macro — l'idée est de suivre la semaine de
+  // travail sans que les cheat days du week-end ne viennent la lisser.
+  const weeklyTrend = weeklyWeekdayKcalTrend(macros, { weeks: 8 }).map((w) => ({ ...w, label: fmt(w.weekStart) }));
+  const weeksWithData = weeklyTrend.filter((w) => w.days > 0);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader title="Macros" subtitle={date === today() ? "aujourd'hui" : fmt(date)} />
+      <ScreenHeader title="Performance" />
 
-      {/* Calories + Eau — héros côte à côte */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <Card style={{ padding: 14 }}>
-          <Label style={{ fontSize: 10, letterSpacing: 1.5 }}>Calories</Label>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 4, margin: "6px 0 8px" }}>
-            <span style={{ fontFamily: C.mono, fontSize: 26, fontWeight: 800, color: C.text }}>{Math.round(kcal)}</span>
-            <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>/{kcalTarget}</span>
-          </div>
-          <div style={{ background: C.bg, borderRadius: 6, height: 8, overflow: "hidden" }}>
-            <div style={{ background: C.accent, width: `${kcalPct}%`, height: "100%" }} />
-          </div>
-        </Card>
-        <Card style={{ padding: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <Droplet size={12} color={C.accent} />
-            <Label style={{ fontSize: 10 }}>Eau</Label>
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 4, margin: "6px 0 8px" }}>
-            <span style={{ fontFamily: C.mono, fontSize: 26, fontWeight: 800, color: C.text }}>{(water / 1000).toFixed(2)}</span>
-            <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>/{(waterTgt / 1000).toFixed(1)} L</span>
-          </div>
-          <div style={{ background: C.bg, borderRadius: 6, height: 8, overflow: "hidden" }}>
-            <div style={{ background: C.accent, width: `${Math.min(100, (water / waterTgt) * 100)}%`, height: "100%" }} />
-          </div>
-          {basketDay && <span style={{ display: "inline-block", fontSize: 8.5, color: "#000", background: C.accent, padding: "2px 5px", borderRadius: 4, fontWeight: 800, marginTop: 6 }}>+1 L BASKET</span>}
-        </Card>
-      </div>
-
-      {/* Protéines / glucides / lipides / fibres */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        {[{ l: "Protéines", v: p, t: at.protein }, { l: "Glucides", v: c, t: at.carbs }, { l: "Lipides", v: f, t: at.fat }, { l: "Fibres", v: fib, t: at.fiber }].map((x) => (
-          <div key={x.l} style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
-            <Label>{x.l}</Label>
-            <div style={{ fontFamily: C.mono, fontSize: 18, fontWeight: 800, color: C.text, marginTop: 3 }}>{x.v}g</div>
-            <div style={{ fontSize: 9.5, color: C.dim, marginTop: 1, fontFamily: C.mono }}>/ {x.t}g</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Tendance calories — remontée à la place de l'ancienne tuile Eau */}
+      {/* Moyenne hebdo kcal, lundi-vendredi seulement */}
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-          <Label>Calories · 14 jours</Label>
-          <span style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono }}>cible ~{kcalTarget} kcal</span>
+          <Label>Moyenne kcal · lun-ven</Label>
+          <span style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono }}>cible ~{kcalTargetToday} kcal</span>
         </div>
-        {kcalTrend.length ? (
+        {weeksWithData.length ? (
           <div style={{ height: 130 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={kcalTrend} margin={{ top: 4, right: 4, left: -22, bottom: 0 }}>
+              <BarChart data={weeklyTrend} margin={{ top: 4, right: 4, left: -22, bottom: 0 }}>
                 <CartesianGrid stroke={C.divider} vertical={false} />
-                <XAxis dataKey="date" tick={chartAxis} interval="preserveEnd" />
+                <XAxis dataKey="label" tick={chartAxis} interval="preserveEnd" />
                 <YAxis tick={chartAxis} />
-                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle} />
-                <ReferenceLine y={kcalTarget} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
-                <Bar dataKey="kcal" radius={[3, 3, 0, 0]}>
-                  {kcalTrend.map((d, i) => <Cell key={i} fill={Math.abs(d.kcal - kcalTarget) <= kcalTarget * 0.1 ? C.accent : C.border} />)}
+                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle}
+                  formatter={(v) => (v == null ? ["—", "kcal"] : [v, "kcal"])} />
+                <ReferenceLine y={kcalTargetToday} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
+                <Bar dataKey="avgKcal" radius={[3, 3, 0, 0]}>
+                  {weeklyTrend.map((d, i) => (
+                    <Cell key={i} fill={d.avgKcal == null ? "transparent" : Math.abs(d.avgKcal - kcalTargetToday) <= kcalTargetToday * 0.1 ? C.accent : C.border} />
+                  ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
         ) : <Empty>Aucune donnée.</Empty>}
+        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
+          Semaine du lundi, moyenne sur les jours ouvrés réellement loggés — le week-end n'est
+          jamais compté dans cette moyenne.
+        </Body>
       </Card>
 
       {/* Dépense énergétique adaptative (V7) */}
       <TdeeCard result={tdeeToday} deficitReel={deficitReel} />
-
-      {/* Saisie */}
-      <Card>
-        <div style={{ marginBottom: 10 }}><DateField value={date} onChange={pickDate} /></div>
-        {isSynced ? (
-          <SyncedBanner
-            label={fromFoodLog ? "Synchronisé depuis l'onglet Repas" : "Synchronisé depuis Health Connect"}
-            onCorrect={fromFoodLog ? undefined : () => setForceManual(true)}
-          />
-        ) : (
-          <>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <Field label="Protéines (g)"><Stepper value={p} set={setP} step={5} int /></Field>
-              <Field label="Glucides (g)"><Stepper value={c} set={setC} step={5} int /></Field>
-              <Field label="Lipides (g)"><Stepper value={f} set={setF} step={5} int /></Field>
-              <Field label="Fibres (g)"><Stepper value={fib} set={setFib} step={1} int /></Field>
-            </div>
-            <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>Tracker les grammes de macros, pas le total kcal de l'app (décalage fibres).</Body>
-            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-              <Btn variant="primary" onClick={saveMacros} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
-              {macros.some((m) => m.date === date) && (
-                <Btn variant="danger" onClick={() => { save.macros(macros.filter((m) => m.date !== date)); setP(emptyMacro(at.protein)); setC(emptyMacro(at.carbs)); setF(emptyMacro(at.fat)); setFib(emptyMacro(at.fiber)); }}>
-                  <Trash2 size={14} />
-                </Btn>
-              )}
-            </div>
-            <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.divider}` }}>
-              <Label style={{ marginBottom: 8 }}>Eau</Label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <Btn variant="plain" onClick={() => addWater(250)} style={{ flex: 1 }}>+250 ml</Btn>
-                <Btn variant="plain" onClick={() => addWater(500)} style={{ flex: 1 }}>+500 ml</Btn>
-                <Btn variant="ghost" onClick={() => addWater(-250)}>−250</Btn>
-              </div>
-            </div>
-          </>
-        )}
-      </Card>
 
       {/* Péri-training */}
       <Card>
@@ -2502,8 +2395,8 @@ export default function App({ silent = false } = {}) {
     { key: "steps", label: "Pas", icon: Footprints },
     { key: "train", label: "Séances", icon: Dumbbell },
     { key: "pain", label: "Douleurs", icon: HeartPulse },
-    { key: "macro", label: "Macros", icon: Utensils },
-    { key: "food", label: "Repas", icon: Apple },
+    { key: "perf", label: "Performance", icon: TrendingUp },
+    { key: "macro", label: "Macro", icon: Flame },
   ];
 
   // Lancé par le bouton Sync du widget (SilentSyncActivity, voir main.jsx) : tous les
@@ -2551,8 +2444,8 @@ export default function App({ silent = false } = {}) {
             {tab === "steps" && <StepsTab {...{ steps, save }} />}
             {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, elbow, scheme }} />}
             {tab === "pain" && <PainTab {...{ knee, elbow, save, hsrWeek }} />}
-            {tab === "macro" && <MacroTab {...{ macros, targets, save, training, weight }} />}
-            {tab === "food" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} apiKey={apiKey} model={model} />}
+            {tab === "perf" && <PerformanceTab {...{ macros, targets, training, weight }} />}
+            {tab === "macro" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} apiKey={apiKey} model={model} />}
           </>
         )}
       </main>

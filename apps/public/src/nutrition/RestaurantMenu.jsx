@@ -27,7 +27,7 @@
 // source parmi d'autres, pas une garantie (voir SYSTEM_PROMPT, tableaux vides si illisible).
 
 import React, { useState, useRef } from "react";
-import { ChevronLeft, Sparkles, Plus, Check, Camera, X, Link } from "lucide-react";
+import { ChevronLeft, Sparkles, Plus, Check, Camera, Image, X, Link } from "lucide-react";
 import { C, Btn, Label, Body, inputStyle } from "../ui.jsx";
 import { callClaude, costCents } from "@rawcare/core/coach/claudeApi";
 import { fileToImagePayload } from "@rawcare/core/nutrition/imageUtils";
@@ -129,6 +129,7 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
   const [photos, setPhotos] = useState([]); // [{id, dataUrl, base64, mediaType}]
   const [photoErr, setPhotoErr] = useState("");
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const [state, setState] = useState("idle"); // idle | loading | done | error
   const [progress, setProgress] = useState("");
   const [err, setErr] = useState("");
@@ -234,7 +235,11 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
           style={{ ...inputStyle(false), fontFamily: "inherit", fontSize: 12, fontWeight: 400, resize: "vertical", width: "100%" }}
         />
 
+        {/* Deux inputs distincts (01/09/2026), voir apps/perso : `multiple` sur l'input
+            galerie fait disparaître l'option caméra du sélecteur système sur beaucoup
+            d'appareils Android. */}
         <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={pickPhotos} style={{ display: "none" }} />
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={pickPhotos} style={{ display: "none" }} />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
           {photos.map((p) => (
             <div key={p.id} style={{ position: "relative", width: 56, height: 56 }}>
@@ -249,12 +254,22 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
             </div>
           ))}
           {photos.length < MAX_PHOTOS && (
-            <button onClick={() => fileInputRef.current?.click()} style={{
-              width: 56, height: 56, borderRadius: 6, border: `1.5px dashed ${C.border}`, background: "transparent",
-              color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <Camera size={18} />
-            </button>
+            <>
+              <button onClick={() => fileInputRef.current?.click()} style={{
+                width: 56, height: 56, borderRadius: 6, border: `1.5px dashed ${C.border}`, background: "transparent",
+                color: C.muted, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3,
+              }}>
+                <Image size={15} />
+                <span style={{ fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.4 }}>Galerie</span>
+              </button>
+              <button onClick={() => cameraInputRef.current?.click()} style={{
+                width: 56, height: 56, borderRadius: 6, border: `1.5px dashed ${C.border}`, background: "transparent",
+                color: C.muted, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3,
+              }}>
+                <Camera size={15} />
+                <span style={{ fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.4 }}>Photo</span>
+              </button>
+            </>
           )}
         </div>
 

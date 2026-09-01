@@ -2336,6 +2336,57 @@ brut, purement informatif.
   Xcode. Risques d'AltStore/SideStore documentés avec Yoann : signature à re-valider tous les
   7 jours, casse possible à chaque mise à jour iOS, Yoann en support technique permanent.
 
+## Chantier RawCare — Refonte Macro/Performance + ajout rapide + galerie/photo (01/09/2026, v3.66.0)
+
+Trois retours d'usage groupés en une session, portés à l'identique sur `apps/perso` et
+`apps/public` (fichiers en miroir, mêmes noms).
+
+- **Ajout à la volée sur "Vos aliments habituels"** (`FoodSearch.jsx`) : bouton `+` par ligne
+  (`QuickAddButton`), ajoute directement à la **dernière quantité utilisée** (`f.lastQ`,
+  toujours renseignée pour un aliment déjà loggé — 100 g de repli sinon) sans ouvrir le détail
+  ni fermer le tiroir de recherche. Retour visuel bref (coche) le temps qu'il n'y a pas de
+  navigation pour confirmer autrement. **Scope volontairement limité aux favoris/habituels**
+  (pas la recherche CIQUAL/OFF) — décision explicite de Yoann.
+  **Changement structurel qui va avec** : "Ajouter" (détail d'un aliment via `QtyPanel`, ou
+  "Saisie libre" via `FreeEntry`) ne ferme plus tout le tiroir — il ramène sur l'écran
+  précédent À L'INTÉRIEUR du tiroir (`onBack()` appelé après `onAdd()`). Seul le bouton "X"
+  referme désormais. `NutritionTab.add()` ne fait plus de `setOpenMeal(null)` lui-même.
+  Corrige au passage un bug latent : "Photo d'un plat" affichait un état "Ajouté ✓" qui ne
+  pouvait jamais s'afficher puisque le tiroir se refermait instantanément avant ce changement.
+- **Choix galerie/appareil photo** (`PhotoDish.jsx`, `RestaurantMenu.jsx`) : deux inputs
+  `<input type="file">` distincts au lieu d'un seul — un input galerie (`multiple`, inchangé)
+  et un nouvel input caméra dédié (`capture="environment"`, un cliché à la fois). Raison :
+  `multiple` fait disparaître l'option caméra du sélecteur système sur beaucoup d'appareils
+  Android — ce n'était pas un choix de widget à faire, c'est une contrainte du sélecteur
+  natif. Solution HTML pure, aucune dépendance native supplémentaire, donc identique sur les
+  deux apps (natif comme web).
+- **"Repas" → "Macro" (icône `Flame`), "Macros" → "Performance" (icône `TrendingUp`)** — les
+  icônes précédentes (couverts/pomme) n'étaient pas appréciées, en plus du renommage demandé.
+  `apps/public` n'a pas d'icônes de nav (barre texte seule) : seuls les libellés changent
+  là-bas. Clés internes renommées en cohérence (`food`→`macro`, `macro`/`macros`→`perf`),
+  aucune clé `localStorage` touchée (les clés de nav ne sont pas persistées).
+  **"Performance" (ex-Macros) vidé de tout ce qui devient redondant avec "Macro" (ex-Repas)** :
+  plus de saisie manuelle de macros, plus de cibles P/G/L/Fib du jour, plus de graphique
+  14 jours quotidien, plus d'eau — tout ça existe déjà dans "Macro" via `foodLog`. Reste
+  seulement : dépense estimée (TDEE, inchangé), fiche péri-training (inchangée), protocole
+  basket (inchangé), et une nouvelle **moyenne kcal lundi-vendredi par semaine** (8 semaines,
+  `weeklyWeekdayKcalTrend` dans `packages/core/src/targets.js`, partagée par les deux apps).
+  Week-ends **volontairement exclus du calcul** (pas juste non affichés) — l'objectif explicite
+  de Yoann est de suivre la semaine de travail sans que les cheat days du week-end ne la
+  lissent. Semaine ancrée sur le lundi, arithmétique locale pure (même famille que
+  `shiftDateKey`), jamais un aller-retour par un instant UTC. Un jour sans apport connu est
+  ignoré plutôt que compté à 0 (`days` compte les jours réellement loggés dans la semaine).
+  `apps/public/src/MacroTab.jsx` supprimé, remplacé par `PerformanceTab.jsx` (même contenu que
+  la version `apps/perso`, signature `{ data, update, error }` au lieu de props directes).
+- **Testé dans l'aperçu (`apps/perso` uniquement)** : ajout d'un aliment via le détail →
+  retour confirmé sur la liste de recherche (pas fermeture du tiroir) ; `+` rapide sur un
+  aliment déjà loggé → re-logué à l'identique (même quantité), tiroir resté ouvert ; onglets
+  Performance et Macro vérifiés (icônes, titres, contenu) ; Galerie/Photo vérifiés sur "Photo
+  d'un plat" ET "Carte resto". **`apps/public` non testé en direct** (pas de session Supabase
+  active dans cette session, pas d'identifiants) — port fichier par fichier en miroir exact de
+  la version `apps/perso` déjà testée, mais un test réel sur `apps/public` reste à faire.
+  Build `apps/perso` ET `apps/public` propres.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,

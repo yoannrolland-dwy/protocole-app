@@ -14,7 +14,7 @@
 // principal levier pour corriger ça ; le system prompt lui donne priorité sur le jugé visuel.
 
 import React, { useState, useRef } from "react";
-import { ChevronLeft, Sparkles, Plus, Camera, X } from "lucide-react";
+import { ChevronLeft, Sparkles, Plus, Camera, Image, X } from "lucide-react";
 import { C, Btn, Label, Body, inputStyle } from "../ui.jsx";
 import { callClaude, costCents } from "@rawcare/core/coach/claudeApi";
 import { fileToImagePayload } from "@rawcare/core/nutrition/imageUtils";
@@ -63,6 +63,7 @@ export default function PhotoDish({ apiKey, model, onAdd, onBack }) {
   const [photos, setPhotos] = useState([]); // [{id, dataUrl, base64, mediaType}]
   const [photoErr, setPhotoErr] = useState("");
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const [note, setNote] = useState("");
   const [state, setState] = useState("idle"); // idle | loading | done | error
   const [progress, setProgress] = useState("");
@@ -142,7 +143,11 @@ export default function PhotoDish({ apiKey, model, onAdd, onBack }) {
 
       <div>
         <Label style={{ marginBottom: 5 }}>Photo de l'assiette</Label>
+        {/* Deux inputs distincts (01/09/2026), voir apps/perso : `multiple` sur l'input
+            galerie fait disparaître l'option caméra du sélecteur système sur beaucoup
+            d'appareils Android. */}
         <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={pickPhotos} style={{ display: "none" }} />
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={pickPhotos} style={{ display: "none" }} />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {photos.map((p) => (
             <div key={p.id} style={{ position: "relative", width: 72, height: 72 }}>
@@ -157,12 +162,22 @@ export default function PhotoDish({ apiKey, model, onAdd, onBack }) {
             </div>
           ))}
           {photos.length < MAX_PHOTOS && (
-            <button onClick={() => fileInputRef.current?.click()} style={{
-              width: 72, height: 72, borderRadius: 6, border: `1.5px dashed ${C.border}`, background: "transparent",
-              color: C.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <Camera size={20} />
-            </button>
+            <>
+              <button onClick={() => fileInputRef.current?.click()} style={{
+                width: 72, height: 72, borderRadius: 6, border: `1.5px dashed ${C.border}`, background: "transparent",
+                color: C.muted, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
+              }}>
+                <Image size={18} />
+                <span style={{ fontSize: 8.5, textTransform: "uppercase", letterSpacing: 0.5 }}>Galerie</span>
+              </button>
+              <button onClick={() => cameraInputRef.current?.click()} style={{
+                width: 72, height: 72, borderRadius: 6, border: `1.5px dashed ${C.border}`, background: "transparent",
+                color: C.muted, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4,
+              }}>
+                <Camera size={18} />
+                <span style={{ fontSize: 8.5, textTransform: "uppercase", letterSpacing: 0.5 }}>Photo</span>
+              </button>
+            </>
           )}
         </div>
         {photoErr && <Body style={{ fontSize: 10, color: C.danger, marginTop: 4 }}>{photoErr}</Body>}

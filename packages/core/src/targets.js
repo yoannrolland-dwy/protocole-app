@@ -49,6 +49,43 @@ export const kcalFromMacros = (p, c, f, fib = 0) => (p ?? 0) * 4 + (c ?? 0) * 4 
 export const kcalOfEntry = (m) => m?.kcal ?? kcalFromMacros(m?.protein, m?.carbs, m?.fat, m?.fiber);
 
 /**
+ * Moyenne des calories du lundi au vendredi, semaine par semaine (onglet Performance,
+ * chantier "révision Macro/Performance" du 01/09/2026). Week-ends exclus volontairement —
+ * l'objectif est de suivre la semaine de travail sans que les cheat days du week-end ne la
+ * lissent, donc un week-end chargé n'affecte jamais cette moyenne.
+ * Semaine ancrée sur le lundi, arithmétique locale pure (mêmes `new Date(y, m-1, d)` que
+ * `shiftDateKey`/`localDateKey`), jamais un aller-retour par un instant UTC. Un jour sans
+ * apport connu est ignoré plutôt que compté à 0 — la moyenne porte sur les jours réellement
+ * loggés (`days`), pour rester honnête sur une semaine partiellement saisie.
+ */
+export function weeklyWeekdayKcalTrend(macros, { weeks = 8, endDate } = {}) {
+  const end = endDate || today();
+  const [ey, em, ed] = end.split("-").map(Number);
+  const endObj = new Date(ey, em - 1, ed);
+  const mondayOffset = (endObj.getDay() + 6) % 7; // lundi=0 ... dimanche=6
+  const thisMonday = new Date(endObj);
+  thisMonday.setDate(endObj.getDate() - mondayOffset);
+
+  const kcalByDate = new Map(macros.map((m) => [m.date, kcalOfEntry(m)]));
+  const dateKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  const out = [];
+  for (let w = weeks - 1; w >= 0; w--) {
+    const monday = new Date(thisMonday);
+    monday.setDate(thisMonday.getDate() - w * 7);
+    let sum = 0, days = 0;
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const key = dateKey(d);
+      if (kcalByDate.has(key)) { sum += kcalByDate.get(key); days++; }
+    }
+    out.push({ weekStart: dateKey(monday), avgKcal: days ? Math.round(sum / days) : null, days });
+  }
+  return out;
+}
+
+/**
  * Dépense énergétique adaptative (V7) — calculée "maintenant", factorisée pour que l'écran
  * Macros et le Coach IA appellent EXACTEMENT le même calcul (jamais deux chiffres
  * différents pour la même réalité). `foodLog`/`overrides` doivent être lus fraîchement par

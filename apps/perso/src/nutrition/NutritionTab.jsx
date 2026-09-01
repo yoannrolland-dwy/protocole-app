@@ -225,10 +225,12 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
     save.macros(upsert(macros, { date, water: next, source: "manual" }));
   };
 
+  // Ne ferme plus le tiroir de recherche (01/09/2026) : "Ajouter" ramène désormais à l'écran
+  // précédent À L'INTÉRIEUR du tiroir (voir QtyPanel/FreeEntry dans FoodSearch.jsx), pour
+  // pouvoir enchaîner plusieurs ajouts sans revenir sur cet onglet à chaque fois. Seul le
+  // bouton "X" (closeSearch) referme le tiroir désormais.
   const add = (f, q) => {
     food.add(makeEntry({ date, meal: openMeal, food: f, q }));
-    setOpenMeal(null);
-    setQuickAdd(false);
   };
 
   // Carte resto : le reste de macros envoyé à l'IA et la date d'enregistrement sont ceux
@@ -323,7 +325,7 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}
       onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <ScreenHeader
-        title="Nutrition"
+        title="Macro"
         subtitle={date === today() ? "aujourd'hui" : fmt(date)}
       />
 
@@ -460,8 +462,8 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
       {dayEntries.length === 0 && <Empty>Aucun aliment enregistré ce jour.</Empty>}
 
       <Body style={{ fontSize: 10, color: C.dim, textAlign: "center", padding: "4px 0 2px" }}>
-        Module interne en test — calories et macros alimentent l'onglet Macros,
-        plus Health Connect côté nutrition (coupé depuis la bascule M6).
+        Calories et macros alimentent aussi la dépense estimée de l'onglet Performance
+        (Health Connect côté nutrition reste coupé depuis la bascule M6).
       </Body>
 
       {openMeal && (

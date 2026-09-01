@@ -190,10 +190,11 @@ export default function NutritionTab({ data, update, error: loadError }) {
     update({ macroLog: upsert(macros, { date, water: next, source: "manual" }) });
   };
 
+  // Ne ferme plus le tiroir de recherche (01/09/2026, port depuis apps/perso) : "Ajouter"
+  // ramène désormais à l'écran précédent À L'INTÉRIEUR du tiroir (voir QtyPanel/FreeEntry
+  // dans FoodSearch.jsx). Seul le bouton "X" (closeSearch) referme le tiroir désormais.
   const add = (f, q) => {
     food.add(makeEntry({ date, meal: openMeal, food: f, q }));
-    setOpenMeal(null);
-    setQuickAdd(false);
   };
 
   // Carte resto : reste de macros du jour AFFICHÉ (`date`), pas forcément aujourd'hui — même
@@ -275,7 +276,7 @@ export default function NutritionTab({ data, update, error: loadError }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}
       onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <ScreenHeader
-        title="Repas"
+        title="Macro"
         subtitle={date === today() ? "aujourd'hui" : fmt(date)}
       />
 
