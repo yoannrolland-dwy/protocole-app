@@ -86,7 +86,7 @@ export const SESSION_TYPES_CATALOG = {
       groupe: "quadriceps", mouvement: "genou", materiel: "barre", tendon: "genou" },
     { n: "Leg extension", s: 3, r: "10-12", rest: 90, mode: "reps", c: "",
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou" },
-    { n: "Leg curl bilatéral", s: 3, r: "10-12", rest: 90, mode: "reps", c: "",
+    { n: "Leg curl unilatéral", s: 3, r: "10-12", rest: 90, mode: "reps", c: "",
       groupe: "ischios", mouvement: "isolation", materiel: "machine", tendon: null },
     { n: "Hip thrust", s: 3, r: "8-10", rest: 120, mode: "reps", c: "genou-safe",
       groupe: "fessiers", mouvement: "hanche", materiel: "machine", tendon: null },

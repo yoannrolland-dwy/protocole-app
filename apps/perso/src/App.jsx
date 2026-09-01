@@ -42,7 +42,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.66.1";
+const APP_VERSION = "3.67.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -1446,7 +1446,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow, scheme }) 
           <span style={{ fontFamily: C.mono, fontSize: 12, color: C.accent, fontWeight: 800 }}>{hsrForWeek(hsrWeek).scheme}</span>
         </div>
         <Stepper value={hsrWeek} set={setHsrWeek} step={1} min={1} max={12} int unit="/12" />
-        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>Pilote presse à cuisses + leg extension en Lower A. Tempo 6 s · repos 2-3 min.</Body>
+        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>Pilote presse à cuisses + leg extension en Lower A et Lower C. Tempo 6 s · repos 2-3 min.</Body>
       </Card>
 
       {/* Historique */}
@@ -1719,12 +1719,37 @@ function TdeeCard({ result, deficitReel }) {
   );
 }
 
+// Planning hebdomadaire idéal (01/09/2026) — affiché à titre de référence dans l'onglet TDEE,
+// jamais lu par le recommandeur ni le Coach IA : c'est un repère pour Yoann, pas une règle
+// appliquée automatiquement. Deux variantes selon qu'il y a match ou non dans la semaine.
+const WEEKLY_PLAN = {
+  sansMatch: [
+    { jour: "Lundi", texte: "Lower A (HSR lourd)" },
+    { jour: "Mardi", texte: "Upper A" },
+    { jour: "Mercredi", texte: "Mobilité (matin) · Basket (soir)" },
+    { jour: "Jeudi", texte: "Repos actif — 10k pas, mobilité douce ; iso genou et/ou escalade légère en option selon ressenti" },
+    { jour: "Vendredi", texte: "Mobilité (matin) · Basket (midi)" },
+    { jour: "Samedi", texte: "Lower B (HSR)" },
+    { jour: "Dimanche", texte: "Upper B" },
+  ],
+  avecMatch: [
+    { jour: "Lundi", texte: "Lower C (HSR lourd)" },
+    { jour: "Mardi", texte: "Upper A" },
+    { jour: "Mercredi", texte: "Mobilité (matin) · Basket (soir)" },
+    { jour: "Jeudi", texte: "Repos actif — même logique que la semaine sans match" },
+    { jour: "Vendredi", texte: "Mobilité (matin) · Basket (midi)" },
+    { jour: "Samedi", texte: "Upper B + routine iso quad autonome" },
+    { jour: "Dimanche", texte: "Match" },
+  ],
+};
+
 /* ============================================================
    TAB — PERFORMANCE
    ============================================================ */
 function PerformanceTab({ macros, targets, training, weight }) {
   const [showPeri, setShowPeri] = useState(false);
   const [basketProto, setBasketProto] = useState("soir21h");
+  const [planVariant, setPlanVariant] = useState("sansMatch");
 
   // Dépense énergétique adaptative (V7). Calculée à chaque montage de l'onglet — le journal
   // Repas et ses corrections vivent dans un autre onglet (un seul monté à la fois), donc un
@@ -1778,6 +1803,23 @@ function PerformanceTab({ macros, targets, training, weight }) {
 
       {/* Dépense énergétique adaptative (V7) */}
       <TdeeCard result={tdeeToday} deficitReel={deficitReel} />
+
+      {/* Planning hebdomadaire idéal — référence affichée, jamais appliquée automatiquement */}
+      <Card>
+        <Label style={{ marginBottom: 8 }}>Planning idéal</Label>
+        <Pills
+          options={[{ key: "sansMatch", label: "Sans match" }, { key: "avecMatch", label: "Avec match" }]}
+          value={planVariant} onChange={setPlanVariant} small
+        />
+        <div style={{ marginTop: 10 }}>
+          {WEEKLY_PLAN[planVariant].map((d) => (
+            <div key={d.jour} style={{ display: "flex", gap: 10, padding: "6px 0", borderBottom: `1px solid ${C.divider}` }}>
+              <div style={{ width: 66, flexShrink: 0, fontSize: 10.5, color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }}>{d.jour}</div>
+              <div style={{ fontSize: 11.5, color: C.text2, lineHeight: 1.4 }}>{d.texte}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       {/* Péri-training */}
       <Card>
@@ -2164,7 +2206,20 @@ export default function App({ silent = false } = {}) {
     (async () => {
       setWeight(await store.get("weightLog", []));
       setSleep(await store.get("sleepLog", []));
-      setTraining(await store.get("trainingLog", []));
+      // Migration (01/09/2026) : "Leg curl bilatéral" était une erreur de nom, l'exercice
+      // réel est unilatéral — le gabarit Lower B a été corrigé, mais le nom d'un exercice
+      // est aussi sa clé d'historique (lastPerf/records/progression matchent par `nom`).
+      // Sans renommer aussi les séances déjà enregistrées, l'historique de cet exercice
+      // repartirait de zéro. Idempotent : sans occurrence à corriger, c'est un no-op.
+      const rawTraining = await store.get("trainingLog", []);
+      let trainingMigrated = false;
+      const migratedTraining = rawTraining.map((s) => {
+        if (!s.exercices?.some((e) => e.nom === "Leg curl bilatéral")) return s;
+        trainingMigrated = true;
+        return { ...s, exercices: s.exercices.map((e) => (e.nom === "Leg curl bilatéral" ? { ...e, nom: "Leg curl unilatéral" } : e)) };
+      });
+      if (trainingMigrated) store.set("trainingLog", migratedTraining);
+      setTraining(migratedTraining);
       setKnee(await store.get("kneeLog", []));
       setElbow(await store.get("elbowLog", []));
       setMacros(await store.get("macroLog", []));

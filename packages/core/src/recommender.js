@@ -53,7 +53,11 @@ const NEUTRAL_ZONE = { unknown: false, painLast: null, flagged7: 0, red: false, 
 export function recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme, extraSports }) {
   const t0 = today();
   const isUpper = (t) => t.type === "Upper A" || t.type === "Upper B";
-  const isLower = (t) => t.type === "Lower A" || t.type === "Lower B";
+  // "Lower C" (01/09/2026, semaine avec match) compte dans le volume/dernier-fait Lower
+  // affiché, mais reste hors de `variant("Lower A","Lower B")` — jamais suggéré/évité
+  // automatiquement, uniquement choisi à la main. Le gate de sécurité genou (dKnee, plus bas)
+  // reste correct dans tous les cas : il est déjà basé sur `chargeTags`, pas sur ce littéral.
+  const isLower = (t) => t.type === "Lower A" || t.type === "Lower B" || t.type === "Lower C";
   // `d >= 0` indispensable : sans lui, une entrée datée dans le futur (le sélecteur de
   // date le permet) donne un écart négatif, donc « <= n » est vrai et elle compte dans
   // la semaine écoulée. Même garde-fou que le helper global `withinDays`.

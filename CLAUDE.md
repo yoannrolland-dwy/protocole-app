@@ -2387,6 +2387,68 @@ Trois retours d'usage groupés en une session, portés à l'identique sur `apps/
   la version `apps/perso` déjà testée, mais un test réel sur `apps/public` reste à faire.
   Build `apps/perso` ET `apps/public` propres.
 
+## Chantier RawCare — Lower C, correction Leg curl, planning idéal (01/09/2026, v3.67.0)
+
+Retours d'usage sur le programme muscu et l'onglet TDEE, `apps/perso` uniquement (contenu
+personnel à Yoann — planning avec matchs, Lower C — pas propagé à `apps/public`, qui n'a de
+toute façon pas accès à "Lower C" : `FAMILY_TYPES.musculation` dans `onboarding.js` reste
+`["Upper A","Upper B","Lower A","Lower B"]`, liste figée non dérivée de `TEMPLATES`).
+
+- **Correction "Leg curl bilatéral" → "Leg curl unilatéral"** (Lower B) : erreur de nom,
+  l'exercice réel est unilatéral. Renommé dans `TEMPLATES` (Lower B), `catalog.js` (Bro
+  split — Jambes, pour cohérence même si inutilisé), et `DEFAULT_WEIGHTS`. **Le nom d'un
+  exercice est aussi sa clé d'historique** (`lastPerf`/records/progression matchent par
+  `nom` dans `trainingLog`) : un simple renommage du gabarit aurait fait repartir de zéro la
+  progression de cet exercice. Migration additive dans `apps/perso/src/App.jsx` (juste après
+  le chargement de `trainingLog`) : renomme silencieusement toute occurrence historique de
+  "Leg curl bilatéral" en "Leg curl unilatéral", idempotente (no-op après la première
+  exécution), jamais retirée du code (coût nul de la laisser en permanence, même précédent
+  que la fusion de `targets` avec `DEFAULT_TARGETS` au chargement).
+- **"Leg extension unilatérale" : saisie G/D simplifiée** (Lower A, B et C) — retrait de
+  `perLeg: true` sur les trois occurrences. Demandé à l'origine seulement pour Lower A/C,
+  mais c'est le même exercice (même `nom`) dans les trois gabarits : laisser Lower B avec la
+  distinction G/D aurait fait cohabiter deux formats de saisie sur le même historique,
+  perturbant le "dernière fois" préremplie. **Décision confirmée par Yoann après qu'on le lui
+  ait signalé.** Sans risque : `bestSet`/`exerciseSessions`/`lastPerf` (training.js, perf.js)
+  sont déjà agnostiques du flag `perLeg` — ils lisent `series` telle quelle, qu'elle soit
+  scindée G/D ou plate. Les séances déjà loguées gardent leur propre `perLeg` historique
+  (stocké par séance, pas recalculé) ; seul le tout premier "dernière fois" après le
+  changement peut piocher une valeur d'un ancien set G isolé — cosmétique, se corrige tout
+  seul dès la séance suivante.
+- **Nouveau type de séance "Lower C"** (semaine avec match, Lower unique de la semaine) :
+  `chargeTags: ["genou"], knee: true, hsr: true` — mêmes mécanismes de sécurité que Lower A/B.
+  7 exercices : Iso leg extension (option, 5×45s, identique à Lower A), Presse à cuisses
+  (HSR), Leg extension unilatérale (HSR, saisie simplifiée), Mollets à la presse (**3** séries,
+  pas 4 comme A/B), Soulevé de terre roumain, Hip thrust, Core — Planche (**2** séries, pas 3).
+  Volume total réduit par rapport à Lower A pour compenser l'ajout de RDL + Hip thrust dans la
+  même séance. Apparaît automatiquement dans le sélecteur `apps/perso` (`TYPES.map(...)`,
+  dynamique) — aucun code UI à ajouter côté carnet.
+  **Non intégré au recommandeur automatique** ("Prochaine séance") : `variant("Lower A",
+  "Lower B")` reste inchangé, Lower C n'est donc jamais suggéré ni écarté automatiquement —
+  c'est un choix manuel de Yoann selon son calendrier de matchs, pas une décision que
+  l'algorithme doit prendre. Le gate de sécurité genou (cooldown 48h, "déjà fait aujourd'hui")
+  reste correct dans tous les cas : `dKnee`/`kneeToday` sont déjà génériques par `chargeTags`
+  (Phase 1 lot 3), pas câblés sur des noms de type littéraux — Lower C en hérite sans aucun
+  code supplémentaire. Seul `isLower()` (comptage du volume hebdo affiché, "Lower X/2 cette
+  semaine") a été étendu pour reconnaître aussi "Lower C" — correction isolée d'une ligne,
+  confirmée par Yoann, qui ne touche ni au choix automatique Lower A/B ni à aucune logique de
+  sécurité.
+- **Carte "Planning idéal"** dans l'onglet TDEE (`apps/perso` seulement) : deux variantes
+  (sans match / avec match) sélectionnables par `Pills`, contenu figé dans une constante
+  `WEEKLY_PLAN` locale à `App.jsx` — texte affiché à titre de référence uniquement, jamais lu
+  par le recommandeur ni le Coach IA (pas de couplage, contrairement à
+  `summary.recommandeur` dans `buildCoachPrompt`).
+- **Texte de la table HSR mis à jour** ("Pilote presse à cuisses + leg extension en Lower A
+  et Lower C", au lieu de "Lower A" seul) — la table pilote désormais les deux gabarits.
+- **Testé dans l'aperçu** : Lower C apparaît dans le sélecteur avec les 7 exercices et les
+  bons volumes (3×15RM presse HSR semaine 1, mollets 3 séries, planche 2 séries) ; Leg
+  extension unilatérale confirmée en saisie simple (3 lignes, plus de colonnes G/D) sur
+  Lower B ; Lower B affiche "Leg curl unilatéral" avec son poids par défaut (35 kg) préservé ;
+  carte Planning idéal vérifiée dans les deux variantes ; aucune erreur console. Séances de
+  test annulées, rien sauvegardé. Build `apps/perso` ET `apps/public` propres (le second pour
+  confirmer que les changements de `packages/core` ne cassent rien côté public, qui n'active
+  Lower C nulle part).
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
