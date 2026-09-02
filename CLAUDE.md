@@ -2550,12 +2550,72 @@ séries loguées sous le nom substitué.
   série ✓" (pas un retour au gabarit d'origine). Aucune erreur console. Séance de test
   annulée puis supprimée après vérification, rien de réel affecté. Build `apps/perso` propre.
 
-## Chantier RawCare — Bibliothèque d'exercices, premier lot (01/09/2026)
+## Chantier RawCare — Planning Basket fixe (01/09/2026, v3.69.0)
+
+Le recommandeur ne connaissait que ce qui était déjà loggé dans `trainingLog` — il ne
+pouvait pas savoir qu'un Basket est prévu AVANT d'être saisi. Yoann a un entraînement fixe
+le mercredi soir et le vendredi midi, plus 22 matchs le dimanche cette saison (octobre à
+mai) — des dates PONCTUELLES, pas "tous les dimanches" (~34 dimanches possibles sur la
+période, seulement 22 avec match).
+
+- **`basketSchedule`, nouvelle clé `DATA_KEYS`** : `{ weekly: [0-6], matchDates:
+  ["AAAA-MM-JJ"] }` (0=dimanche...6=samedi, comme `Date#getDay()`). Deux mécanismes
+  distincts pour deux réalités distinctes — un jour fixe se répète indéfiniment, une date de
+  match ne se répète jamais toute seule. Défaut `{weekly:[], matchDates:[]}` : aucun effet
+  tant que rien n'est configuré.
+- **`packages/core/src/recommender.js`, nouveau paramètre optionnel `basketSchedule`** —
+  absent (comportement de tous les appelants d'avant ce chantier, et d'`apps/public` qui ne
+  le fournit pas encore) → `isScheduledBasket` renvoie toujours `false`, comportement
+  identique bit pour bit à avant.
+  - **`dKneeEff`** (nouveau, distinct de `dKnee`) : un Basket prévu aujourd'hui OU hier
+    (planning, pas encore loggé) compte comme une exposition genou pour le gate du Lower —
+    exactement comme si la séance avait déjà eu lieu. **Utilisé UNIQUEMENT par le bloc Lower**,
+    jamais par le bloc Basket lui-même : sinon un Basket prévu aujourd'hui s'écarterait de
+    ses propres suggestions (`dKnee`/`kneeToday` réels, inchangés, gardent ce rôle pour le
+    bloc Basket). Message distinct selon que l'exposition est réelle ("Exposition genou déjà
+    faite aujourd'hui") ou seulement planifiée ("Basket prévu aujourd'hui") — jamais
+    affirmer un fait qui n'a pas encore eu lieu.
+  - **Priorité absolue le jour même** : un Basket planifié aujourd'hui obtient un score fixe
+    de 999 (au-dessus de tout calcul possible) avec le texte "C'est le jour de
+    l'entraînement — Basket prévu aujourd'hui", garantissant la première place dans
+    "Prochaine séance" — demande explicite de Yoann, ce n'est plus une suggestion parmi
+    d'autres à évaluer une fois que c'est sur le planning. Placé après les gates de sécurité
+    (genou rouge, double exposition réelle) : ceux-ci restent prioritaires même un jour
+    planifié.
+- **`packages/core/src/coach/prompt.js`** : `basketSchedule` ajouté au sac de données de
+  `buildCoachPrompt`, transmis tel quel à `recommendSessions` — même verdict entre la carte
+  "Prochaine séance" et le Coach IA, comme depuis Phase 1. `buildCoachBriefing` n'appelle pas
+  `recommendSessions`, non concerné.
+- **`apps/perso/src/App.jsx`** : état `basketSchedule` (chargé/sauvé comme `climbScheme`),
+  nouvelle carte "Planning Basket fixe" dans les Réglages — chips jour de semaine
+  (Lun-Dim, multi-sélection) pour l'entraînement récurrent, champ date + liste
+  ajouter/supprimer pour les dates de match. Réglages plutôt que code en dur (décision de
+  Yoann) : la saison de matchs change, pas de rebuild à chaque fois.
+- **Correctif au passage, sans rapport avec ce chantier** : le titre "## Règles absolues à
+  ne jamais casser" avait été écrasé par erreur lors d'une édition précédente (remplacé par
+  un titre de chantier dupliqué) — repéré en cherchant où insérer cette section, corrigé.
+- **Testé dans l'aperçu** (mercredi 2 septembre confirmé via l'horloge du navigateur) :
+  planning configuré (mercredi + vendredi + un dimanche de test), "Prochaine séance" affiche
+  bien Basket en premier avec le score 999 et le texte dédié, "Lower A / B" apparaît dans
+  "à éviter" avec "Basket prévu aujourd'hui — ne pas empiler." Logique du lendemain (jeudi,
+  cooldown 48h même sans avoir loggé le Basket de la veille) vérifiée par script Node isolé
+  (impossible de changer l'horloge du navigateur d'aperçu) : `dKneeEff = 1` le jeudi suivant
+  un mercredi planifié, gate bien déclenché. Dates de match testées indépendamment des jours
+  fixes (un dimanche sans match dans la liste n'est pas reconnu). Aucune erreur console.
+  Build `apps/perso` ET `apps/public` propres.
+- **Non fait à ce stade** : Yoann doit configurer lui-même son vrai planning dans Réglages
+  après l'installation (mercredi/vendredi + ses 22 dates de match réelles) — je n'ai pas ses
+  22 dates, seule une date de test a été utilisée puis laissée dans l'aperçu (sans
+  conséquence, aperçu isolé du téléphone réel). `apps/public` n'a pas encore ce réglage
+  (pas d'écran Réglages équivalent pour l'instant) — le paramètre reste `undefined` côté
+  public, sans effet, comme prévu par la conception additive.
+
+## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
    `trainingLog`, `kneeLog`, `elbowLog`, `macroLog`, `noteLog`, `stepsLog`, `targets`,
-   `phase`, `hsrWeek`, `climbScheme`, `apiKey`, `model`, `coachProfile`, `coachJournal`,
-   `foodLog`, `foodPins`, `foodMuted`, `foodPortions`, `foodRecipes`,
+   `phase`, `hsrWeek`, `climbScheme`, `basketSchedule`, `apiKey`, `model`, `coachProfile`,
+   `coachJournal`, `foodLog`, `foodPins`, `foodMuted`, `foodPortions`, `foodRecipes`,
    `foodOverrides` —
    préfixées `protocole:` dans `store.js`)
    sans écrire une migration. Casser une clé = perdre l'historique de

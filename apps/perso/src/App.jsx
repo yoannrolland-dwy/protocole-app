@@ -43,7 +43,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.68.1";
+const APP_VERSION = "3.69.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -305,7 +305,7 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
 /* ============================================================
    TAB — DASHBOARD
    ============================================================ */
-function Dashboard({ weight, sleep, knee, elbow, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme }) {
+function Dashboard({ weight, sleep, knee, elbow, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast ? round(wLast.kg - tgtW) : null;
@@ -317,7 +317,7 @@ function Dashboard({ weight, sleep, knee, elbow, macros, steps, targets, trainin
   const mToday = macros.find((m) => m.date === today());
   const kcalToday = mToday ? Math.round(kcalOfEntry(mToday)) : null;
 
-  const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee, elbow, sleep, targets, scheme }), [training, knee, elbow, sleep, targets, scheme]);
+  const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee, elbow, sleep, targets, scheme, basketSchedule }), [training, knee, elbow, sleep, targets, scheme, basketSchedule]);
 
   const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
   const waterToday = mToday?.water ?? 0;
@@ -1952,12 +1952,85 @@ function PerformanceTab({ macros, targets, training, weight }) {
   );
 }
 
+// Planning Basket fixe (01/09/2026) : jours de semaine récurrents (entraînement hebdo,
+// 0=dimanche...6=samedi comme Date#getDay()) + dates de matchs ponctuelles (calendrier de
+// saison, irrégulier — 22 dimanches sur les ~34 possibles entre octobre et mai, donc jamais
+// "tous les dimanches"). Deux mécanismes distincts pour deux réalités distinctes : un jour
+// fixe se répète indéfiniment, une date de match ne se répète jamais toute seule.
+const WEEKDAYS = [
+  { key: 1, label: "Lun" }, { key: 2, label: "Mar" }, { key: 3, label: "Mer" },
+  { key: 4, label: "Jeu" }, { key: 5, label: "Ven" }, { key: 6, label: "Sam" }, { key: 0, label: "Dim" },
+];
+
+function BasketScheduleCard({ basketSchedule, setBasketSchedule }) {
+  const [newDate, setNewDate] = useState("");
+  const weekly = basketSchedule.weekly || [];
+  const matchDates = basketSchedule.matchDates || [];
+  const toggleDay = (d) => {
+    const next = weekly.includes(d) ? weekly.filter((x) => x !== d) : [...weekly, d].sort();
+    setBasketSchedule({ ...basketSchedule, weekly: next });
+  };
+  const addMatch = () => {
+    if (!newDate || matchDates.includes(newDate)) return;
+    setBasketSchedule({ ...basketSchedule, matchDates: [...matchDates, newDate].sort() });
+    setNewDate("");
+  };
+  const removeMatch = (d) => setBasketSchedule({ ...basketSchedule, matchDates: matchDates.filter((x) => x !== d) });
+
+  return (
+    <Card>
+      <Label style={{ marginBottom: 8 }}>Planning Basket fixe</Label>
+      <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
+        Le recommandeur sait qu'un Basket est prévu avant même que tu l'aies loggé : il évite
+        de proposer un Lower le même jour, applique déjà le repos de 48 h le lendemain, et le
+        propose en priorité ("c'est le jour de l'entraînement") le jour même.
+      </Body>
+
+      <Label style={{ marginBottom: 6 }}>Entraînement hebdomadaire</Label>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+        {WEEKDAYS.map((d) => {
+          const on = weekly.includes(d.key);
+          return (
+            <button key={d.key} onClick={() => toggleDay(d.key)} style={{
+              padding: "7px 12px", borderRadius: 6, cursor: "pointer",
+              fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5,
+              background: on ? C.accent : C.card, color: on ? "#000" : C.muted,
+              border: `1.5px solid ${on ? C.accent : C.border}`, fontFamily: "inherit",
+            }}>{d.label}</button>
+          );
+        })}
+      </div>
+
+      <Label style={{ marginBottom: 6 }}>Dates de matchs (saison)</Label>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} style={{ ...inputStyle(false), flex: 1 }} />
+        <Btn variant="primary" disabled={!newDate} onClick={addMatch} style={{ padding: "0 16px" }}>Ajouter</Btn>
+      </div>
+      {matchDates.length === 0 ? (
+        <Body style={{ fontSize: 11, color: C.dim }}>Aucune date de match enregistrée.</Body>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {matchDates.map((d) => (
+            <div key={d} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 2px", borderBottom: `1px solid ${C.divider}` }}>
+              <span style={{ fontSize: 12, color: C.text, fontFamily: C.mono }}>{fmt(d)}</span>
+              <button onClick={() => removeMatch(d)} style={{ background: "none", border: "none", cursor: "pointer", color: C.dim, padding: 4 }}>
+                <X size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 /* ============================================================
    RÉGLAGES
    ============================================================ */
 function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync, onHealthSync,
                          coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, saveTargets, buildBriefing,
-                         lastAutoBackup, lastCloudBackup, onCloudBackupDone, climbScheme, setClimbScheme, phase, setPhase }) {
+                         lastAutoBackup, lastCloudBackup, onCloudBackupDone, climbScheme, setClimbScheme, phase, setPhase,
+                         basketSchedule, setBasketSchedule }) {
   const [k, setK] = useState(apiKey);
   const [m, setM] = useState(model);
   const [msg, setMsg] = useState("");
@@ -2086,6 +2159,8 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
         <Pills options={[{ key: "gym", label: "Couleur de salle" }, { key: "fontainebleau", label: "Fontainebleau" }]}
           value={climbScheme} onChange={setClimbScheme} />
       </Card>
+
+      <BasketScheduleCard basketSchedule={basketSchedule} setBasketSchedule={setBasketSchedule} />
 
       <Card>
         <Label style={{ marginBottom: 8 }}>Phase</Label>
@@ -2277,6 +2352,11 @@ export default function App({ silent = false } = {}) {
   const [phase, setPhaseState] = useState("seche");
   const [hsrWeek, setHsrWeekState] = useState(1);
   const [climbScheme, setClimbSchemeState] = useState("gym");
+  // Planning Basket fixe (01/09/2026) : `weekly` = jours de semaine récurrents (entraînement
+  // hebdo, 0=dimanche...6=samedi comme Date#getDay()), `matchDates` = dates ponctuelles
+  // (calendrier de matchs, irrégulier — pas un simple jour de semaine). Défaut vide : aucun
+  // effet sur le recommandeur tant que rien n'est configuré dans les Réglages.
+  const [basketSchedule, setBasketScheduleState] = useState({ weekly: [], matchDates: [] });
   const [apiKey, setApiKeyState] = useState("");
   const [model, setModelState] = useState("claude-sonnet-5");
   const [coachProfile, setCoachProfileState] = useState("");
@@ -2316,6 +2396,7 @@ export default function App({ silent = false } = {}) {
       setPhaseState(await store.get("phase", "seche"));
       setHsrWeekState(await store.get("hsrWeek", 1));
       setClimbSchemeState(await store.get("climbScheme", "gym"));
+      setBasketScheduleState(await store.get("basketSchedule", { weekly: [], matchDates: [] }));
       setApiKeyState(await store.get("apiKey", ""));
       setModelState(await store.get("model", "claude-sonnet-5"));
       // Profil : amorcé une seule fois avec les règles auparavant codées en dur, pour que
@@ -2480,6 +2561,7 @@ export default function App({ silent = false } = {}) {
   const setPhase = (v) => { setPhaseState(v); store.set("phase", v); };
   const setHsrWeek = (v) => { setHsrWeekState(v); store.set("hsrWeek", v); };
   const setClimbScheme = (v) => { setClimbSchemeState(v); store.set("climbScheme", v); };
+  const setBasketSchedule = (v) => { setBasketScheduleState(v); store.set("basketSchedule", v); };
   // Objet schéma dérivé, recalculé seulement quand le réglage change — passé partout où
   // packages/core/src/climbing.js est consommé (BlocsField, historique, recommandeur, Coach
   // IA). Repli sur "gym" si une valeur invalide traînait dans le stockage.
@@ -2507,7 +2589,7 @@ export default function App({ silent = false } = {}) {
       buildCoachPrompt({
         weight, sleep, training, knee, elbow, macros, notes, steps, targets, phase,
         foodLog: getSync("foodLog", []), foodOverrides: getSync("foodOverrides", {}),
-        profile, journal, scheme,
+        profile, journal, scheme, basketSchedule,
       }, note),
     buildBriefing: () =>
       buildCoachBriefing({
@@ -2572,10 +2654,10 @@ export default function App({ silent = false } = {}) {
       {/* Contenu */}
       <main ref={mainRef} style={{ flex: 1, overflowY: "auto", padding: "14px 16px 24px" }}>
         {loading ? <Empty>Chargement…</Empty> : showSettings ? (
-          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, climbScheme, setClimbScheme, phase, setPhase }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
+          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, climbScheme, setClimbScheme, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, elbow, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme }} openSettings={() => setShowSettings(true)} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, elbow, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme, basketSchedule }} openSettings={() => setShowSettings(true)} />}
             {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
             {tab === "sleep" && <SleepTab {...{ sleep, save }} />}
             {tab === "steps" && <StepsTab {...{ steps, save }} />}

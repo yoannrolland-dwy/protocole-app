@@ -50,7 +50,24 @@ const NEUTRAL_ZONE = { unknown: false, painLast: null, flagged7: 0, red: false, 
 // identique bit pour bit à avant : `buildZones(DEFAULT_ZONES, {knee, elbow}, t0)` en interne.
 // Fourni (apps/public) → zones dynamiques de l'utilisateur, potentiellement 0 à N zones,
 // gate "genou"/"tirage" absent toléré via NEUTRAL_ZONE plutôt qu'un crash.
-export function recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme, extraSports }) {
+// Planning Basket fixe (01/09/2026) — `basketSchedule` optionnel : `{ weekly: [0-6],
+// matchDates: ["AAAA-MM-JJ"] }` (0=dimanche...6=samedi, comme `Date#getDay()`). Absent
+// (comportement de tous les appelants avant ce chantier, et d'apps/public qui ne le fournit
+// pas encore) → `isScheduledBasket` renvoie toujours `false`, aucun changement de
+// comportement. Objectif : le recommandeur sait qu'un Basket est prévu AVANT qu'il soit
+// loggé — jours fixes récurrents (entraînement hebdo) ET dates ponctuelles (calendrier de
+// matchs, irrégulier d'une semaine à l'autre, jamais un simple jour de semaine).
+function isScheduledBasket(basketSchedule, dateKey) {
+  if (!basketSchedule) return false;
+  if (basketSchedule.matchDates?.includes(dateKey)) return true;
+  if (!basketSchedule.weekly?.length) return false;
+  // Arithmétique locale pure (mêmes `new Date(y, m-1, d)` que `shiftDateKey`), jamais un
+  // aller-retour par un instant UTC — même piège déjà corrigé ailleurs dans ce projet.
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return basketSchedule.weekly.includes(new Date(y, m - 1, d).getDay());
+}
+
+export function recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme, extraSports, basketSchedule }) {
   const t0 = today();
   const isUpper = (t) => t.type === "Upper A" || t.type === "Upper B";
   // "Lower C" (01/09/2026, semaine avec match) compte dans le volume/dernier-fait Lower
@@ -100,6 +117,15 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   const dFoot = daysSince((t) => t.type === "Foot");
   const dBike = daysSince((t) => t.type === "Vélo");
   const dKnee = daysSinceTag("genou"); // Lower + Basket + Course à pied + Foot (tag partagé)
+  // Planning Basket fixe : un Basket PRÉVU (pas encore loggé) compte comme une exposition
+  // genou pour le gate du Lower — `dKneeEff` seulement, jamais `dKnee` lui-même : le bloc
+  // BASKET plus bas doit continuer à se juger sur ce qui est RÉELLEMENT arrivé (sinon un
+  // Basket prévu aujourd'hui s'écarterait lui-même). `basketToday`/`basketYesterday` restent
+  // undefined→false si `basketSchedule` est absent (apps/public, tous les appels d'avant ce
+  // chantier) — `dKneeEff === dKnee` dans ce cas, comportement inchangé.
+  const basketToday = isScheduledBasket(basketSchedule, t0);
+  const basketYesterday = isScheduledBasket(basketSchedule, shiftDateKey(t0, -1));
+  const dKneeEff = Math.min(dKnee, basketToday ? 0 : basketYesterday ? 1 : Infinity);
 
   // Charge de la dernière séance d'escalade (V5) : jusqu'ici la pénalité « escalade
   // récente » était FORFAITAIRE — une heure tranquille et une grosse session de blocs
@@ -220,12 +246,18 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   }
 
   // ---- BAS DU CORPS ----
+  // `dKneeEff` (pas `dKnee`) : un Basket PRÉVU aujourd'hui/hier (planning fixe, pas encore
+  // loggé) gate le Lower exactement comme s'il avait déjà eu lieu — c'est le but du
+  // planning. Le texte distingue "déjà faite"/"prévu" selon que c'est réel ou seulement
+  // planifié, pour ne jamais affirmer un fait qui n'a pas encore eu lieu.
   if (kneeRed) {
     push(avoid, "Lower A / B", 0, `Genou : ${kLast.baseline === false ? "pas revenu à la base sous 24 h" : `douleur ${painLast}/10`}. Attendre le retour à la base.`);
-  } else if (kneeToday || dKnee === 0) {
-    push(avoid, "Lower A / B", 0, "Exposition genou déjà faite aujourd'hui — ne pas empiler.");
-  } else if (dKnee <= 1) {
-    push(avoid, "Lower A / B", 0, "Expo genou hier (Lower ou basket) — laisser ~48 h au tendon.");
+  } else if (kneeToday || dKneeEff === 0) {
+    const why = kneeToday || dKnee === 0 ? "Exposition genou déjà faite aujourd'hui" : "Basket prévu aujourd'hui";
+    push(avoid, "Lower A / B", 0, `${why} — ne pas empiler.`);
+  } else if (dKneeEff <= 1) {
+    const why = dKnee <= 1 ? "Expo genou hier (Lower ou basket)" : "Basket prévu hier";
+    push(avoid, "Lower A / B", 0, `${why} — laisser ~48 h au tendon.`);
   } else {
     const loV = variant("Lower A", "Lower B");
     let loScore = 20 + (2 - lower7) * 12 + cap(dLower) - (kneeAmber ? AMBER_PENALTY.genou["Lower A"] : 0);
@@ -244,6 +276,11 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
     push(avoid, "Basket", 0, "Expo genou déjà faite aujourd'hui — deuxième dose déconseillée.");
   } else if (upperToday) {
     push(avoid, "Basket", 0, "Musculation (Upper) déjà faite aujourd'hui — basket déconseillé le même jour (fatigue générale).");
+  } else if (basketToday) {
+    // Planning fixe (01/09/2026) : entraînement/match déjà prévu aujourd'hui — plus une
+    // suggestion parmi d'autres à évaluer, une certitude. Score au-dessus de tout calcul
+    // possible pour garantir la première place, texte dédié plutôt que le score habituel.
+    push(sugg, "Basket", 999, "C'est le jour de l'entraînement — Basket prévu aujourd'hui. Passer par l'échauffement guidé.");
   } else {
     let bScore = 10 + cap(dBasket) - (kneeAmber ? AMBER_PENALTY.genou["Basket"] : 0) - (dKnee <= 1 ? 6 : 0);
     let bReason = `${basket7}× cette semaine · dernier ${ago(dBasket)}. Passer par l'échauffement guidé.`;

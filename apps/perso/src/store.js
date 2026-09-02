@@ -63,7 +63,7 @@ export const store = {
 // défaut si absente (comportement de toujours, aucune migration nécessaire).
 export const DATA_KEYS = [
   "weightLog", "sleepLog", "trainingLog", "kneeLog", "elbowLog", "macroLog", "noteLog", "stepsLog",
-  "targets", "phase", "hsrWeek", "model", "climbScheme",
+  "targets", "phase", "hsrWeek", "model", "climbScheme", "basketSchedule",
   "coachProfile", "coachJournal",
   "foodLog", "foodPins", "foodMuted", "foodPortions", "foodRecipes", "foodOverrides",
 ];

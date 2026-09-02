@@ -101,7 +101,7 @@ export const mealsFor = (log, date) => {
  */
 export function buildCoachPrompt(data, note) {
   const { weight, sleep, training, knee, elbow, macros, notes, steps, targets, phase,
-    foodLog, foodOverrides, profile, journal, scheme, zones, painLogs, identity } = data;
+    foodLog, foodOverrides, profile, journal, scheme, zones, painLogs, identity, basketSchedule } = data;
 
   // Dépense adaptative (V7) : mêmes données, même calcul que la carte de l'onglet
   // Macros (`tdeeNow`) — jamais deux chiffres différents pour la même réalité.
@@ -118,7 +118,7 @@ export function buildCoachPrompt(data, note) {
   // `zones` passé tel quel (undefined pour apps/perso, reconstruit en interne par
   // recommendSessions exactement comme avant — voir recommender.js) : jamais deux verdicts
   // différents entre cette fonction et la carte "Prochaine séance" côté apps/public.
-  const reco = recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme });
+  const reco = recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme, basketSchedule });
 
   // Phrase "Deux tendinopathies en rééduc : ..." du system prompt, construite en itérant
   // sur les zones (RawCare Phase 1, 06/08/2026) plutôt qu'écrite en dur pour exactement
