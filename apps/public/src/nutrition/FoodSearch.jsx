@@ -590,7 +590,16 @@ export default function FoodSearch({
   useEffect(() => { if (!startFree) inputRef.current?.focus(); }, [startFree]);
 
   const showSugg = q.trim().length < 2;
-  const list = showSugg ? sugg : results;
+  // Favoris/récents cherchés EN PREMIER, même en tapant (01/09/2026, port depuis apps/perso) :
+  // `sugg` porte déjà tous les favoris/récents, un simple filtre texte local suffit.
+  const favMatches = useMemo(() => {
+    if (showSugg) return [];
+    const nq = normalize(q);
+    return sugg.filter((f) => normalize(f.name).includes(nq));
+  }, [sugg, q, showSugg]);
+  // CIQUAL/OFF ne répètent jamais un aliment déjà remonté en favori/récent juste au-dessus.
+  const favRefs = useMemo(() => new Set(favMatches.map((f) => f.ref)), [favMatches]);
+  const list = showSugg ? sugg : results.filter((f) => !favRefs.has(f.ref));
   const matchedRecipes = useMemo(() => {
     if (!recipes?.length) return [];
     if (showSugg) return recipes;
@@ -705,7 +714,20 @@ export default function FoodSearch({
               </>
             )}
 
-            <Label style={{ marginBottom: 4, marginTop: matchedRecipes.length > 0 ? 14 : 0 }}>
+            {!showSugg && favMatches.length > 0 && (
+              <>
+                <Label style={{ marginBottom: 4, marginTop: matchedRecipes.length > 0 ? 14 : 0 }}>Favoris et récents</Label>
+                {favMatches.map((f) => (
+                  <Row key={f.ref + f.name} food={f} pinned={f.pinned}
+                    onClick={() => setSel(f)}
+                    onPin={() => onTogglePin(f.ref)}
+                    onRemove={() => onMute(f.ref)}
+                    onQuickAdd={() => onAdd(f, f.lastQ ?? f.defaultQ ?? 100)} />
+                ))}
+              </>
+            )}
+
+            <Label style={{ marginBottom: 4, marginTop: (matchedRecipes.length > 0 || favMatches.length > 0) ? 14 : 0 }}>
               {showSugg ? "Vos aliments habituels" : `${results.length} résultat${results.length > 1 ? "s" : ""}`}
             </Label>
 

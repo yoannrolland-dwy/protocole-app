@@ -2610,6 +2610,24 @@ période, seulement 22 avec match).
   (pas d'écran Réglages équivalent pour l'instant) — le paramètre reste `undefined` côté
   public, sans effet, comme prévu par la conception additive.
 
+## Chantier RawCare — Favoris cherchés en premier (01/09/2026, v3.69.1)
+
+Retour de Yoann : taper 2 caractères dans la recherche d'aliment faisait disparaître
+entièrement "Vos aliments habituels" au profit de CIQUAL — retrouver un favori en tapant son
+nom prenait donc plus de temps que la première fois où il avait été loggé.
+
+- **`FoodSearch.jsx` (les deux apps)** : `favMatches` — filtre texte local sur `sugg` (déjà
+  tous les favoris/récents, jamais limité) dès que la recherche est active, affiché dans une
+  nouvelle section "Favoris et récents" juste après "Vos recettes", avant les résultats
+  CIQUAL/OFF. Mêmes actions que la liste habituelle (épingler, masquer, `+` ajout rapide).
+  Les résultats CIQUAL en dessous excluent ce qui est déjà remonté en favori (par `ref`), pour
+  ne jamais afficher le même aliment deux fois à l'écran.
+- **Testé dans l'aperçu (`apps/perso`)** : "Pomme Gala" loguée puis recherchée par "pomme" —
+  remonte bien en tête sous "Favoris et récents", absente des 40 résultats CIQUAL juste en
+  dessous (pas de doublon). Aucune erreur console. Test nettoyé (localStorage vidé).
+  **`apps/public` non testé en direct** (pas de session Supabase active) — port fichier par
+  fichier en miroir exact, build propre.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
