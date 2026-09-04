@@ -238,8 +238,10 @@ protocole-app/                    (racine = workspaces npm uniquement)
   rechargée (à l'ouverture de l'onglet, au changement de date **et au changement
   de zone**) ; passer sur une combinaison zone/jour sans entrée remet le champ à
   vide. + règle de Silbernagel (retour à la base sous 24h) sur les deux zones,
-  table HSR et deux routines guidées avec minuteur (rééduc autonome,
-  échauffement basket sécurisé) **attachées au genou seul**.
+  table HSR (attachée au genou seul). Les deux routines guidées qui vivaient ici (rééduc
+  autonome, échauffement basket sécurisé) ont déménagé dans l'onglet Séances le 04/09/2026 —
+  voir la tuile "Basket" (échauffement en carnet, progressif) et "Mobilité" (choix
+  d'exercices, genou/coude inclus) dans le chantier dédié plus bas.
 - **Recommandeur "Prochaine séance"** (`recommendSessions`) : analyse tout
   l'historique des séances et des douleurs (pas de jours fixes — je n'ai
   plus de rythme figé). Retourne `{ suggestions, avoid }` : 3 suggestions
@@ -2627,6 +2629,112 @@ nom prenait donc plus de temps que la première fois où il avait été loggé.
   dessous (pas de doublon). Aucune erreur console. Test nettoyé (localStorage vidé).
   **`apps/public` non testé en direct** (pas de session Supabase active) — port fichier par
   fichier en miroir exact, build propre.
+
+## Chantier RawCare — Échauffement basket + Mobilité en carnet, nouveaux repas (04/09/2026, v3.70.0)
+
+Deux retours groupés, `apps/perso` uniquement (contenu personnel — programme d'échauffement,
+routine coude/genou spécifiques). Décisions prises sans repasser par une question, avec le
+raisonnement explicité ici pour que Yoann puisse challenger a posteriori :
+- **"Pré-training"/"Post-training"** : noms retenus tels que proposés par Yoann — cohérents
+  avec le reste de l'app (PERI/BASKET_PROTOCOLS parlent déjà d'"avant"/"après basket" en
+  prose, WHEY/RPE/TDEE/HSR sont déjà des emprunts anglais assumés) et plus précis que "Avant
+  entraînement"/"Après entraînement" (ambigus avec "avant/après LA séance de muscu du jour").
+- **Tuile "Mobilité"** (pas "Mobilité/rééducation", qui ne tenait pas bien dans la grille
+  2 colonnes) : un seul mot, même longueur que les autres tuiles ("Escalade", "Lower C"),
+  couvre à la fois mobilité générale et rééduc genou/coude.
+
+### Onglet Macro — 2 repas ajoutés, 1 renommé
+
+- **`packages/core/src/nutrition/foodStore.js`, `MEALS`** : "Pré-training" ajouté avant
+  "Petit-déjeuner", "Post-training" ajouté après "Dîner" (avant "Extra") — nouvelles clés
+  (`pretraining`/`posttraining`), aucune migration nécessaire. **"Autre" → "Extra" est un
+  renommage d'AFFICHAGE seul** : la clé interne reste `"autre"` (déjà stockée dans chaque
+  ligne de `foodLog` depuis M1) — la renommer aurait cassé le regroupement par repas de tout
+  l'historique déjà saisi sous cette clé, pour un gain purement cosmétique. Ordre dans `MEALS`
+  = ordre d'affichage uniquement (vérifié : aucun autre code n'en dépend), donc sans risque.
+- **`coach/prompt.js`** : la phrase du prompt qui explique au modèle les repères horaires par
+  repas ("avant midi seul le petit-déjeuner...") mentionne désormais "Pré-training"/
+  "Post-training"/"Extra" comme repas flexibles (liés à une séance, pas à l'heure), à la place
+  de la seule mention "Autre".
+- Propagé automatiquement à `apps/public` (même `MEALS` partagé) — non testé en direct (pas de
+  session Supabase active dans cette session).
+
+### Onglet Séances — Basket et Mobilité en carnet d'exercices
+
+- **Basket** (`packages/core/src/session/templates.js`) : passe de `kind: "sport"` (exos
+  vides) à `kind: "muscu"` avec 7 exercices d'échauffement — l'échauffement, jusqu'ici une
+  routine à minuteur JOUÉE depuis l'onglet Douleurs (jamais logguée), devient un vrai carnet
+  suivi pas à pas comme Upper/Lower (mêmes checkboxes série par série, mêmes minuteur/
+  historique/records) et sauvegardé dans `trainingLog` — donc visible par le Coach IA et
+  "Dernières séances". **Montée en régime progressive** (demande explicite) : 7 étapes
+  d'intensité croissante (cardio léger → mobilité dynamique → primer iso genou wall-sit →
+  squats poids du corps → sauts → changements de direction 70-80 % → spécifique intensité
+  match) — contenu réétalé depuis les 5 blocs d'origine de `ROUTINES.basket`, pas juste
+  renommé, pour une vraie progressivité. Les repères de sécurité genou (primer sous le seuil
+  de douleur, activation avant charge) sont conservés du texte d'origine.
+- **`withMeta: true`** (nouveau flag `TEMPLATES`) : Basket restait le seul type "muscu" à
+  avoir besoin de Durée + RPE (déjà utilisés par "Dernières séances" et le Coach IA pour les
+  séances non-muscu) — sans ce flag, passer Basket en carnet d'exercices aurait fait perdre
+  ces deux champs. `MuscuLogger` (`apps/perso/src/App.jsx`) gagne un état `duration`/`rpe`
+  local (init `initial?.duration ?? 60`/`initial?.rpe ?? 7`, même défaut que l'ancien
+  formulaire non-muscu), rendu juste sous Date/Début uniquement si `template.withMeta`, et
+  persisté par `validate()`. "Dernières séances" affiche désormais les deux à la fois quand
+  ils coexistent (`7 exos · 12 séries · 60′ · RPE 7`) au lieu de l'ancien "soit l'un soit
+  l'autre" — la ligne construit une liste de morceaux (exos/séries, durée, RPE, escalade) et
+  ne garde que ceux présents, rétrocompatible à l'identique pour tous les autres types.
+- **Nouvelle tuile "Mobilité"** (`TEMPLATES`, `kind: "muscu"`) : déménagée depuis
+  `ROUTINES.reeduc` (2 blocs genou/coude uniquement) et **élargie à 7 exercices au choix**
+  (demande explicite : "avoir le choix... même si je les fais pas tous") — les 2 exercices
+  d'origine (iso leg extension genou, iso flexion coude prise marteau + supination, mêmes
+  consignes Silbernagel) plus 5 exercices de mobilité générale (hanche, chevilles, chaîne
+  postérieure, épaules, gainage doux). **Tous en `opt: true`** — même mécanisme déjà en place
+  pour "Iso leg extension (si genou raide)" en Lower A : un exercice non coché n'est
+  simplement pas persisté (`validate()` le filtre), donc "choisir librement" ne demandait
+  aucun nouveau code, seulement le bon contenu et le bon flag partout.
+- **Aucun impact négatif sur les douleurs/l'entraînement futur — demande explicite, vérifiée
+  point par point** :
+  - "Mobilité" porte `chargeTags: []` et aucun flag `knee`/`climb` : ne gate ni ne pénalise
+    jamais rien (le gate/la pénalité genou-coude lit `chargeTags`, voir Phase 1 lot 3).
+  - `recommender.js` : nouveau `isLoadBearing = (t) => t.type !== "Mobilité"`, appliqué à
+    `load3` (charge 3 j, sinon aurait déclenché `fatigueScore`/`loadHigh` à tort sur une
+    séance de récup), `trainedDays` (streak — un jour de Mobilité seule ne casse ni ne compte
+    comme un jour "entraîné"), et `recentExoNames` (signal de baisse de perf — la durée d'un
+    étirement n'a rien à voir avec une tendance de charge). Reste dans `training` sans filtre
+    partout ailleurs (historique, décompte "7 j" par type exact, Coach IA) : seuls ces 3
+    signaux génériques "toute séance compte" en avaient besoin.
+  - Basket, lui, continue de compter normalement dans `chargeTags: ["genou"]`/`load3`/
+    `trainedDays` — comportement inchangé, c'est une vraie charge d'entraînement.
+- **`parseSecs`/`medianTarget` gèrent désormais "min"** (`templates.js`/`session/perf.js`) :
+  bug trouvé au test — "5 min" (Cardio léger, Basket) affichait "maintien 5 s" et préremplissait
+  la série à 5 au lieu de 300, les deux fonctions ne lisant que le dernier nombre de la chaîne
+  sans regarder l'unité. Corrigé par un test `/min/i` (× 60 si présent), sans "min" dans la
+  chaîne le comportement est strictement inchangé (vérifié : toutes les autres cibles du
+  projet, en secondes ou en reps, ne contiennent jamais "min").
+- **`PainTab`/`ROUTINES`** : la section "Routines guidées" (genou uniquement) et son état
+  `routine` retirés de `PainTab` — `RoutinePlayer`/`flatten()` (App.jsx) et l'import
+  `SkipForward` (devenus morts) supprimés. **`ROUTINES` reste exporté par `templates.js` et
+  intact** : `apps/public` l'utilise encore dans son propre `PainTab.jsx` (zones dynamiques,
+  hors scope de ce chantier apps/perso-only) — vérifié avant de toucher au fichier partagé.
+- **Non propagé à `apps/public`, volontairement** : "Mobilité" n'est PAS dans `FAMILY_TYPES`
+  (`apps/public/src/onboarding.js`), donc n'apparaît jamais dans son picker de séances — même
+  mécanisme déjà en place pour "Lower C" (type présent dans `TEMPLATES` mais absent de
+  `FAMILY_TYPES.musculation`, donc invisible côté public). Basket, en revanche, EST dans
+  `FAMILY_TYPES.basket` : le nouveau contenu d'échauffement + `withMeta` profitent aussi aux
+  utilisateurs `apps/public` qui logguent du Basket — attendu, pas un oubli : c'est le même
+  mécanisme de partage déjà en jeu pour tout changement de contenu Upper/Lower/Basket/Escalade
+  depuis la Phase 2 (ex. renommage "Leg curl"), pas une propagation par réflexe.
+- **Testé dans l'aperçu (`apps/perso`)** : tuile "MOBILITÉ" tient sur une ligne dans la grille
+  2 colonnes ; Basket ouvre bien un carnet à 7 exercices avec Durée/RPE, "maintien 300 s"
+  correct pour "5 min", série préremplie à 300 (plus 5) ; séance Basket loguée avec 1 série
+  cochée + durée 60′/RPE 7 → "Dernières séances" affiche "7 exos · 12 séries · 60′ · RPE 7" ;
+  Mobilité ouvre 7 exercices tous marqués "(option)", aucun champ Durée/RPE (pas `withMeta`) ;
+  onglet Douleurs vérifié sans la section Routines, table HSR intacte pour le genou ; onglet
+  Macro vérifié avec les 7 repas dans l'ordre Pré-training → Petit-déjeuner → Déjeuner →
+  Goûter → Dîner → Post-training → Extra. Aucune erreur console à aucune étape. Séance de
+  test supprimée après vérification. Build `apps/perso` ET `apps/public` propres.
+- **Non fait à ce stade** : `apps/public` non testé en direct (pas de session Supabase
+  active) ; pas de nouvelle question posée à Yoann sur le contenu exact des 7 exercices de
+  Mobilité (choix fait avec le raisonnement documenté ci-dessus, à ajuster sur son retour).
 
 ## Règles absolues à ne jamais casser
 

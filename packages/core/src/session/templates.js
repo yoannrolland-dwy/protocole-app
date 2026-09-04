@@ -95,8 +95,58 @@ const TEMPLATES = {
     { n: "Core — Planche", s: 2, r: "45-60 s", rest: 60, mode: "temps", c: "finisher",
       groupe: "core", mouvement: "gainage", materiel: "aucun", tendon: null },
   ]},
-  "Basket":   { kind: "sport", knee: true, chargeTags: ["genou"], exos: [] },
+  // Échauffement (04/09/2026) : déménagé depuis ROUTINES.basket (routine "jouée" hors
+  // trainingLog, onglet Douleurs) — devient un vrai carnet d'exercices, suivi pas à pas comme
+  // Upper/Lower, et loggé (recommandeur/Coach IA le voient). `withMeta: true` ajoute les
+  // champs durée + RPE de la vraie séance (perdus sinon : `kind: "muscu"` seul ne capture ni
+  // l'un ni l'autre) — sans ça, passer Basket en carnet d'exercices aurait fait perdre un
+  // signal déjà utilisé par le Coach IA et "Dernières séances". Montée en régime progressive
+  // (7 étapes, intensité croissante) au lieu des 5 blocs d'origine — contenu réétalé, pas
+  // juste renommé, pour une vraie progressivité (cardio → mobilité → primer genou → charge
+  // légère → charge élevée → spécifique modéré → spécifique intense).
+  "Basket": { kind: "muscu", knee: true, withMeta: true, chargeTags: ["genou"], exos: [
+    { n: "Cardio léger (vélo ou trot)", s: 1, r: "5 min", rest: 0, mode: "temps", c: "élever la température, allure tranquille",
+      groupe: "cardio", mouvement: "cardio", materiel: "aucun", tendon: null },
+    { n: "Mobilité dynamique", s: 1, r: "5 min", rest: 0, mode: "temps", c: "fentes marchées, balancements hanche/cheville",
+      groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
+    { n: "Primer iso genou (wall-sit @60°)", s: 4, r: "40 s", rest: 20, mode: "temps", c: "sous le seuil de douleur — antalgie + activation",
+      groupe: "quadriceps", mouvement: "genou", materiel: "aucun", tendon: "genou" },
+    { n: "Montée en charge : squats", s: 2, r: "45 s", rest: 30, mode: "temps", c: "poids du corps, amplitude progressive · ~60-70 %",
+      groupe: "quadriceps", mouvement: "genou", materiel: "aucun", tendon: "genou" },
+    { n: "Montée en charge : sauts", s: 2, r: "30 s", rest: 30, mode: "temps", c: "hauteur ↑ seulement si indolore · ~80 %",
+      groupe: "quadriceps", mouvement: "genou", materiel: "aucun", tendon: "genou" },
+    { n: "Spécifique basket : accél/décél", s: 1, r: "90 s", rest: 20, mode: "temps", c: "changements de direction ~70-80 %",
+      groupe: "cardio", mouvement: "specifique", materiel: "aucun", tendon: null },
+    { n: "Spécifique basket : tirs en mouvement", s: 1, r: "60 s", rest: 0, mode: "temps", c: "intensité proche du match",
+      groupe: "cardio", mouvement: "specifique", materiel: "aucun", tendon: null },
+  ]},
   "Escalade": { kind: "sport", climb: true, chargeTags: ["tirage"], exos: [] },
+
+  // "Mobilité" (04/09/2026) : déménagée depuis ROUTINES.reeduc (onglet Douleurs), ÉLARGIE à
+  // plusieurs exercices AU CHOIX (`opt: true` partout — même mécanisme que "Iso leg extension
+  // (si genou raide)" en Lower A, qui documente déjà que valider sans rien cocher ne persiste
+  // rien) plutôt que les 2 seuls blocs genou/coude d'origine, comme demandé. `chargeTags: []`
+  // et AUCUN flag knee/climb DÉLIBÉRÉMENT : de la récup/mobilité ne doit jamais compter comme
+  // une exposition genou/coude (gate, pénalité ambre) ni comme une charge d'entraînement —
+  // voir aussi l'exclusion de "Mobilité" dans load3/streak (recommender.js).
+  "Mobilité": { kind: "muscu", chargeTags: [], exos: [
+    { n: "Iso leg extension unilatérale @60° (genou)", s: 5, r: "45 s", rest: 120, mode: "temps", opt: true,
+      c: "primer antalgique · effort ~70 %, doser par genou",
+      groupe: "quadriceps", mouvement: "genou", materiel: "aucun", tendon: "genou" },
+    { n: "Iso flexion coude prise marteau + supination", s: 4, r: "45 s", rest: 60, mode: "temps", opt: true,
+      c: "prise neutre, supination résistée en fin de tenue",
+      groupe: "biceps", mouvement: "isolation", materiel: "aucun", tendon: "coude" },
+    { n: "Mobilité hanche (fentes + rotations)", s: 1, r: "3 min", rest: 0, mode: "temps", opt: true, c: "",
+      groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
+    { n: "Mobilité chevilles", s: 1, r: "2 min", rest: 0, mode: "temps", opt: true, c: "",
+      groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
+    { n: "Étirement chaîne postérieure (ischios/mollets)", s: 2, r: "30-45 s", rest: 30, mode: "temps", opt: true, c: "",
+      groupe: "mobilite", mouvement: "isolation", materiel: "aucun", tendon: null },
+    { n: "Mobilité épaules (coiffe des rotateurs)", s: 2, r: "30-45 s", rest: 30, mode: "temps", opt: true, c: "",
+      groupe: "epaules", mouvement: "mobilite", materiel: "aucun", tendon: null },
+    { n: "Gainage doux (planche genoux ou côté)", s: 2, r: "30 s", rest: 30, mode: "temps", opt: true, c: "",
+      groupe: "core", mouvement: "gainage", materiel: "aucun", tendon: null },
+  ]},
 };
 export { TEMPLATES };
 export const TYPES = Object.keys(TEMPLATES);
@@ -140,9 +190,15 @@ export const hsrParse = (scheme) => {
   const m = scheme.match(/(\d+)\s*×\s*(\d+)/);
   return m ? { series: +m[1], reps: +m[2] } : { series: 3, reps: 10 };
 };
+// Gère "min" (04/09/2026, échauffement basket : "5 min" plutôt que "300 s" pour rester
+// lisible côté carnet) en plus des "45 s"/"30-45 s" d'origine — sans "min" dans la chaîne,
+// comportement strictement inchangé (dernier nombre = secondes).
 export const parseSecs = (str) => {
-  const nums = String(str).match(/\d+/g);
-  return nums ? +nums[nums.length - 1] : 30;
+  const s = String(str);
+  const nums = s.match(/\d+/g);
+  if (!nums) return 30;
+  const last = +nums[nums.length - 1];
+  return /min/i.test(s) ? last * 60 : last;
 };
 
 export const ROUTINES = {

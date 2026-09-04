@@ -15,12 +15,19 @@
 
 import { today as todayKey } from "../dateUtils.js";
 
+// Pré-training/post-training ajoutés le 04/09/2026 (whey/bonbons avant le petit-déj,
+// collation après le basket) — clés nouvelles, aucune migration nécessaire. "autre" → "Extra"
+// est un renommage d'AFFICHAGE seul : la clé interne reste "autre" (c'est elle qui est
+// stockée dans chaque entrée de foodLog depuis M1) pour ne jamais casser le regroupement par
+// repas de l'historique déjà saisi.
 export const MEALS = [
+  { key: "pretraining", label: "Pré-training" },
   { key: "petitdej", label: "Petit-déjeuner" },
   { key: "dejeuner", label: "Déjeuner" },
   { key: "gouter", label: "Goûter" },
   { key: "diner", label: "Dîner" },
-  { key: "autre", label: "Autre" },
+  { key: "posttraining", label: "Post-training" },
+  { key: "autre", label: "Extra" },
 ];
 
 export const MACROS = ["kcal", "prot", "gluc", "lip", "fib"];

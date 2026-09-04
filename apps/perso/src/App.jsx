@@ -6,7 +6,7 @@ import {
 import {
   LayoutDashboard, Scale, Moon, Dumbbell, HeartPulse, Flame, TrendingUp, Footprints,
   Plus, AlertTriangle, CheckCircle2, Circle, Sparkles, Trash2,
-  Play, Pause, SkipForward, RotateCcw, Timer, Droplet,
+  Play, Pause, RotateCcw, Timer, Droplet,
   ChevronRight, ChevronDown, Zap, Settings, Download, Upload, X, Copy, Repeat,
 } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
@@ -18,7 +18,7 @@ import { exoProgress, exerciseList, exerciseSessions, exerciseTrend, isTimeMode,
 import { SCHEMES, gradeIndex, ISSUES, climbSummary, climbLabel } from "@rawcare/core/climbing";
 import { realDeficit, MIN_WINDOW_DAYS as MIN_TDEE_DAYS } from "@rawcare/core/tdee";
 import { TEMPLATES, TYPES, DEFAULT_WEIGHTS, HSR_TABLE, hsrForWeek, hsrParse, parseSecs,
-         ROUTINES, PERI, BASKET_PROTOCOLS } from "@rawcare/core/session/templates";
+         PERI, BASKET_PROTOCOLS } from "@rawcare/core/session/templates";
 import { refSet, lastPerf, perfHistory, lastExerciseSets, medianTarget } from "@rawcare/core/session/perf";
 import { EXERCISE_LIBRARY } from "@rawcare/core/session/exercises";
 import { recommendSessions } from "@rawcare/core/recommender";
@@ -43,7 +43,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.69.1";
+const APP_VERSION = "3.70.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -88,93 +88,6 @@ const SyncedBanner = ({ onCorrect, label = "Synchronisé depuis Health Connect" 
   </div>
 );
 
-
-/* ============================================================
-   ROUTINE PLAYER
-   ============================================================ */
-function flatten(blocks) {
-  const steps = [];
-  blocks.forEach((b) => {
-    for (let i = 1; i <= b.rounds; i++) {
-      steps.push({ label: b.label, note: b.note, kind: "work", sec: b.work, round: i, rounds: b.rounds });
-      if (b.rest > 0 && i < b.rounds) steps.push({ label: "Repos", note: "", kind: "rest", sec: b.rest, round: i, rounds: b.rounds });
-    }
-  });
-  return steps;
-}
-
-function RoutinePlayer({ routine, onClose }) {
-  const steps = useMemo(() => flatten(routine.blocks), [routine]);
-  const [idx, setIdx] = useState(0);
-  const [rem, setRem] = useState(steps[0]?.sec ?? 0);
-  const [running, setRunning] = useState(false);
-  const [done, setDone] = useState(false);
-  const tick = useRef();
-
-  useEffect(() => {
-    if (!running) return;
-    tick.current = setInterval(() => {
-      setRem((r) => {
-        if (r > 1) return r - 1;
-        clearInterval(tick.current);
-        setIdx((i) => {
-          const next = i + 1;
-          if (next >= steps.length) { setRunning(false); setDone(true); return i; }
-          setRem(steps[next].sec);
-          return next;
-        });
-        return 0;
-      });
-    }, 1000);
-    return () => clearInterval(tick.current);
-  }, [running, idx, steps]);
-
-  const cur = steps[idx];
-  const skip = () => {
-    clearInterval(tick.current);
-    const next = idx + 1;
-    if (next >= steps.length) { setRunning(false); setDone(true); return; }
-    setIdx(next); setRem(steps[next].sec);
-  };
-  const reset = () => { clearInterval(tick.current); setRunning(false); setDone(false); setIdx(0); setRem(steps[0].sec); };
-
-  return (
-    <Card style={{ borderColor: C.accent }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <div style={{ fontSize: 13, color: C.accent, fontWeight: 800, textTransform: "uppercase" }}>{routine.title}</div>
-        <button onClick={onClose} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer" }}><X size={16} /></button>
-      </div>
-      {done ? (
-        <div style={{ textAlign: "center", padding: "18px 0" }}>
-          <CheckCircle2 size={30} color={C.accent} style={{ margin: "0 auto 8px" }} />
-          <div style={{ color: C.text, fontSize: 14, fontWeight: 700 }}>Routine terminée.</div>
-          <Btn variant="plain" onClick={reset} style={{ marginTop: 12 }}><RotateCcw size={13} style={{ display: "inline", marginRight: 5 }} />Recommencer</Btn>
-        </div>
-      ) : (
-        <>
-          <div style={{
-            background: cur.kind === "rest" ? C.bg : C.accentRow,
-            border: `1.5px solid ${cur.kind === "rest" ? C.border : C.accent}`,
-            borderRadius: 8, padding: 18, textAlign: "center", marginBottom: 12,
-          }}>
-            <Label>{cur.kind === "rest" ? "Repos" : `Bloc ${cur.round}/${cur.rounds}`}</Label>
-            <div style={{ fontFamily: C.mono, fontSize: 46, fontWeight: 800, color: cur.kind === "rest" ? C.text : C.accent, margin: "6px 0" }}>{mmss(rem)}</div>
-            <div style={{ fontSize: 12.5, color: C.text, fontWeight: 700 }}>{cur.label}</div>
-            {cur.note && <Body style={{ fontSize: 11, marginTop: 4 }}>{cur.note}</Body>}
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <Btn variant="primary" onClick={() => setRunning((r) => !r)} style={{ flex: 1 }}>
-              {running ? <><Pause size={14} style={{ display: "inline", marginRight: 5 }} />Pause</> : <><Play size={14} style={{ display: "inline", marginRight: 5 }} />Démarrer</>}
-            </Btn>
-            <Btn variant="plain" onClick={skip}><SkipForward size={14} /></Btn>
-            <Btn variant="plain" onClick={reset}><RotateCcw size={14} /></Btn>
-          </div>
-          <div style={{ fontSize: 10, color: C.dim, marginTop: 8, textAlign: "center", fontFamily: C.mono }}>Étape {idx + 1}/{steps.length}</div>
-        </>
-      )}
-    </Card>
-  );
-}
 
 /* ============================================================
    COACH IA
@@ -767,6 +680,12 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
   });
 
   const [start, setStart] = useState(() => initial?.start ?? new Date().toTimeString().slice(0, 5));
+  // Durée + RPE (04/09/2026) : seuls les types marqués `withMeta` (Basket, désormais un
+  // carnet d'exercices comme Upper/Lower) les capturent — sans ça, le passage de Basket en
+  // "muscu" aurait fait perdre ces deux champs déjà lus par le Coach IA et "Dernières
+  // séances", jusque-là propres aux séances non-muscu (voir TrainTab).
+  const [duration, setDuration] = useState(() => initial?.duration ?? 60);
+  const [rpe, setRpe] = useState(() => initial?.rpe ?? 7);
   const [exos, setExos] = useState(buildExos);
   const [open, setOpen] = useState(0);
   const [hist, setHist] = useState(null);
@@ -906,6 +825,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
     onSave({
       id: initial?.id ?? `${date}-${type}-${Date.now()}`,
       date, type, start,
+      ...(template.withMeta ? { duration: round(duration), rpe } : {}),
       exercices: exos.map((e) => ({
         nom: e.nom, mode: e.mode, perLeg: e.perLeg, origine: e.origine,
         series: e.series
@@ -994,6 +914,13 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
           <input type="time" value={start} onChange={(e) => setStart(e.target.value)} style={inputStyle(false)} />
         </Field>
       </div>
+
+      {template.withMeta && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <Field label="Durée (min)"><Stepper value={duration} set={setDuration} step={5} min={0} int /></Field>
+          <Field label="RPE"><Stepper value={rpe} set={setRpe} step={1} min={1} max={10} int /></Field>
+        </div>
+      )}
 
       {/* Exercices */}
       {exos.map((e, ei) => {
@@ -1485,11 +1412,9 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow, scheme }) 
           <div style={{ fontSize: 14, color: C.accent, fontWeight: 800, textTransform: "uppercase", marginBottom: 8 }}>
             {open}{editing && <span style={{ fontSize: 11, textTransform: "none", marginLeft: 6 }}>(modification)</span>}
           </div>
-          <Body style={{ marginBottom: 12 }}>
-            {open === "Escalade"
-              ? "Compte comme volume tirage — jamais un jour Upper, pour protéger le coude."
-              : "Passer par l'échauffement basket sécurisé (onglet Genou)."}
-          </Body>
+          {/* Basket est passé en carnet d'exercices (04/09/2026, kind:"muscu") : cette carte
+              ne sert plus qu'à Escalade, seul type "sport" restant. */}
+          <Body style={{ marginBottom: 12 }}>Compte comme volume tirage — jamais un jour Upper, pour protéger le coude.</Body>
           <div style={{ marginBottom: 10 }}><DateField value={date} onChange={setDate} /></div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
             <Field label="Début">
@@ -1552,9 +1477,14 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow, scheme }) 
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono }}>
-                {t.exercices
-                  ? `${t.exercices.length} exos · ${t.exercices.reduce((a, e) => a + (e.series?.length || 0), 0)} séries`
-                  : `${t.duration != null ? t.duration + "′" : ""}${t.rpe != null ? ` · RPE ${t.rpe}` : ""}${climbLabel(t.blocs, scheme) ? ` · ${climbLabel(t.blocs, scheme)}` : ""}`}
+                {/* Basket (04/09/2026) porte désormais exercices ET durée/RPE à la fois — les
+                    deux se combinent, au lieu de l'ancien "soit l'un soit l'autre". */}
+                {[
+                  t.exercices?.length ? `${t.exercices.length} exos · ${t.exercices.reduce((a, e) => a + (e.series?.length || 0), 0)} séries` : null,
+                  t.duration != null ? `${t.duration}′` : null,
+                  t.rpe != null ? `RPE ${t.rpe}` : null,
+                  climbLabel(t.blocs, scheme) || null,
+                ].filter(Boolean).join(" · ")}
               </span>
               <button onClick={(ev) => { ev.stopPropagation(); save.training(training.filter((x) => x !== t)); }}
                 style={{ background: "none", border: "none", cursor: "pointer", color: C.dim, padding: 0 }}>
@@ -1579,15 +1509,17 @@ const PAIN_ZONES = [
   {
     key: "knee", label: "Genou",
     title: "Genou · réhab", sub: "tendon quadricipital · HSR · Silbernagel",
-    // La table HSR et les routines guidées sont propres au quadricipital : elles ne
-    // doivent pas s'afficher sous la zone Coude, où elles n'ont aucun sens.
-    hsr: true, routines: true,
+    // La table HSR est propre au quadricipital : elle ne doit pas s'afficher sous la zone
+    // Coude, où elle n'a aucun sens. Les routines guidées (rééduc/échauffement basket) ont
+    // déménagé dans l'onglet Séances le 04/09/2026 (voir CLAUDE.md) — loguées comme de
+    // vraies séances ("Mobilité", "Basket") plutôt que jouées ici hors historique.
+    hsr: true,
     alertText: "Décharge : pas de basket ni de Lower tant que la douleur n'est pas revenue à sa base. Réduire charge ou amplitude à la prochaine exposition.",
   },
   {
     key: "elbow", label: "Coude",
     title: "Coude · réhab", sub: "tendon distal du biceps · prises neutres · Silbernagel",
-    hsr: false, routines: false,
+    hsr: false,
     alertText: "Décharge du tirage : pas d'escalade ni d'Upper tant que la douleur n'est pas revenue à sa base. Prises neutres/pronation, supination (chin-ups) à éviter.",
   },
 ];
@@ -1613,7 +1545,6 @@ function PainTab({ knee, elbow, save, hsrWeek }) {
   const existingToday = (knee || []).find((k) => k.date === today());
   const [pain, setPain] = useState(existingToday ? existingToday.pain : null);
   const [baseline, setBaseline] = useState(existingToday ? existingToday.baseline !== false : true);
-  const [routine, setRoutine] = useState(null);
   // Changer de date OU de zone recharge l'entrée existante, ou remet à vide si la
   // combinaison visée n'a rien — sans ce reset, la douleur d'une autre date (ou de l'autre
   // tendon) resterait affichée et pourrait être enregistrée par erreur.
@@ -1622,7 +1553,6 @@ function PainTab({ knee, elbow, save, hsrWeek }) {
     const e = entryOf(zk, d);
     setPain(e ? e.pain : null);
     setBaseline(e ? e.baseline !== false : true);
-    if (zk !== zoneKey) setRoutine(null);
   };
   const pickDate = (d) => pick(zoneKey, d);
   const add = () => { if (pain == null) return; save[zoneKey](upsert(log, { date, pain, baseline })); };
@@ -1729,24 +1659,6 @@ function PainTab({ knee, elbow, save, hsrWeek }) {
       </Card>
       )}
 
-      {/* Routines guidées — genou uniquement */}
-      {zone.routines && (routine ? (
-        <RoutinePlayer routine={ROUTINES[routine]} onClose={() => setRoutine(null)} />
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {Object.entries(ROUTINES).map(([key, r]) => (
-            <div key={key} onClick={() => setRoutine(key)} style={{
-              background: C.card, border: `1.5px solid ${C.accent}`, borderRadius: 10,
-              padding: "13px 14px", textAlign: "center", cursor: "pointer",
-            }}>
-              <div style={{ fontSize: 13, color: C.accent, fontWeight: 800, textTransform: "uppercase" }}>
-                <Play size={12} style={{ display: "inline", marginRight: 5 }} />{r.title}
-              </div>
-              <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>{r.sub}</div>
-            </div>
-          ))}
-        </div>
-      ))}
     </div>
   );
 }

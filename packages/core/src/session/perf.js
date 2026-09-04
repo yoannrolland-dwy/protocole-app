@@ -36,9 +36,15 @@ export function lastExerciseSets(training, nom) {
   return null;
 }
 
+// Gère "min" (04/09/2026, échauffement basket/mobilité : "5 min" plutôt que "300 s" pour
+// rester lisible côté carnet) — même conversion que `parseSecs` (templates.js), pour que le
+// préremplissage de la série (ici) et le bouton "maintien" (parseSecs) affichent le même
+// nombre de secondes. Sans "min" dans la chaîne (reps, HSR, secondes déjà en l'état),
+// comportement strictement inchangé.
 export const medianTarget = (r) => {
-  const nums = String(r).match(/\d+/g);
+  const s = String(r);
+  const nums = s.match(/\d+/g);
   if (!nums) return "";
-  if (nums.length === 1) return +nums[0];
-  return Math.round((+nums[0] + +nums[nums.length - 1]) / 2);
+  const val = nums.length === 1 ? +nums[0] : Math.round((+nums[0] + +nums[nums.length - 1]) / 2);
+  return /min/i.test(s) ? val * 60 : val;
 };

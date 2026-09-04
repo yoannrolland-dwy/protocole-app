@@ -79,6 +79,14 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   // date le permet) donne un écart négatif, donc « <= n » est vrai et elle compte dans
   // la semaine écoulée. Même garde-fou que le helper global `withinDays`.
   const within = (arr, n) => arr.filter((e) => { const d = daysBetween(e.date, t0); return d >= 0 && d <= n; });
+  // "Mobilité" (04/09/2026, apps/perso — TEMPLATES) : récup/mobilité choisie librement,
+  // jamais une charge d'entraînement. Exclue des signaux de fatigue à court terme (load3) et
+  // du décompte de jours enchaînés (streak/trainedDays) pour ne jamais pénaliser à tort une
+  // séance de récupération — demande explicite : aucun impact négatif sur les suggestions
+  // futures. Reste dans `training` sans filtre partout ailleurs (historique, Coach IA, "7 j
+  // derniers" par type exact) : seuls ces deux signaux génériques "toute séance compte"
+  // avaient besoin de l'exclure. Toujours vrai pour apps/public, qui ne logue jamais ce type.
+  const isLoadBearing = (t) => t.type !== "Mobilité";
   const daysSince = (pred) => {
     const hits = training.filter(pred);
     return hits.length ? daysBetween(hits[hits.length - 1].date, t0) : Infinity;
@@ -194,7 +202,7 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   // à laquelle l'ancien seuil ≥3 déclenchait quasiment en permanence — pénalisant à tort
   // Upper/Lower/Basket/Escalade (via fatigueScore) ET gonflant Repos, même sans aucun
   // vrai signe de fatigue. 7 ne se déclenche donc que nettement au-dessus de sa normale.
-  const load3 = within(training, 2).length;
+  const load3 = within(training, 2).filter(isLoadBearing).length;
   const loadHigh = load3 >= 7;
 
   // Fenêtre d'objectif (sèche avant vacances) : la règle du profil est de ne jamais AJOUTER
@@ -378,7 +386,7 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   // ils font monter le score mais n'y contribuent significativement que si les 3 signaux
   // restent propres — jamais de blocage dur, jamais d'`avoid`.
 
-  const trainedDays = new Set(training.map((t) => t.date));
+  const trainedDays = new Set(training.filter(isLoadBearing).map((t) => t.date));
   // Si aucune séance n'a encore été loguée aujourd'hui, on compte à partir d'hier (sinon
   // un streak de 6 jours retomberait artificiellement à 0 tant que la séance du jour
   // n'est pas saisie).
@@ -391,7 +399,7 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   // Progression) est à la baisse. Un seul exercice en baisse arrive tout le temps (fatigue
   // locale, mauvaise nuit isolée) ; ≥ 2 est le signal d'une dérive plus large.
   const recentExoNames = new Set();
-  within(training, 2).forEach((s) => (s.exercices || []).forEach((e) => recentExoNames.add(e.nom)));
+  within(training, 2).filter(isLoadBearing).forEach((s) => (s.exercices || []).forEach((e) => recentExoNames.add(e.nom)));
   const decliningExos = [...recentExoNames].filter((nom) => exerciseTrend(exerciseSessions(training, nom)).key === "down");
   const perfDrift = decliningExos.length >= 2;
 
