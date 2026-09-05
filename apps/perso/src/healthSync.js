@@ -25,12 +25,13 @@ const HealthNutrition = registerPlugin("HealthNutrition");
 // weight → READ_WEIGHT, ajouté le 28/07/2026 : une pesée saisie à la main dans Samsung
 // Health (pas MyFitnessPal, qui ne déclare pas WRITE_WEIGHT) apparaît bien dans Health
 // Connect — voir HealthNutritionPlugin.readWeight().
-// restingHeartRate → ajouté le 05/09/2026 pour le score d'énergie (module 1, voir
-// packages/core/src/energy.js). Health Connect n'a de FC repos QUE si une app source
-// (Samsung Health) l'y écrit — non vérifié à ce stade si c'est le cas sur ce téléphone,
-// voir HealthNutritionPlugin.readRestingHeartRate() : le score affiche honnêtement "pas
-// assez de données" si jamais aucun échantillon n'apparaît.
-const READ_TYPES = ["steps", "sleep", "weight", "restingHeartRate"];
+// heartRate → ajouté le 05/09/2026 pour le score d'énergie (module 1, voir
+// packages/core/src/energy.js). D'abord tenté via "restingHeartRate" (le type dédié de
+// Health Connect) : resté vide malgré une FC repos bien visible dans Samsung Health —
+// confirmé que Samsung Health n'écrit aucun `RestingHeartRateRecord` sur ce téléphone,
+// seulement la FC continue. `HealthNutrition.readRestingHeartRate()` la reconstruit donc
+// lui-même (moyenne des mesures de FC pendant les phases de sommeil réel).
+const READ_TYPES = ["steps", "sleep", "weight", "heartRate"];
 
 export async function syncHealthConnect() {
   if (!Capacitor.isNativePlatform()) return { status: "web" };
@@ -57,7 +58,7 @@ export async function syncHealthConnect() {
   const canSteps = auth.readAuthorized?.includes("steps");
   const canSleep = auth.readAuthorized?.includes("sleep");
   const canWeight = auth.readAuthorized?.includes("weight");
-  const canRhr = auth.readAuthorized?.includes("restingHeartRate");
+  const canRhr = auth.readAuthorized?.includes("heartRate");
   if (!canSteps && !canSleep && !canWeight && !canRhr) return { status: "denied" };
 
   // Bornes alignées sur MINUIT LOCAL (corrigé le 03/08/2026 — c'était minuit UTC, soit 2h

@@ -2520,14 +2520,13 @@ export default function App({ silent = false } = {}) {
   // (Poids, Calories, Énergie, Pas, Eau), reformatées pour l'affichage natif — la 6e
   // tuile du widget est un bouton Sync, pas une donnée (voir widgetSync.js /
   // DashboardWidgetProvider.kt). La tuile "Sommeil" est devenue "Énergie" le 05/09/2026 :
-  // valeur = score d'énergie, note = score de sommeil (les deux scores demandés par Yoann
-  // pour le widget, faute de place pour davantage sur une tuile aussi étroite).
+  // valeur = score d'énergie, note = durée de sommeil réelle (demande explicite de Yoann,
+  // qui préfère la durée brute au score de sommeil sur cette tuile).
   useEffect(() => {
     if (loading || !Capacitor.isNativePlatform()) return;
     const wLast = lastN(weight, 1)[0];
     const lastNightDash = lastN(sleep, 1)[0];
     const energyDash = computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps });
-    const sleepScoreDash = computeSleepScore(lastNightDash);
     const mToday = macros.find((m) => m.date === today());
     const kcalToday = mToday ? Math.round(kcalOfEntry(mToday)) : null;
     const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
@@ -2544,7 +2543,7 @@ export default function App({ silent = false } = {}) {
       eau: { value: `${(waterToday / 1000).toFixed(2)} L`, note: `/ ${(waterTgt / 1000).toFixed(1)} L` },
       energie: {
         value: energyDash.status === "ok" ? `${energyDash.total}` : "—",
-        note: sleepScoreDash != null ? `Sommeil ${sleepScoreDash}` : "—",
+        note: lastNightDash ? fmtHM(lastNightDash.hours) : "—",
       },
       // Pas de "value" affichée pour ce tile (juste l'icône Sync) — seule la note sert,
       // horodatage du dernier instantané poussé au widget (peu importe si déclenché par

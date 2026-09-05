@@ -12,7 +12,7 @@ const WidgetBridge = registerPlugin("WidgetBridge");
  * snapshot attendu : { poids, pas, calories, eau, energie, sync } — chacun
  * { value: string, note: string }. "sync" n'affiche pas sa valeur (juste l'icône Sync),
  * seule sa note (horodatage de dernière synchro) est utilisée. "energie" (ex-"sommeil",
- * 05/09/2026) affiche le score d'énergie en valeur et le score de sommeil en note.
+ * 05/09/2026) affiche le score d'énergie en valeur et la durée de sommeil réelle en note.
  */
 export async function updateDashboardWidget(snapshot) {
   if (!Capacitor.isNativePlatform()) return;

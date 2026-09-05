@@ -24,7 +24,7 @@ class WidgetBridgePlugin : Plugin() {
         const val EXTRA_SILENT_SYNC = "silent_sync"
         // "sync" n'a pas de tuile de valeur affichée (seulement une note, l'heure de la
         // dernière synchro) : sa clé "value" est stockée mais jamais lue. "energie" (ex-
-        // "sommeil", 05/09/2026) : score d'énergie en valeur, score de sommeil en note.
+        // "sommeil", 05/09/2026) : score d'énergie en valeur, durée de sommeil réelle en note.
         val KEYS = listOf("poids", "pas", "calories", "eau", "energie", "sync")
     }
 

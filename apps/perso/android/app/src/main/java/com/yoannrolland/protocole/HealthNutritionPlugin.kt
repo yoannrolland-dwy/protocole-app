@@ -3,8 +3,8 @@ package com.yoannrolland.protocole
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.HydrationRecord
+import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.NutritionRecord
-import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.WeightRecord
@@ -45,6 +45,29 @@ class HealthNutritionPlugin : Plugin() {
         if (HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE)
             HealthConnectClient.getOrCreate(context)
         else null
+
+    /**
+     * `readRecords` pagine par défaut à 1000 enregistrements (`ReadRecordsRequest.pageSize`)
+     * et ne renvoie que la première page si on ignore `pageToken` — sans conséquence pour
+     * poids/sommeil/nutrition (quelques enregistrements par jour), mais silencieusement FAUX
+     * pour la FC continue (`HeartRateRecord`) : sur 14 jours, largement plus de 1000
+     * enregistrements existent, triés du plus ANCIEN au plus récent — la première page
+     * s'arrêtait donc pile avant les données du jour même. Bug trouvé le 05/09/2026 (les
+     * FC repos de tous les jours SAUF aujourd'hui apparaissaient). Boucle sur toutes les
+     * pages tant que `pageToken` n'est pas vide.
+     */
+    private suspend fun <T : androidx.health.connect.client.records.Record> readAllRecords(
+        hc: HealthConnectClient, recordType: kotlin.reflect.KClass<T>, range: TimeRangeFilter
+    ): List<T> {
+        val all = mutableListOf<T>()
+        var pageToken: String? = null
+        do {
+            val resp = hc.readRecords(ReadRecordsRequest(recordType, range, pageToken = pageToken))
+            all.addAll(resp.records)
+            pageToken = resp.pageToken
+        } while (!pageToken.isNullOrEmpty())
+        return all
+    }
 
     /**
      * Outil de diagnostic (non utilisé par la synchro normale) — dump brut du contenu de
@@ -284,13 +307,21 @@ class HealthNutritionPlugin : Plugin() {
     }
 
     /**
-     * Renvoie, par date locale (yyyy-MM-dd), la FC repos moyenne du jour (05/09/2026, score
-     * d'énergie — voir packages/core/src/energy.js).
+     * Renvoie, par "jour de sommeil" (yyyy-MM-dd), une FC repos calculée MAISON (05/09/2026,
+     * score d'énergie — voir packages/core/src/energy.js) : moyenne des mesures de FC
+     * (`HeartRateRecord`, mesures continues) tombant dans les phases de sommeil RÉEL (hors
+     * éveil) de la nuit.
      *
-     * Health Connect n'a de FC repos QUE si une app source (Samsung Health) l'y écrit — même
-     * incertitude que pour le poids (readWeight ci-dessus) avant son premier test réel. Non
-     * vérifié sur ce téléphone à l'écriture de cette fonction : le score d'énergie affiche
-     * honnêtement "pas assez de données" si `days` reste vide après synchro.
+     * **v1 abandonnée le 05/09/2026** : lisait `RestingHeartRateRecord`, le type dédié de
+     * Health Connect — resté vide après synchro sur cet appareil alors que Samsung Health
+     * affiche bien une FC repos dans sa propre UI. Confirmé : Samsung Health ne pousse
+     * aucun `RestingHeartRateRecord` dans Health Connect ici, seulement la FC continue.
+     * Cette v2 la reconstruit depuis les mesures brutes, en réutilisant le même découpage
+     * "jour de sommeil" que `readSleep()` (fenêtre midi-veille à midi-jour même) et les
+     * mêmes phases de sommeil (stages) pour exclure les moments éveillé-au-lit.
+     *
+     * Une nuit sans détail par phase (pas de `stages`, cas déjà géré par `readSleep`) retombe
+     * sur la période brute coucher→réveil pour cette part de la nuit — mieux qu'aucune donnée.
      */
     @PluginMethod
     fun readRestingHeartRate(call: PluginCall) {
@@ -302,22 +333,41 @@ class HealthNutritionPlugin : Plugin() {
             try {
                 val range = TimeRangeFilter.between(Instant.parse(start), Instant.parse(end))
 
-                fun dayOf(instant: Instant) =
-                    instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString()
+                fun sleepDayOf(instant: Instant): String {
+                    val zdt = instant.atZone(java.time.ZoneId.systemDefault())
+                    val d = if (zdt.hour < 12) zdt.toLocalDate() else zdt.toLocalDate().plusDays(1)
+                    return d.toString()
+                }
 
-                // Même précaution que poids/sommeil : dédoublonne par (source, instant),
-                // garde le plus récemment écrit.
-                val records = hc.readRecords(ReadRecordsRequest(RestingHeartRateRecord::class, range)).records
-                    .groupBy { "${it.metadata.dataOrigin.packageName}|${it.time}" }
+                val sleepRecords = readAllRecords(hc, SleepSessionRecord::class, range)
+                    .groupBy { "${it.metadata.dataOrigin.packageName}|${it.startTime}" }
                     .values.map { grp -> grp.maxByOrNull { it.metadata.lastModifiedTime }!! }
 
+                if (sleepRecords.isEmpty()) { call.resolve(JSObject().put("days", JSObject())); return@launch }
+
+                // Fenêtre de lecture FC élargie de 2h de part et d'autre du sommeil connu :
+                // `readRecords` ne renvoie que ce qui tombe STRICTEMENT dans la plage
+                // demandée, une marge évite de rater des mesures proches des bords.
+                val hrStart = sleepRecords.minOf { it.startTime }.minusSeconds(2 * 3600)
+                val hrEnd = sleepRecords.maxOf { it.endTime }.plusSeconds(2 * 3600)
+                // `readAllRecords` (pas `hc.readRecords` direct) : indispensable ici, voir sa
+                // doc — sur 14 jours de FC continue, une seule page (1000 enregistrements)
+                // s'arrêtait avant les données les plus récentes.
+                val hrSamples = readAllRecords(hc, HeartRateRecord::class, TimeRangeFilter.between(hrStart, hrEnd))
+                    .flatMap { it.samples }
+
                 val out = JSObject()
-                records.groupBy { dayOf(it.time) }.forEach { (day, recs) ->
-                    // Plusieurs échantillons le même jour (rare pour une FC "repos") :
-                    // moyenne plutôt que le dernier, cohérent avec l'intention "FC repos du
-                    // jour" plutôt qu'un instant précis.
-                    val avgBpm = recs.map { it.beatsPerMinute }.average()
-                    out.put(day, Math.round(avgBpm).toInt())
+                sleepRecords.groupBy { sleepDayOf(it.endTime) }.forEach { (day, group) ->
+                    // Fenêtres "asleep" (STAGE_TYPE_AWAKE=1/OUT_OF_BED=3/AWAKE_IN_BED=7
+                    // exclus, même liste que readSleep) ; repli sur la période brute
+                    // coucher→réveil du segment si aucune phase n'y est disponible.
+                    val windows = group.flatMap { r ->
+                        val asleep = r.stages.filter { it.stage !in setOf(1, 3, 7) }
+                        if (asleep.isNotEmpty()) asleep.map { it.startTime to it.endTime }
+                        else listOf(r.startTime to r.endTime)
+                    }
+                    val inWindow = hrSamples.filter { s -> windows.any { (a, b) -> !s.time.isBefore(a) && !s.time.isAfter(b) } }
+                    if (inWindow.isNotEmpty()) out.put(day, Math.round(inWindow.map { it.beatsPerMinute }.average()).toInt())
                 }
                 call.resolve(JSObject().put("days", out))
             } catch (e: Exception) {
