@@ -127,14 +127,20 @@ export function mergeZoneStates(states) {
   return { ...worst, unknown: known.length === 0 };
 }
 
-// Config des deux zones réelles de Yoann, seule utilisée aujourd'hui (par `recommender.js`
-// et `coach/prompt.js`) — aucun seuil précisé, donc les défauts de `zoneState` s'appliquent
+// Config de la seule zone réelle suivie par Yoann (par `recommender.js` et
+// `coach/prompt.js`) — aucun seuil précisé, donc les défauts de `zoneState` s'appliquent
 // à l'identique de l'ancien comportement figé. Une future `apps/public` construirait sa
 // propre liste (zéro zone par défaut, nom + seuils choisis par l'utilisateur) plutôt que de
 // réutiliser celle-ci.
+//
+// Le coude (tendon distal du biceps, gateTag "tirage") a été retiré le 05/09/2026 : plus
+// aucune douleur depuis son retour de vacances (confirmé par Yoann). Le mécanisme par TAG
+// (RawCare Phase 1) rend ce retrait sans risque : aucune zone ne portant plus "tirage", tout
+// gate/pénalité associé dans `recommender.js` devient silencieusement neutre (`NEUTRAL_ZONE`)
+// sans qu'aucune ligne de ce fichier n'ait besoin d'être touchée. L'historique `elbowLog`
+// reste dans `DATA_KEYS` (apps/perso/src/store.js) pour ne pas perdre les anciennes données
+// à l'export/import, mais plus aucun code n'écrit ni ne lit cette clé.
 export const DEFAULT_ZONES = [
   { key: "knee", label: "genou", gateTag: "genou", unknownIsCaution: true,
     coachClause: "tendon quadricipital (HSR, tempo 6 s, règle de Silbernagel : douleur ≤ 3-5/10 tolérée si retour à la base sous 24 h)" },
-  { key: "elbow", label: "coude", gateTag: "tirage", unknownIsCaution: false,
-    coachClause: "distale du biceps (prises neutres/pronation privilégiées, supination limitée)" },
 ];

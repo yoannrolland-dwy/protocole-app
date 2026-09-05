@@ -22,6 +22,7 @@ import { TEMPLATES, TYPES, DEFAULT_WEIGHTS, HSR_TABLE, hsrForWeek, hsrParse, par
 import { refSet, lastPerf, perfHistory, lastExerciseSets, medianTarget } from "@rawcare/core/session/perf";
 import { EXERCISE_LIBRARY } from "@rawcare/core/session/exercises";
 import { recommendSessions } from "@rawcare/core/recommender";
+import { computeEnergyScore, computeSleepScore } from "@rawcare/core/energy";
 import { PHASES, phaseTarget as phaseTargetCore, DEFAULT_TARGETS, isCutWindow, targetsForDate,
          kcalFromMacros, kcalOfEntry, tdeeNow, weeklyWeekdayKcalTrend } from "@rawcare/core/targets";
 import { buildCoachPrompt, buildCoachBriefing, splitCarnet, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
@@ -43,7 +44,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.70.0";
+const APP_VERSION = "3.71.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -210,7 +211,7 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
           </span>
         </div>
       )}
-      {state === "idle" && <Body style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Analyse tes 14 derniers jours (poids, macros, eau, séances, sommeil, douleurs genou/coude), au jour le jour et sur la semaine glissante. Nécessite ta clé API (Réglages).</Body>}
+      {state === "idle" && <Body style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Analyse tes 14 derniers jours (poids, macros, eau, séances, sommeil, douleur genou), au jour le jour et sur la semaine glissante. Nécessite ta clé API (Réglages).</Body>}
     </Card>
   );
 }
@@ -218,19 +219,18 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
 /* ============================================================
    TAB — DASHBOARD
    ============================================================ */
-function Dashboard({ weight, sleep, knee, elbow, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule }) {
+function Dashboard({ weight, sleep, knee, rhr, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule, weeklyPlan }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast ? round(wLast.kg - tgtW) : null;
 
   const lastNightDash = lastN(sleep, 1)[0];
+  const energy = useMemo(() => computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps }), [rhr, sleep, steps]);
 
-  const kToday = knee.find((k) => k.date === today());
-  const eToday = elbow.find((k) => k.date === today());
   const mToday = macros.find((m) => m.date === today());
   const kcalToday = mToday ? Math.round(kcalOfEntry(mToday)) : null;
 
-  const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee, elbow, sleep, targets, scheme, basketSchedule }), [training, knee, elbow, sleep, targets, scheme, basketSchedule]);
+  const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee, sleep, targets, scheme, basketSchedule, weeklyPlan, energy }), [training, knee, sleep, targets, scheme, basketSchedule, weeklyPlan, energy]);
 
   const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
   const waterToday = mToday?.water ?? 0;
@@ -255,15 +255,13 @@ function Dashboard({ weight, sleep, knee, elbow, macros, steps, targets, trainin
     { label: "Sommeil", tab: "sleep", val: lastNightDash ? fmtHM(lastNightDash.hours) : "—", unit: "",
       note: lastNightDash ? `${fmt(lastNightDash.date)}${lastNightDash.quality != null ? " · " + "★".repeat(lastNightDash.quality) : ""}` : "—",
       color: C.text },
-    // Deux tendinopathies actives : la tuile en montre deux valeurs plutôt qu'une seule.
-    // `pair` déclenche un rendu spécifique plus bas (val/unit/bar ne s'appliquent pas ici).
-    { label: "Douleurs", tab: "pain", note: "aujourd'hui",
-      pair: [
-        { k: "Genou", val: kToday ? kToday.pain : "—",
-          col: kToday && (kToday.baseline === false || kToday.pain >= 6) ? C.danger : kToday ? C.accent : C.muted },
-        { k: "Coude", val: eToday ? eToday.pain : "—",
-          col: eToday && (eToday.baseline === false || eToday.pain >= 6) ? C.danger : eToday ? C.accent : C.muted },
-      ] },
+    // Remplace la tuile "Douleurs" (05/09/2026, demande explicite de Yoann — le coude est
+    // retiré, le genou reste suivi mais n'a plus besoin de sa propre tuile ici). Score
+    // d'énergie façon Samsung Health, reconstruit depuis FC repos/sommeil/pas — "pas assez
+    // de données" tant que la FC repos n'a jamais été synchronisée (natif uniquement).
+    { label: "Score d'énergie", tab: "sleep", val: energy.status === "ok" ? energy.total : "—", unit: energy.status === "ok" ? "/100" : "",
+      note: energy.status === "ok" ? "aujourd'hui" : "pas assez de données", color: C.text,
+      bar: energy.status === "ok" ? energy.total : null },
   ];
 
   return (
@@ -439,7 +437,50 @@ function WeightTab({ weight, targets, save, phase }) {
 /* ============================================================
    TAB — SOMMEIL
    ============================================================ */
-function SleepTab({ sleep, save }) {
+// Couleur par palier de score (0-100) — mêmes seuils que ceux donnés par Yoann pour le
+// score de sommeil (85+ excellent, 75-84 bon, 60-74 correct, <60 risque), réutilisés tels
+// quels pour le score d'énergie (même échelle, même lecture).
+function scoreColor(v) {
+  if (v == null) return C.muted;
+  if (v >= 75) return C.accent;
+  if (v >= 60) return "#e8a33d";
+  return C.danger;
+}
+
+/** Carte "Score d'énergie" (05/09/2026) — reconstruction façon Samsung Health depuis FC
+ * repos/sommeil/pas (Health Connect, natif seulement). Détail des 4 modules toujours
+ * affiché, même si le total est indisponible : voir quel module manque plutôt qu'un simple
+ * "pas assez de données" muet. */
+function EnergyScoreCard({ energy }) {
+  return (
+    <Card style={{ padding: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+        <Label style={{ fontSize: 10, letterSpacing: 1.5 }}>Score d'énergie</Label>
+        {energy.status === "ok" && (
+          <span style={{ fontFamily: C.mono, fontSize: 22, fontWeight: 800, color: scoreColor(energy.total) }}>{energy.total}<span style={{ fontSize: 12, color: C.muted }}>/100</span></span>
+        )}
+      </div>
+      {energy.status !== "ok" && (
+        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 8 }}>
+          Pas assez de données pour un score complet — détail des modules ci-dessous.
+        </Body>
+      )}
+      {energy.modules.map((m) => (
+        <div key={m.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderTop: `1px solid ${C.divider}` }}>
+          <div>
+            <div style={{ fontSize: 11, color: C.text2 }}>{m.label}</div>
+            <div style={{ fontSize: 9.5, color: C.dim, marginTop: 1 }}>{m.reason}</div>
+          </div>
+          <div style={{ fontFamily: C.mono, fontSize: 13, fontWeight: 800, color: m.points == null ? C.dim : C.text, flexShrink: 0, marginLeft: 8 }}>
+            {m.points == null ? "—" : m.points}<span style={{ fontSize: 10, color: C.muted }}>/{m.max}</span>
+          </div>
+        </div>
+      ))}
+    </Card>
+  );
+}
+
+function SleepTab({ sleep, rhr, steps, save }) {
   const [date, setDate] = useState(today());
   const cur = sleep.find((s) => s.date === date);
   const initH = lastN(sleep, 1)[0]?.hours ?? 7.5;
@@ -457,10 +498,14 @@ function SleepTab({ sleep, save }) {
   const avg7 = avg(last7.map((s) => s.hours));
   const lastNight = lastN(sleep, 1)[0];
   const data = lastN(sleep, 21).map((s) => ({ date: fmt(s.date), hours: s.hours }));
+  const energy = useMemo(() => computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps }), [rhr, sleep, steps]);
+  const sleepScore = computeSleepScore(lastNight);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader title="Sommeil" subtitle="récupération tendon & muscle" />
+      <ScreenHeader title="Énergie" subtitle="récupération tendon & muscle" />
+
+      <EnergyScoreCard energy={energy} />
 
       <Card style={{ padding: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -469,10 +514,15 @@ function SleepTab({ sleep, save }) {
             <span style={{ fontSize: 13, color: C.accent, letterSpacing: 1 }}>{"★".repeat(lastNight.quality)}<span style={{ color: C.dim }}>{"★".repeat(4 - lastNight.quality)}</span></span>
           )}
         </div>
-        <div style={{ margin: "6px 0 14px" }}>
+        <div style={{ margin: "6px 0 14px", display: "flex", alignItems: "baseline", gap: 10 }}>
           <span style={{ fontFamily: C.mono, fontSize: 44, fontWeight: 800, color: C.text }}>
             {lastNight ? fmtHM(lastNight.hours) : "—"}
           </span>
+          {sleepScore != null && (
+            <span style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 800, color: scoreColor(sleepScore) }}>
+              {sleepScore}<span style={{ fontSize: 10, color: C.muted, fontWeight: 400 }}>/100</span>
+            </span>
+          )}
         </div>
         <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 44 }}>
           {last7.length ? last7.map((s, i) => (
@@ -1319,7 +1369,7 @@ const blocStep = {
   fontFamily: "inherit", lineHeight: 1,
 };
 
-function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow, scheme }) {
+function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme }) {
   const [open, setOpen] = useState(null);
   const [progress, setProgress] = useState(false);
   const [date, setDate] = useState(today());
@@ -1371,7 +1421,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow, scheme }) 
   // Records rejoués sur tout l'historique (V4) : quelles séances contenaient un record au
   // moment où elles ont eu lieu. Clé par référence d'objet, comme la suppression.
   const records = useMemo(() => recordsBySession(training), [training]);
-  const painRed = painOutOfBase([knee, elbow], date);
+  const painRed = painOutOfBase([knee], date);
 
   if (open && TEMPLATES[open]?.kind === "muscu") {
     return (
@@ -1463,7 +1513,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow, scheme }) 
           // Marqueur record : la séance contenait au moins une meilleure série de tous les
           // temps AU MOMENT où elle a eu lieu, et aucun tendon n'était hors base ce jour-là.
           const rec = records.get(t);
-          const recShown = rec && !painOutOfBase([knee, elbow], t.date);
+          const recShown = rec && !painOutOfBase([knee], t.date);
           return (
           <div key={i} onClick={() => editSession(t)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderTop: `1px solid ${C.divider}`, cursor: "pointer" }}>
             <div>
@@ -1500,43 +1550,40 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, elbow, scheme }) 
 }
 
 /* ============================================================
-   TAB — DOULEURS (genou + coude)
+   TAB — DOULEURS (genou — le coude a été retiré le 05/09/2026)
    ============================================================ */
 // Une zone = un journal (clé localStorage distincte, même forme `{date, pain, baseline}`)
 // et son habillage. Ajouter une 3e zone un jour ne coûte qu'une entrée ici + une clé dans
 // `DATA_KEYS` + une ligne dans `save` — c'est le but de cette table.
+//
+// Le coude (tendon distal du biceps) a été retiré le 05/09/2026 : plus aucune douleur
+// depuis le retour de vacances de Yoann (confirmé par lui). `elbowLog` reste dans
+// `DATA_KEYS` (store.js) pour ne pas perdre l'historique déjà exporté, mais plus aucun
+// code ne le lit ni ne l'écrit — si le coude redevient un jour un problème, il suffira de
+// rajouter une entrée ici.
 const PAIN_ZONES = [
   {
     key: "knee", label: "Genou",
     title: "Genou · réhab", sub: "tendon quadricipital · HSR · Silbernagel",
-    // La table HSR est propre au quadricipital : elle ne doit pas s'afficher sous la zone
-    // Coude, où elle n'a aucun sens. Les routines guidées (rééduc/échauffement basket) ont
-    // déménagé dans l'onglet Séances le 04/09/2026 (voir CLAUDE.md) — loguées comme de
-    // vraies séances ("Mobilité", "Basket") plutôt que jouées ici hors historique.
+    // Les routines guidées (rééduc/échauffement basket) ont déménagé dans l'onglet Séances
+    // le 04/09/2026 (voir CLAUDE.md) — loguées comme de vraies séances ("Mobilité",
+    // "Basket") plutôt que jouées ici hors historique.
     hsr: true,
     alertText: "Décharge : pas de basket ni de Lower tant que la douleur n'est pas revenue à sa base. Réduire charge ou amplitude à la prochaine exposition.",
   },
-  {
-    key: "elbow", label: "Coude",
-    title: "Coude · réhab", sub: "tendon distal du biceps · prises neutres · Silbernagel",
-    hsr: false,
-    alertText: "Décharge du tirage : pas d'escalade ni d'Upper tant que la douleur n'est pas revenue à sa base. Prises neutres/pronation, supination (chin-ups) à éviter.",
-  },
 ];
 
-function PainTab({ knee, elbow, save, hsrWeek }) {
-  const logs = { knee, elbow };
-  const [zoneKey, setZoneKey] = useState("knee");
-  const zone = PAIN_ZONES.find((z) => z.key === zoneKey);
-  const log = logs[zoneKey];
-  const entryOf = (zk, d) => (logs[zk] || []).find((e) => e.date === d);
+function PainTab({ knee, save, hsrWeek }) {
+  // Une seule zone désormais (genou) : plus de sélecteur de zone, `zone`/`log` sont fixes.
+  const zone = PAIN_ZONES[0];
+  const log = knee;
 
   const [date, setDate] = useState(today());
   // Aucune valeur par défaut (ni 4 ni 5) : rien n'est présélectionné à l'ouverture, et
   // l'enregistrement reste bloqué tant qu'un chiffre n'a pas été touché. Demandé
   // explicitement pour forcer une vraie évaluation de la sensation plutôt qu'un
   // enregistrement réflexe — une entrée « par défaut » fausserait l'historique et la
-  // règle de Silbernagel. Vaut pour les deux zones.
+  // règle de Silbernagel.
   // ...mais si le jour affiché a DÉJÀ une entrée, on la recharge (exigence explicite) :
   // sinon l'écran afficherait « rien de noté » alors que la donnée existe, et on risquerait
   // de croire la journée non renseignée. Les onglets ne sont montés qu'une fois le
@@ -1545,17 +1592,16 @@ function PainTab({ knee, elbow, save, hsrWeek }) {
   const existingToday = (knee || []).find((k) => k.date === today());
   const [pain, setPain] = useState(existingToday ? existingToday.pain : null);
   const [baseline, setBaseline] = useState(existingToday ? existingToday.baseline !== false : true);
-  // Changer de date OU de zone recharge l'entrée existante, ou remet à vide si la
-  // combinaison visée n'a rien — sans ce reset, la douleur d'une autre date (ou de l'autre
-  // tendon) resterait affichée et pourrait être enregistrée par erreur.
-  const pick = (zk, d) => {
-    setZoneKey(zk); setDate(d);
-    const e = entryOf(zk, d);
+  // Changer de date recharge l'entrée existante, ou remet à vide si le jour visé n'a rien —
+  // sans ce reset, la douleur d'une autre date resterait affichée et pourrait être
+  // enregistrée par erreur.
+  const pickDate = (d) => {
+    setDate(d);
+    const e = (log || []).find((x) => x.date === d);
     setPain(e ? e.pain : null);
     setBaseline(e ? e.baseline !== false : true);
   };
-  const pickDate = (d) => pick(zoneKey, d);
-  const add = () => { if (pain == null) return; save[zoneKey](upsert(log, { date, pain, baseline })); };
+  const add = () => { if (pain == null) return; save.knee(upsert(log, { date, pain, baseline })); };
 
   const kLast = lastN(log, 1)[0];
   // Même logique de péremption que le recommandeur : une alerte vieille de dix jours
@@ -1569,8 +1615,6 @@ function PainTab({ knee, elbow, save, hsrWeek }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <ScreenHeader title={zone.title} subtitle={zone.sub} />
-
-      <Pills options={PAIN_ZONES.map((z) => ({ key: z.key, label: z.label }))} value={zoneKey} onChange={(k) => pick(k, date)} />
 
       <Card>
         <Label style={{ marginBottom: 8 }}>Douleur · 30 jours</Label>
@@ -1634,7 +1678,7 @@ function PainTab({ knee, elbow, save, hsrWeek }) {
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <Btn variant="primary" onClick={add} disabled={pain == null} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
           {log.some((k) => k.date === date) && (
-            <Btn variant="danger" onClick={() => save[zoneKey](log.filter((k) => k.date !== date))}><Trash2 size={14} /></Btn>
+            <Btn variant="danger" onClick={() => save.knee(log.filter((k) => k.date !== date))}><Trash2 size={14} /></Btn>
           )}
         </div>
       </Card>
@@ -1716,26 +1760,60 @@ function TdeeCard({ result, deficitReel }) {
 // Planning hebdomadaire idéal (01/09/2026) — affiché à titre de référence dans l'onglet TDEE,
 // jamais lu par le recommandeur ni le Coach IA : c'est un repère pour Yoann, pas une règle
 // appliquée automatiquement. Deux variantes selon qu'il y a match ou non dans la semaine.
+// Mardi/Jeudi inversés le 05/09/2026 (demande explicite de Yoann) : Upper passe au jeudi,
+// le repos actif remonte au mardi. `WEEKLY_PLAN_FAMILIES` ci-dessous DOIT rester en phase
+// avec ce texte (même inversion) — voir `familiesForToday`, qui couple ce planning au
+// recommandeur ("Prochaine séance").
 const WEEKLY_PLAN = {
   sansMatch: [
     { jour: "Lundi", texte: "Lower A (HSR lourd)" },
-    { jour: "Mardi", texte: "Upper A" },
+    { jour: "Mardi", texte: "Repos actif — 10k pas, mobilité douce ; iso genou et/ou escalade légère en option selon ressenti" },
     { jour: "Mercredi", texte: "Mobilité (matin) · Basket (soir)" },
-    { jour: "Jeudi", texte: "Repos actif — 10k pas, mobilité douce ; iso genou et/ou escalade légère en option selon ressenti" },
+    { jour: "Jeudi", texte: "Upper A" },
     { jour: "Vendredi", texte: "Mobilité (matin) · Basket (midi)" },
     { jour: "Samedi", texte: "Lower B (HSR)" },
     { jour: "Dimanche", texte: "Upper B" },
   ],
   avecMatch: [
     { jour: "Lundi", texte: "Lower C (HSR lourd)" },
-    { jour: "Mardi", texte: "Upper A" },
+    { jour: "Mardi", texte: "Repos actif — même logique que la semaine sans match" },
     { jour: "Mercredi", texte: "Mobilité (matin) · Basket (soir)" },
-    { jour: "Jeudi", texte: "Repos actif — même logique que la semaine sans match" },
+    { jour: "Jeudi", texte: "Upper A" },
     { jour: "Vendredi", texte: "Mobilité (matin) · Basket (midi)" },
     { jour: "Samedi", texte: "Upper B + routine iso quad autonome" },
     { jour: "Dimanche", texte: "Match" },
   ],
 };
+
+// Version machine-lisible du planning ci-dessus, couplée au recommandeur (05/09/2026) :
+// pour chaque jour de la semaine (index `Date#getDay()`, 0=dimanche...6=samedi), la ou les
+// "familles" de séance prévues. Une famille est un préfixe de type reconnu par
+// `recommendSessions` (packages/core/src/recommender.js) — "Upper" matche "Upper A"/"Upper
+// B", "Lower" matche "Lower A/B/C", "Repos" matche "Repos / mobilité". "Mobilité" ne matche
+// aucun type suggéré automatiquement (c'est un choix manuel, jamais suggéré) : gardée ici
+// à titre documentaire, sans effet sur le score.
+const WEEKLY_PLAN_FAMILIES = {
+  sansMatch: { 1: ["Lower"], 2: ["Repos"], 3: ["Mobilité", "Basket"], 4: ["Upper"], 5: ["Mobilité", "Basket"], 6: ["Lower"], 0: ["Upper"] },
+  avecMatch: { 1: ["Lower"], 2: ["Repos"], 3: ["Mobilité", "Basket"], 4: ["Upper"], 5: ["Mobilité", "Basket"], 6: ["Upper"], 0: ["Basket"] },
+};
+
+/**
+ * Familles du planning idéal pour AUJOURD'HUI, à passer telles quelles à `recommendSessions`
+ * (`weeklyPlan`) — le recommandeur ne sait rien du planning lui-même, juste matcher une
+ * famille à un type suggéré (bonus modéré, jamais un remplacement, voir recommender.js).
+ *
+ * Variante avec/sans match détectée AUTOMATIQUEMENT depuis `basketSchedule.matchDates` : un
+ * match ce dimanche (fin de la semaine en cours, lundi-dimanche) → "avecMatch", sinon
+ * "sansMatch". Décision explicite de Yoann (05/09/2026) plutôt qu'un réglage manuel à
+ * rebasculer chaque semaine — cohérent avec le planning déjà configuré en Réglages.
+ */
+function familiesForToday(basketSchedule) {
+  const dow = new Date().getDay(); // 0=dimanche...6=samedi
+  const daysUntilSunday = dow === 0 ? 0 : 7 - dow;
+  const sundayKey = shiftDateKey(today(), daysUntilSunday);
+  const variant = basketSchedule?.matchDates?.includes(sundayKey) ? "avecMatch" : "sansMatch";
+  return WEEKLY_PLAN_FAMILIES[variant][dow] || [];
+}
 
 /* ============================================================
    TAB — PERFORMANCE
@@ -2256,7 +2334,10 @@ export default function App({ silent = false } = {}) {
   const [sleep, setSleep] = useState([]);
   const [training, setTraining] = useState([]);
   const [knee, setKnee] = useState([]);
-  const [elbow, setElbow] = useState([]);
+  // FC repos (Health Connect, natif seulement — 05/09/2026, score d'énergie) : `{date, bpm}`,
+  // même famille que weightLog/stepsLog. Vide sur la PWA (jamais synchronisée), le score
+  // d'énergie affiche alors "pas assez de données" plutôt qu'un chiffre inventé.
+  const [rhr, setRhr] = useState([]);
   const [macros, setMacros] = useState([]);
   const [steps, setSteps] = useState([]);
   const [notes, setNotes] = useState([]);
@@ -2295,7 +2376,7 @@ export default function App({ silent = false } = {}) {
       if (trainingMigrated) store.set("trainingLog", migratedTraining);
       setTraining(migratedTraining);
       setKnee(await store.get("kneeLog", []));
-      setElbow(await store.get("elbowLog", []));
+      setRhr(await store.get("rhrLog", []));
       setMacros(await store.get("macroLog", []));
       setSteps(await store.get("stepsLog", []));
       setNotes(await store.get("noteLog", []));
@@ -2371,6 +2452,17 @@ export default function App({ silent = false } = {}) {
         return next;
       });
     }
+    // FC repos (05/09/2026, score d'énergie) — pas de note "source" ici : contrairement au
+    // poids/sommeil/pas, il n'existe aucune saisie manuelle de la FC repos dans l'app, donc
+    // pas de conflit "manuel vs synchronisé" à arbitrer.
+    if (Object.keys(result.rhrByDate || {}).length) {
+      setRhr((prev) => {
+        let next = prev;
+        Object.entries(result.rhrByDate).forEach(([date, bpm]) => { next = upsert(next, { date, bpm }); });
+        store.set("rhrLog", next);
+        return next;
+      });
+    }
     setHealthSync({ status: "ok", at: new Date().toISOString() });
   };
 
@@ -2425,13 +2517,17 @@ export default function App({ silent = false } = {}) {
   }, []);
 
   // Widget d'écran d'accueil (Android) : 5 valeurs des tuiles du tableau de bord
-  // (Poids, Calories, Sommeil, Pas, Eau), reformatées pour l'affichage natif — la 6e
+  // (Poids, Calories, Énergie, Pas, Eau), reformatées pour l'affichage natif — la 6e
   // tuile du widget est un bouton Sync, pas une donnée (voir widgetSync.js /
-  // DashboardWidgetProvider.kt).
+  // DashboardWidgetProvider.kt). La tuile "Sommeil" est devenue "Énergie" le 05/09/2026 :
+  // valeur = score d'énergie, note = score de sommeil (les deux scores demandés par Yoann
+  // pour le widget, faute de place pour davantage sur une tuile aussi étroite).
   useEffect(() => {
     if (loading || !Capacitor.isNativePlatform()) return;
     const wLast = lastN(weight, 1)[0];
     const lastNightDash = lastN(sleep, 1)[0];
+    const energyDash = computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps });
+    const sleepScoreDash = computeSleepScore(lastNightDash);
     const mToday = macros.find((m) => m.date === today());
     const kcalToday = mToday ? Math.round(kcalOfEntry(mToday)) : null;
     const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
@@ -2446,9 +2542,9 @@ export default function App({ silent = false } = {}) {
       pas: { value: stepsToday.toLocaleString("fr-FR"), note: `/ ${STEPS_TARGET.toLocaleString("fr-FR")}` },
       calories: { value: kcalToday != null ? `${kcalToday}` : "—", note: `/ ${kcalTgt} kcal` },
       eau: { value: `${(waterToday / 1000).toFixed(2)} L`, note: `/ ${(waterTgt / 1000).toFixed(1)} L` },
-      sommeil: {
-        value: lastNightDash ? fmtHM(lastNightDash.hours) : "—",
-        note: lastNightDash?.quality != null ? "★".repeat(lastNightDash.quality) : "—",
+      energie: {
+        value: energyDash.status === "ok" ? `${energyDash.total}` : "—",
+        note: sleepScoreDash != null ? `Sommeil ${sleepScoreDash}` : "—",
       },
       // Pas de "value" affichée pour ce tile (juste l'icône Sync) — seule la note sert,
       // horodatage du dernier instantané poussé au widget (peu importe si déclenché par
@@ -2464,7 +2560,7 @@ export default function App({ silent = false } = {}) {
     sleep: (v) => { setSleep(v); store.set("sleepLog", v); },
     training: (v) => { setTraining(v); store.set("trainingLog", v); },
     knee: (v) => { setKnee(v); store.set("kneeLog", v); },
-    elbow: (v) => { setElbow(v); store.set("elbowLog", v); },
+    rhr: (v) => { setRhr(v); store.set("rhrLog", v); },
     macros: (v) => { setMacros(v); store.set("macroLog", v); },
     steps: (v) => { setSteps(v); store.set("stepsLog", v); },
     notes: (v) => { setNotes(v); store.set("noteLog", v); },
@@ -2499,13 +2595,14 @@ export default function App({ silent = false } = {}) {
   const coach = {
     buildPrompt: (note, { profile = coachProfile, journal = coachJournal } = {}) =>
       buildCoachPrompt({
-        weight, sleep, training, knee, elbow, macros, notes, steps, targets, phase,
+        weight, sleep, training, knee, macros, notes, steps, targets, phase,
         foodLog: getSync("foodLog", []), foodOverrides: getSync("foodOverrides", {}),
-        profile, journal, scheme, basketSchedule,
+        profile, journal, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule),
+        energy: computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps }),
       }, note),
     buildBriefing: () =>
       buildCoachBriefing({
-        weight, sleep, training, knee, elbow, macros, notes, steps, targets, phase,
+        weight, sleep, training, knee, macros, notes, steps, targets, phase,
         foodLog: getSync("foodLog", []), foodOverrides: getSync("foodOverrides", {}),
         profile: coachProfile, journal: coachJournal, scheme,
       }),
@@ -2522,7 +2619,7 @@ export default function App({ silent = false } = {}) {
   const NAV = [
     { key: "dash", label: "Bord", icon: LayoutDashboard },
     { key: "weight", label: "Poids", icon: Scale },
-    { key: "sleep", label: "Sommeil", icon: Moon },
+    { key: "sleep", label: "Énergie", icon: Moon },
     { key: "steps", label: "Pas", icon: Footprints },
     { key: "train", label: "Séances", icon: Dumbbell },
     { key: "pain", label: "Douleurs", icon: HeartPulse },
@@ -2569,12 +2666,12 @@ export default function App({ silent = false } = {}) {
           <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, climbScheme, setClimbScheme, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, elbow, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme, basketSchedule }} openSettings={() => setShowSettings(true)} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule) }} openSettings={() => setShowSettings(true)} />}
             {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
-            {tab === "sleep" && <SleepTab {...{ sleep, save }} />}
+            {tab === "sleep" && <SleepTab {...{ sleep, rhr, steps, save }} />}
             {tab === "steps" && <StepsTab {...{ steps, save }} />}
-            {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, elbow, scheme }} />}
-            {tab === "pain" && <PainTab {...{ knee, elbow, save, hsrWeek }} />}
+            {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, scheme }} />}
+            {tab === "pain" && <PainTab {...{ knee, save, hsrWeek }} />}
             {tab === "perf" && <PerformanceTab {...{ macros, targets, training, weight }} />}
             {tab === "macro" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} apiKey={apiKey} model={model} />}
           </>

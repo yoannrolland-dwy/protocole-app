@@ -82,26 +82,27 @@ export const mealsFor = (log, date) => {
 };
 
 /**
- * `data` : { weight, sleep, training, knee, elbow, macros, notes, steps, targets, phase,
+ * `data` : { weight, sleep, training, knee, macros, notes, steps, targets, phase,
  *            foodLog, foodOverrides, profile, journal, zones, painLogs, identity }
  * `foodLog`/`foodOverrides` doivent être lus fraîchement par l'appelant (getSync), jamais
  * mis en cache, pour ne jamais rater une correction ou un repas ajouté entre deux appels.
  *
+ * `elbow` (coude, retiré le 05/09/2026 — plus de douleur depuis le retour de vacances de
+ * Yoann) n'est plus lu : `DEFAULT_ZONES` (packages/core/src/pain.js) ne porte plus qu'une
+ * zone, genou.
+ *
  * `zones`/`painLogs`/`identity` (RawCare, chantier Coach IA public — 06/08/2026) : additifs,
  * optionnels. Absents (apps/perso) → comportement identique bit pour bit à avant : zones
- * reconstruites depuis `DEFAULT_ZONES`/`knee`/`elbow`, identité par défaut "de Yoann, 43 ans,
+ * reconstruites depuis `DEFAULT_ZONES`/`knee`, identité par défaut "de Yoann, 43 ans,
  * athlète (muscu/basket/escalade)". Fournis (apps/public, zones dynamiques de
  * l'utilisateur — voir packages/core/src/pain.js) : `zones` = résultat déjà construit de
  * `buildZones(zoneDefs, painLogs, t0)`, `identity` = clause d'ouverture du `system`
- * substituée. Les champs douleur passent alors d'un format nommé genou/coude à un tableau
- * générique par zone — contourner ça en passant `knee:[]/elbow:[]` ne suffirait pas :
- * `DEFAULT_ZONES` reste codé en dur pour la clause de tendinopathies, donc le prompt
- * affirmerait quand même « deux tendinopathies en rééduc » à tort pour un utilisateur qui
- * n'a pas ce problème.
+ * substituée. Les champs douleur passent alors d'un format nommé genou à un tableau
+ * générique par zone.
  */
 export function buildCoachPrompt(data, note) {
-  const { weight, sleep, training, knee, elbow, macros, notes, steps, targets, phase,
-    foodLog, foodOverrides, profile, journal, scheme, zones, painLogs, identity, basketSchedule } = data;
+  const { weight, sleep, training, knee, macros, notes, steps, targets, phase,
+    foodLog, foodOverrides, profile, journal, scheme, zones, painLogs, identity, basketSchedule, weeklyPlan, energy } = data;
 
   // Dépense adaptative (V7) : mêmes données, même calcul que la carte de l'onglet
   // Macros (`tdeeNow`) — jamais deux chiffres différents pour la même réalité.
@@ -118,13 +119,13 @@ export function buildCoachPrompt(data, note) {
   // `zones` passé tel quel (undefined pour apps/perso, reconstruit en interne par
   // recommendSessions exactement comme avant — voir recommender.js) : jamais deux verdicts
   // différents entre cette fonction et la carte "Prochaine séance" côté apps/public.
-  const reco = recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme, basketSchedule });
+  const reco = recommendSessions({ training, knee, zones, sleep, targets, scheme, basketSchedule, weeklyPlan, energy });
 
   // Phrase "Deux tendinopathies en rééduc : ..." du system prompt, construite en itérant
   // sur les zones (RawCare Phase 1, 06/08/2026) plutôt qu'écrite en dur pour exactement
   // deux zones — chaque zone porte sa propre `coachClause` (packages/core/src/pain.js).
   // Produit un texte identique au caractère près pour les 2 zones actuelles (genou, coude).
-  const zonesForCoach = zones ?? buildZones(DEFAULT_ZONES, { knee, elbow }, today());
+  const zonesForCoach = zones ?? buildZones(DEFAULT_ZONES, { knee }, today());
   // Seules les zones avec une clause de rééduc définie alimentent cette phrase — une zone
   // "Autre" côté apps/public (suivi libre, `coachClause: null`) n'a pas de contrainte
   // clinique à énoncer ici, mais reste visible pour le modèle via `summary.douleurs`.
@@ -173,28 +174,20 @@ export function buildCoachPrompt(data, note) {
   const painSummary = {};
   if (!zones) {
     const kToday = findDay(knee, today()), kYest = findDay(knee, y);
-    const eToday = findDay(elbow, today()), eYest = findDay(elbow, y);
     const kLast = lastN(knee, 1)[0] ?? null;
-    const eLast = lastN(elbow, 1)[0] ?? null;
     painRealtime.douleur_genou_hier = kYest ? { pain: kYest.pain, base_ok: kYest.baseline !== false } : null;
     painRealtime.douleur_genou_aujourdhui = kToday ? { pain: kToday.pain, base_ok: kToday.baseline !== false } : null;
-    painRealtime.douleur_coude_hier = eYest ? { pain: eYest.pain, base_ok: eYest.baseline !== false } : null;
-    painRealtime.douleur_coude_aujourdhui = eToday ? { pain: eToday.pain, base_ok: eToday.baseline !== false } : null;
     painSummary.genou = {
       derniere_douleur: kLast?.pain ?? null, derniere_date: kLast?.date ?? null,
       base_ok: kLast ? kLast.baseline !== false : null,
       jours_hors_base_14j: win(knee, 0, 13).filter((k) => k.baseline === false).length,
       douleur_moy_7j: avgKey(win(knee, 0, 6), "pain"), douleur_moy_7j_precedents: avgKey(win(knee, 7, 13), "pain"),
     };
-    // Mêmes agrégats pour le tendon distal du biceps (V1, 03/08/2026) : jusqu'ici le
-    // coude n'existait que comme contrainte dans le `system`, sans un seul chiffre à
-    // commenter. Coût : quelques dizaines de tokens.
-    painSummary.coude = {
-      derniere_douleur: eLast?.pain ?? null, derniere_date: eLast?.date ?? null,
-      base_ok: eLast ? eLast.baseline !== false : null,
-      jours_hors_base_14j: win(elbow, 0, 13).filter((k) => k.baseline === false).length,
-      douleur_moy_7j: avgKey(win(elbow, 0, 6), "pain"), douleur_moy_7j_precedents: avgKey(win(elbow, 7, 13), "pain"),
-    };
+    // Le coude (tendon distal du biceps) a été retiré le 05/09/2026 : plus de douleur depuis
+    // le retour de vacances de Yoann, confirmé par lui. `summary.coude`/`douleur_coude_*`
+    // disparaissent avec lui — `zonesForCoach` (DEFAULT_ZONES, ci-dessus) ne compte plus
+    // qu'une zone, donc `tendinopathiesClause` s'ajuste déjà automatiquement à "Une
+    // tendinopathie en rééduc : tendon quadricipital (...)".
   } else {
     const logs = painLogs || {};
     painRealtime.douleurs = zonesForCoach.map((z) => {
@@ -224,11 +217,11 @@ export function buildCoachPrompt(data, note) {
   // depuis les libellés des zones réellement suivies — `null` si aucune, filtré à l'usage
   // plutôt que de laisser une mention "douleurs ()" vide.
   const painDomainClause = !zones
-    ? "douleurs genou ET coude (Silbernagel sur les deux tendons, priorité absolue si l'un des deux a flambé — le coude conditionne l'escalade et le tirage, le genou le Lower et le basket)"
+    ? "douleur genou (règle de Silbernagel, priorité absolue si elle a flambé — conditionne le Lower et le basket)"
     : zonesForCoach.length
       ? `douleur(s) suivie(s) (${zonesForCoach.map((z) => z.label).join(", ")}) — règle de Silbernagel, priorité absolue si l'une a flambé`
       : null;
-  const painMentionShort = !zones ? "genou ET coude" : (zonesForCoach.length ? zonesForCoach.map((z) => z.label).join(", ") : null);
+  const painMentionShort = !zones ? "genou" : (zonesForCoach.length ? zonesForCoach.map((z) => z.label).join(", ") : null);
   // "Yoann" nommément pour apps/perso (comportement inchangé) ; générique dès qu'une
   // `identity` custom est fournie (apps/public — pas de nom à présumer).
   const authorLabel = identity ? "l'utilisateur" : "Yoann";
@@ -355,7 +348,7 @@ ${(journal || "").trim() ? `CARNET DE BORD — état que TU as écrit à la fin 
 Structure ta réponse en deux temps :
 1. **Aujourd'hui / les prochaines 24h** : à partir du bloc TEMPS RÉEL, dis-lui concrètement quoi faire (ou éviter) MAINTENANT — ${["séance", "nutrition", "hydratation", "récupération", painMentionShort ? `douleurs (${painMentionShort})` : null].filter(Boolean).join(", ")} — en te basant sur ce qui s'est passé hier et sur les notes de contexte. \`repas_hier\`/\`repas_aujourdhui\` donnent le détail réel des aliments par repas (pas seulement les totaux macros) : commente la COMPOSITION si elle appelle un conseil concret (répartition protéique entre repas, repas trop pauvre/trop riche en fibres, timing autour de l'entraînement) — pas une simple relecture de la liste. Le champ \`recommandeur\` (dans RÉSUMÉ 14 JOURS) donne déjà un verdict calculé sur la séance du jour (score + motif, alternatives, à éviter) : appuie-toi dessus au lieu d'en recalculer un autre de ton côté — commente-le, nuance-le ou signale un désaccord argumenté si tu vois un facteur qu'il ignore, mais ne propose pas une séance différente sans le dire explicitement.
 2. **Tendance de fond (14 jours)** : ce qui se dessine sur la durée et ce qu'il faut ajuster pour la semaine à venir, EN CORRÉLANT explicitement poids, kcal, macros, fibres et eau à partir du dataset JOUR PAR JOUR (ex. un pic de poids coïncide-t-il avec un pic de glucides/sodium la veille plutôt qu'un vrai surplus calorique ? un manque de fibres ou d'eau coïncide-t-il avec une stagnation ?). Le champ \`depense_estimee\` (dans RÉSUMÉ 14 JOURS) donne déjà la dépense énergétique réelle calculée par le JS (tendance de poids lissée vs apports réels) avec sa fiabilité et sa fenêtre : utilise CE chiffre pour le déficit plutôt que d'en estimer un toi-même à la louche à partir du poids et des apports bruts. S'il chevauche la perte hydrique du début de sèche (\`chevauche_perte_eau\`) ou si la fiabilité est "faible", dis-le explicitement et nuance en conséquence — ne présente jamais ce chiffre comme définitif dans ce cas. S'il vaut "pas assez de données", n'invente pas de dépense chiffrée.
-Traite explicitement CHAQUE domaine : ${["poids (bruit quotidien vs moyenne glissante)", "macros (protéines jour le jour, reste en moyenne 7j)", "eau (jours de basket +1L)", "sommeil (impact récup)", "pas quotidiens (corrélation activité/résultat)", "séances (équilibre Upper/Lower, progressive overload exercice par exercice, respect coude/escalade)", painDomainClause].filter(Boolean).join(", ")}.
+Traite explicitement CHAQUE domaine : ${["poids (bruit quotidien vs moyenne glissante)", "macros (protéines jour le jour, reste en moyenne 7j)", "eau (jours de basket +1L)", "sommeil (impact récup)", "pas quotidiens (corrélation activité/résultat)", "séances (équilibre Upper/Lower, progressive overload exercice par exercice, gestion de charge sur l'escalade)", painDomainClause].filter(Boolean).join(", ")}.
 Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reciter les données brutes (cite seulement les chiffres qui appuient un conseil) : va droit aux conseils, en bullet points courts. Limite stricte : 500 mots maximum au total — écourte les détails plutôt que de laisser une section inachevée, et termine toujours par une phrase de conclusion complète. Ce n'est pas un avis médical.
 
 Puis, APRÈS ta conclusion, écris la ligne \`${CARNET_MARK}\` seule, et en dessous la version mise à jour du carnet de bord. Règles du carnet : c'est un ÉTAT, pas un journal — tu réécris la version complète à chaque fois, tu élagues ce qui est résolu ou périmé, tu gardes ce qui est en cours. ${CARNET_MAX_CHARS} caractères maximum. Y faire figurer : où en est la progression (chiffrée), ce que tu as demandé de changer et si ça a été appliqué, ce qui a marché ou pas, les points de vigilance en cours. Pas de conseils dedans, pas de redite de la réponse ci-dessus.`;
@@ -372,17 +365,18 @@ Puis, APRÈS ta conclusion, écris la ligne \`${CARNET_MARK}\` seule, et en dess
  * démarre avec tout le contexte. C'est le pendant « suivi de fond » du point du jour.
  */
 export function buildCoachBriefing(data) {
-  const { training, foodLog, sleep, knee, elbow, zones, painLogs } = data;
+  const { training, foodLog, sleep, knee, zones, painLogs } = data;
   const { system, user } = buildCoachPrompt(data, "");
   const brut = last14(training).filter((s) => s.exercices).map((s) => ({
     d: s.date, t: s.type,
     ex: s.exercices.map((e) => ({ n: e.nom, s: e.series.map((x) => `${x.poids || 0}x${x.val || 0}${x.leg ? "/" + x.leg : ""}`) })),
   }));
   const repasBrut = [...new Set(last14(foodLog).map((e) => e.date))].sort().map((d) => ({ d, ...mealsFor(foodLog, d) }));
-  // Dumps douleur bruts : "Genou brut"/"Coude brut" nommés si `zones` absent (identique à
-  // avant), une ligne par zone réelle sinon — mêmes raisons que dans buildCoachPrompt.
+  // Dump douleur brut : "Genou brut" seul si `zones` absent (le coude a été retiré le
+  // 05/09/2026, plus de journal à dumper), une ligne par zone réelle sinon — mêmes raisons
+  // que dans buildCoachPrompt.
   const painBrut = !zones
-    ? `Genou brut : ${JSON.stringify(last14(knee))}\nCoude brut : ${JSON.stringify(last14(elbow))}`
+    ? `Genou brut : ${JSON.stringify(last14(knee))}`
     : (zones.length
         ? zones.map((z) => `${z.label} brut : ${JSON.stringify(last14((painLogs || {})[z.key] || []))}`).join("\n")
         : "Aucune zone de douleur suivie.");

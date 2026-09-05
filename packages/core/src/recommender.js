@@ -67,7 +67,32 @@ function isScheduledBasket(basketSchedule, dateKey) {
   return basketSchedule.weekly.includes(new Date(y, m - 1, d).getDay());
 }
 
-export function recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme, extraSports, basketSchedule }) {
+// Planning idéal (onglet TDEE, "Planning idéal") : bonus de score MODÉRÉ, pas un remplacement
+// des suggestions calculées — Yoann veut que le recommandeur "privilégie ce programme mais
+// puisse l'adapter" (douleur, sommeil, charge, score d'énergie, jours de repos manquants),
+// donc un simple bonus additif qui s'ajoute à tout ce qui précède (05/09/2026), jamais un
+// score plancher ni un gate. `weeklyPlan` (optionnel, additif) : liste de "familles" de
+// séance prévues pour AUJOURD'HUI (ex. `["Lower"]`, `["Mobilité","Basket"]`, `["Repos"]`),
+// déjà résolue par l'appelant (apps/perso/src/App.jsx) selon le jour de la semaine ET la
+// variante avec/sans match — le recommandeur reste agnostique du contenu du planning
+// lui-même, il ne sait que matcher une famille à un type de séance suggéré.
+const PLAN_BONUS = 18;
+function matchesPlanFamily(type, family) {
+  if (family === "Repos") return type.startsWith("Repos");
+  return type.startsWith(family);
+}
+function applyPlanBonus(sugg, weeklyPlan) {
+  if (!weeklyPlan?.length) return;
+  sugg.forEach((s) => {
+    const family = weeklyPlan.find((f) => matchesPlanFamily(s.type, f));
+    if (family) {
+      s.score += PLAN_BONUS;
+      s.reason += ` Planning idéal du jour : ${family} — bonus de priorité (reste adaptable).`;
+    }
+  });
+}
+
+export function recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme, extraSports, basketSchedule, weeklyPlan, energy }) {
   const t0 = today();
   const isUpper = (t) => t.type === "Upper A" || t.type === "Upper B";
   // "Lower C" (01/09/2026, semaine avec match) compte dans le volume/dernier-fait Lower
@@ -205,6 +230,17 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   const load3 = within(training, 2).filter(isLoadBearing).length;
   const loadHigh = load3 >= 7;
 
+  // Score d'énergie façon Samsung Health (05/09/2026, packages/core/src/energy.js) : même
+  // philosophie que `sleepPoor`/`loadHigh` — un nudge, jamais un gate dur. `energy` est
+  // optionnel et additif (absent → aucun effet, comportement identique à avant ce
+  // paramètre) ; un score "insufficient" (donnée manquante, ex. FC repos jamais
+  // synchronisée) n'est PAS pénalisé non plus, pour ne jamais punir une absence de saisie
+  // comme le ferait le genou. Seuil (50/100) choisi à mi-chemin des paliers "correct"/
+  // "risque" du score de sommeil (même échelle de lecture) — à ajuster une fois le score
+  // validé sur plusieurs semaines réelles.
+  const energyLow = energy?.status === "ok" && energy.total < 50;
+  const energyNote = energyLow ? `Score d'énergie bas (${energy.total}/100) → séance allégée ou repos conseillé.` : null;
+
   // Fenêtre d'objectif (sèche avant vacances) : la règle du profil est de ne jamais AJOUTER
   // de volume à impact par rapport au rythme habituel — donc on n'interdit pas Basket/
   // Escalade (ils restent dans sa rotation normale), mais on n'inflate plus leur score et on
@@ -232,8 +268,8 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
 
   // Nudge fatigue partagé (sommeil + charge 3j), appliqué à toute option encore en lice —
   // jamais à Repos, qui doit au contraire en profiter.
-  const fatigueScore = (s) => s - (sleepPoor ? 6 : 0) - (loadHigh ? 6 : 0);
-  const fatigueReason = () => [sleepNote, loadHigh ? `${load3} séances sur les 3 derniers jours → fatigue à surveiller.` : null].filter(Boolean).join(" ");
+  const fatigueScore = (s) => s - (sleepPoor ? 6 : 0) - (loadHigh ? 6 : 0) - (energyLow ? 6 : 0);
+  const fatigueReason = () => [sleepNote, loadHigh ? `${load3} séances sur les 3 derniers jours → fatigue à surveiller.` : null, energyNote].filter(Boolean).join(" ");
 
   // ---- HAUT DU CORPS : jamais bloqué par le genou, mais bloqué par le coude ----
   const upV = variant("Upper A", "Upper B");
@@ -436,8 +472,14 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   // écarte aussi Lower et Basket, donc ne laisse quasiment rien d'autre).
   if (elbowRed) { restScore += 12; restReason += ` Coude hors base (${E.redWhy}) : tout le haut du corps est écarté aujourd'hui.`; }
   if (!kneeRed && loadHigh) { restScore += 8; restReason += ` ${load3} séances sur les 3 derniers jours → fatigue à surveiller.`; }
+  if (!kneeRed && energyLow) { restScore += 8; restReason += ` Score d'énergie bas (${energy.total}/100).`; }
   if (!kneeRed && cutOn) { restScore += 4; restReason += " Fenêtre de sèche : le repos ne compte pas comme volume manqué."; }
   push(sugg, "Repos / mobilité", restScore, restReason);
+
+  // Bonus planning idéal — appliqué en dernier, après tous les signaux de sécurité et de
+  // fatigue ci-dessus : un score déjà à 0 (bloqué ailleurs via `avoid`) ne repasse jamais
+  // par `sugg`, donc jamais bonifié malgré lui.
+  applyPlanBonus(sugg, weeklyPlan);
 
   return {
     suggestions: sugg.sort((a, b) => b.score - a.score).slice(0, 3),

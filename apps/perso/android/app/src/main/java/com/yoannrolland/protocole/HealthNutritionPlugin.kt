@@ -4,6 +4,7 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.HydrationRecord
 import androidx.health.connect.client.records.NutritionRecord
+import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.WeightRecord
@@ -278,6 +279,49 @@ class HealthNutritionPlugin : Plugin() {
                 call.resolve(JSObject().put("days", out))
             } catch (e: Exception) {
                 call.reject("Lecture poids impossible : ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Renvoie, par date locale (yyyy-MM-dd), la FC repos moyenne du jour (05/09/2026, score
+     * d'énergie — voir packages/core/src/energy.js).
+     *
+     * Health Connect n'a de FC repos QUE si une app source (Samsung Health) l'y écrit — même
+     * incertitude que pour le poids (readWeight ci-dessus) avant son premier test réel. Non
+     * vérifié sur ce téléphone à l'écriture de cette fonction : le score d'énergie affiche
+     * honnêtement "pas assez de données" si `days` reste vide après synchro.
+     */
+    @PluginMethod
+    fun readRestingHeartRate(call: PluginCall) {
+        val hc = client() ?: run { call.reject("Health Connect indisponible"); return }
+        val start = call.getString("startDate") ?: run { call.reject("startDate requis"); return }
+        val end = call.getString("endDate") ?: run { call.reject("endDate requis"); return }
+
+        scope.launch {
+            try {
+                val range = TimeRangeFilter.between(Instant.parse(start), Instant.parse(end))
+
+                fun dayOf(instant: Instant) =
+                    instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString()
+
+                // Même précaution que poids/sommeil : dédoublonne par (source, instant),
+                // garde le plus récemment écrit.
+                val records = hc.readRecords(ReadRecordsRequest(RestingHeartRateRecord::class, range)).records
+                    .groupBy { "${it.metadata.dataOrigin.packageName}|${it.time}" }
+                    .values.map { grp -> grp.maxByOrNull { it.metadata.lastModifiedTime }!! }
+
+                val out = JSObject()
+                records.groupBy { dayOf(it.time) }.forEach { (day, recs) ->
+                    // Plusieurs échantillons le même jour (rare pour une FC "repos") :
+                    // moyenne plutôt que le dernier, cohérent avec l'intention "FC repos du
+                    // jour" plutôt qu'un instant précis.
+                    val avgBpm = recs.map { it.beatsPerMinute }.average()
+                    out.put(day, Math.round(avgBpm).toInt())
+                }
+                call.resolve(JSObject().put("days", out))
+            } catch (e: Exception) {
+                call.reject("Lecture FC repos impossible : ${e.message}")
             }
         }
     }

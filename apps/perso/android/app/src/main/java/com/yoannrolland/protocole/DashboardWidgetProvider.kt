@@ -13,7 +13,7 @@ import android.os.Looper
 import android.widget.RemoteViews
 
 /**
- * Widget d'écran d'accueil : 5 tuiles du tableau de bord (Poids, Calories, Sommeil,
+ * Widget d'écran d'accueil : 5 tuiles du tableau de bord (Poids, Calories, Énergie,
  * Pas, Eau) en lecture seule, plus un bouton Sync. Tap sur une tuile de donnée ou sur
  * le fond du widget = ouvre l'app normalement. Le bouton Sync, lui, lance
  * SilentSyncActivity (invisible) qui exécute la synchro Health Connect sans jamais
@@ -77,7 +77,7 @@ class DashboardWidgetProvider : AppWidgetProvider() {
             fillTile(views, R.id.tile_pas_value, R.id.tile_pas_note, prefs, "pas")
             fillTile(views, R.id.tile_calories_value, R.id.tile_calories_note, prefs, "calories")
             fillTile(views, R.id.tile_eau_value, R.id.tile_eau_note, prefs, "eau")
-            fillTile(views, R.id.tile_sommeil_value, R.id.tile_sommeil_note, prefs, "sommeil")
+            fillTile(views, R.id.tile_energie_value, R.id.tile_energie_note, prefs, "energie")
             views.setTextViewText(R.id.tile_sync_note, prefs.getString("sync_note", ""))
             views.setFloat(R.id.tile_sync_icon, "setRotation", syncAngle)
 

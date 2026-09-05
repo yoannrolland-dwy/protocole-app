@@ -92,7 +92,7 @@
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/tile_sommeil"
+            android:id="@+id/tile_energie"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
@@ -105,12 +105,12 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="SOMMEIL"
+                android:text="ENERGIE"
                 android:textSize="9sp"
                 android:textColor="#8a8a84" />
 
             <TextView
-                android:id="@+id/tile_sommeil_value"
+                android:id="@+id/tile_energie_value"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
@@ -121,7 +121,7 @@
                 android:textColor="#f5f5f0" />
 
             <TextView
-                android:id="@+id/tile_sommeil_note"
+                android:id="@+id/tile_energie_note"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text=""

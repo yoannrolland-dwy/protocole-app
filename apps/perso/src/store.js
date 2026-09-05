@@ -62,7 +62,9 @@ export const store = {
 // ("gym" | "fontainebleau"), voir packages/core/src/climbing.js. Chaîne simple, "gym" par
 // défaut si absente (comportement de toujours, aucune migration nécessaire).
 export const DATA_KEYS = [
-  "weightLog", "sleepLog", "trainingLog", "kneeLog", "elbowLog", "macroLog", "noteLog", "stepsLog",
+  // "elbowLog" reste ici uniquement pour ne pas perdre l'historique déjà exporté (le coude a
+  // été retiré le 05/09/2026, plus aucun code ne le lit ni ne l'écrit — voir CLAUDE.md).
+  "weightLog", "sleepLog", "trainingLog", "kneeLog", "elbowLog", "rhrLog", "macroLog", "noteLog", "stepsLog",
   "targets", "phase", "hsrWeek", "model", "climbScheme", "basketSchedule",
   "coachProfile", "coachJournal",
   "foodLog", "foodPins", "foodMuted", "foodPortions", "foodRecipes", "foodOverrides",

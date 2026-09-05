@@ -25,7 +25,12 @@ const HealthNutrition = registerPlugin("HealthNutrition");
 // weight → READ_WEIGHT, ajouté le 28/07/2026 : une pesée saisie à la main dans Samsung
 // Health (pas MyFitnessPal, qui ne déclare pas WRITE_WEIGHT) apparaît bien dans Health
 // Connect — voir HealthNutritionPlugin.readWeight().
-const READ_TYPES = ["steps", "sleep", "weight"];
+// restingHeartRate → ajouté le 05/09/2026 pour le score d'énergie (module 1, voir
+// packages/core/src/energy.js). Health Connect n'a de FC repos QUE si une app source
+// (Samsung Health) l'y écrit — non vérifié à ce stade si c'est le cas sur ce téléphone,
+// voir HealthNutritionPlugin.readRestingHeartRate() : le score affiche honnêtement "pas
+// assez de données" si jamais aucun échantillon n'apparaît.
+const READ_TYPES = ["steps", "sleep", "weight", "restingHeartRate"];
 
 export async function syncHealthConnect() {
   if (!Capacitor.isNativePlatform()) return { status: "web" };
@@ -52,7 +57,8 @@ export async function syncHealthConnect() {
   const canSteps = auth.readAuthorized?.includes("steps");
   const canSleep = auth.readAuthorized?.includes("sleep");
   const canWeight = auth.readAuthorized?.includes("weight");
-  if (!canSteps && !canSleep && !canWeight) return { status: "denied" };
+  const canRhr = auth.readAuthorized?.includes("restingHeartRate");
+  if (!canSteps && !canSleep && !canWeight && !canRhr) return { status: "denied" };
 
   // Bornes alignées sur MINUIT LOCAL (corrigé le 03/08/2026 — c'était minuit UTC, soit 2h
   // du matin heure locale en France l'été : le plugin @capgo/capacitor-health traite le
@@ -68,6 +74,7 @@ export async function syncHealthConnect() {
   const stepsByDate = {};
   const sleepByDate = {};
   const weightByDate = {};
+  const rhrByDate = {};
 
   try {
     if (canSteps) {
@@ -102,9 +109,16 @@ export async function syncHealthConnect() {
       });
       Object.entries(days || {}).forEach(([date, kg]) => { weightByDate[date] = kg; });
     }
+
+    if (canRhr) {
+      const { days } = await HealthNutrition.readRestingHeartRate({
+        startDate: start.toISOString(), endDate: end.toISOString(),
+      });
+      Object.entries(days || {}).forEach(([date, bpm]) => { rhrByDate[date] = bpm; });
+    }
   } catch (e) {
     return { status: "error", message: String(e) };
   }
 
-  return { status: "ok", stepsByDate, sleepByDate, weightByDate };
+  return { status: "ok", stepsByDate, sleepByDate, weightByDate, rhrByDate };
 }
