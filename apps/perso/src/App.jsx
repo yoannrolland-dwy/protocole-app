@@ -2543,7 +2543,7 @@ export default function App({ silent = false } = {}) {
       eau: { value: `${(waterToday / 1000).toFixed(2)} L`, note: `/ ${(waterTgt / 1000).toFixed(1)} L` },
       energie: {
         value: energyDash.status === "ok" ? `${energyDash.total}` : "—",
-        note: lastNightDash ? fmtHM(lastNightDash.hours) : "—",
+        note: lastNightDash ? `Sommeil ${fmtHM(lastNightDash.hours)}` : "—",
       },
       // Pas de "value" affichée pour ce tile (juste l'icône Sync) — seule la note sert,
       // horodatage du dernier instantané poussé au widget (peu importe si déclenché par
