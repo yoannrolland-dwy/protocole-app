@@ -32,6 +32,35 @@ import { C, Btn, Label, Body, inputStyle } from "../ui.jsx";
 import { callClaude, costCents } from "../claudeApi.js";
 import { fileToImagePayload } from "@rawcare/core/nutrition/imageUtils";
 
+// Messages clairs pour chaque `error_code` que peut renvoyer un bloc `web_fetch_tool_result`
+// en échec (doc Anthropic, outil web_fetch) — jusqu'ici ce bloc était totalement ignoré
+// (seuls les blocs "text" étaient lus), donc un lien qui échouait à la lecture donnait
+// exactement le même "Aucun plat reconnu" qu'une carte simplement vide. Le vrai motif,
+// quand il y en a un, permet de savoir s'il vaut la peine de réessayer ou de passer à la
+// photo directement.
+const FETCH_ERROR_MESSAGES = {
+  url_not_accessible: "Page inaccessible (erreur HTTP).",
+  unsupported_content_type: "Contenu non lisible pour cet outil (ni texte, ni HTML, ni PDF).",
+  url_not_allowed: "Page bloquée à la lecture (restriction du site).",
+  url_too_long: "Lien trop long.",
+  invalid_tool_input: "Lien invalide.",
+  too_many_requests: "Trop de requêtes vers ce site pour l'instant — réessaie plus tard.",
+  max_uses_exceeded: "Limite de lecture atteinte pour cette analyse.",
+  unavailable: "Erreur interne du service de lecture — réessaie.",
+};
+
+// Repère un échec de lecture du lien dans la réponse (bloc `web_fetch_tool_result` avec
+// `content.type === "web_fetch_tool_result_error"`). Le fetch peut réussir techniquement
+// mais renvoyer un contenu tronqué/confus sans passer par ce chemin d'erreur — cette
+// fonction ne couvre que l'échec net (page bloquée, inaccessible, type non supporté...),
+// pas la qualité de ce qui a été lu.
+function webFetchError(content) {
+  const block = (content || []).find((b) => b.type === "web_fetch_tool_result" && b.content?.type === "web_fetch_tool_result_error");
+  if (!block) return null;
+  const code = block.content.error_code;
+  return FETCH_ERROR_MESSAGES[code] || `Lecture du lien impossible (${code}).`;
+}
+
 function extractJson(raw) {
   let s = raw.trim();
   const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -53,11 +82,21 @@ et les macros qu'il reste à l'utilisateur à consommer ce jour-là. Tâche :
    "entree"/"plat"/"dessert"/"autre", et ESTIME ses macros (kcal, prot, gluc, lip, fib en grammes) à
    partir de sa composition et de portions restaurant françaises courantes. Ce sont des estimations,
    pas des valeurs mesurées : reste réaliste, ne détaille pas ton raisonnement.
-2. Propose 2 à 3 combinaisons adaptées à l'objectif "peu de calories, riche en protéines", chacune
+2. EXCLUS systématiquement les boissons et l'alcool (apéritifs, bières, vins, champagnes,
+   cocktails, softs, cafés/thés) de la liste des plats — ce ne sont pas des plats, sauf si
+   l'utilisateur en fait la demande explicite dans sa note.
+3. Une page de site de restaurant regroupe souvent PLUSIEURS menus à la suite (formule déjeuner,
+   menu enfant, carte à la carte, carte des boissons, carte des vins...), parfois sans titres
+   clairement délimités une fois le texte extrait. Repère et utilise TOUS les menus de nourriture
+   présents (formule ET carte), mais ignore tout ce qui vient après un intitulé du type "Carte des
+   boissons"/"Carte des vins"/"Cocktails"/"Apéritifs". Si un même plat apparaît dans plusieurs
+   menus (ex. présent à la fois dans une formule et à la carte), ne le liste qu'UNE seule fois —
+   garde la version la plus complète (à la carte plutôt que formule).
+4. Propose 2 à 3 combinaisons adaptées à l'objectif "peu de calories, riche en protéines", chacune
    composée de EXACTEMENT deux plats de la carte : soit une entrée + un plat, soit une entrée + une
    autre entrée (jamais un plat seul, jamais dessert dans une combinaison). Les noms dans
    suggestions[].plats doivent être copiés EXACTEMENT depuis plats[].nom.
-3. N'invente aucun plat absent de la carte. Si la carte est illisible (photo floue, texte vide, page
+5. N'invente aucun plat absent de la carte. Si la carte est illisible (photo floue, texte vide, page
    web qui ne charge pas ou ne contient pas de menu exploitable — PDF, image, site trop dynamique),
    renvoie des tableaux vides plutôt que d'inventer.
 
@@ -168,22 +207,30 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
       const askedModel = model || "claude-sonnet-5";
       // web_fetch : outil serveur, aucun header beta requis, ne lit qu'une URL déjà présente
       // dans le message (celle qu'on vient d'y écrire) — cf. commentaire d'en-tête du fichier.
-      const tools = hasUrl ? [{ type: "web_fetch_20260209", name: "web_fetch", max_uses: 2, max_content_tokens: 5000 }] : undefined;
+      // `max_content_tokens` relevé de 5000 à 20000 le 07/09/2026 : une page de carte resto
+      // classique (plusieurs menus + carte des boissons/vins sur une seule page, cas courant)
+      // peut dépasser 5000 tokens de texte à elle seule, ce qui tronquait la lecture avant
+      // même d'atteindre le menu utile — mesuré sur un cas réel (~6000 tokens de texte brut
+      // pour une page qui n'était pourtant pas anormalement longue).
+      const tools = hasUrl ? [{ type: "web_fetch_20260209", name: "web_fetch", max_uses: 2, max_content_tokens: 20000 }] : undefined;
       const { data, usedModel } = await callClaude({
         apiKey, model: askedModel, system: SYSTEM_PROMPT, user, tools,
         effort: "medium", maxTokens: 3000, onRetry: setProgress,
       });
       setProgress("");
+      // Échec net de lecture du lien (page bloquée/inaccessible/type non supporté) : jusqu'ici
+      // totalement invisible, on ne lisait que les blocs "text" — voir `webFetchError`.
+      const fetchErr = hasUrl ? webFetchError(data.content) : null;
       const raw = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
       let parsed;
       try { parsed = extractJson(raw); }
       catch {
         console.warn("Carte resto — JSON illisible :", raw);
-        setErr("Réponse illisible. Réessaie, ou simplifie le texte/la photo.");
+        setErr(fetchErr ? `Lien illisible : ${fetchErr}` : "Réponse illisible. Réessaie, ou simplifie le texte/la photo.");
         setState("error");
         return;
       }
-      setMeta({ model: usedModel, fellBack: usedModel !== askedModel, usage: data.usage, cents: costCents(usedModel, data.usage) });
+      setMeta({ model: usedModel, fellBack: usedModel !== askedModel, usage: data.usage, cents: costCents(usedModel, data.usage), fetchErr });
       setResult({ plats: parsed.plats || [], suggestions: parsed.suggestions || [] });
       setState("done");
     } catch (e) {
@@ -319,7 +366,9 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
             ))}
 
             {result.plats.length === 0 && (
-              <Body style={{ fontSize: 11, color: C.dim }}>Aucun plat reconnu.</Body>
+              <Body style={{ fontSize: 11, color: meta?.fetchErr ? C.danger : C.dim }}>
+                {meta?.fetchErr ? `Lecture du lien échouée : ${meta.fetchErr} Essaie une photo à la place.` : "Aucun plat reconnu."}
+              </Body>
             )}
 
             {meta && (
