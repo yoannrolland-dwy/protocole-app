@@ -357,6 +357,87 @@ Puis, APRÈS ta conclusion, écris la ligne \`${CARNET_MARK}\` seule, et en dess
 }
 
 /**
+ * Prompt du bilan long terme (bouton "Analyse approfondie" du Coach IA, point 4 du chantier
+ * "4 points IA", 07/09/2026). Distinct de `buildCoachPrompt` : pas de bloc "temps réel"
+ * jour/hier, pas de carnet de bord (ce n'est pas l'analyse quotidienne) — uniquement les
+ * faits déjà calculés par `computeBilanFacts` (packages/core/src/bilan.js), que le modèle
+ * interprète et priorise plutôt que de recalculer. Même principe que le prompt quotidien :
+ * "le JS calcule les faits, l'IA les juge", ici étendu sur plusieurs mois.
+ *
+ * `data` : { facts, phase, targets, profile, identity }. `identity` optionnelle (apps/public,
+ * même convention que `buildCoachPrompt`) — absente pour apps/perso, clause "de Yoann, 43
+ * ans, athlète (...)" par défaut.
+ */
+export function buildBilanPrompt({ facts, phase, targets, profile, identity }) {
+  const tgtW = phaseTarget(phase, targets);
+  // Seules les clauses de rééduc servent ici (pas l'état du jour, hors sujet pour un bilan
+  // long terme) — `{}` en logs suffit, `zoneState` retombe sur un état neutre inutilisé.
+  const zonesForCoach = buildZones(DEFAULT_ZONES, {}, today());
+  const zonesWithClause = zonesForCoach.filter((z) => z.coachClause);
+  const zoneCount = (n) => (n === 1 ? "Une tendinopathie en rééduc" : n === 2 ? "Deux tendinopathies en rééduc" : `${n} tendinopathies en rééduc`);
+  const frenchList = (arr) => (arr.length <= 1 ? (arr[0] || "") : `${arr.slice(0, -1).join(", ")} et ${arr[arr.length - 1]}`);
+  const tendinopathiesClause = zonesWithClause.length
+    ? `${zoneCount(zonesWithClause.length)} : ${frenchList(zonesWithClause.map((z) => z.coachClause))}. ` : "";
+  const authorLabel = identity ? "l'utilisateur" : "Yoann";
+  const who = identity ?? "de Yoann, 43 ans, athlète (muscu/basket/escalade)";
+
+  // Traduction des clés camelCase (bilan.js) en clés françaises lisibles côté prompt, même
+  // convention que `summary`/`realtime` dans `buildCoachPrompt`. `null` explicite conservé
+  // (pas supprimé) : le modèle doit voir qu'un point a été considéré mais manque de données,
+  // pas juste l'absence silencieuse d'une clé.
+  const faits = {
+    fenetre_jours: facts.fenetreJours,
+    records: facts.records ? { count: facts.records.count, seances: facts.records.sessions } : null,
+    depense_reelle: facts.deficitReel ? {
+      kcal_j: facts.deficitReel.tdee, deficit_vs_cible: facts.deficitReel.deficit,
+      delta_kg: facts.deficitReel.deltaKg, jours: facts.deficitReel.days, fiabilite: facts.deficitReel.reliability,
+    } : null,
+    projection_fin_seche: facts.projectionFinSeche ? {
+      poids_kg: facts.projectionFinSeche.projectedKg, date_fin: facts.projectionFinSeche.endDate,
+      jours_restants: facts.projectionFinSeche.daysLeft,
+    } : null,
+    type_delaisse: facts.typeDelaisse ? { type: facts.typeDelaisse.type, jours_depuis: facts.typeDelaisse.daysSince } : null,
+    regularite_seche: facts.regulariteSeche ? { pct_dans_la_cible: facts.regulariteSeche.pct, jours_logges: facts.regulariteSeche.loggedDays } : null,
+    sommeil_vs_energie: facts.sommeilVsEnergie ? {
+      score_apres_bonne_nuit: facts.sommeilVsEnergie.goodAvg, score_apres_mauvaise_nuit: facts.sommeilVsEnergie.poorAvg,
+      n_bonnes: facts.sommeilVsEnergie.goodN, n_mauvaises: facts.sommeilVsEnergie.poorN,
+    } : null,
+    escalade_vs_douleur_genou: facts.escaladeVsDouleurGenou ? {
+      douleur_moy_apres_grosse_seance: facts.escaladeVsDouleurGenou.heavyAvgPain,
+      douleur_moy_apres_seance_legere_normale: facts.escaladeVsDouleurGenou.otherAvgPain,
+      n_grosses: facts.escaladeVsDouleurGenou.heavyN, n_autres: facts.escaladeVsDouleurGenou.otherN,
+    } : null,
+    fibres_vs_stagnation_poids: facts.fibresVsStagnationPoids ? {
+      fibres_moy_semaines_stagnation: facts.fibresVsStagnationPoids.stagnantWeeksAvgFiber,
+      fibres_moy_semaines_perte: facts.fibresVsStagnationPoids.droppingWeeksAvgFiber,
+      n_semaines_stagnation: facts.fibresVsStagnationPoids.stagnantWeeksN, n_semaines_perte: facts.fibresVsStagnationPoids.droppingWeeksN,
+    } : null,
+    kcal_semaine_lun_ven: (facts.kcalSemaineLunVen || []).filter((w) => w.avgKcal != null)
+      .map((w) => ({ semaine: w.weekStart, kcal_moy: w.avgKcal, jours: w.days })),
+  };
+
+  const profileBlock = (profile || "").trim()
+    ? `
+
+CONTEXTE PERMANENT écrit par ${authorLabel} — à traiter comme des contraintes, pas des suggestions :
+${profile.trim()}` : "";
+  const system = `Tu es le coach personnel tout-en-un ${who} : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. Phase ${PHASES[phase].label}, poids cible ${tgtW} kg. ${tendinopathiesClause}${profileBlock}`;
+
+  const user = `BILAN LONG TERME — ${facts.fenetreJours} derniers jours. Ce n'est PAS l'analyse quotidienne habituelle : le JS a déjà calculé des corrélations et tendances chiffrées sur plusieurs mois (pas 14 jours). Ton rôle est d'INTERPRÉTER ces chiffres, pas de les recalculer ni d'en inventer d'autres. Un champ \`null\` veut dire "pas assez de données" — ne l'invente jamais, dis simplement qu'il n'y a pas assez de recul sur ce point précis plutôt que de l'ignorer silencieusement.
+
+FAITS CALCULÉS :
+${JSON.stringify(faits)}
+
+Rédige un bilan de fond, structuré ainsi :
+1. **Tendances majeures** sur la période — ce qui se dégage vraiment sur ${facts.fenetreJours} jours, pas ce qui bouge au jour le jour.
+2. **Corrélations notables** — commente en priorité celles qui montrent un écart net entre les deux groupes comparés ; pour celles qui sont marginales ou absentes, une phrase courte suffit plutôt que de forcer un commentaire.
+3. **Ce qu'il faut ajuster** pour les semaines à venir, concrètement.
+Sois direct, chiffré, sans réciter les données brutes (cite seulement ce qui appuie un conseil).${tendinopathiesClause ? " Priorité absolue à la sécurité tendineuse si un signal genou ressort des faits." : ""} Limite stricte : 600 mots maximum, termine toujours par une conclusion complète. Ce n'est pas un avis médical.`;
+
+  return { system, user };
+}
+
+/**
  * Briefing complet à coller dans une conversation claude.ai.
  *
  * Volontairement PLUS riche que le prompt API : ici les tokens ne coûtent rien

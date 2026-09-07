@@ -24,9 +24,10 @@ import { EXERCISE_LIBRARY } from "@rawcare/core/session/exercises";
 import { recommendSessions } from "@rawcare/core/recommender";
 import { computeEnergyScore, computeSleepScore, scoreLabel } from "@rawcare/core/energy";
 import { computeFreeInsights } from "@rawcare/core/insights";
+import { computeBilanFacts } from "@rawcare/core/bilan";
 import { PHASES, phaseTarget as phaseTargetCore, DEFAULT_TARGETS, isCutWindow, targetsForDate,
          kcalFromMacros, kcalOfEntry, tdeeNow, weeklyWeekdayKcalTrend } from "@rawcare/core/targets";
-import { buildCoachPrompt, buildCoachBriefing, splitCarnet, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
+import { buildCoachPrompt, buildCoachBriefing, buildBilanPrompt, splitCarnet, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
 import { updateDashboardWidget } from "./widgetSync.js";
@@ -45,7 +46,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.76.0";
+const APP_VERSION = "3.77.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -107,16 +108,19 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
   const [openNote, setOpenNote] = useState(false);
   const [progress, setProgress] = useState("");   // « réessai 1/2… », « bascule Haiku… »
   const [meta, setMeta] = useState(null);         // { model, usage, cents } de la dernière analyse
+  // Point 4 du chantier IA (07/09/2026) : quel type de dernière analyse est affiché — "jour"
+  // (habituelle, 14j + carnet de bord) ou "bilan" (approfondie, 90j, pas de carnet).
+  const [kind, setKind] = useState("jour");
 
-  const run = async () => {
+  const run = async (which = "jour") => {
     if (!coach.apiKey) {
       setErr("Ajoute ta clé API Anthropic dans Réglages pour activer l'analyse.");
       setState("error"); return;
     }
-    saveNote(note);
-    setState("loading"); setErr(""); setProgress(""); setMeta(null);
+    if (which === "jour") saveNote(note);
+    setState("loading"); setErr(""); setProgress(""); setMeta(null); setKind(which);
     try {
-      const { system, user } = coach.buildPrompt(note);
+      const { system, user } = which === "bilan" ? coach.buildBilan() : coach.buildPrompt(note);
       const askedModel = coach.model || "claude-sonnet-5";
       const { data, usedModel } = await callClaude({
         apiKey: coach.apiKey,
@@ -127,16 +131,19 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
         // dès qu'on ne précise rien, et cette réflexion est facturée au tarif de sortie tout
         // en consommant max_tokens — c'est la cause des réponses vides/tronquées observées
         // (budget monté 1000 → 1800 → 4096 → 6000). À « medium » la qualité reste au niveau
-        // de Sonnet 4.6 en « high » pour une fraction du coût.
+        // de Sonnet 4.6 en « high » pour une fraction du coût. Le bilan (moins de données en
+        // entrée, mais 600 mots demandés au lieu de 500) garde une marge un peu plus large.
         effort: "medium",
-        maxTokens: 6000,
+        maxTokens: which === "bilan" ? 8000 : 6000,
         onRetry: setProgress,
       });
       setProgress("");
       const raw = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
-      const { advice, journal } = splitCarnet(raw);
+      // Le bilan n'a pas de carnet de bord (ce n'est pas l'analyse quotidienne, voir
+      // buildBilanPrompt) : `splitCarnet` ne s'applique qu'à "jour".
+      let out = raw, journal = null;
+      if (which === "jour") ({ advice: out, journal } = splitCarnet(raw));
       if (journal) saveJournal(journal);
-      const out = advice;
       setMeta({ model: usedModel, fellBack: usedModel !== askedModel, usage: data.usage, cents: costCents(usedModel, data.usage), carnet: !!journal });
       if (!out) {
         console.warn("CoachIA — réponse vide, réponse brute :", data);
@@ -163,14 +170,19 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
 
   return (
     <Card>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <Sparkles size={13} color={C.accent} />
           <Label style={{ fontSize: 10 }}>Coach IA</Label>
         </div>
-        <Btn variant="outline" onClick={run} disabled={state === "loading"} style={{ padding: "6px 10px", fontSize: 11 }}>
-          {state === "loading" ? "Analyse…" : "Analyser"}
-        </Btn>
+        <div style={{ display: "flex", gap: 6 }}>
+          <Btn variant="outline" onClick={() => run("jour")} disabled={state === "loading"} style={{ padding: "6px 10px", fontSize: 11 }}>
+            {state === "loading" && kind === "jour" ? "Analyse…" : "Analyser"}
+          </Btn>
+          <Btn variant="outline" onClick={() => run("bilan")} disabled={state === "loading"} style={{ padding: "6px 10px", fontSize: 11 }}>
+            {state === "loading" && kind === "bilan" ? "Analyse…" : "Bilan 3 mois"}
+          </Btn>
+        </div>
       </div>
 
       {state === "loading" && progress && (
@@ -200,6 +212,7 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
             : <>{err}</>}
         </div>
       )}
+      {state === "done" && kind === "bilan" && <Label style={{ marginBottom: 6 }}>Bilan — 90 derniers jours</Label>}
       {state === "done" && <Body style={{ whiteSpace: "pre-wrap" }}>{text}</Body>}
       {state === "done" && meta?.usage && (
         <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.divider}`, display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
@@ -212,7 +225,7 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
           </span>
         </div>
       )}
-      {state === "idle" && <Body style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>Analyse tes 14 derniers jours (poids, macros, eau, séances, sommeil, douleur genou), au jour le jour et sur la semaine glissante. Nécessite ta clé API (Réglages).</Body>}
+      {state === "idle" && <Body style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>« Analyser » : tes 14 derniers jours (poids, macros, eau, séances, sommeil, douleur genou), au jour le jour et sur la semaine glissante. « Bilan 3 mois » : corrélations calculées sur 90 jours (records, sommeil vs énergie, escalade vs genou, fibres vs stagnation, sèche). Nécessite ta clé API (Réglages).</Body>}
     </Card>
   );
 }
@@ -2710,6 +2723,18 @@ export default function App({ silent = false } = {}) {
         foodLog: getSync("foodLog", []), foodOverrides: getSync("foodOverrides", {}),
         profile: coachProfile, journal: coachJournal, scheme,
       }),
+    // Bilan long terme (point 4 du chantier IA, 07/09/2026) : mêmes données que l'analyse
+    // quotidienne, mais résumées sur 90 jours par `computeBilanFacts` (packages/core/src/
+    // bilan.js) — le JS calcule les corrélations, `buildBilanPrompt` ne fait que les mettre
+    // en mots. Même calcul TDEE que la carte Macros/point 1 (lecture fraîche foodLog/
+    // overrides), jamais un chiffre différent pour la même réalité.
+    buildBilan: () => {
+      const tdeeResult = tdeeNow({ foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}), macros, weight, targets });
+      const atToday = targetsForDate(today(), targets);
+      const kcalTargetToday = Math.round(kcalFromMacros(atToday.protein, atToday.carbs, atToday.fat, atToday.fiber));
+      const facts = computeBilanFacts({ training, weight, macros, sleep, rhr, steps, knee, targets, scheme, tdeeResult, kcalTargetToday, todayDate: today() });
+      return buildBilanPrompt({ facts, phase, targets, profile: coachProfile });
+    },
     apiKey, model,
   };
 
