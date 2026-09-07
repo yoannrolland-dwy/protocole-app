@@ -9,6 +9,8 @@
 //
 // Aucune dépendance à React ni à `ui.jsx` : ce module doit rester testable seul en Node.
 
+import { TEMPLATES } from "./session/templates.js";
+
 const byDateAsc = (a, b) => a.date.localeCompare(b.date);
 
 /**
@@ -233,4 +235,70 @@ export function exerciseTrend(sessions) {
   if (beats(last.best, prev.best, last.mode)) return { key: "up", label: "hausse", delta };
   if (beats(prev.best, last.best, last.mode)) return { key: "down", label: "baisse", delta };
   return { key: "flat", label: "stable", delta: 0 };
+}
+
+/* ============================================================
+   Suggestion de progressive overload sur plateau (chantier "4 points IA", point 3, 07/09/2026)
+   ============================================================ */
+
+const PLATEAU_STABLE_STREAK = 4; // séances d'affilée "stable" avant de considérer un plateau
+
+/** Toutes les définitions de gabarit pour un exercice donné — un même nom peut apparaître
+ * dans plusieurs types (ex. "Leg extension unilatérale" en Lower A/B/C, HSR dans A/C, pas
+ * dans B). */
+function templateDefsFor(nom) {
+  const defs = [];
+  for (const t of Object.values(TEMPLATES)) {
+    for (const e of t.exos || []) if (e.n === nom) defs.push(e);
+  }
+  return defs;
+}
+
+/** "8-10" → {min:8,max:10} ; "15" → {min:15,max:15} ; sinon `null` (ex. "table HSR"). */
+function parseRepRange(r) {
+  const m = String(r).match(/^(\d+)(?:-(\d+))?$/);
+  if (!m) return null;
+  const min = +m[1];
+  return { min, max: m[2] ? +m[2] : min };
+}
+
+/**
+ * Suggestion de progressive overload (viser le haut de la fourchette de reps, puis passer à
+ * la charge supérieure) une fois qu'un plateau est détecté : `PLATEAU_STABLE_STREAK` séances
+ * d'affilée "stable" (même définition que `exerciseTrend`, rejouée pas à pas plutôt
+ * qu'estimée sur les 3 dernières comme l'écran de progression).
+ *
+ * Exclusions volontaires (décidées avec Yoann le 07/09/2026, pas des oublis) : les exercices
+ * HSR — leur charge est déjà pilotée par la table HSR (semaine 1-12, `hsrForWeek`), une
+ * suggestion en plus créerait un conflit avec le protocole de rééduc — et le mode "temps"
+ * (gainage/tenues), hors scope pour l'instant.
+ *
+ * `null` si pas de plateau, si l'exercice est exclu (HSR/temps), ou si sa fourchette de reps
+ * n'est pas résolue dans les gabarits (ex. un exercice substitué via la bibliothèque — voir
+ * `EXERCISE_LIBRARY` —, jamais catalogué avec sa propre fourchette).
+ */
+export function progressiveOverloadSuggestion(sessions, nom) {
+  if (!sessions || sessions.length < PLATEAU_STABLE_STREAK) return null;
+  const last = sessions[sessions.length - 1];
+  if (isTimeMode(last.mode)) return null;
+
+  const defs = templateDefsFor(nom);
+  if (!defs.length || defs.some((d) => d.hsr)) return null;
+  const range = parseRepRange(defs[0].r);
+  if (!range) return null;
+
+  const recent = sessions.slice(-PLATEAU_STABLE_STREAK);
+  for (let i = 1; i < recent.length; i++) {
+    if (beats(recent[i].best, recent[i - 1].best, last.mode)) return null; // progression → pas un plateau
+    if (beats(recent[i - 1].best, recent[i].best, last.mode)) return null; // régression → pas ce cas
+  }
+
+  const { poids, val } = last.best;
+  if (val < range.max) {
+    return { kind: "reps", poids, from: val, target: Math.min(range.max, val + 2), range };
+  }
+  // Déjà en haut de fourchette : pas d'incrément inventé (les paliers réels dépendent du
+  // matériel — haltères, machine, barre — que l'app ne connaît pas assez finement), juste la
+  // consigne de passer à la charge supérieure disponible.
+  return { kind: "poids", from: poids, range };
 }

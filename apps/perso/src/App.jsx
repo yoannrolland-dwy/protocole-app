@@ -14,7 +14,7 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { store, getSync, exportData, importData } from "./store.js";
 import { isBackupStale, daysSinceBackup, scheduleBackupReminder } from "./cloudBackup.js";
 import { exoProgress, exerciseList, exerciseSessions, exerciseTrend, isTimeMode, setLabel,
-         beats, recordToBeat, recordsBySession, painOutOfBase } from "@rawcare/core/training";
+         beats, recordToBeat, recordsBySession, painOutOfBase, progressiveOverloadSuggestion } from "@rawcare/core/training";
 import { SCHEMES, gradeIndex, ISSUES, climbSummary, climbLabel } from "@rawcare/core/climbing";
 import { realDeficit, MIN_WINDOW_DAYS as MIN_TDEE_DAYS } from "@rawcare/core/tdee";
 import { TEMPLATES, TYPES, DEFAULT_WEIGHTS, HSR_TABLE, hsrForWeek, hsrParse, parseSecs,
@@ -45,7 +45,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.75.0";
+const APP_VERSION = "3.76.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -1224,11 +1224,18 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
    ============================================================ */
 const trendColor = (key) => (key === "up" ? C.accent : key === "down" ? C.danger : C.muted);
 
-function ExerciseDetail({ training, nom, onBack }) {
+function ExerciseDetail({ training, knee, nom, onBack }) {
   const sessions = useMemo(() => exerciseSessions(training, nom), [training, nom]);
   const mode = sessions[sessions.length - 1]?.mode;
   const temps = isTimeMode(mode);
   const trend = exerciseTrend(sessions);
+  // Coach de programmation (point 3 du chantier IA, 07/09/2026) : détection JS pure du
+  // plateau + suggestion de progressive overload — voir training.js pour les exclusions
+  // (HSR, mode temps). Pas de suggestion un jour où le genou est hors base, même garde-fou
+  // que l'affichage des records (V4) : encourager une surcharge le jour où le tendon a
+  // flambé irait contre la règle de Silbernagel.
+  const overload = useMemo(() => progressiveOverloadSuggestion(sessions, nom), [sessions, nom]);
+  const showOverload = overload && !painOutOfBase([knee], today());
   // Grandeur tracée : les secondes en gainage, le volume (charge × reps) sinon — voir
   // `setScore`. Pas de 1RM estimé, décision explicite (tendinopathie en rééducation).
   const data = sessions.map((s) => ({ date: fmt(s.date), v: s.score, label: setLabel(s.best, s.mode) }));
@@ -1261,6 +1268,24 @@ function ExerciseDetail({ training, nom, onBack }) {
         ) : <Empty>Une seule séance — la courbe apparaîtra à la deuxième.</Empty>}
       </Card>
 
+      {showOverload && (
+        <Card accentLeft style={{ padding: "13px 14px" }}>
+          <Label style={{ marginBottom: 5 }}>Plateau détecté</Label>
+          {overload.kind === "reps" ? (
+            <Body>
+              4 séances stables d'affilée sur {overload.poids} kg × {overload.from}. Vise{" "}
+              <strong style={{ color: C.text }}>{overload.target} reps</strong> à {overload.poids} kg la prochaine fois
+              (fourchette {overload.range.min}-{overload.range.max}).
+            </Body>
+          ) : (
+            <Body>
+              4 séances stables d'affilée en haut de la fourchette ({overload.range.min}-{overload.range.max} reps) à{" "}
+              {overload.from} kg. Passe à la charge supérieure disponible et repars en bas de la fourchette.
+            </Body>
+          )}
+        </Card>
+      )}
+
       <Card style={{ padding: "6px 14px" }}>
         <Label style={{ padding: "10px 0 6px", letterSpacing: 1.5 }}>Séance par séance</Label>
         {sessions.slice().reverse().map((s, i) => (
@@ -1281,10 +1306,10 @@ function ExerciseDetail({ training, nom, onBack }) {
   );
 }
 
-function ProgressScreen({ training, onBack }) {
+function ProgressScreen({ training, knee, onBack }) {
   const [sel, setSel] = useState(null);
   const list = useMemo(() => exerciseList(training), [training]);
-  if (sel) return <ExerciseDetail training={training} nom={sel} onBack={() => setSel(null)} />;
+  if (sel) return <ExerciseDetail training={training} knee={knee} nom={sel} onBack={() => setSel(null)} />;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1509,7 +1534,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme }) {
         onSave={saveMuscu} onCancel={() => { setOpen(null); setEditing(null); }} initial={editing} painRed={painRed} />
     );
   }
-  if (progress) return <ProgressScreen training={training} onBack={() => setProgress(false)} />;
+  if (progress) return <ProgressScreen training={training} knee={knee} onBack={() => setProgress(false)} />;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
