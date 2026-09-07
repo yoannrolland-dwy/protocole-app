@@ -9,7 +9,7 @@
 //
 // Purs, testables en Node, aucune dépendance React/DOM.
 
-import { shiftDateKey } from "./dateUtils.js";
+import { shiftDateKey, fmtHM } from "./dateUtils.js";
 
 // ---------- Score de sommeil (0-100) ----------
 //
@@ -39,6 +39,14 @@ export function computeSleepScore(night) {
   if (night.hours >= 6) return scoreInBand([60, 74], night.hours);
   if (night.hours >= 5) return scoreInBand([40, 59], night.hours);
   return Math.max(10, Math.round((night.hours / 5) * 40));
+}
+
+// Libellé qualitatif par palier de score (0-100) — mêmes seuils que ceux donnés par Yoann
+// pour le score de sommeil, réutilisés tels quels pour le score d'énergie (même échelle).
+const SCORE_LABEL_BANDS = [[85, "Excellent"], [75, "Bon"], [60, "Correct"], [0, "Risque"]];
+export function scoreLabel(v) {
+  if (v == null) return null;
+  return SCORE_LABEL_BANDS.find(([min]) => v >= min)?.[1] ?? "Risque";
 }
 
 // ---------- Score d'énergie (4 modules, 100 pts) ----------
@@ -76,17 +84,21 @@ function scoreRhrModule(rhrLog, t0) {
     reason: `${today.bpm} bpm vs moyenne 7 j ${Math.round(avg7 * 10) / 10} (${diff >= 0 ? "+" : ""}${diff}).` };
 }
 
+// Recalibré le 07/09/2026 : le barème d'origine (durée seule — 8h=30, 7h=25, 6h=18...)
+// suivait la grille demandée à la lettre, mais contredisait une règle déjà établie
+// ailleurs dans l'app (recommandeur, CLAUDE.md) — Yoann est short sleeper, 6-7h est SA
+// normale, jamais un signal de fatigue en soi. Ce barème le pénalisait donc
+// systématiquement même sur une bonne nuit, ce qui décalait le score d'énergie vers le
+// bas par rapport à celui de Samsung Health (qui pondère surtout qualité/efficacité).
+// Réutilise `computeSleepScore` (même échelle de lecture que l'onglet Énergie) plutôt que
+// deux calculs différents qui pourraient se contredire.
 function scoreSleepDurationModule(sleepLog, t0) {
   const night = (sleepLog || []).find((e) => e.date === t0);
   if (!night || night.hours == null) return { key: "sleepDuration", label: "Sommeil (nuit précédente)", max: MODULE_MAX.sleep, points: null, reason: "Nuit précédente non renseignée." };
-  const h = night.hours;
-  let points;
-  if (h >= 8) points = 30;
-  else if (h >= 7) points = 25;
-  else if (h >= 6) points = 18;
-  else if (h >= 5) points = 10;
-  else points = 5;
-  return { key: "sleepDuration", label: "Sommeil (nuit précédente)", max: MODULE_MAX.sleep, points, hours: h, reason: `${h.toFixed(1)} h.` };
+  const sleepScore = computeSleepScore(night);
+  const points = Math.round((sleepScore / 100) * MODULE_MAX.sleep);
+  return { key: "sleepDuration", label: "Sommeil (nuit précédente)", max: MODULE_MAX.sleep, points, hours: night.hours,
+    reason: `${fmtHM(night.hours)}${night.quality != null ? ` · qualité ${night.quality}/4` : ""} (score sommeil ${sleepScore}/100).` };
 }
 
 function scoreStepsModule(stepsLog, t0) {

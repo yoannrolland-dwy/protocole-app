@@ -22,7 +22,7 @@ import { TEMPLATES, TYPES, DEFAULT_WEIGHTS, HSR_TABLE, hsrForWeek, hsrParse, par
 import { refSet, lastPerf, perfHistory, lastExerciseSets, medianTarget } from "@rawcare/core/session/perf";
 import { EXERCISE_LIBRARY } from "@rawcare/core/session/exercises";
 import { recommendSessions } from "@rawcare/core/recommender";
-import { computeEnergyScore, computeSleepScore } from "@rawcare/core/energy";
+import { computeEnergyScore, computeSleepScore, scoreLabel } from "@rawcare/core/energy";
 import { PHASES, phaseTarget as phaseTargetCore, DEFAULT_TARGETS, isCutWindow, targetsForDate,
          kcalFromMacros, kcalOfEntry, tdeeNow, weeklyWeekdayKcalTrend } from "@rawcare/core/targets";
 import { buildCoachPrompt, buildCoachBriefing, splitCarnet, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
@@ -44,7 +44,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.71.0";
+const APP_VERSION = "3.72.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -323,6 +323,12 @@ function Dashboard({ weight, sleep, knee, rhr, macros, steps, targets, training,
       {/* Prochaine séance */}
       <Card accentLeft onClick={() => setTab("train")} style={{ padding: "13px 14px", cursor: "pointer" }}>
         <Label style={{ letterSpacing: 1.5, marginBottom: 5 }}>Prochaine séance</Label>
+        {!knee.some((k) => k.date === today()) && (
+          <div style={{ display: "flex", gap: 6, alignItems: "flex-start", marginBottom: 8 }}>
+            <AlertTriangle size={12} color="#e8a33d" style={{ marginTop: 1, flexShrink: 0 }} />
+            <span style={{ fontSize: 10.5, color: "#e8a33d", lineHeight: 1.4 }}>Douleur genou pas notée aujourd'hui — le recommandeur reste prudent par défaut sans cette info.</span>
+          </div>
+        )}
         <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginBottom: 3 }}>
           <div style={{ fontSize: 16, color: C.text, fontWeight: 800 }}>{suggestions[0]?.type}</div>
           <div style={{ fontFamily: C.mono, fontSize: 10, color: C.dim }}>{suggestions[0]?.score}</div>
@@ -2542,7 +2548,7 @@ export default function App({ silent = false } = {}) {
       calories: { value: kcalToday != null ? `${kcalToday}` : "—", note: `/ ${kcalTgt} kcal` },
       eau: { value: `${(waterToday / 1000).toFixed(2)} L`, note: `/ ${(waterTgt / 1000).toFixed(1)} L` },
       energie: {
-        value: energyDash.status === "ok" ? `${energyDash.total}` : "—",
+        value: energyDash.status === "ok" ? `${energyDash.total} ${scoreLabel(energyDash.total)}` : "—",
         note: lastNightDash ? `Sommeil ${fmtHM(lastNightDash.hours)}` : "—",
       },
       // Pas de "value" affichée pour ce tile (juste l'icône Sync) — seule la note sert,
