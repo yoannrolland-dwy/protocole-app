@@ -3046,6 +3046,35 @@ proprement en 401, pas une erreur de requête malformée) — pas de test avec u
   Yoann avec sa vraie clé, en particulier la qualité de l'interprétation des corrélations et
   si la limite de 600 mots/8000 tokens est bien calibrée en usage réel.
 
+### Correctif post-test réel : notes de contexte absentes du Bilan (07/09/2026, v3.77.1)
+
+Testé par Yoann avec sa vraie clé API ("j'ai testé ça m'a l'air cohérent") — puis remonté :
+le Bilan 3 mois ignorait complètement le journal `notes` (alcool, insomnie, petite
+blessure...), y compris la note du jour. Corrigé : `buildBilanPrompt` (`coach/prompt.js`)
+accepte désormais un paramètre `notes`, filtré sur la fenêtre du bilan (90 j, pas 14 j comme
+l'analyse quotidienne — sur 3 mois c'est la RÉCURRENCE d'une note qui est le signal, pas une
+mention isolée), avec une consigne explicite de relier une récurrence à une corrélation
+quand c'est pertinent. `coach.buildBilan()` (App.jsx) passe `notes` en plus des données déjà
+utilisées. Testé par script Node (notes dans la fenêtre incluses, notes plus anciennes
+exclues, aucun bloc si `notes` vide). **Retour de Yoann après ce correctif** : "c'est mieux"
+mais pertinence réelle pas encore certaine — à réévaluer à l'usage, pas de nouvelle demande
+de changement pour l'instant.
+
+### Point abandonné : notifications proactives
+
+C'était le 5e point envisagé dans la discussion initiale ("passer du réactif à l'ambiant" —
+une notification native le matin avec un mini-résumé), volontairement mis en dernier car le
+plus lourd techniquement (nécessite une vraie tâche native en arrière-plan, au-delà d'une
+simple notification programmée à l'avance — le mécanisme `LocalNotifications`/`AlarmManager`
+déjà en place dans l'app sert à un usage ponctuel, pas à un calcul quotidien répété). Une
+fois les points 1/3/4 livrés et proposé à nouveau, **Yoann l'a explicitement abandonné** :
+contrairement aux trois autres, ce point ne calcule rien de nouveau — il pousserait vers une
+notification une info déjà visible sur le Dashboard (score d'énergie, prochaine séance), et
+comme il ouvre l'app plusieurs fois par jour de toute façon (musculation, macros...), le
+gain réel ("ne pas avoir à aller chercher l'info") est faible pour son usage. **Ne pas
+reproposer sans un nouveau contexte** (ex. un moment identifié où il n'ouvre pas l'app le
+matin).
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
