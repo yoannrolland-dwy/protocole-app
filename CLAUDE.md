@@ -162,8 +162,10 @@ protocole-app/                    (racine = workspaces npm uniquement)
 
 ## Fonctionnalités en place (ne pas régresser sans le signaler)
 
-- **8 onglets** : Tableau de bord, Poids, Sommeil, Pas, Séances, Douleurs, Macros,
-  Repas (module Nutrition interne en bêta — voir la section dédiée plus bas)
+- **8 onglets** : Tableau de bord, Poids, Énergie (ex-Sommeil, 05/09/2026 — sommeil +
+  score d'énergie), Pas, Séances, Douleurs (genou seul depuis le 05/09/2026, coude
+  retiré), Performance (ex-Macros), Macro (ex-Repas, module Nutrition interne — voir la
+  section dédiée plus bas)
 - **Carnet de musculation série par série** (`MuscuLogger`) : grille
   kg × reps (ou secondes pour les exos en mode "temps"), mémoire de la
   dernière perf **par série** (pas juste par exercice — si la 3e série était
@@ -2736,10 +2738,211 @@ raisonnement explicité ici pour que Yoann puisse challenger a posteriori :
   active) ; pas de nouvelle question posée à Yoann sur le contenu exact des 7 exercices de
   Mobilité (choix fait avec le raisonnement documenté ci-dessus, à ajuster sur son retour).
 
+## Chantier RawCare — Coude retiré, planning idéal couplé au recommandeur (05/09/2026, apps/perso v3.71.0)
+
+Yoann n'a plus aucune douleur au coude depuis son retour de vacances — confirmé explicitement,
+retrait complet demandé (option "tout retirer", pas juste désactiver le gate).
+
+- **Coude retiré du recommandeur sans toucher à sa logique** : `DEFAULT_ZONES`
+  (`packages/core/src/pain.js`) ne porte plus que le genou. Le mécanisme par TAG (Phase 1,
+  RawCare) rend ça sans risque — plus aucune zone ne portant `gateTag: "tirage"`, tout ce qui
+  dépendait du coude dans `recommender.js` (gate Escalade/Upper, `AMBER_PENALTY.tirage`, texte
+  des raisons) devient silencieusement neutre (`NEUTRAL_ZONE`) : **`recommender.js` lui-même
+  n'a pas été touché**.
+- **`PainTab` simplifié à une seule zone** (genou) : plus de sélecteur `Pills` de zone,
+  `PAIN_ZONES` ne contient plus que "Genou". `elbowLog` reste dans `DATA_KEYS` (voir Règles
+  absolues #1) pour ne pas perdre l'historique déjà exporté, mais plus aucun code natif ne le
+  lit/l'écrit.
+- **`coach/prompt.js`** : branche `!zones` (legacy, celle qu'utilise `apps/perso`) purgée de
+  toute mention du coude (`douleur_coude_*`, `summary.coude`, `painDomainClause`). La clause
+  "Une tendinopathie en rééduc" s'ajuste automatiquement (déjà générique par zone depuis Phase
+  1) puisque `DEFAULT_ZONES` n'a plus qu'une entrée.
+- **Mobilité (TEMPLATES) inchangée** : le seul exercice de coude déjà présent ("Iso flexion
+  coude prise marteau + supination") était déjà LE seul exercice coude de la routine — rien à
+  retirer, la demande "garder un seul exercice" était déjà satisfaite par construction.
+- **`apps/public` non affecté** : ses zones sont dynamiques (`data.painZones`), jamais liées à
+  `DEFAULT_ZONES` — vérifié avant de toucher au fichier partagé.
+
+### Planning idéal couplé au recommandeur
+
+- **Mardi/Jeudi inversés** dans `WEEKLY_PLAN` (App.jsx, onglet TDEE) — Repos actif passe au
+  mardi, Upper au jeudi, dans les deux variantes (avec/sans match).
+- **`WEEKLY_PLAN_FAMILIES`** : version machine-lisible du même planning (une ou plusieurs
+  "familles" de type par jour de la semaine, ex. `["Lower"]`, `["Mobilité","Basket"]`), gardée
+  manuellement synchronisée avec `WEEKLY_PLAN` (commentaire explicite dans le code pour ne pas
+  les faire diverger).
+- **`recommender.js`, nouveau paramètre optionnel `weeklyPlan`** : liste de familles prévues
+  aujourd'hui, déjà résolue par l'appelant. **Bonus de score MODÉRÉ (+18 pts)**, jamais un
+  remplacement — décision explicite de Yoann (pas de priorité quasi systématique comme le
+  Basket planifié). Appliqué en tout dernier, après tous les gates de sécurité : un type déjà
+  écarté via `avoid` n'est jamais bonifié.
+- **Semaine avec/sans match détectée AUTOMATIQUEMENT** (`familiesForToday` dans App.jsx) depuis
+  `basketSchedule.matchDates` : un match le dimanche de la semaine en cours → variante
+  "avecMatch", sinon "sansMatch" — décision explicite de Yoann plutôt qu'un réglage manuel à
+  rebasculer chaque semaine.
+- **Coach IA** : `weeklyPlan` transmis à `buildCoachPrompt`/`recommendSessions` de la même
+  façon que côté Dashboard — jamais deux verdicts différents.
+- **Testé en direct dans l'aperçu** : bonus "Planning idéal du jour : Lower — bonus de
+  priorité" confirmé sur "Lower A" un samedi ; bascule automatique vers "avecMatch" vérifiée en
+  seedant un match le dimanche suivant (le score du jour passe de Lower à Upper, conforme au
+  planning avec match).
+
+## Chantier RawCare — Score d'énergie façon Samsung Health + score de sommeil (05-07/09/2026, apps/perso v3.71.0 → v3.72.0)
+
+Samsung Health affiche un "score d'énergie" propriétaire, jamais exposé par Health Connect (ni
+`RestingHeartRateRecord`, confirmé vide sur ce téléphone malgré une FC repos bien visible dans
+Samsung Health — voir plus bas). Le Samsung Health Data SDK (accès plus direct) a été écarté
+comme trop complexe pour ce projet, comme documenté plus haut dans ce fichier. Ce chantier
+reconstruit une approximation maison à partir de données déjà lisibles via Health Connect.
+
+- **Nouveau module pur `packages/core/src/energy.js`** (aucune dépendance React/DOM) :
+  - `computeSleepScore(night)` : score de sommeil sur 100, remis à l'échelle depuis la qualité
+    1-4 déjà calculée nativement (efficacité + temps endormi, `HealthNutritionPlugin.readSleep`)
+    plutôt que recalculé depuis zéro. Paliers donnés par Yoann : 85-100 excellent (qualité 4),
+    75-84 bon (3), 60-74 correct (2), 0-59 risque (1) ; la durée de la nuit place le score À
+    L'INTÉRIEUR de son palier. Sans qualité native (saisie manuelle, ou nuit sans détail par
+    phase) : estimation par la seule durée, jamais "excellent" sans une vraie mesure
+    d'efficacité.
+  - `computeEnergyScore(t0, {rhrLog, sleepLog, stepsLog})` : 4 modules sur 100 pts (grille
+    donnée par Yoann) — FC repos vs moyenne 7 j (30 pts), sommeil de la nuit (30 pts, **recalibré
+    le 07/09/2026** — voir plus bas), activité de la veille (25 pts), régularité du sommeil vs
+    moyenne 7 j (15 pts). `trailingAvg` : moyenne des 7 jours PRÉCÉDANT (jamais incluant) le jour
+    noté, minimum 3 points trouvés sinon `null` — jamais une moyenne peu fiable. **Jamais de
+    total inventé** : si un seul module manque de donnée, `status: "insufficient"`, mais le
+    détail des modules disponibles reste affiché (pas un "pas assez de données" muet).
+  - `scoreLabel(v)` : libellé qualitatif (Excellent/Bon/Correct/Risque), mêmes paliers que le
+    score de sommeil.
+- **Recalibrage du module sommeil (07/09/2026)** : le barème d'origine (durée seule — 8h=30,
+  7h=25, 6h=18...) suivait la grille demandée à la lettre mais contredisait une règle déjà
+  établie dans ce fichier (Yoann est short sleeper, 6-7h est SA normale, jamais un signal de
+  fatigue) — ça décalait systématiquement le score vers le bas par rapport à Samsung Health, qui
+  pondère surtout qualité/efficacité. Remplacé par `computeSleepScore(night)` ramené sur 30
+  points (`Math.round(score/100 × 30)`), confirmé par Yoann après une question explicite —
+  jamais deux calculs de "qualité de sommeil" différents qui pourraient se contredire.
+- **FC repos (`rhrLog`, nouvelle clé DATA_KEYS)** — deux versions, la seconde seule retenue :
+  - **v1 abandonnée** : lecture de `RestingHeartRateRecord` (type Health Connect dédié) — resté
+    vide après synchro sur ce téléphone alors que Samsung Health affiche bien une FC repos dans
+    sa propre UI. Confirmé par Yoann via l'app Health Connect elle-même (autorisation "FC repos"
+    accordée, mais aucune entrée de ce type précis) : Samsung Health ne pousse pas ce type vers
+    Health Connect ici, seulement la FC continue.
+  - **v2 retenue** (`HealthNutritionPlugin.readRestingHeartRate`) : FC repos reconstruite en
+    moyennant les mesures de FC continue (`HeartRateRecord`) tombant dans les phases de sommeil
+    RÉEL de chaque nuit (mêmes stages/découpage "jour de sommeil" que `readSleep`), avec repli
+    sur la période brute coucher→réveil si une nuit n'a pas de détail par phase.
+  - **Bug de pagination trouvé en diagnostiquant sur device (logs `adb logcat`)** : `readRecords`
+    limite à 1000 enregistrements par page et ne renvoie que la première page si on ignore
+    `pageToken` — invisible pour poids/sommeil/nutrition (quelques enregistrements/jour), mais
+    sur 14 jours de FC continue (largement >1000 enregistrements, triés du plus ancien au plus
+    récent), ça coupait systématiquement AVANT les données du jour même. Nouveau helper privé
+    `readAllRecords` (boucle sur toutes les pages) dans `HealthNutritionPlugin.kt`, utilisé pour
+    la lecture FC. Diagnostiqué en ajoutant des `Log.d` temporaires lus en direct via
+    `adb logcat` pendant un relancement forcé de l'app (`am force-stop` + `am start`) — logs
+    retirés une fois la cause confirmée.
+  - `healthSync.js` : `READ_TYPES` demande `"heartRate"` (plus `"restingHeartRate"`, abandonné
+    avec la v1).
+- **UI** :
+  - Onglet **Sommeil renommé "Énergie"** (`SleepTab` dans App.jsx, clé de tab restée `"sleep"`
+    en interne) : nouvelle carte `EnergyScoreCard` en tête (score total + détail des 4 modules,
+    toujours affiché même si le total est indisponible), score de sommeil affiché à côté de la
+    durée ("Dernière nuit"). Durée du module sommeil affichée en **h/min** (`fmtHM`), jamais en
+    décimal.
+  - **Tuile Dashboard "Douleurs" remplacée par "Score d'énergie"** (demande explicite de Yoann —
+    le genou reste suivi via l'onglet Douleurs, plus besoin de sa propre tuile).
+  - **Alerte** sous la carte "Prochaine séance" si aucune entrée genou n'existe pour aujourd'hui
+    (`!knee.some(k => k.date === today())`) — demande explicite, distincte du `kneeNote` déjà
+    existant dans le recommandeur (qui ne se déclenche qu'après péremption de 3 j, pas "pas noté
+    aujourd'hui" spécifiquement).
+  - **Widget écran d'accueil** : tuile "Sommeil" → "Énergie" (`WidgetBridgePlugin.KEYS`,
+    `DashboardWidgetProvider.buildViews`, `widget_dashboard.xml` — ids et libellé renommés).
+    Valeur = score d'énergie + libellé qualitatif (`scoreLabel`, ex. "88 Excellent" — taille de
+    police réduite à 13sp sur cette tuile pour absorber la longueur variable du libellé). Note =
+    "Sommeil " + durée réelle en h/min (PAS le score de sommeil — changé sur demande explicite
+    après un premier essai avec le score).
+  - **Score d'énergie intégré comme signal d'adaptation dans le recommandeur** (pas seulement
+    affiché) : nouveau paramètre optionnel `energy` dans `recommendSessions`, `energyLow`
+    (score < 50, silencieux si donnée absente) traité exactement comme `sleepPoor`/`loadHigh`
+    (nudge -6 sur `fatigueScore`, +8 sur Repos) — complète ce que Yoann avait demandé
+    initialement ("adapter en fonction de... score d'énergie") et qui manquait à la première
+    passe.
+- **Testé en conditions réelles sur le téléphone de Yoann** (pas seulement dans l'aperçu) :
+  build + `npx cap sync android` + `gradlew assembleDebug` + `adb install -r`, logs vérifiés
+  via `adb logcat` à chaque étape de diagnostic. Score final confirmé cohérent (ex. "92
+  Excellent" avec 6h01 de sommeil, plus jamais pénalisé pour une nuit courte de bonne qualité).
+
+## Chantier RawCare — Carte resto : diagnostic et corrections (07/09/2026, apps/perso v3.73.0 → v3.73.1)
+
+Signalé par Yoann : une carte de restaurant réelle (site avec plusieurs menus sur une seule
+page — formule déjeuner, carte à la carte, carte des boissons/vins) ne remontait aucun plat.
+Diagnostic fait AVANT toute modification (méthode demandée explicitement par Yoann,
+confirmation point par point) : récupération de la page en HTTP simple (`curl`, sans JS —
+proche de ce que voit l'outil `web_fetch`, qui ne rend pas le JavaScript selon la doc Anthropic)
+pour mesurer son contenu réel plutôt que deviner.
+
+- **Cause 1 (confirmée) : `max_content_tokens` trop bas.** Une page de carte resto réaliste,
+  cumulant plusieurs menus, peut à elle seule dépasser largement les 5000 tokens de texte
+  d'origine (mesuré : ~5900 tokens sur un cas réel qui n'était pourtant pas anormalement long) —
+  la lecture était tronquée avant même d'atteindre le menu utile.
+- **Cause 2 (confirmée, hypothèse initiale de Yoann) : pollution par plusieurs menus + carte des
+  boissons/vins.** Une fois le HTML aplati en texte, plus aucun titre ne sépare "Menu Déjeuner"/
+  "Carte Food"/"Carte des Boissons"/"Carte des Vins" — des plats identiques apparaissent parfois
+  en double (formule ET carte, prix différents), et une énorme liste de boissons/vins/cocktails
+  suit directement les plats sans démarcation claire.
+- **Cause 3 (angle mort du code, indépendant de l'URL testée) : le bloc `web_fetch_tool_result`
+  était totalement ignoré** — seuls les blocs `type: "text"` de la réponse étaient lus. Un échec
+  net de lecture (page bloquée, type non supporté, timeout — `error_code` documenté par
+  Anthropic) donnait donc exactement le même "Aucun plat reconnu" qu'une carte simplement vide,
+  aucun moyen de distinguer les deux cas.
+- **`RestaurantMenu.jsx`, trois correctifs (les 3 validés par Yoann)** :
+  1. `max_content_tokens` : 5000 → 20000 (testé en conditions réelles) → **10000** (valeur
+     retenue) — 20000 laissait passer la carte des boissons/vins EN ENTIER, que le modèle doit
+     ensuite activement lire puis exclure (prompt), ce qui grignotait à son tour trop de budget
+     de réflexion pour finir le JSON (voir point 3).
+  2. `SYSTEM_PROMPT` renforcé : exclusion explicite des boissons/alcool de la liste des plats,
+     consigne pour repérer TOUS les menus de nourriture d'une page qui en cumule plusieurs tout
+     en ignorant ce qui suit "Carte des boissons"/"Carte des vins"/"Cocktails"/etc., et
+     dédoublonnage des plats identiques entre plusieurs menus (garder la version "à la carte"
+     plutôt que la formule).
+  3. `webFetchError(content)` : détecte un bloc `web_fetch_tool_result` en échec
+     (`type: "web_fetch_tool_result_error"`), mappe son `error_code` à un message clair affiché
+     à l'écran au lieu du générique "Aucun plat reconnu".
+- **Bug supplémentaire trouvé EN TESTANT le correctif ci-dessus (même piège que le Coach IA,
+  déjà documenté dans ce fichier)** : `maxTokens` (budget de SORTIE, réflexion `effort:"medium"`
+  comprise) était resté à 3000 alors que `max_content_tokens` avait été monté à 20000 — plus de
+  contenu à digérer ⇒ plus de réflexion ⇒ le JSON se coupait en plein milieu
+  (`stop_reason: "max_tokens"`), d'où "Réponse illisible" alors que le fetch avait réussi.
+  Ajout d'un message dédié ("Réponse coupée...") quand `stop_reason === "max_tokens"`, pour que
+  ce cas précis se reconnaisse tout seul si ça revient. `maxTokens` : 3000 → 8000 (encore
+  insuffisant en test réel) → **14000** (valeur retenue).
+- **Confirmé fonctionnel par Yoann sur son téléphone** après le réglage `max_content_tokens:
+  10000` / `maxTokens: 14000` — testé avec un lien réel, plats correctement extraits.
+- **L'URL utilisée pour ce diagnostic était un exemple de test fourni par Yoann, volontairement
+  non conservée dans le code ni dans cette documentation** (demande explicite) — le
+  raisonnement/les correctifs ci-dessus sont génériques, pas spécifiques à un site.
+- **Intégration au journal vérifiée, déjà en place, rien à créer** : `logRestoDishes`
+  (`NutritionTab.jsx`) utilise déjà `food.addMany` avec exactement le même chemin de stockage
+  (`foodLog`) que "Ajouter"/"Saisie libre", suffixé "(estimé IA)".
+
+## Macro rapide — calories toujours éditables (07/09/2026, apps/perso+public v3.74.0)
+
+`FreeEntry` (saisie libre, `FoodSearch.jsx`) forçait les calories au calcul 4/4/9+fibres dès
+qu'une macro était renseignée, masquant le champ de saisie manuelle — impossible de corriger
+pour tout ce que les 4 macros suivies ne couvrent pas, l'alcool en particulier (un cocktail à
+190 kcal peut n'avoir que quelques grammes de glucides comme macro connue, le reste vient de
+l'alcool qui n'est pas une macro suivie par l'app).
+
+- **Un seul champ Calories, toujours visible et modifiable** : pré-rempli automatiquement
+  depuis les macros (`kcalComputed`) tant que l'utilisateur n'y a pas touché lui-même
+  (`kcalTouched`) ; dès qu'il tape une valeur, elle devient la référence et NE SE FAIT PLUS
+  ÉCRASER par un changement de macro ensuite — remplace l'ancien état à deux modes (calories
+  calculées en lecture seule OU calories seules, mutuellement exclusifs avec les macros).
+  Testé en direct : 16 g glucides → 64 kcal auto, corrigé à 190, ajout de 2 g protéines
+  ensuite → reste à 190.
+- Porté à l'identique sur `apps/public` (même composant, même comportement).
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
-   `trainingLog`, `kneeLog`, `elbowLog`, `macroLog`, `noteLog`, `stepsLog`, `targets`,
+   `trainingLog`, `kneeLog`, `elbowLog`, `rhrLog`, `macroLog`, `noteLog`, `stepsLog`, `targets`,
    `phase`, `hsrWeek`, `climbScheme`, `basketSchedule`, `apiKey`, `model`, `coachProfile`,
    `coachJournal`, `foodLog`, `foodPins`, `foodMuted`, `foodPortions`, `foodRecipes`,
    `foodOverrides` —
@@ -2751,6 +2954,9 @@ raisonnement explicité ici pour que Yoann puisse challenger a posteriori :
    prochaine restauration. **Deux exceptions volontaires**, à ne pas « corriger » :
    `lastAutoBackupDate` et `lastCloudBackup` sont des marqueurs de sauvegarde —
    les restaurer ferait croire à l'app qu'une sauvegarde vient d'avoir lieu.
+   `elbowLog` est un troisième cas particulier depuis le 05/09/2026 : le coude a été
+   retiré (plus aucun code ne le lit/l'écrit, voir plus bas), la clé reste dans
+   `DATA_KEYS` uniquement pour ne pas perdre l'historique déjà exporté.
 2. **Toujours vérifier que le build passe** (`npm run build --workspace=apps/perso`,
    depuis la racine du monorepo) avant de considérer une modification terminée.
 3. **Bumper `APP_VERSION`** (dans `apps/perso/src/App.jsx`) et `"version"` (dans
