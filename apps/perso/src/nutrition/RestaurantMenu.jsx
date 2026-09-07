@@ -207,15 +207,25 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
       const askedModel = model || "claude-sonnet-5";
       // web_fetch : outil serveur, aucun header beta requis, ne lit qu'une URL déjà présente
       // dans le message (celle qu'on vient d'y écrire) — cf. commentaire d'en-tête du fichier.
-      // `max_content_tokens` relevé de 5000 à 20000 le 07/09/2026 : une page de carte resto
-      // classique (plusieurs menus + carte des boissons/vins sur une seule page, cas courant)
-      // peut dépasser 5000 tokens de texte à elle seule, ce qui tronquait la lecture avant
-      // même d'atteindre le menu utile — mesuré sur un cas réel (~6000 tokens de texte brut
-      // pour une page qui n'était pourtant pas anormalement longue).
-      const tools = hasUrl ? [{ type: "web_fetch_20260209", name: "web_fetch", max_uses: 2, max_content_tokens: 20000 }] : undefined;
+      // `max_content_tokens` : 5000 → 20000 le 07/09/2026 (une page de carte resto classique,
+      // avec plusieurs menus + carte des boissons/vins sur une seule page, dépassait 5000
+      // tokens de texte à elle seule, tronquant la lecture avant même le menu utile) → 10000
+      // le même jour, une fois 20000 testé en conditions réelles : ça laissait passer la
+      // TOTALITÉ d'une énorme carte des boissons/vins que le modèle doit ensuite activement
+      // lire puis exclure (consigne du prompt), ce qui consommait à son tour trop du budget
+      // de RÉFLEXION (voir `maxTokens` juste en dessous) pour finir le JSON. 10000 couvre
+      // largement un menu réel (mesuré : le menu utile d'une page test tenait dans les 3000
+      // premiers tokens de contenu) sans forcer la lecture complète d'une carte des vins.
+      const tools = hasUrl ? [{ type: "web_fetch_20260209", name: "web_fetch", max_uses: 2, max_content_tokens: 10000 }] : undefined;
+      // `maxTokens` : 3000 → 8000 le 07/09/2026, insuffisant en test réel (réponse encore
+      // coupée, `stop_reason === "max_tokens"`) → 14000 le même jour. Même piège que le
+      // Coach IA (voir plus haut dans ce fichier) : avec `output_config.effort`, la
+      // réflexion du modèle consomme CE MÊME budget avant le texte visible, et une carte
+      // fournie (30+ plats, plusieurs menus à trier/dédupliquer) demande une réflexion non
+      // négligeable avant même la première ligne du JSON.
       const { data, usedModel } = await callClaude({
         apiKey, model: askedModel, system: SYSTEM_PROMPT, user, tools,
-        effort: "medium", maxTokens: 3000, onRetry: setProgress,
+        effort: "medium", maxTokens: 14000, onRetry: setProgress,
       });
       setProgress("");
       // Échec net de lecture du lien (page bloquée/inaccessible/type non supporté) : jusqu'ici
@@ -226,7 +236,12 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
       try { parsed = extractJson(raw); }
       catch {
         console.warn("Carte resto — JSON illisible :", raw);
-        setErr(fetchErr ? `Lien illisible : ${fetchErr}` : "Réponse illisible. Réessaie, ou simplifie le texte/la photo.");
+        // `stop_reason === "max_tokens"` : le JSON a été coupé en plein milieu (voir le
+        // commentaire sur `maxTokens` ci-dessus) — motif précis plutôt qu'un "illisible"
+        // générique, pour distinguer ce cas d'une vraie réponse mal formée.
+        setErr(fetchErr ? `Lien illisible : ${fetchErr}`
+          : data.stop_reason === "max_tokens" ? "Réponse coupée (carte trop fournie pour le budget actuel) — réessaie."
+          : "Réponse illisible. Réessaie, ou simplifie le texte/la photo.");
         setState("error");
         return;
       }
