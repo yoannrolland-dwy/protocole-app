@@ -23,6 +23,7 @@ import { refSet, lastPerf, perfHistory, lastExerciseSets, medianTarget } from "@
 import { EXERCISE_LIBRARY } from "@rawcare/core/session/exercises";
 import { recommendSessions } from "@rawcare/core/recommender";
 import { computeEnergyScore, computeSleepScore, scoreLabel } from "@rawcare/core/energy";
+import { computeFreeInsights } from "@rawcare/core/insights";
 import { PHASES, phaseTarget as phaseTargetCore, DEFAULT_TARGETS, isCutWindow, targetsForDate,
          kcalFromMacros, kcalOfEntry, tdeeNow, weeklyWeekdayKcalTrend } from "@rawcare/core/targets";
 import { buildCoachPrompt, buildCoachBriefing, splitCarnet, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
@@ -44,7 +45,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.74.0";
+const APP_VERSION = "3.75.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -238,6 +239,18 @@ function Dashboard({ weight, sleep, knee, rhr, macros, steps, targets, training,
   const waterTgt = targets.water + (basketToday ? 1000 : 0);
   const kcalTgt = (() => { const a = targetsForDate(today(), targets); return Math.round(kcalFromMacros(a.protein, a.carbs, a.fat, a.fiber)); })();
 
+  // Constats gratuits (07/09/2026, point 1 du chantier IA) : réutilise le même calcul TDEE
+  // que la carte Macros (lecture fraîche de foodLog/overrides via getSync, jamais mise en
+  // cache) pour ne jamais afficher un chiffre différent de celui de l'onglet Macro.
+  const tdeeForInsights = useMemo(
+    () => tdeeNow({ foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}), macros, weight, targets }),
+    [macros, weight, targets]
+  );
+  const insights = useMemo(
+    () => computeFreeInsights({ training, weight, macros, sleep, rhr, steps, knee, targets, tdeeResult: tdeeForInsights, kcalTargetToday: kcalTgt, todayDate: today() }),
+    [training, weight, macros, sleep, rhr, steps, knee, targets, tdeeForInsights, kcalTgt]
+  );
+
   // 3 paires, toutes cliquables vers l'onglet correspondant.
   const tiles = [
     { label: "Poids", tab: "weight", val: wLast ? wLast.kg : "—", unit: "kg",
@@ -358,6 +371,9 @@ function Dashboard({ weight, sleep, knee, rhr, macros, steps, targets, training,
           </div>
         )}
       </Card>
+
+      {/* Constats gratuits */}
+      <InsightsCard insights={insights} />
 
       {/* Coach IA */}
       <CoachIA coach={coach} todayNote={todayNote} saveNote={saveNote} saveJournal={saveJournal} />
@@ -480,6 +496,64 @@ function EnergyScoreCard({ energy }) {
           <div style={{ fontFamily: C.mono, fontSize: 13, fontWeight: 800, color: m.points == null ? C.dim : C.text, flexShrink: 0, marginLeft: 8 }}>
             {m.points == null ? "—" : m.points}<span style={{ fontSize: 10, color: C.muted }}>/{m.max}</span>
           </div>
+        </div>
+      ))}
+    </Card>
+  );
+}
+
+/** Carte "Constats" (07/09/2026, point 1 du chantier IA) : aucun appel API, tout est calculé
+ * en JS pur à partir de données déjà en mémoire (records V4, TDEE V7, score d'énergie...).
+ * Chaque ligne n'apparaît que si le constat correspondant a assez de données ; la carte
+ * entière disparaît s'il n'y en a aucune (rien à montrer plutôt qu'une carte vide). */
+function InsightsCard({ insights }) {
+  const rows = [];
+  if (insights.streaks.training > 0) {
+    rows.push({ label: "Streak entraînement", value: `${insights.streaks.training} j`, note: "jours d'affilée entraînés" });
+  }
+  if (insights.streaks.logging > 0) {
+    rows.push({ label: "Streak apports loggés", value: `${insights.streaks.logging} j`, note: "jours d'affilée avec macros loggées" });
+  }
+  if (insights.records) {
+    const r = insights.records;
+    rows.push({ label: "Records récents", value: `${r.count}`, note: `sur ${r.sessions} séance${r.sessions > 1 ? "s" : ""} · ${r.windowDays} derniers jours` });
+  }
+  if (insights.weightTdee) {
+    const w = insights.weightTdee;
+    rows.push({
+      label: "Déficit réel", value: `${w.deficit > 0 ? "+" : ""}${w.deficit} kcal/j`,
+      note: `${w.deltaKg > 0 ? "+" : ""}${w.deltaKg} kg sur ${w.days} j · fiabilité ${w.reliability}`,
+    });
+  }
+  if (insights.cutProjection) {
+    const p = insights.cutProjection;
+    rows.push({ label: "Projection fin de sèche", value: `${p.projectedKg} kg`, note: `au ${fmt(p.endDate)} (dans ${p.daysLeft} j)` });
+  }
+  if (insights.neglected) {
+    const n = insights.neglected;
+    rows.push({ label: "Type délaissé", value: n.type, note: n.daysSince == null ? "jamais loggé" : `pas fait depuis ${n.daysSince} j` });
+  }
+  if (insights.cutAdherence) {
+    const a = insights.cutAdherence;
+    rows.push({ label: "Régularité de la sèche", value: `${a.pct}%`, note: `des jours dans la cible (${a.loggedDays} jours loggés)` });
+  }
+  if (insights.sleepEnergy) {
+    const s = insights.sleepEnergy;
+    rows.push({ label: "Sommeil vs énergie", value: `${s.goodAvg} vs ${s.poorAvg}`, note: `score moyen après bonne nuit vs mauvaise (n=${s.goodN}/${s.poorN})` });
+  }
+
+  if (!rows.length) return null;
+
+  return (
+    <Card style={{ padding: 16 }}>
+      <Label style={{ fontSize: 10, letterSpacing: 1.5, marginBottom: 8 }}>Constats</Label>
+      {rows.map((r, i) => (
+        <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderTop: i === 0 ? "none" : `1px solid ${C.divider}` }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 11, color: C.text2 }}>{r.label}</div>
+            <div style={{ fontSize: 9.5, color: C.dim, marginTop: 1 }}>{r.note}</div>
+          </div>
+          <div style={{ fontFamily: C.mono, fontSize: 13, fontWeight: 800, color: C.text, flexShrink: 0, marginLeft: 8, textAlign: "right" }}>{r.value}</div>
         </div>
       ))}
     </Card>
