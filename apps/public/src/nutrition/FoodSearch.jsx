@@ -185,14 +185,22 @@ function Row({ food, onClick, pinned, onPin, onRemove, onEdit, onQuickAdd }) {
 function FreeEntry({ onAdd, onBack, backLabel = "Saisie libre" }) {
   const [name, setName] = useState("");
   const [m, setM] = useState({ prot: "", gluc: "", lip: "", fib: "" });
-  // Calories seules (05/09/2026, port depuis apps/perso) : n'a de sens QUE si aucune macro
-  // n'est renseignée à côté — sinon deux sources de calories coexisteraient sans savoir
-  // laquelle est la vraie.
-  const [kcalOnly, setKcalOnly] = useState("");
   const num = (v) => { const n = parseFloat(String(v).replace(",", ".")); return Number.isFinite(n) ? n : 0; };
   const macrosEntered = MACROS.some((k) => k !== "kcal" && m[k] !== "" && num(m[k]) > 0);
   const kcalComputed = Math.round(num(m.prot) * 4 + num(m.gluc) * 4 + num(m.lip) * 9 + num(m.fib) * 2);
-  const ok = macrosEntered || num(kcalOnly) > 0;
+
+  // Calories toujours éditables, jamais figées sur le calcul 4/4/9+fibres (07/09/2026, port
+  // depuis apps/perso — cas de l'alcool : les macros seules sous-estiment grossièrement des
+  // calories que l'app ne suit pas comme macro à part). Suit le calcul tant que
+  // l'utilisateur n'a rien tapé lui-même ; dès qu'il tape, sa valeur devient la référence et
+  // ne se fait plus écraser par un changement de macro ensuite.
+  const [kcal, setKcal] = useState("");
+  const [kcalTouched, setKcalTouched] = useState(false);
+  useEffect(() => {
+    if (!kcalTouched) setKcal(kcalComputed ? String(kcalComputed) : "");
+  }, [kcalComputed, kcalTouched]);
+
+  const ok = macrosEntered || num(kcal) > 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -210,32 +218,29 @@ function FreeEntry({ onAdd, onBack, backLabel = "Saisie libre" }) {
         {[["prot", "Protéines"], ["gluc", "Glucides"], ["lip", "Lipides"], ["fib", "Fibres"]].map(([k, l]) => (
           <div key={k}>
             <Label style={{ marginBottom: 4 }}>{l} (g)</Label>
-            <input type="text" inputMode="decimal" value={m[k]} placeholder="0" disabled={kcalOnly !== "" && !macrosEntered}
+            <input type="text" inputMode="decimal" value={m[k]} placeholder="0"
               onChange={(e) => setM({ ...m, [k]: e.target.value })}
-              style={{ ...inputStyle(false), textAlign: "center", opacity: kcalOnly !== "" && !macrosEntered ? 0.4 : 1 }} />
+              style={{ ...inputStyle(false), textAlign: "center" }} />
           </div>
         ))}
       </div>
-      {macrosEntered ? (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <Label>Calories calculées</Label>
-          <span style={{ fontFamily: C.mono, fontSize: 20, fontWeight: 800, color: C.accent }}>{kcalComputed}</span>
-        </div>
-      ) : (
-        <div>
-          <Label style={{ marginBottom: 4 }}>Ou calories seules (si aucune macro connue)</Label>
-          <input type="text" inputMode="decimal" value={kcalOnly} placeholder="0"
-            onChange={(e) => setKcalOnly(e.target.value)}
-            style={{ ...inputStyle(false), textAlign: "center" }} />
-        </div>
-      )}
+      <div>
+        <Label style={{ marginBottom: 4 }}>Calories</Label>
+        <input type="text" inputMode="decimal" value={kcal} placeholder="0"
+          onChange={(e) => { setKcalTouched(true); setKcal(e.target.value); }}
+          style={{ ...inputStyle(false), textAlign: "center", fontSize: 16, fontWeight: 800, color: C.accent }} />
+        <Body style={{ fontSize: 9.5, color: C.dim, marginTop: 4 }}>
+          Pré-rempli depuis les macros (4/4/9 + fibres) — modifiable, utile pour l'alcool ou
+          toute source de calories que les macros ne couvrent pas.
+        </Body>
+      </div>
       <Btn variant="primary" disabled={!ok} onClick={() => {
         onAdd({
           ref: newQuickRef(),
           name: name.trim() || "Ajout rapide",
           per100: macrosEntered
-            ? { kcal: kcalComputed, prot: num(m.prot), gluc: num(m.gluc), lip: num(m.lip), fib: num(m.fib) }
-            : { kcal: Math.round(num(kcalOnly)), prot: null, gluc: null, lip: null, fib: null },
+            ? { kcal: Math.round(num(kcal)), prot: num(m.prot), gluc: num(m.gluc), lip: num(m.lip), fib: num(m.fib) }
+            : { kcal: Math.round(num(kcal)), prot: null, gluc: null, lip: null, fib: null },
         }, 100);
         onBack();
       }}>Ajouter</Btn>
