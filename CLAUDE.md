@@ -2939,6 +2939,113 @@ l'alcool qui n'est pas une macro suivie par l'app).
   ensuite → reste à 190.
 - Porté à l'identique sur `apps/public` (même composant, même comportement).
 
+## Chantier RawCare — 4 points IA (07/09/2026, apps/perso v3.75.0 → v3.77.0)
+
+Suite à une question de Yoann sur l'installation d'un LLM local (Gemma...) pour réduire le
+coût API : conclusion que le cloud reste le bon choix (un modèle local serait nettement plus
+faible sur ce raisonnement multi-domaine, et n'a pas d'équivalent à `web_fetch`/vision pour
+Carte resto/Photo d'un plat — voir l'échange détaillé dans la session). Yoann a ensuite
+demandé d'extrapoler ce que l'IA pourrait apporter au quotidien : 6 pistes proposées, une
+écartée (#5, alertes précoces douleur), une autre abandonnée après cadrage (#3 initial,
+logging repas maison en langage naturel — redondant avec la recherche CIQUAL/OFF déjà en
+place, coût répété plusieurs fois par jour pour un gain de friction faible). **3 points
+retenus, cadrés en détail avec Yoann avant tout code (réponses aux questions posées via
+AskUserQuestion), livrés dans cet ordre — apps/perso uniquement, décision explicite de ne
+pas porter sur apps/public dans ce chantier.**
+
+### Point 1 — Constats gratuits (JS pur, zéro appel API)
+
+Nouveau module `packages/core/src/insights.js` (testé en Node) : réutilise records V4, TDEE
+V7 et score d'énergie déjà calculés plutôt que de dupliquer leur logique. Nouvelle carte
+"Constats" sur le Dashboard (`InsightsCard`, `apps/perso/src/App.jsx`), sous "Prochaine
+séance" — sept constats, chacun affiché seulement s'il a assez de données (la carte entière
+disparaît si aucun n'en a) :
+- **Streaks** : jours d'affilée entraînés (tout type confondu, y compris Mobilité —
+  célébration de régularité, pas un signal de charge comme dans le recommandeur) et jours
+  d'affilée avec macros loggées. Tolère un jour de battement (streak type Duolingo : pas
+  cassé tant qu'un jour complet n'est pas sauté).
+- **Récap des records récents** : `recordsBySession` sur 30 jours glissants, un record posé
+  un jour où le genou est hors base est exclu (`painOutOfBase`, même garde-fou que
+  l'affichage individuel du carnet, V4).
+- **Déficit réel** : ne recalcule rien, formate `tdeeNow(...)` (même calcul que la carte
+  Macros — jamais deux chiffres différents pour la même réalité).
+- **Projection fin de sèche** : poids projeté à la date de fin de `targets.cut`, en
+  extrapolant la tendance EMA du poids au rythme mesuré par le TDEE (`deltaKg/days`).
+- **Type de séance délaissé** : celui dont la dernière occurrence est la plus ancienne (ou
+  jamais loggé, prioritaire), Mobilité exclue (pas une charge d'entraînement, même
+  exclusion que `isLoadBearing` dans le recommandeur). Rien signalé sous 14 jours.
+- **Régularité de la sèche** : % de jours loggés dans ±10 % de la cible du jour
+  (`targetsForDate`), depuis le début de la fenêtre. Un jour non loggé est ignoré, pas compté
+  comme un échec.
+- **Sommeil vs score d'énergie** : score moyen des matins après une nuit qualité 4 vs
+  qualité ≤2, sur 60 jours glissants — `null` sous 3 points par groupe.
+- **Testé dans l'aperçu** avec un historique synthétique complet : les 7 lignes s'affichent
+  avec les bonnes valeurs, aucune erreur console.
+
+### Point 3 — Coach de programmation (détection de plateau, JS pur aussi)
+
+Nouvelles fonctions dans `packages/core/src/training.js` (testées en Node, 7 scénarios) :
+`progressiveOverloadSuggestion(sessions, nom)` détecte un plateau (4 séances d'affilée
+"stable", même définition que `exerciseTrend` mais rejouée pas à pas plutôt qu'estimée sur
+les 3 dernières) et suggère un progressive overload classique — viser le haut de la
+fourchette de reps (`+2 reps`, plafonné au max de la fourchette lue dans les gabarits), puis
+passer à la charge supérieure une fois en haut de fourchette (pas d'incrément chiffré :
+les paliers réels dépendent du matériel, que l'app ne connaît pas assez finement).
+**Exclusions volontaires** : exercices HSR (`templateDefsFor` exclut le nom entier dès
+qu'UNE de ses définitions dans les gabarits a `hsr: true` — ex. "Leg extension unilatérale"
+est HSR en Lower A/C mais pas en Lower B, donc exclu partout par prudence) et mode "temps"
+(gainage/tenues, hors scope).
+Affiché sur la fiche exercice de l'écran Progression (`ExerciseDetail`), sous le graphique —
+carte "Plateau détecté" avec la consigne exacte. **Même garde-fou que les records (V4)** :
+pas de suggestion un jour où le genou est hors base (`painOutOfBase`), pour ne jamais
+encourager une surcharge le jour où le tendon a flambé. `knee` remonté en prop depuis
+`TrainTab` → `ProgressScreen` → `ExerciseDetail` (n'existait pas avant, ajouté pour ce
+chantier).
+**Testé dans l'aperçu** : plateau détecté et suggestion correcte sur un historique
+synthétique (55 kg × 8 stable → "vise 10 reps") ; carte confirmée masquée après avoir simulé
+une douleur genou hors base le jour même.
+
+### Point 4 — Bilan long terme (le seul qui coûte, à la demande uniquement)
+
+Nouveau module `packages/core/src/bilan.js` (testé en Node) : `computeBilanFacts(...)`
+étend les briques du point 1 sur une fenêtre de 90 jours (records, déficit réel, projection
+de sèche, type délaissé, régularité de la sèche, sommeil vs énergie) et ajoute deux
+corrélations propres au bilan, absentes du point 1 :
+- **Charge d'escalade vs douleur genou les 2 jours suivants** (`climbLoadPainCorrelation`) :
+  douleur moyenne après une "grosse" séance (`climbLoad`, V5) vs une séance légère/normale —
+  `null` sous 2 séances par groupe.
+- **Fibres vs stagnation de poids, semaine par semaine** (`fiberWeightStagnationCorrelation`) :
+  apport moyen en fibres des semaines où le poids a stagné (variation < 0,15 kg) vs des
+  semaines où il a nettement baissé — `null` sous 3 semaines par groupe.
+Intégré à la carte Coach IA existante (pas un nouvel écran, décision explicite de Yoann) :
+nouveau bouton "Bilan 3 mois" à côté d'"Analyser" (`CoachIA`, état `kind` pour distinguer les
+deux analyses). `buildBilanPrompt` (`packages/core/src/coach/prompt.js`) — **même principe
+que le prompt quotidien : "le JS calcule les faits, l'IA les juge"**, ici étendu sur 3 mois
+au lieu de 14 jours. Pas de bloc "temps réel" jour/hier, pas de carnet de bord (ce n'est pas
+l'analyse quotidienne) — uniquement les faits calculés, que le modèle interprète et priorise
+plutôt que de recalculer ou d'en inventer d'autres (`null` explicite conservé dans le JSON
+envoyé : le modèle doit voir qu'un point a été considéré mais manque de données, pas
+l'absence silencieuse d'une clé). Limite 600 mots (vs 500 pour l'analyse quotidienne),
+`maxTokens: 8000` (vs 6000) par précaution — même piège de troncature déjà rencontré sur le
+Coach IA et la Carte resto, mieux vaut un budget large qu'une réponse coupée.
+**Testé dans l'aperçu** : bouton "Bilan 3 mois" affiché à côté d'"Analyser" sans casser la
+mise en page, clic avec une fausse clé API confirme que `computeBilanFacts`/`buildBilanPrompt`
+s'exécutent sans erreur et qu'une vraie requête part vers l'API Anthropic (rejetée
+proprement en 401, pas une erreur de requête malformée) — pas de test avec une vraie clé
+(nécessiterait la clé réelle de Yoann, hors du champ de ce test).
+
+### Non fait à ce stade
+
+- **Point 2 (mémoire longue/bilan) était le nom d'origine de cette idée** — rebaptisé et
+  scindé : ce qui en reste est exactement le point 4 ci-dessus, cadré et livré.
+- **`apps/public` non touché**, décision explicite de Yoann (voir en tête de section) — les
+  trois modules (`insights.js`, `training.js` étendu, `bilan.js`) vivent dans
+  `packages/core`, donc portables sans réécrire la logique le jour où Yoann le demande,
+  seule l'UI restera à faire.
+- **Pas de test avec un vrai appel API** pour le bilan (voir plus haut) — à confirmer par
+  Yoann avec sa vraie clé, en particulier la qualité de l'interprétation des corrélations et
+  si la limite de 600 mots/8000 tokens est bien calibrée en usage réel.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
