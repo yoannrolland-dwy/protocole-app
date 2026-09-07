@@ -46,7 +46,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.77.0";
+const APP_VERSION = "3.77.1";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -2733,7 +2733,7 @@ export default function App({ silent = false } = {}) {
       const atToday = targetsForDate(today(), targets);
       const kcalTargetToday = Math.round(kcalFromMacros(atToday.protein, atToday.carbs, atToday.fat, atToday.fiber));
       const facts = computeBilanFacts({ training, weight, macros, sleep, rhr, steps, knee, targets, scheme, tdeeResult, kcalTargetToday, todayDate: today() });
-      return buildBilanPrompt({ facts, phase, targets, profile: coachProfile });
+      return buildBilanPrompt({ facts, phase, targets, profile: coachProfile, notes });
     },
     apiKey, model,
   };

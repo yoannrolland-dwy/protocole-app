@@ -364,11 +364,15 @@ Puis, APRÈS ta conclusion, écris la ligne \`${CARNET_MARK}\` seule, et en dess
  * interprète et priorise plutôt que de recalculer. Même principe que le prompt quotidien :
  * "le JS calcule les faits, l'IA les juge", ici étendu sur plusieurs mois.
  *
- * `data` : { facts, phase, targets, profile, identity }. `identity` optionnelle (apps/public,
- * même convention que `buildCoachPrompt`) — absente pour apps/perso, clause "de Yoann, 43
- * ans, athlète (...)" par défaut.
+ * `data` : { facts, phase, targets, profile, identity, notes }. `identity` optionnelle
+ * (apps/public, même convention que `buildCoachPrompt`) — absente pour apps/perso, clause
+ * "de Yoann, 43 ans, athlète (...)" par défaut. `notes` (le journal `notes` complet, pas
+ * juste 14 jours comme le prompt quotidien) : sur 3 mois, une note isolée ("insomnie",
+ * "alcool hier soir"…) compte moins que la RÉCURRENCE — un contexte qui explique par
+ * exemple une corrélation escalade/douleur ou sommeil/énergie. Absent → pas de bloc notes,
+ * comportement identique à avant cet ajout.
  */
-export function buildBilanPrompt({ facts, phase, targets, profile, identity }) {
+export function buildBilanPrompt({ facts, phase, targets, profile, identity, notes }) {
   const tgtW = phaseTarget(phase, targets);
   // Seules les clauses de rééduc servent ici (pas l'état du jour, hors sujet pour un bilan
   // long terme) — `{}` en logs suffit, `zoneState` retombe sur un état neutre inutilisé.
@@ -423,14 +427,22 @@ CONTEXTE PERMANENT écrit par ${authorLabel} — à traiter comme des contrainte
 ${profile.trim()}` : "";
   const system = `Tu es le coach personnel tout-en-un ${who} : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. Phase ${PHASES[phase].label}, poids cible ${tgtW} kg. ${tendinopathiesClause}${profileBlock}`;
 
+  // Notes de contexte sur la fenêtre du bilan (pas seulement 14 jours comme le prompt
+  // quotidien) : sur 3 mois, c'est la récurrence qui est le signal ("insomnie" notée 6 fois
+  // en 90 jours peut expliquer une corrélation sommeil/énergie), pas une note isolée.
+  const notesInWindow = (notes || []).filter((n) => daysBetween(n.date, today()) <= facts.fenetreJours);
+  const notesTxt = notesInWindow.map((n) => `${n.date} : ${n.text}`).join("\n");
+  const notesBlock = notesTxt
+    ? `\n\nNOTES DE CONTEXTE écrites par ${authorLabel} sur la période (${notesInWindow.length}, ex. alcool, insomnie, petite blessure) — repère les récurrences, pas juste les mentions isolées :\n${notesTxt}\n` : "";
+
   const user = `BILAN LONG TERME — ${facts.fenetreJours} derniers jours. Ce n'est PAS l'analyse quotidienne habituelle : le JS a déjà calculé des corrélations et tendances chiffrées sur plusieurs mois (pas 14 jours). Ton rôle est d'INTERPRÉTER ces chiffres, pas de les recalculer ni d'en inventer d'autres. Un champ \`null\` veut dire "pas assez de données" — ne l'invente jamais, dis simplement qu'il n'y a pas assez de recul sur ce point précis plutôt que de l'ignorer silencieusement.
 
 FAITS CALCULÉS :
 ${JSON.stringify(faits)}
-
+${notesBlock}
 Rédige un bilan de fond, structuré ainsi :
 1. **Tendances majeures** sur la période — ce qui se dégage vraiment sur ${facts.fenetreJours} jours, pas ce qui bouge au jour le jour.
-2. **Corrélations notables** — commente en priorité celles qui montrent un écart net entre les deux groupes comparés ; pour celles qui sont marginales ou absentes, une phrase courte suffit plutôt que de forcer un commentaire.
+2. **Corrélations notables** — commente en priorité celles qui montrent un écart net entre les deux groupes comparés ; pour celles qui sont marginales ou absentes, une phrase courte suffit plutôt que de forcer un commentaire.${notesTxt ? " Si une récurrence dans les notes de contexte peut expliquer une corrélation ou une tendance, dis-le explicitement." : ""}
 3. **Ce qu'il faut ajuster** pour les semaines à venir, concrètement.
 Sois direct, chiffré, sans réciter les données brutes (cite seulement ce qui appuie un conseil).${tendinopathiesClause ? " Priorité absolue à la sécurité tendineuse si un signal genou ressort des faits." : ""} Limite stricte : 600 mots maximum, termine toujours par une conclusion complète. Ce n'est pas un avis médical.`;
 
