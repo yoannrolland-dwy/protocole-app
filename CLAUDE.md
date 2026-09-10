@@ -3075,6 +3075,24 @@ gain réel ("ne pas avoir à aller chercher l'info") est faible pour son usage. 
 reproposer sans un nouveau contexte** (ex. un moment identifié où il n'ouvre pas l'app le
 matin).
 
+## Idée abandonnée : extrapoler l'eau des aliments (09/09/2026)
+
+Yoann a demandé si l'eau contenue dans les aliments (fruits/légumes surtout, souvent 85-95 %
+d'eau) pourrait être calculée et ajoutée à son suivi hydrique — hypothèse que son impression
+de "trop boire" (toilettes fréquentes) vienne du fait que son alimentation très végétale
+apporte déjà beaucoup d'eau, non comptée par-dessus la cible actuelle. **Scientifiquement
+fondé** (les recommandations officielles d'hydratation comptent l'eau totale, boissons +
+aliments — c'est déjà pour cette raison que la cible de base avait été baissée de 3000 à
+2000 mL le 02/08/2026) et **techniquement faisable** : CIQUAL a une teneur en eau par 100g
+dans ses données sources, simplement pas extraite par `build-ciqual.mjs` (arrêté à 5 valeurs
+depuis le 01/08/2026) ; Open Food Facts n'a quasiment jamais cette donnée, mais ça importe
+peu puisque les fruits/légumes bruts de Yoann passent par CIQUAL, pas par un scan.
+Proposition faite (ligne séparée "Eau des aliments", jamais fusionnée dans le compteur
+piloté par les boutons +250/+500 pour ne pas rendre ce chiffre auto-déclaré confus) —
+**Yoann a tranché que ça ne valait pas le coup** : gain informatif, pas actionnable (aucune
+cible à ajuster dessus), pour un chantier qui touche une décision déjà prise (les 5 valeurs
+CIQUAL). **Ne pas reproposer sans nouveau contexte.**
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
