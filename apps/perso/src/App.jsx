@@ -46,7 +46,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.77.1";
+const APP_VERSION = "3.79.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -990,6 +990,14 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
     exos.forEach((e) => { m[e.nom] = recordToBeat(training, e.nom, initial); });
     return m;
   }, [training, initial, exos.map((e) => e.nom).join("|")]);
+  // Plateau visible directement dans le carnet pendant la séance (10/09/2026, demande
+  // explicite) — même calcul que Progression, pas de nouvelle logique. Une ligne discrète,
+  // affichée uniquement à l'ouverture d'un exercice, comme le record.
+  const plateauByExo = useMemo(() => {
+    const m = {};
+    exos.forEach((e) => { m[e.nom] = progressiveOverloadSuggestion(exerciseSessions(training, e.nom), e.nom); });
+    return m;
+  }, [training, exos.map((e) => e.nom).join("|")]);
   // Indices des séries qui battent le record au moment où elles sont cochées : la référence
   // avance au fil des séries, donc seules les vraies améliorations successives ressortent.
   const recordIdx = (e) => {
@@ -1097,6 +1105,11 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
                 {!painRed && refRecords[e.nom] && (
                   <Body style={{ fontSize: 10.5, color: C.muted, marginTop: 6, fontFamily: C.mono }}>
                     ★ record : {setLabel(refRecords[e.nom], e.mode)}
+                  </Body>
+                )}
+                {!painRed && plateauByExo[e.nom] && (
+                  <Body style={{ fontSize: 10.5, color: "#e8a33d", marginTop: 6, fontFamily: C.mono }}>
+                    ⏸ plateau depuis {plateauByExo[e.nom].weeks} semaine{plateauByExo[e.nom].weeks > 1 ? "s" : ""}
                   </Body>
                 )}
 
@@ -1286,14 +1299,16 @@ function ExerciseDetail({ training, knee, nom, onBack }) {
           <Label style={{ marginBottom: 5 }}>Plateau détecté</Label>
           {overload.kind === "reps" ? (
             <Body>
-              4 séances stables d'affilée sur {overload.poids} kg × {overload.from}. Vise{" "}
+              {overload.sessions} séances stables d'affilée (depuis {overload.weeks} semaine{overload.weeks > 1 ? "s" : ""}) sur{" "}
+              {overload.poids} kg × {overload.from}. Vise{" "}
               <strong style={{ color: C.text }}>{overload.target} reps</strong> à {overload.poids} kg la prochaine fois
               (fourchette {overload.range.min}-{overload.range.max}).
             </Body>
           ) : (
             <Body>
-              4 séances stables d'affilée en haut de la fourchette ({overload.range.min}-{overload.range.max} reps) à{" "}
-              {overload.from} kg. Passe à la charge supérieure disponible et repars en bas de la fourchette.
+              {overload.sessions} séances stables d'affilée (depuis {overload.weeks} semaine{overload.weeks > 1 ? "s" : ""}) en haut
+              de la fourchette ({overload.range.min}-{overload.range.max} reps) à {overload.from} kg. Passe à la charge
+              supérieure disponible et repars en bas de la fourchette.
             </Body>
           )}
         </Card>
@@ -1332,7 +1347,14 @@ function ProgressScreen({ training, knee, onBack }) {
         {list.length ? list.map((e) => {
           // Tendance calculée par exercice : c'est l'information qu'on vient chercher, la
           // liste seule ne dirait pas si ça monte ou si ça stagne.
-          const t = exerciseTrend(exerciseSessions(training, e.nom));
+          const sessions = exerciseSessions(training, e.nom);
+          const t = exerciseTrend(sessions);
+          // Plateau visible directement dans la liste (10/09/2026, demande explicite), pas
+          // seulement en ouvrant la fiche détail — même garde-fou douleur que la fiche
+          // (ExerciseDetail) et les records (V4) : pas de nudge de surcharge affiché un jour
+          // où le genou est hors base.
+          const overload = progressiveOverloadSuggestion(sessions, e.nom);
+          const showPlateau = overload && !painOutOfBase([knee], today());
           return (
             <div key={e.nom} onClick={() => setSel(e.nom)} style={{
               display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -1345,6 +1367,11 @@ function ProgressScreen({ training, knee, onBack }) {
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                {showPlateau && (
+                  <span style={{ fontSize: 9, fontFamily: C.mono, fontWeight: 800, color: "#e8a33d", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    Plateau
+                  </span>
+                )}
                 <span style={{ fontSize: 10, fontFamily: C.mono, fontWeight: 800, color: trendColor(t.key) }}>{t.label}</span>
                 <ChevronRight size={13} color={C.dim} />
               </div>

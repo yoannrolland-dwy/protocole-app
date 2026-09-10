@@ -3093,6 +3093,49 @@ piloté par les boutons +250/+500 pour ne pas rendre ce chiffre auto-déclaré c
 cible à ajuster dessus), pour un chantier qui touche une décision déjà prise (les 5 valeurs
 CIQUAL). **Ne pas reproposer sans nouveau contexte.**
 
+## Chantier RawCare — Plateau : volume secondaire + durée affichée (10/09/2026, apps/perso v3.79.0)
+
+Deux retours de Yoann après avoir testé le point 3 du chantier "4 points IA" (détection de
+plateau). Question posée d'abord ("comment calculer un progressive overload qui soit
+pertinent ?") avant de coder — proposition retenue après discussion des tradeoffs.
+
+- **Volume total comme garde-fou secondaire** (`packages/core/src/training.js`,
+  `progressiveOverloadSuggestion`) : jusqu'ici, un plateau se déclarait dès que la MEILLEURE
+  série stagnait 4 séances d'affilée (`beats()`), sans regarder les autres séries de la
+  séance. Nouveau `sessionVolume(session)` (somme poids × reps de TOUTES les séries cochées)
+  sert de second signal : si le volume total a progressé sur la fenêtre du plateau (ex.
+  60×8/60×7/60×5 → 60×8/60×8/60×6 — la meilleure série ne bouge pas, mais tenir la charge sur
+  les séries suivantes est une vraie progression), ce n'est PAS un plateau. **La charge reste
+  prioritaire pour dire hausse/baisse** (historique du 13/08/2026, volontairement pas rouvert) —
+  le volume n'intervient qu'en second filtre, jamais comme critère principal.
+- **Fenêtre de détection étendue à la vraie série stable**, pas figée à 4 séances : la
+  fonction remonte maintenant tant que les séances restent "stable" deux à deux, pour pouvoir
+  dire DEPUIS QUAND (`weeks`/`sessions`/`since` dans le retour), pas juste s'il y a plateau ou
+  non. `PLATEAU_STABLE_STREAK = 4` reste le seuil minimum pour déclarer un plateau, mais la
+  durée réelle peut être plus longue.
+- **Affiché à deux endroits** :
+  1. **Liste "Progression par exercice"** (`ProgressScreen`) : badge ambre "PLATEAU" à côté
+     de la tendance (hausse/baisse/stable), pour voir d'un coup d'œil quels exercices sont
+     coincés sans ouvrir chaque fiche.
+  2. **Carnet de musculation, en direct** (`MuscuLogger`, demande explicite : "je lance la
+     séance, je veux savoir dès que j'ouvre l'exercice") — une ligne discrète "⏸ plateau
+     depuis N semaines" juste sous "★ record", même style/emplacement, pas de nouvel écran ni
+     de carte supplémentaire ("sans trop alourdir l'interface").
+  Même garde-fou douleur que les records (V4) et la fiche détail : masqué si le genou est
+  hors base aujourd'hui (`painRed` dans `MuscuLogger`, `painOutOfBase` dans `ProgressScreen`).
+- **Fiche détail** (`ExerciseDetail`, carte "Plateau détecté") mise à jour pour afficher la
+  vraie durée ("6 séances stables d'affilée (depuis 4 semaines)") au lieu du texte figé
+  "4 séances stables d'affilée".
+- **Testé en Node** : non-régression sur tous les scénarios déjà couverts (7 du point 3
+  initial + 3 du garde-fou volume) — identiques au comportement précédent, seuls les champs
+  `weeks`/`sessions`/`since` s'ajoutent au retour. Nouveau scénario : plateau de 6 séances
+  espacées de 5 jours après 2 séances de progression → détecte bien exactement les 6 séances
+  du plateau (pas les 2 précédentes), 4 semaines calculées correctement. **Testé dans
+  l'aperçu** : historique synthétique (6 séances stables sur "Développé incliné haltères",
+  espacées de 5 jours) → badge "⏸ plateau depuis 4 semaines" affiché dès l'ouverture de
+  l'exercice dans le carnet Upper A, juste sous le record. Aucune erreur console. Build
+  `apps/perso` ET `apps/public` propres.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,

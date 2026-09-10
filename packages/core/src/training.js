@@ -10,6 +10,7 @@
 // Aucune dépendance à React ni à `ui.jsx` : ce module doit rester testable seul en Node.
 
 import { TEMPLATES } from "./session/templates.js";
+import { daysBetween } from "./dateUtils.js";
 
 const byDateAsc = (a, b) => a.date.localeCompare(b.date);
 
@@ -262,11 +263,25 @@ function parseRepRange(r) {
   return { min, max: m[2] ? +m[2] : min };
 }
 
+/** Volume total d'une séance pour cet exercice (somme poids × reps de TOUTES les séries
+ * cochées, pas seulement la meilleure) — signal secondaire pour ne pas déclarer un plateau
+ * à tort quand la meilleure série stagne mais que les séries suivantes tiennent mieux la
+ * charge (ex. 60×8/60×7/60×5 → 60×8/60×8/60×6 : même meilleure série, vraie progression). */
+function sessionVolume(session) {
+  return (session.series || []).reduce((sum, s) => sum + (+s.poids || 0) * (+s.val || 0), 0);
+}
+
 /**
  * Suggestion de progressive overload (viser le haut de la fourchette de reps, puis passer à
- * la charge supérieure) une fois qu'un plateau est détecté : `PLATEAU_STABLE_STREAK` séances
- * d'affilée "stable" (même définition que `exerciseTrend`, rejouée pas à pas plutôt
- * qu'estimée sur les 3 dernières comme l'écran de progression).
+ * la charge supérieure) une fois qu'un plateau est détecté. Un plateau, c'est la plus longue
+ * série de séances consécutives "stable" sur la meilleure série (même définition que
+ * `exerciseTrend`, rejouée pas à pas) qui se termine à la dernière séance — pas juste les
+ * `PLATEAU_STABLE_STREAK` dernières : ça sert aussi à dire DEPUIS QUAND (`weeks`), pour
+ * l'afficher directement dans le carnet pendant la séance (demande du 10/09/2026), pas
+ * seulement sur la fiche Progression. Un plateau nécessite en plus que le volume total
+ * n'ait pas non plus progressé sur cette même fenêtre (voir `sessionVolume` — décidé avec
+ * Yoann le 10/09/2026 : la charge reste prioritaire pour dire hausse/baisse — historique du
+ * 13/08/2026, ne pas rouvrir —, mais un plateau nécessite qu'AUCUN des deux signaux ne bouge).
  *
  * Exclusions volontaires (décidées avec Yoann le 07/09/2026, pas des oublis) : les exercices
  * HSR — leur charge est déjà pilotée par la table HSR (semaine 1-12, `hsrForWeek`), une
@@ -287,18 +302,26 @@ export function progressiveOverloadSuggestion(sessions, nom) {
   const range = parseRepRange(defs[0].r);
   if (!range) return null;
 
-  const recent = sessions.slice(-PLATEAU_STABLE_STREAK);
-  for (let i = 1; i < recent.length; i++) {
-    if (beats(recent[i].best, recent[i - 1].best, last.mode)) return null; // progression → pas un plateau
-    if (beats(recent[i - 1].best, recent[i].best, last.mode)) return null; // régression → pas ce cas
+  // Étend la fenêtre en remontant tant que chaque paire consécutive reste "stable" — pas
+  // figée à PLATEAU_STABLE_STREAK, pour connaître la vraie durée du plateau.
+  let start = sessions.length - 1;
+  while (start > 0
+    && !beats(sessions[start].best, sessions[start - 1].best, last.mode)
+    && !beats(sessions[start - 1].best, sessions[start].best, last.mode)) {
+    start--;
   }
+  const streak = sessions.slice(start);
+  if (streak.length < PLATEAU_STABLE_STREAK) return null;
+  if (sessionVolume(streak[streak.length - 1]) > sessionVolume(streak[0])) return null; // volume total en hausse → vraie progression, pas un plateau
 
   const { poids, val } = last.best;
+  const weeks = Math.max(1, Math.round(daysBetween(streak[0].date, last.date) / 7));
+  const base = { sessions: streak.length, weeks, since: streak[0].date };
   if (val < range.max) {
-    return { kind: "reps", poids, from: val, target: Math.min(range.max, val + 2), range };
+    return { ...base, kind: "reps", poids, from: val, target: Math.min(range.max, val + 2), range };
   }
   // Déjà en haut de fourchette : pas d'incrément inventé (les paliers réels dépendent du
   // matériel — haltères, machine, barre — que l'app ne connaît pas assez finement), juste la
   // consigne de passer à la charge supérieure disponible.
-  return { kind: "poids", from: poids, range };
+  return { ...base, kind: "poids", from: poids, range };
 }
