@@ -210,6 +210,23 @@ export function computeTDEE({ weightLog, kcalByDate, today, cutStart = null }) {
   };
 }
 
+/**
+ * Historique du TDEE, semaine par semaine (13/09/2026, onglet TDEE) : recalcule
+ * `computeTDEE` avec un `today` décalé pour chaque semaine passée, sur les mêmes données —
+ * permet de voir si la dépense estimée monte/descend/stagne dans le temps, pas seulement sa
+ * valeur actuelle du jour. Un point sans assez de données reste `null` (jamais un chiffre
+ * inventé) ; l'appelant décide comment l'afficher (trou dans le graphique).
+ */
+export function tdeeTrend({ weightLog, kcalByDate, cutStart = null, todayDate, weeks = 8 }) {
+  const out = [];
+  for (let w = weeks - 1; w >= 0; w--) {
+    const date = shiftDate(todayDate, -w * 7);
+    const r = computeTDEE({ weightLog, kcalByDate, today: date, cutStart });
+    out.push({ date, tdee: r.status === "ok" ? r.tdee : null, reliability: r.status === "ok" ? r.reliability : null });
+  }
+  return out;
+}
+
 /** Déficit réel actuel = cible affichée aujourd'hui − dépense estimée. Négatif = la cible
  * est sous la dépense réelle (vrai déficit) ; positif = la cible est en fait au-dessus
  * (pas de déficit malgré l'intention). Calcul centralisé pour ne jamais diverger entre

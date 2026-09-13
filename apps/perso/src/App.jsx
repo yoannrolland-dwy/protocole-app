@@ -16,7 +16,7 @@ import { isBackupStale, daysSinceBackup, scheduleBackupReminder } from "./cloudB
 import { exoProgress, exerciseList, exerciseSessions, exerciseTrend, isTimeMode, setLabel,
          beats, recordToBeat, recordsBySession, painOutOfBase, progressiveOverloadSuggestion } from "@rawcare/core/training";
 import { SCHEMES, gradeIndex, ISSUES, climbSummary, climbLabel } from "@rawcare/core/climbing";
-import { realDeficit, MIN_WINDOW_DAYS as MIN_TDEE_DAYS } from "@rawcare/core/tdee";
+import { realDeficit, MIN_WINDOW_DAYS as MIN_TDEE_DAYS, tdeeTrend } from "@rawcare/core/tdee";
 import { TEMPLATES, TYPES, DEFAULT_WEIGHTS, HSR_TABLE, hsrForWeek, hsrParse, parseSecs,
          PERI, BASKET_PROTOCOLS } from "@rawcare/core/session/templates";
 import { refSet, lastPerf, perfHistory, lastExerciseSets, medianTarget } from "@rawcare/core/session/perf";
@@ -26,7 +26,7 @@ import { computeEnergyScore, computeSleepScore, scoreLabel } from "@rawcare/core
 import { computeFreeInsights } from "@rawcare/core/insights";
 import { computeBilanFacts } from "@rawcare/core/bilan";
 import { PHASES, phaseTarget as phaseTargetCore, DEFAULT_TARGETS, isCutWindow, targetsForDate,
-         kcalFromMacros, kcalOfEntry, tdeeNow, weeklyWeekdayKcalTrend } from "@rawcare/core/targets";
+         kcalFromMacros, kcalOfEntry, tdeeNow, weeklyKcalTrend, buildKcalByDate } from "@rawcare/core/targets";
 import { buildCoachPrompt, buildCoachBriefing, buildBilanPrompt, splitCarnet, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
@@ -46,7 +46,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.79.0";
+const APP_VERSION = "3.80.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -589,10 +589,21 @@ function SleepTab({ sleep, rhr, steps, save }) {
   const last7 = lastN(sleep, 7);
   const maxH = Math.max(9, ...last7.map((s) => s.hours));
   const avg7 = avg(last7.map((s) => s.hours));
+  // Moyenne QUALITÉ 7j (13/09/2026, demande explicite) : jusqu'ici seule la durée avait une
+  // moyenne — la qualité (1-4, saisie ou Health Connect) n'était visible que nuit par nuit.
+  const quality7 = avg(last7.filter((s) => s.quality != null).map((s) => s.quality));
   const lastNight = lastN(sleep, 1)[0];
   const data = lastN(sleep, 21).map((s) => ({ date: fmt(s.date), hours: s.hours }));
   const energy = useMemo(() => computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps }), [rhr, sleep, steps]);
   const sleepScore = computeSleepScore(lastNight);
+  // Score de sommeil dans le temps + répartition par palier (13/09/2026, demande explicite) :
+  // jusqu'ici le score (0-100, combine durée+qualité) n'était visible QUE pour la dernière
+  // nuit — aucun suivi de la QUALITÉ dans la durée, seule la durée brute avait un graphique.
+  const last21 = lastN(sleep, 21);
+  const scoreData = last21.map((s) => ({ date: fmt(s.date), score: computeSleepScore(s) }));
+  const paliers = { Excellent: 0, Bon: 0, Correct: 0, Risque: 0 };
+  last21.forEach((s) => { const sc = computeSleepScore(s); if (sc != null) paliers[scoreLabel(sc)]++; });
+  const paliersTotal = Object.values(paliers).reduce((a, b) => a + b, 0);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -628,9 +639,15 @@ function SleepTab({ sleep, rhr, steps, save }) {
         </div>
       </Card>
 
-      <div style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
-        <Label>Moy. 7j</Label>
-        <div style={{ fontFamily: C.mono, fontSize: 20, fontWeight: 800, color: C.text, marginTop: 3 }}>{avg7 != null ? fmtHM(avg7) : "—"}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <div style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+          <Label>Durée moy. 7j</Label>
+          <div style={{ fontFamily: C.mono, fontSize: 20, fontWeight: 800, color: C.text, marginTop: 3 }}>{avg7 != null ? fmtHM(avg7) : "—"}</div>
+        </div>
+        <div style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+          <Label>Qualité moy. 7j</Label>
+          <div style={{ fontFamily: C.mono, fontSize: 20, fontWeight: 800, color: C.text, marginTop: 3 }}>{quality7 != null ? `${round(quality7, 1)}/4` : "—"}</div>
+        </div>
       </div>
 
       <Card>
@@ -676,6 +693,46 @@ function SleepTab({ sleep, rhr, steps, save }) {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        ) : <Empty>Aucune donnée.</Empty>}
+      </Card>
+
+      {/* Score de sommeil dans le temps (13/09/2026, demande explicite) : durée seule ne dit
+          rien de la QUALITÉ — deux nuits de 7h peuvent avoir une efficacité très différente.
+          Même score que "Dernière nuit"/le score d'énergie, jamais un second calcul. */}
+      <Card>
+        <Label style={{ marginBottom: 8 }}>Score de sommeil · 21 jours</Label>
+        {scoreData.some((d) => d.score != null) ? (
+          <div style={{ height: 150 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={scoreData} margin={{ top: 4, right: 4, left: -22, bottom: 0 }}>
+                <CartesianGrid stroke={C.divider} vertical={false} />
+                <XAxis dataKey="date" tick={chartAxis} interval="preserveEnd" />
+                <YAxis tick={chartAxis} domain={[0, 100]} />
+                <Tooltip formatter={(v) => (v == null ? ["—", "score"] : [v, "score"])} contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle} />
+                <ReferenceLine y={75} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
+                <Bar dataKey="score" radius={[3, 3, 0, 0]}>
+                  {scoreData.map((d, i) => <Cell key={i} fill={d.score == null ? "transparent" : scoreColor(d.score)} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : <Empty>Aucune donnée.</Empty>}
+      </Card>
+
+      {/* Répartition par palier (13/09/2026) : vue d'ensemble rapide sur la période, sans
+          avoir à relire 21 barres une par une. Mêmes paliers/couleurs que "Dernière nuit" et
+          le score d'énergie (`scoreLabel`/`scoreColor`), jamais un second barème. */}
+      <Card>
+        <Label style={{ marginBottom: 8 }}>Répartition · 21 jours</Label>
+        {paliersTotal ? (
+          <div style={{ display: "flex", gap: 8 }}>
+            {[["Excellent", 90], ["Bon", 80], ["Correct", 65], ["Risque", 30]].map(([label, sample]) => (
+              <div key={label} style={{ flex: 1, textAlign: "center" }}>
+                <div style={{ fontFamily: C.mono, fontSize: 20, fontWeight: 800, color: scoreColor(sample) }}>{paliers[label]}</div>
+                <div style={{ fontSize: 9, color: C.dim, textTransform: "uppercase", letterSpacing: 0.4, marginTop: 2 }}>{label}</div>
+              </div>
+            ))}
           </div>
         ) : <Empty>Aucune donnée.</Empty>}
       </Card>
@@ -1862,7 +1919,7 @@ const TDEE_RELIABILITY_LABEL = { fiable: "fiable", moyenne: "moyenne", faible: "
  * Carte "Dépense estimée" (V7). Jamais un chiffre non fiable : tant qu'il n'y a pas assez
  * de recul (14 j mini, 70 % des apports loggés), affiche pourquoi plutôt qu'un nombre.
  */
-function TdeeCard({ result, deficitReel }) {
+function TdeeCard({ result, deficitReel, trend }) {
   if (result.status !== "ok") {
     return (
       <Card>
@@ -1875,6 +1932,9 @@ function TdeeCard({ result, deficitReel }) {
     );
   }
   const col = TDEE_RELIABILITY_COLOR[result.reliability];
+  // Détails de fenêtre/complétude/tendance de poids (13/09/2026, demande explicite) : tout
+  // était déjà calculé par `computeTDEE`, juste pas affiché — aucun nouveau calcul ici.
+  const trendPoints = (trend || []).filter((p) => p.tdee != null);
   return (
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
@@ -1892,11 +1952,34 @@ function TdeeCard({ result, deficitReel }) {
           {deficitReel > 0 ? "+" : ""}{deficitReel} kcal/j
         </span> contre la cible affichée.
       </Body>
+      <Body style={{ fontSize: 10, color: C.dim, marginTop: 8, fontFamily: C.mono }}>
+        Fenêtre : {fmt(result.windowStart)} → {fmt(result.windowEnd)} · {Math.round(result.loggedRate * 100)}% des jours loggés · {Math.round(result.weighRate * 100)}% pesés
+      </Body>
+      <Body style={{ fontSize: 10, color: C.dim, marginTop: 2, fontFamily: C.mono }}>
+        Tendance de poids sur la fenêtre : {result.deltaKg > 0 ? "+" : ""}{result.deltaKg} kg
+      </Body>
       {result.overlapsWater && (
         <Body style={{ fontSize: 10, color: C.dim, marginTop: 6 }}>
           Fenêtre chevauchant la perte d'eau/glycogène du début de sèche (~21 premiers jours) —
           la dépense réelle est probablement plus proche de la fourchette basse.
         </Body>
+      )}
+      {trendPoints.length >= 2 && (
+        <>
+          <Label style={{ marginTop: 12, marginBottom: 6 }}>Tendance · 8 semaines</Label>
+          <div style={{ height: 90 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trend.map((p) => ({ ...p, label: fmt(p.date) }))} margin={{ top: 4, right: 4, left: -22, bottom: 0 }}>
+                <CartesianGrid stroke={C.divider} vertical={false} />
+                <XAxis dataKey="label" tick={chartAxis} interval="preserveEnd" />
+                <YAxis tick={chartAxis} domain={["dataMin - 50", "dataMax + 50"]} />
+                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle}
+                  formatter={(v) => (v == null ? ["—", "kcal/j"] : [v, "kcal/j"])} />
+                <Line type="monotone" dataKey="tdee" stroke={C.accent} strokeWidth={2} dot={{ r: 2, fill: C.text }} connectNulls={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </>
       )}
     </Card>
   );
@@ -1976,21 +2059,30 @@ function PerformanceTab({ macros, targets, training, weight }) {
   const atToday = targetsForDate(today(), targets);
   const kcalTargetToday = Math.round(kcalFromMacros(atToday.protein, atToday.carbs, atToday.fat, atToday.fiber));
   const deficitReel = tdeeToday.status === "ok" ? realDeficit(kcalTargetToday, tdeeToday.tdee) : null;
+  // Historique du TDEE semaine par semaine (13/09/2026, demande explicite) : même donnée que
+  // `tdeeToday` (kcal réelles fusionnées), juste rejouée à des dates passées.
+  const tdeeHistory = tdeeTrend({
+    weightLog: weight,
+    kcalByDate: buildKcalByDate({ foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}), macros }),
+    cutStart: targets.cut?.enabled !== false && targets.cut?.start ? targets.cut.start : null,
+    todayDate: today(), weeks: 8,
+  });
 
-  // Moyenne hebdomadaire lundi-vendredi (revue du 01/09/2026) : remplace l'ancien graphique
-  // 14 jours quotidien, redondant avec l'onglet Macro — l'idée est de suivre la semaine de
-  // travail sans que les cheat days du week-end ne viennent la lisser.
-  const weeklyTrend = weeklyWeekdayKcalTrend(macros, { weeks: 8 }).map((w) => ({ ...w, label: fmt(w.weekStart) }));
+  // Moyenne hebdomadaire glissante, 7 jours (13/09/2026 — remplace l'ancienne moyenne lun-ven :
+  // les cheat meals de Yoann ne suivent pas un jour fixe, exclure le week-end n'avait donc pas
+  // de sens pour lui). Une vraie moyenne glissante absorbe un écart ponctuel quel que soit le
+  // jour où il tombe, sans avoir à deviner lequel exclure.
+  const weeklyTrend = weeklyKcalTrend(macros, { weeks: 8 }).map((w) => ({ ...w, label: fmt(w.weekStart) }));
   const weeksWithData = weeklyTrend.filter((w) => w.days > 0);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <ScreenHeader title="TDEE" />
 
-      {/* Moyenne hebdo kcal, lundi-vendredi seulement */}
+      {/* Moyenne hebdo kcal, 7 jours glissants */}
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-          <Label>Moyenne kcal · lun-ven</Label>
+          <Label>Moyenne kcal · semaine (lun-dim)</Label>
           <span style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono }}>cible ~{kcalTargetToday} kcal</span>
         </div>
         {weeksWithData.length ? (
@@ -2013,13 +2105,12 @@ function PerformanceTab({ macros, targets, training, weight }) {
           </div>
         ) : <Empty>Aucune donnée.</Empty>}
         <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
-          Semaine du lundi, moyenne sur les jours ouvrés réellement loggés — le week-end n'est
-          jamais compté dans cette moyenne.
+          Semaine du lundi, moyenne glissante sur les 7 jours réellement loggés.
         </Body>
       </Card>
 
       {/* Dépense énergétique adaptative (V7) */}
-      <TdeeCard result={tdeeToday} deficitReel={deficitReel} />
+      <TdeeCard result={tdeeToday} deficitReel={deficitReel} trend={tdeeHistory} />
 
       {/* Planning hebdomadaire idéal — référence affichée, jamais appliquée automatiquement */}
       <Card>

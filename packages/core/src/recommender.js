@@ -150,15 +150,10 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   const dFoot = daysSince((t) => t.type === "Foot");
   const dBike = daysSince((t) => t.type === "Vélo");
   const dKnee = daysSinceTag("genou"); // Lower + Basket + Course à pied + Foot (tag partagé)
-  // Planning Basket fixe : un Basket PRÉVU (pas encore loggé) compte comme une exposition
-  // genou pour le gate du Lower — `dKneeEff` seulement, jamais `dKnee` lui-même : le bloc
-  // BASKET plus bas doit continuer à se juger sur ce qui est RÉELLEMENT arrivé (sinon un
-  // Basket prévu aujourd'hui s'écarterait lui-même). `basketToday`/`basketYesterday` restent
-  // undefined→false si `basketSchedule` est absent (apps/public, tous les appels d'avant ce
-  // chantier) — `dKneeEff === dKnee` dans ce cas, comportement inchangé.
+  // `dKneeEff` (planning Basket prévu → gate du Lower comme si déjà arrivé) a été retiré le
+  // 13/09/2026 avec le gate 48h lui-même (voir le bloc BAS DU CORPS plus bas) — `basketToday`
+  // reste seul nécessaire, pour le bloc BASKET (score 999 le jour de l'entraînement prévu).
   const basketToday = isScheduledBasket(basketSchedule, t0);
-  const basketYesterday = isScheduledBasket(basketSchedule, shiftDateKey(t0, -1));
-  const dKneeEff = Math.min(dKnee, basketToday ? 0 : basketYesterday ? 1 : Infinity);
 
   // Charge de la dernière séance d'escalade (V5) : jusqu'ici la pénalité « escalade
   // récente » était FORFAITAIRE — une heure tranquille et une grosse session de blocs
@@ -290,18 +285,17 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   }
 
   // ---- BAS DU CORPS ----
-  // `dKneeEff` (pas `dKnee`) : un Basket PRÉVU aujourd'hui/hier (planning fixe, pas encore
-  // loggé) gate le Lower exactement comme s'il avait déjà eu lieu — c'est le but du
-  // planning. Le texte distingue "déjà faite"/"prévu" selon que c'est réel ou seulement
-  // planifié, pour ne jamais affirmer un fait qui n'a pas encore eu lieu.
+  // Gate 48h RETIRÉ le 13/09/2026 (demande explicite de Yoann) : avec un planning basket
+  // fixe (mercredi/vendredi + matchs dimanche), le gate "pas de Lower dans les 48h suivant
+  // TOUTE exposition genou" ne laissait plus qu'un seul jour par semaine où Lower pouvait
+  // sortir — alors que le score vise 2 séances Lower/semaine (`lower7`). Seul l'état RÉEL de
+  // la douleur (rouge/ambre, `kneeRed`/`kneeAmber`) gate ou pénalise désormais Lower — plus
+  // aucune règle basée sur "combien de jours depuis la dernière exposition genou". `dKnee`/
+  // `dKneeEff` restent utilisés ailleurs (Basket, Course à pied, Foot — leurs propres
+  // exclusions "déjà fait aujourd'hui", un souci de fatigue générale plutôt que de tendon,
+  // hors scope de cette demande) : rien d'autre n'a changé.
   if (kneeRed) {
     push(avoid, "Lower A / B", 0, `Genou : ${kLast.baseline === false ? "pas revenu à la base sous 24 h" : `douleur ${painLast}/10`}. Attendre le retour à la base.`);
-  } else if (kneeToday || dKneeEff === 0) {
-    const why = kneeToday || dKnee === 0 ? "Exposition genou déjà faite aujourd'hui" : "Basket prévu aujourd'hui";
-    push(avoid, "Lower A / B", 0, `${why} — ne pas empiler.`);
-  } else if (dKneeEff <= 1) {
-    const why = dKnee <= 1 ? "Expo genou hier (Lower ou basket)" : "Basket prévu hier";
-    push(avoid, "Lower A / B", 0, `${why} — laisser ~48 h au tendon.`);
   } else {
     const loV = variant("Lower A", "Lower B");
     let loScore = 20 + (2 - lower7) * 12 + cap(dLower) - (kneeAmber ? AMBER_PENALTY.genou["Lower A"] : 0);

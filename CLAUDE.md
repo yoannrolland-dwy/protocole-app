@@ -3136,6 +3136,84 @@ pertinent ?") avant de coder — proposition retenue après discussion des trade
   l'exercice dans le carnet Upper A, juste sous le record. Aucune erreur console. Build
   `apps/perso` ET `apps/public` propres.
 
+## Chantier RawCare — Gate genou 48h retiré, détails TDEE et sommeil (13/09/2026, apps/perso v3.80.0)
+
+Trois retours de Yoann, discutés et cadrés avant tout code (chaque changement de règle
+métier confirmé explicitement, comme demandé) :
+
+### Recommandeur — gate 48h sur Lower A/B retiré
+
+`recommendSessions` bloquait TOTALEMENT Lower A/B (pas juste une pénalité) dès qu'une
+activité taguée "genou" (Lower, Basket, Course à pied, Foot) avait eu lieu aujourd'hui OU
+hier (`dKneeEff <= 1`). Avec le planning basket réel de Yoann (mercredi + vendredi + matchs
+dimanche), ce gate ne laissait plus qu'**un seul jour par semaine** où Lower pouvait sortir
+— alors que le score de base vise 2 séances Lower/semaine. Diagnostic confirmé par Yoann,
+qui a choisi l'option la plus radicale : **seul l'état RÉEL de la douleur compte désormais**
+(`kneeRed` bloque toujours Lower ; `kneeAmber` continue de le pénaliser sans le bloquer),
+plus aucune règle basée sur "combien de jours depuis la dernière exposition genou".
+`dKneeEff`/`basketYesterday` (devenus morts, ils ne servaient qu'à ce gate) supprimés ;
+`basketToday` reste seul nécessaire pour le bloc Basket. Les exclusions "déjà fait
+aujourd'hui" de Basket/Course à pied/Foot (basées sur `dKnee`, pas `dKneeEff`) sont
+inchangées — hors scope de cette demande, c'est un souci de fatigue générale le même jour,
+pas de rééducation du tendon. **Testé** : basket hier ET aujourd'hui, genou en base → Lower A
+suggéré normalement (avant : bloqué avec le texte "laisser ~48h au tendon") ; genou
+réellement rouge (baseline false) → Lower reste bloqué ; l'auto-exclusion de Basket le jour
+même reste intacte.
+
+### Onglet TDEE — nouveaux détails, tous à partir de données déjà calculées
+
+- **Carte "Moyenne kcal" repensée** : Yoann a signalé que ses cheat meals ne suivent pas un
+  jour fixe (contrairement à l'hypothèse "cheat days le week-end" du 01/09/2026) — exclure
+  spécifiquement le week-end n'avait donc plus de sens pour lui. Remplacée par une vraie
+  moyenne glissante 7 jours (lundi-dimanche) : elle absorbe un écart ponctuel quel que soit
+  le jour où il tombe, sans avoir à deviner lequel exclure. **Nouvelle fonction
+  `weeklyKcalTrend`** (`packages/core/src/targets.js`), factorisée avec l'ancienne
+  `weeklyWeekdayKcalTrend` (fonction privée `weeklyKcalAverages` partagée, seul le nombre de
+  jours échantillonnés par semaine diffère — 5 vs 7). **`weeklyWeekdayKcalTrend` gardée
+  intacte pour `apps/public`**, qui continue de l'utiliser telle quelle (comportement
+  vérifié identique par test avant/après la factorisation).
+- **Carte "Dépense estimée" enrichie** : `computeTDEE` retournait déjà `windowStart`/
+  `windowEnd`/`loggedRate`/`weighRate`/`deltaKg`, simplement jamais affichés. Ajout de deux
+  lignes : la fenêtre exacte + % de jours loggés/pesés, et la tendance de poids lissée sur
+  la fenêtre — **zéro nouveau calcul**, juste de l'affichage.
+- **Nouvelle fonction `tdeeTrend`** (`packages/core/src/tdee.js`) : rejoue `computeTDEE` avec
+  un `today` décalé de semaine en semaine (8 points), sur les mêmes données — donne une vraie
+  tendance (monte/descend/stagne) au lieu d'un seul chiffre instantané. Un point sans assez
+  d'historique reste `null` plutôt qu'un chiffre inventé. Affiché en `LineChart` sous la carte
+  "Dépense estimée", visible dès 2 points valides.
+- **`buildKcalByDate`, extrait de `tdeeNow`** (`targets.js`) : la logique de résolution
+  CIQUAL/OFF/corrections V6 → kcal par date était enfouie dans `tdeeNow`, donc dupliquée à
+  la main aurait été nécessaire pour `tdeeTrend`. Extraite en fonction exportée séparée,
+  réutilisée par les deux — `tdeeNow` inchangé au comportement près (vérifié par test).
+- **Testé en Node** : `weeklyWeekdayKcalTrend` identique à avant sur un cas réel (moyenne
+  lun-ven = 2000 sur un jeu de données avec week-end à 4000) ; `weeklyKcalTrend` calcule bien
+  la vraie moyenne 7 jours sur le même jeu (2571, week-end inclus) ; `tdeeTrend` sur 70 jours
+  d'historique synthétique donne 8 points cohérents, fiabilité "fiable" partout ; `tdeeNow`/
+  `buildKcalByDate` revérifiés après la factorisation. **Testé dans l'aperçu** : les 3 cartes
+  s'affichent avec des valeurs cohérentes sur un historique synthétique de 70 jours, aucune
+  erreur console.
+
+### Onglet Énergie — détails sommeil
+
+Jusqu'ici seule la durée avait une moyenne/un graphique dans le temps — la QUALITÉ n'était
+visible que nuit par nuit ("Dernière nuit").
+
+- **"Qualité moy. 7j"** : nouvelle tuile à côté de "Durée moy. 7j" (les deux dans une grille
+  2 colonnes désormais, contre une seule tuile pleine largeur avant) — moyenne du champ
+  `quality` (1-4) sur les 7 dernières nuits qui en ont une.
+- **"Score de sommeil · 21 jours"** : nouveau graphique, même `computeSleepScore` que
+  "Dernière nuit" (jamais un second calcul) — remplit le vrai manque signalé : deux nuits de
+  durée identique peuvent avoir une efficacité très différente, invisible sur le graphique
+  "Sommeil · 21 jours" (durée brute) déjà en place. Couleurs par palier (`scoreColor`, même
+  convention que le score d'énergie).
+- **"Répartition · 21 jours"** : compte des nuits par palier (Excellent/Bon/Correct/Risque,
+  `scoreLabel`) sur la période — vue d'ensemble rapide sans relire 21 barres une par une.
+- **Testé dans l'aperçu** : 21 nuits synthétiques à qualité variable → répartition 9/6/3/3
+  affichée correctement (somme = 21), graphique score coloré cohérent avec les paliers,
+  moyenne qualité 7j affichée (3/4 sur l'échantillon). Aucune erreur console.
+
+Build `apps/perso` ET `apps/public` propres après chaque changement.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,

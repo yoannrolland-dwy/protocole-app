@@ -48,17 +48,13 @@ export const kcalFromMacros = (p, c, f, fib = 0) => (p ?? 0) * 4 + (c ?? 0) * 4 
 // a déjà sa vraie valeur mesurée : Repas et Macros doivent toujours afficher le même chiffre.
 export const kcalOfEntry = (m) => m?.kcal ?? kcalFromMacros(m?.protein, m?.carbs, m?.fat, m?.fiber);
 
-/**
- * Moyenne des calories du lundi au vendredi, semaine par semaine (onglet Performance,
- * chantier "révision Macro/Performance" du 01/09/2026). Week-ends exclus volontairement —
- * l'objectif est de suivre la semaine de travail sans que les cheat days du week-end ne la
- * lissent, donc un week-end chargé n'affecte jamais cette moyenne.
- * Semaine ancrée sur le lundi, arithmétique locale pure (mêmes `new Date(y, m-1, d)` que
- * `shiftDateKey`/`localDateKey`), jamais un aller-retour par un instant UTC. Un jour sans
- * apport connu est ignoré plutôt que compté à 0 — la moyenne porte sur les jours réellement
- * loggés (`days`), pour rester honnête sur une semaine partiellement saisie.
- */
-export function weeklyWeekdayKcalTrend(macros, { weeks = 8, endDate } = {}) {
+// Semaine ancrée sur le lundi, arithmétique locale pure (mêmes `new Date(y, m-1, d)` que
+// `shiftDateKey`/`localDateKey`), jamais un aller-retour par un instant UTC. Un jour sans
+// apport connu est ignoré plutôt que compté à 0 — la moyenne porte sur les jours réellement
+// loggés (`days`), pour rester honnête sur une semaine partiellement saisie. Factorisé
+// (13/09/2026) : `weeklyWeekdayKcalTrend` (lun-ven, historique) et `weeklyKcalTrend` (7 jours,
+// voir plus bas) ne diffèrent que par le nombre de jours échantillonnés par semaine.
+function weeklyKcalAverages(macros, { weeks = 8, endDate, sampleDays = 7 } = {}) {
   const end = endDate || today();
   const [ey, em, ed] = end.split("-").map(Number);
   const endObj = new Date(ey, em - 1, ed);
@@ -74,7 +70,7 @@ export function weeklyWeekdayKcalTrend(macros, { weeks = 8, endDate } = {}) {
     const monday = new Date(thisMonday);
     monday.setDate(thisMonday.getDate() - w * 7);
     let sum = 0, days = 0;
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < sampleDays; i++) {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
       const key = dateKey(d);
@@ -86,13 +82,42 @@ export function weeklyWeekdayKcalTrend(macros, { weeks = 8, endDate } = {}) {
 }
 
 /**
+ * Moyenne des calories du lundi au vendredi, semaine par semaine (onglet Performance,
+ * chantier "révision Macro/Performance" du 01/09/2026). Week-ends exclus volontairement —
+ * l'objectif était de suivre la semaine de travail sans que les cheat days du week-end ne la
+ * lissent. **Gardée telle quelle pour `apps/public`** (même fonction, même comportement) —
+ * `apps/perso` est passé à `weeklyKcalTrend` (7 jours) le 13/09/2026, voir plus bas : les
+ * cheat meals de Yoann ne suivent pas un jour fixe, donc exclure spécifiquement le week-end
+ * n'avait plus de sens pour lui personnellement.
+ */
+export function weeklyWeekdayKcalTrend(macros, opts = {}) {
+  return weeklyKcalAverages(macros, { ...opts, sampleDays: 5 });
+}
+
+/**
+ * Moyenne des calories sur les 7 jours de la semaine, semaine par semaine (13/09/2026,
+ * `apps/perso` uniquement) : une vraie moyenne glissante absorbe un écart ponctuel quel que
+ * soit le jour où il tombe, sans avoir à deviner quels jours exclure — contrairement à
+ * `weeklyWeekdayKcalTrend`, pensée pour un profil avec des cheat days systématiquement le
+ * week-end (pas le cas de Yoann).
+ */
+export function weeklyKcalTrend(macros, opts = {}) {
+  return weeklyKcalAverages(macros, { ...opts, sampleDays: 7 });
+}
+
+/**
  * Dépense énergétique adaptative (V7) — calculée "maintenant", factorisée pour que l'écran
  * Macros et le Coach IA appellent EXACTEMENT le même calcul (jamais deux chiffres
  * différents pour la même réalité). `foodLog`/`overrides` doivent être lus fraîchement par
  * l'appelant (getSync), jamais mis en cache, pour ne jamais rater une correction ou un
  * repas ajouté entre deux appels — même principe que `buildPrompt`.
  */
-export function tdeeNow({ foodLog, overrides, macros, weight, targets }) {
+/**
+ * Kcal réelles par date, fusionnées avec le repli 4/4/9 (voir `mergeKcalSeries`) — extrait de
+ * `tdeeNow` (13/09/2026) pour être réutilisé par `tdeeTrend` (onglet TDEE, historique semaine
+ * par semaine) sans dupliquer la logique de résolution CIQUAL/OFF/corrections V6.
+ */
+export function buildKcalByDate({ foodLog, overrides, macros }) {
   const resolved = resolveLog(foodLog, overrides);
   const foodKcalByDate = {};
   for (const d of new Set(resolved.map((e) => e.date))) {
@@ -102,7 +127,11 @@ export function tdeeNow({ foodLog, overrides, macros, weight, targets }) {
     const t = totals(entriesFor(resolved, d));
     if (t.missing.kcal === 0) foodKcalByDate[d] = t.kcal;
   }
-  const kcalByDate = mergeKcalSeries(foodKcalByDate, macros);
+  return mergeKcalSeries(foodKcalByDate, macros);
+}
+
+export function tdeeNow({ foodLog, overrides, macros, weight, targets }) {
+  const kcalByDate = buildKcalByDate({ foodLog, overrides, macros });
   const cutStart = targets.cut?.enabled !== false && targets.cut?.start ? targets.cut.start : null;
   return computeTDEE({ weightLog: weight, kcalByDate, today: today(), cutStart });
 }
