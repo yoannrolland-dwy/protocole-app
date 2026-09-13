@@ -116,8 +116,16 @@ export function weeklyKcalTrend(macros, opts = {}) {
  * Kcal réelles par date, fusionnées avec le repli 4/4/9 (voir `mergeKcalSeries`) — extrait de
  * `tdeeNow` (13/09/2026) pour être réutilisé par `tdeeTrend` (onglet TDEE, historique semaine
  * par semaine) sans dupliquer la logique de résolution CIQUAL/OFF/corrections V6.
+ *
+ * `today`, si fourni, retire du résultat l'entrée de CETTE date (13/09/2026, demande
+ * explicite) : une journée en cours n'a jamais un total de kcal complet (repas pas encore
+ * pris), donc l'inclure fausserait toute moyenne vers le bas. `computeTDEE`/`meanKcal` sont
+ * déjà tolérants aux jours absents (un jour non loggé ne compte simplement pas dans la
+ * moyenne) — retirer `today` du résultat suffit, aucun mécanisme supplémentaire nécessaire.
+ * Sans effet sur les points passés de `tdeeTrend` (leur fenêtre ne s'étend jamais jusqu'à
+ * `today` réel), seul le point du jour même en bénéficie.
  */
-export function buildKcalByDate({ foodLog, overrides, macros }) {
+export function buildKcalByDate({ foodLog, overrides, macros, today: todayKey }) {
   const resolved = resolveLog(foodLog, overrides);
   const foodKcalByDate = {};
   for (const d of new Set(resolved.map((e) => e.date))) {
@@ -127,11 +135,14 @@ export function buildKcalByDate({ foodLog, overrides, macros }) {
     const t = totals(entriesFor(resolved, d));
     if (t.missing.kcal === 0) foodKcalByDate[d] = t.kcal;
   }
-  return mergeKcalSeries(foodKcalByDate, macros);
+  const merged = mergeKcalSeries(foodKcalByDate, macros);
+  if (todayKey != null) delete merged[todayKey];
+  return merged;
 }
 
 export function tdeeNow({ foodLog, overrides, macros, weight, targets }) {
-  const kcalByDate = buildKcalByDate({ foodLog, overrides, macros });
+  const t0 = today();
+  const kcalByDate = buildKcalByDate({ foodLog, overrides, macros, today: t0 });
   const cutStart = targets.cut?.enabled !== false && targets.cut?.start ? targets.cut.start : null;
-  return computeTDEE({ weightLog: weight, kcalByDate, today: today(), cutStart });
+  return computeTDEE({ weightLog: weight, kcalByDate, today: t0, cutStart });
 }

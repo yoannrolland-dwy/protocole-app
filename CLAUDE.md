@@ -3214,6 +3214,39 @@ visible que nuit par nuit ("Dernière nuit").
 
 Build `apps/perso` ET `apps/public` propres après chaque changement.
 
+## Correctif TDEE — journée en cours exclue de la moyenne (13/09/2026, apps/perso v3.80.1)
+
+Yoann a signalé que le TDEE lui paraissait bizarre : "il prend les informations
+nutritionnelles du jour". Diagnostic confirmé : `computeTDEE` moyennait les kcal sur une
+fenêtre glissante allant jusqu'à AUJOURD'HUI inclus — journée forcément incomplète au
+moment où on consulte l'onglet TDEE (repas pas encore tous pris), donc systématiquement
+tirée vers le bas et fausse la moyenne. Le poids, lui, n'avait besoin d'aucune correction :
+la pesée du matin précède les repas du jour, donc elle reflète déjà naturellement
+l'alimentation jusqu'à hier soir — confirmé avec Yoann, comportement déjà correct.
+
+- **`buildKcalByDate`** (`packages/core/src/targets.js`) accepte désormais un paramètre
+  `today` optionnel et **retire cette date du résultat** avant de le renvoyer. `computeTDEE`/
+  `meanKcal` sont déjà tolérants aux jours absents (un jour non loggé ne compte simplement pas
+  dans la moyenne, mécanisme préexistant) — retirer l'entrée du jour suffit, aucun nouveau
+  mécanisme nécessaire.
+- **`tdeeNow`** passe désormais `today: today()` à `buildKcalByDate` (au lieu de le lire
+  seulement pour `computeTDEE`). `apps/perso/src/App.jsx` (calcul de `tdeeHistory`, tendance 8
+  semaines) fait de même.
+- **Sans effet sur les points PASSÉS de `tdeeTrend`** (tendance 8 semaines) : seule la fenêtre
+  du point le plus récent (aujourd'hui) s'étend jusqu'à la date réelle du jour — les fenêtres
+  des semaines précédentes se terminent sur des dates déjà passées, donc déjà complètes, et ne
+  perdent aucune donnée. Vérifié explicitement par test (le dernier point de la tendance
+  correspond toujours exactement à `tdeeNow`, les points antérieurs sont inchangés).
+- **Testé en Node** : jeu de données synthétique (20 jours à 2140 kcal/j réels + un jour du
+  jour à seulement 220 kcal, repas du matin seul) — avant le correctif, la moyenne tombait à
+  2052 kcal/j (tirée vers le bas par la journée partielle) ; après, elle reste exactement à
+  2140 (journée en cours totalement ignorée, aucune contamination).
+- **Carte "Moyenne kcal · semaine"** (`weeklyKcalTrend`) a le même défaut théorique sur la
+  semaine en cours, mais Yoann a choisi de la garder telle quelle (moyenne glissante 7 jours,
+  effet qui s'estompe plus vite) — **pas de changement fait ici, décision explicite**.
+
+Build `apps/perso` ET `apps/public` propres.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
