@@ -3290,6 +3290,36 @@ revenir sur celle du 01/09** : Lower C doit désormais être suggérable automat
 
 Build `apps/perso` ET `apps/public` propres.
 
+## Réorganisation de l'onglet Réglages (14/09/2026, apps/perso v3.80.3)
+
+Yoann : "c'est un peu le bordel" — proposition faite AVANT de coder (ordre + regroupement),
+validée point par point via deux questions (retrait complet d'"Objectif temporaire" plutôt
+que la garder repliée ; regroupement des 4 cartes Coach IA plutôt que seulement clé/modèle).
+Pur réordonnancement UI, `apps/public` n'a pas la même écran Réglages (Onboarding en mode
+"settings" + sa propre carte export/import) — non concerné, non touché.
+
+- **Nouvel ordre** (`SettingsPanel`, `apps/perso/src/App.jsx`), du plus fréquemment utilisé
+  au moins fréquent : Sauvegarde des données (seul réglage avec un rappel actif — bandeau +
+  notification hebdo) → Planning Basket fixe → Phase → Cibles macro de base (+ poids cible
+  par phase) → Cible eau de base → Système de cotation escalade → Health Connect (natif) →
+  puis un label "Coach IA" et les 4 cartes du coach regroupées tout en bas (clé API/modèle,
+  contexte permanent, carnet de bord, revue de fond claude.ai) — Yoann ne s'en sert quasiment
+  jamais au quotidien.
+- **Carte "Objectif temporaire · cibles macros" retirée entièrement de l'écran** (jugée
+  inutile) : `targets.cut` reste intact en interne (`isCutWindow`/`targetsForDate` continuent
+  de le lire normalement partout ailleurs dans l'app — TDEE, Coach IA, cibles du jour), plus
+  aucune UI pour l'éditer. Les variables locales `cut`/`setCut` du composant, devenues
+  inutiles, retirées avec la carte ; import `isCutWindow` (désormais inutilisé dans ce
+  fichier) retiré aussi. Texte de la carte "Cibles macro de base" ajusté (ne référence plus
+  la fenêtre temporaire disparue).
+- **Aucune migration nécessaire** : aucune clé `localStorage` touchée, aucune donnée perdue —
+  un pur réordonnancement/masquage d'UI. Si un jour une sèche ponctuelle avant vacances refait
+  sens, la carte peut être remise sans backfill (la donnée n'a jamais bougé).
+- **Testé dans l'aperçu** : ordre confirmé exact (Sauvegarde → Planning Basket → Phase →
+  Cibles macro → Eau → Escalade → label "Coach IA" → les 4 cartes coach), "Objectif
+  temporaire" bien absent, aucune erreur console. Build `apps/perso` ET `apps/public` propres
+  (`apps/public` non affecté, aucun fichier partagé touché).
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,

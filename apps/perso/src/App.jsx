@@ -25,7 +25,7 @@ import { recommendSessions } from "@rawcare/core/recommender";
 import { computeEnergyScore, computeSleepScore, scoreLabel } from "@rawcare/core/energy";
 import { computeFreeInsights } from "@rawcare/core/insights";
 import { computeBilanFacts } from "@rawcare/core/bilan";
-import { PHASES, phaseTarget as phaseTargetCore, DEFAULT_TARGETS, isCutWindow, targetsForDate,
+import { PHASES, phaseTarget as phaseTargetCore, DEFAULT_TARGETS, targetsForDate,
          kcalFromMacros, kcalOfEntry, tdeeNow, weeklyKcalTrend, buildKcalByDate } from "@rawcare/core/targets";
 import { buildCoachPrompt, buildCoachBriefing, buildBilanPrompt, splitCarnet, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
 import { syncHealthConnect } from "./healthSync.js";
@@ -46,7 +46,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.80.2";
+const APP_VERSION = "3.80.3";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -2287,10 +2287,6 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
       setMsg("");
     }
   };
-  const cut = targets.cut || {};
-  // saveTargets (et non le setter brut) : il écrit AUSSI dans le localStorage. Passer
-  // setTargets ici perdrait silencieusement les réglages au redémarrage.
-  const setCut = (patch) => saveTargets({ ...targets, cut: { ...cut, ...patch } });
   const doExport = async () => {
     const json = JSON.stringify(exportData(), null, 2);
     const name = `protocole-${today()}.json`;
@@ -2336,6 +2332,143 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <ScreenHeader title="Réglages" right={<Btn variant="ghost" onClick={onClose}><X size={16} /></Btn>} />
+
+      {/* Réordonné le 14/09/2026 (retour de Yoann : "c'est un peu le bordel") — du plus
+          fréquemment utilisé au moins fréquent. Sauvegarde en tête : c'est le seul réglage
+          avec un rappel actif (bandeau + notification hebdo), donc celui qui demande le plus
+          souvent une action. "Objectif temporaire" retiré de l'écran (jugé inutile par
+          Yoann) — `targets.cut` reste intact en interne, juste plus affiché nulle part ; le
+          Coach IA (clé API/modèle, contexte permanent, carnet de bord, revue de fond) est
+          regroupé tout en bas, quasi jamais utilisé au quotidien. */}
+
+      <Card>
+        <Label style={{ marginBottom: 8 }}>Sauvegarde des données</Label>
+        {/* Bandeau d'alerte : c'est lui, pas le bouton, qui fait que la sauvegarde a lieu. */}
+        {isBackupStale(lastCloudBackup) && (
+          <div style={{
+            background: C.dangerBg, border: `1.5px solid ${C.danger}`, borderRadius: 8,
+            padding: "9px 11px", marginBottom: 10,
+          }}>
+            <div style={{ fontSize: 11, color: C.danger, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>
+              ⚠ Sauvegarde hors du téléphone
+            </div>
+            <Body style={{ color: C.dangerText, fontSize: 11, marginTop: 3 }}>
+              {lastCloudBackup
+                ? `Dernière il y a ${daysSinceBackup(lastCloudBackup)} jours (${fmt(lastCloudBackup)}).`
+                : "Jamais faite."} Perdre ou casser le téléphone effacerait tout l'historique.
+            </Body>
+          </div>
+        )}
+        <Btn variant="primary" onClick={doExport} style={{ width: "100%" }}>
+          <Download size={14} style={{ display: "inline", marginRight: 4 }} />Sauvegarder hors du téléphone
+        </Btn>
+        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
+          {Capacitor.isNativePlatform()
+            ? "Ouvre le partage Android : envoie le fichier vers Drive, un mail ou Fichiers. Rappel automatique au bout d'une semaine sans sauvegarde."
+            : "Télécharge le fichier JSON complet. Vider les données du navigateur effacerait l'app."}
+          {lastCloudBackup && !isBackupStale(lastCloudBackup) ? ` Dernière : ${fmt(lastCloudBackup)}.` : ""}
+        </Body>
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.divider}` }}>
+          <label>
+            <span style={{
+              display: "block", textAlign: "center", background: C.card, color: C.accent,
+              border: `1.5px solid ${C.accent}`, borderRadius: 8, padding: "9px 12px",
+              fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, cursor: "pointer",
+            }}><Upload size={14} style={{ display: "inline", marginRight: 4 }} />Restaurer un fichier</span>
+            <input type="file" accept="application/json" onChange={doImport} style={{ display: "none" }} />
+          </label>
+        </div>
+        {Capacitor.isNativePlatform() && (
+          <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
+            Sauvegarde auto locale (dossier Documents/Protocole) : {lastAutoBackup ? `dernière le ${fmt(lastAutoBackup)}` : "pas encore faite"}.
+            Ne remplace pas celle ci-dessus : elle reste sur le téléphone, donc elle disparaît avec lui.
+          </Body>
+        )}
+      </Card>
+
+      <BasketScheduleCard basketSchedule={basketSchedule} setBasketSchedule={setBasketSchedule} />
+
+      <Card>
+        <Label style={{ marginBottom: 8 }}>Phase</Label>
+        <Pills options={Object.entries(PHASES).map(([k, v]) => ({ key: k, label: v.label }))} value={phase} onChange={setPhase} small />
+        <Body style={{ marginTop: 8, fontSize: 11 }}>{PHASES[phase].msg}</Body>
+      </Card>
+
+      <Card>
+        <Label style={{ marginBottom: 8 }}>Cibles macro de base</Label>
+        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
+          Cibles quotidiennes, appliquées partout dans l'app.
+        </Body>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <Field label="Protéines (g)"><Stepper value={targets.protein ?? 0} set={(v) => saveTargets({ ...targets, protein: v })} step={5} min={0} int /></Field>
+          <Field label="Glucides (g)"><Stepper value={targets.carbs ?? 0} set={(v) => saveTargets({ ...targets, carbs: v })} step={5} min={0} int /></Field>
+          <Field label="Lipides (g)"><Stepper value={targets.fat ?? 0} set={(v) => saveTargets({ ...targets, fat: v })} step={5} min={0} int /></Field>
+          <Field label="Fibres (g)"><Stepper value={targets.fiber ?? 0} set={(v) => saveTargets({ ...targets, fiber: v })} step={1} min={0} int /></Field>
+        </div>
+        <Body style={{ fontSize: 10, color: C.dim, marginTop: -2, marginBottom: 8, fontFamily: C.mono }}>
+          ≈ {Math.round(kcalFromMacros(targets.protein, targets.carbs, targets.fat, targets.fiber))} kcal
+        </Body>
+        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 8 }}>
+          Poids cible par phase — pilote la tuile Poids et le sous-titre de l'onglet Poids
+          selon la phase active ci-dessus.
+        </Body>
+        {/* Empilé verticalement (07/08/2026, retour de Yoann) : 3 Stepper (chacun déjà
+            −/champ/+) sur une seule ligne ne tenaient pas dans la largeur d'une Card,
+            débordaient du cadre et laissaient le champ de saisie trop étroit pour taper
+            dedans. Une ligne par phase, comme suggéré. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <Field label="Sèche (kg)">
+            <Stepper value={targets.weightCutTarget ?? PHASES.seche.target} set={(v) => saveTargets({ ...targets, weightCutTarget: v })} step={0.5} min={0} />
+          </Field>
+          <Field label="Maintenance (kg)">
+            <Stepper value={targets.weightMaintenance ?? 96} set={(v) => saveTargets({ ...targets, weightMaintenance: v })} step={0.5} min={0} />
+          </Field>
+          <Field label="Prise (kg)">
+            <Stepper value={targets.weightBulkTarget ?? PHASES.prise.target} set={(v) => saveTargets({ ...targets, weightBulkTarget: v })} step={0.5} min={0} />
+          </Field>
+        </div>
+      </Card>
+
+      <Card>
+        <Label style={{ marginBottom: 8 }}>Cible eau de base</Label>
+        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
+          Cible quotidienne hors basket. +1 L automatique les jours où une séance Basket est loggée.
+        </Body>
+        <Field label="Eau (mL)"><Stepper value={targets.water ?? 0} set={(v) => saveTargets({ ...targets, water: v })} step={100} min={0} int /></Field>
+      </Card>
+
+      <Card>
+        <Label style={{ marginBottom: 8 }}>Système de cotation escalade</Label>
+        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
+          "Couleur de salle" reste la valeur par défaut. Changer de système n'efface rien :
+          les blocs déjà enregistrés dans l'ancien système restent comptés dans le volume de
+          la séance, juste hors échelle pour le classement par niveau.
+        </Body>
+        <Pills options={[{ key: "gym", label: "Couleur de salle" }, { key: "fontainebleau", label: "Fontainebleau" }]}
+          value={climbScheme} onChange={setClimbScheme} />
+      </Card>
+
+      {Capacitor.isNativePlatform() && (
+        <Card>
+          <Label style={{ marginBottom: 8 }}>Health Connect · pas, sommeil & macros</Label>
+          <Body style={{ fontSize: 12, color: C.text2, marginBottom: 10 }}>
+            {healthSync.status === "running" && "Synchronisation en cours…"}
+            {healthSync.status === "ok" && `À jour · dernière synchro ${new Date(healthSync.at).toLocaleTimeString("fr-FR")}`}
+            {healthSync.status === "unavailable" && "Health Connect indisponible sur cet appareil."}
+            {healthSync.status === "denied" && "Accès refusé — autorise pas, sommeil, nutrition et hydratation dans Health Connect."}
+            {healthSync.status === "error" && `Erreur : ${healthSync.message}`}
+            {healthSync.status === "idle" && "Pas encore synchronisé."}
+          </Body>
+          <Btn variant="outline" onClick={onHealthSync} style={{ width: "100%" }} disabled={healthSync.status === "running"}>
+            Synchroniser maintenant
+          </Btn>
+          <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
+            Synchronise automatiquement au lancement et à chaque retour au premier plan. Écrase toujours la valeur locale du jour concerné.
+          </Body>
+        </Card>
+      )}
+
+      <Label style={{ marginTop: 4, marginBottom: -2, color: C.muted }}>Coach IA</Label>
 
       <Card>
         <Label style={{ marginBottom: 8 }}>Coach IA · clé API Anthropic</Label>
@@ -2385,97 +2518,6 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
       </Card>
 
       <Card>
-        <Label style={{ marginBottom: 8 }}>Système de cotation escalade</Label>
-        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
-          "Couleur de salle" reste la valeur par défaut. Changer de système n'efface rien :
-          les blocs déjà enregistrés dans l'ancien système restent comptés dans le volume de
-          la séance, juste hors échelle pour le classement par niveau.
-        </Body>
-        <Pills options={[{ key: "gym", label: "Couleur de salle" }, { key: "fontainebleau", label: "Fontainebleau" }]}
-          value={climbScheme} onChange={setClimbScheme} />
-      </Card>
-
-      <BasketScheduleCard basketSchedule={basketSchedule} setBasketSchedule={setBasketSchedule} />
-
-      <Card>
-        <Label style={{ marginBottom: 8 }}>Phase</Label>
-        <Pills options={Object.entries(PHASES).map(([k, v]) => ({ key: k, label: v.label }))} value={phase} onChange={setPhase} small />
-        <Body style={{ marginTop: 8, fontSize: 11 }}>{PHASES[phase].msg}</Body>
-      </Card>
-
-      <Card>
-        <Label style={{ marginBottom: 8 }}>Cibles macro de base</Label>
-        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
-          Cibles quotidiennes hors fenêtre d'objectif temporaire (ci-dessous). S'appliquent
-          partout dans l'app dès que la fenêtre est inactive ou hors période.
-        </Body>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-          <Field label="Protéines (g)"><Stepper value={targets.protein ?? 0} set={(v) => saveTargets({ ...targets, protein: v })} step={5} min={0} int /></Field>
-          <Field label="Glucides (g)"><Stepper value={targets.carbs ?? 0} set={(v) => saveTargets({ ...targets, carbs: v })} step={5} min={0} int /></Field>
-          <Field label="Lipides (g)"><Stepper value={targets.fat ?? 0} set={(v) => saveTargets({ ...targets, fat: v })} step={5} min={0} int /></Field>
-          <Field label="Fibres (g)"><Stepper value={targets.fiber ?? 0} set={(v) => saveTargets({ ...targets, fiber: v })} step={1} min={0} int /></Field>
-        </div>
-        <Body style={{ fontSize: 10, color: C.dim, marginTop: -2, marginBottom: 8, fontFamily: C.mono }}>
-          ≈ {Math.round(kcalFromMacros(targets.protein, targets.carbs, targets.fat, targets.fiber))} kcal
-        </Body>
-        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 8 }}>
-          Poids cible par phase — pilote la tuile Poids et le sous-titre de l'onglet Poids
-          selon la phase active ci-dessus.
-        </Body>
-        {/* Empilé verticalement (07/08/2026, retour de Yoann) : 3 Stepper (chacun déjà
-            −/champ/+) sur une seule ligne ne tenaient pas dans la largeur d'une Card,
-            débordaient du cadre et laissaient le champ de saisie trop étroit pour taper
-            dedans. Une ligne par phase, comme suggéré. */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <Field label="Sèche (kg)">
-            <Stepper value={targets.weightCutTarget ?? PHASES.seche.target} set={(v) => saveTargets({ ...targets, weightCutTarget: v })} step={0.5} min={0} />
-          </Field>
-          <Field label="Maintenance (kg)">
-            <Stepper value={targets.weightMaintenance ?? 96} set={(v) => saveTargets({ ...targets, weightMaintenance: v })} step={0.5} min={0} />
-          </Field>
-          <Field label="Prise (kg)">
-            <Stepper value={targets.weightBulkTarget ?? PHASES.prise.target} set={(v) => saveTargets({ ...targets, weightBulkTarget: v })} step={0.5} min={0} />
-          </Field>
-        </div>
-      </Card>
-
-      <Card>
-        <Label style={{ marginBottom: 8 }}>Cible eau de base</Label>
-        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
-          Cible quotidienne hors basket. +1 L automatique les jours où une séance Basket est loggée.
-        </Body>
-        <Field label="Eau (mL)"><Stepper value={targets.water ?? 0} set={(v) => saveTargets({ ...targets, water: v })} step={100} min={0} int /></Field>
-      </Card>
-
-      <Card>
-        <Label style={{ marginBottom: 8 }}>Objectif temporaire · cibles macros</Label>
-        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
-          Sur cette période, ces cibles remplacent les cibles de base partout dans l'app. En dehors,
-          tout revient automatiquement à la normale.
-        </Body>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <Pills options={[{ key: true, label: "Actif" }, { key: false, label: "Inactif" }]}
-            value={cut.enabled !== false} onChange={(v) => setCut({ enabled: v })} small />
-          {isCutWindow(today(), targets)
-            ? <span style={{ fontSize: 10.5, color: C.accent, fontFamily: C.mono }}>en cours</span>
-            : <span style={{ fontSize: 10.5, color: C.dim, fontFamily: C.mono }}>hors période</span>}
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-          <Field label="Début"><input type="date" value={cut.start || ""} onChange={(e) => setCut({ start: e.target.value })} style={inputStyle(false)} /></Field>
-          <Field label="Fin"><input type="date" value={cut.end || ""} onChange={(e) => setCut({ end: e.target.value })} style={inputStyle(false)} /></Field>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <Field label="Protéines (g)"><Stepper value={cut.protein ?? 0} set={(v) => setCut({ protein: v })} step={5} min={0} int /></Field>
-          <Field label="Glucides (g)"><Stepper value={cut.carbs ?? 0} set={(v) => setCut({ carbs: v })} step={5} min={0} int /></Field>
-          <Field label="Lipides (g)"><Stepper value={cut.fat ?? 0} set={(v) => setCut({ fat: v })} step={5} min={0} int /></Field>
-          <Field label="Fibres (g)"><Stepper value={cut.fiber ?? 0} set={(v) => setCut({ fiber: v })} step={1} min={0} int /></Field>
-        </div>
-        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8, fontFamily: C.mono }}>
-          ≈ {Math.round(kcalFromMacros(cut.protein, cut.carbs, cut.fat, cut.fiber))} kcal
-        </Body>
-      </Card>
-
-      <Card>
         <Label style={{ marginBottom: 8 }}>Revue de fond dans claude.ai</Label>
         <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 8 }}>
           Copie tout ton contexte (profil, carnet, 14 jours de données, séries brutes) pour le coller
@@ -2494,71 +2536,6 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
           </>
         )}
       </Card>
-
-      <Card>
-        <Label style={{ marginBottom: 8 }}>Sauvegarde des données</Label>
-        {/* Bandeau d'alerte : c'est lui, pas le bouton, qui fait que la sauvegarde a lieu. */}
-        {isBackupStale(lastCloudBackup) && (
-          <div style={{
-            background: C.dangerBg, border: `1.5px solid ${C.danger}`, borderRadius: 8,
-            padding: "9px 11px", marginBottom: 10,
-          }}>
-            <div style={{ fontSize: 11, color: C.danger, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>
-              ⚠ Sauvegarde hors du téléphone
-            </div>
-            <Body style={{ color: C.dangerText, fontSize: 11, marginTop: 3 }}>
-              {lastCloudBackup
-                ? `Dernière il y a ${daysSinceBackup(lastCloudBackup)} jours (${fmt(lastCloudBackup)}).`
-                : "Jamais faite."} Perdre ou casser le téléphone effacerait tout l'historique.
-            </Body>
-          </div>
-        )}
-        <Btn variant="primary" onClick={doExport} style={{ width: "100%" }}>
-          <Download size={14} style={{ display: "inline", marginRight: 4 }} />Sauvegarder hors du téléphone
-        </Btn>
-        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
-          {Capacitor.isNativePlatform()
-            ? "Ouvre le partage Android : envoie le fichier vers Drive, un mail ou Fichiers. Rappel automatique au bout d'une semaine sans sauvegarde."
-            : "Télécharge le fichier JSON complet. Vider les données du navigateur effacerait l'app."}
-          {lastCloudBackup && !isBackupStale(lastCloudBackup) ? ` Dernière : ${fmt(lastCloudBackup)}.` : ""}
-        </Body>
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.divider}` }}>
-          <label>
-            <span style={{
-              display: "block", textAlign: "center", background: C.card, color: C.accent,
-              border: `1.5px solid ${C.accent}`, borderRadius: 8, padding: "9px 12px",
-              fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, cursor: "pointer",
-            }}><Upload size={14} style={{ display: "inline", marginRight: 4 }} />Restaurer un fichier</span>
-            <input type="file" accept="application/json" onChange={doImport} style={{ display: "none" }} />
-          </label>
-        </div>
-        {Capacitor.isNativePlatform() && (
-          <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
-            Sauvegarde auto locale (dossier Documents/Protocole) : {lastAutoBackup ? `dernière le ${fmt(lastAutoBackup)}` : "pas encore faite"}.
-            Ne remplace pas celle ci-dessus : elle reste sur le téléphone, donc elle disparaît avec lui.
-          </Body>
-        )}
-      </Card>
-
-      {Capacitor.isNativePlatform() && (
-        <Card>
-          <Label style={{ marginBottom: 8 }}>Health Connect · pas, sommeil & macros</Label>
-          <Body style={{ fontSize: 12, color: C.text2, marginBottom: 10 }}>
-            {healthSync.status === "running" && "Synchronisation en cours…"}
-            {healthSync.status === "ok" && `À jour · dernière synchro ${new Date(healthSync.at).toLocaleTimeString("fr-FR")}`}
-            {healthSync.status === "unavailable" && "Health Connect indisponible sur cet appareil."}
-            {healthSync.status === "denied" && "Accès refusé — autorise pas, sommeil, nutrition et hydratation dans Health Connect."}
-            {healthSync.status === "error" && `Erreur : ${healthSync.message}`}
-            {healthSync.status === "idle" && "Pas encore synchronisé."}
-          </Body>
-          <Btn variant="outline" onClick={onHealthSync} style={{ width: "100%" }} disabled={healthSync.status === "running"}>
-            Synchroniser maintenant
-          </Btn>
-          <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
-            Synchronise automatiquement au lancement et à chaque retour au premier plan. Écrase toujours la valeur locale du jour concerné.
-          </Body>
-        </Card>
-      )}
 
       {msg && <Body style={{ color: C.accent, fontSize: 12 }}>{msg}</Body>}
       <Body style={{ fontSize: 10, color: C.dim, textAlign: "center", fontFamily: C.mono }}>Protocole v{APP_VERSION}</Body>
