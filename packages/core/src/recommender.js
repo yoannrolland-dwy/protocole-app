@@ -305,8 +305,18 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   // `dKneeEff` restent utilisés ailleurs (Basket, Course à pied, Foot — leurs propres
   // exclusions "déjà fait aujourd'hui", un souci de fatigue générale plutôt que de tendon,
   // hors scope de cette demande) : rien d'autre n'a changé.
+  //
+  // Correctif du 14/09/2026 : le retrait ci-dessus a supprimé PAR ERREUR la vérification
+  // "Lower déjà fait aujourd'hui" — elle était fusionnée dans la même condition que le
+  // cooldown 48h (`kneeToday || dKneeEff === 0`) et est partie avec lui. Repéré par Yoann :
+  // un Lower C loggé le matin restait quand même suggéré en premier l'après-midi. Restauré
+  // ÉTROITEMENT via `lowerToday` (Lower A/B/C fait aujourd'hui, déjà calculé plus haut) —
+  // volontairement PAS `kneeToday`/`dKnee` (Basket/Course/Foot inclus), qui réintroduirait
+  // exactement la contrainte large que Yoann vient de faire retirer.
   if (kneeRed) {
     push(avoid, matchWeek ? "Lower C" : "Lower A / B", 0, `Genou : ${kLast.baseline === false ? "pas revenu à la base sous 24 h" : `douleur ${painLast}/10`}. Attendre le retour à la base.`);
+  } else if (lowerToday) {
+    push(avoid, matchWeek ? "Lower C" : "Lower A / B", 0, "Lower déjà fait aujourd'hui — deuxième dose déconseillée.");
   } else {
     const loV = matchWeek ? "Lower C" : variant("Lower A", "Lower B");
     let loScore = 20 + (2 - lower7) * 12 + cap(dLower) - (kneeAmber ? AMBER_PENALTY.genou["Lower A"] : 0);
@@ -342,8 +352,14 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   }
 
   // ---- ESCALADE ---- (pas de jour attitré : autorisée surtout jours Lower ou off, jamais un jour Upper)
+  // `climbToday` (14/09/2026) : Escalade n'avait jamais eu de vérification "déjà faite
+  // aujourd'hui" (contrairement à Upper/Basket/Course/Foot) — repéré le même jour que le
+  // correctif Lower ci-dessus, même symptôme (une séance loguée le matin restait proposée
+  // l'après-midi).
   if (elbowRed) {
     push(avoid, "Escalade", 0, `Coude : ${E.redWhy}. C'est la séance qui charge le plus le tendon distal du biceps — attendre le retour à la base.`);
+  } else if (climbToday) {
+    push(avoid, "Escalade", 0, "Escalade déjà faite aujourd'hui — deuxième dose déconseillée.");
   } else if (upperToday) {
     push(avoid, "Escalade", 0, "Upper déjà fait aujourd'hui — l'escalade ajoute du volume de tirage (coude).");
   } else {

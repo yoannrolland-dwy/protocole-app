@@ -3345,6 +3345,37 @@ hypothèse déjà invalidée une fois.
   Eau → contexte permanent → carnet de bord → revue de fond → escalade → clé API → Sauvegarde
   en tout dernier), aucune erreur console.
 
+## Correctif recommandeur — "déjà fait aujourd'hui" perdu au retrait du gate 48h (14/09/2026, apps/perso v3.80.5)
+
+Yoann : "j'ai loggé un lower C et une séance d'escalade ce matin mais le recommandeur me
+propose en prochaine séance lower C puis repos mobilité puis escalade, ce n'est pas normal."
+Diagnostic confirmé dans le code : le retrait du gate 48h la veille (13/09) a supprimé PAR
+ERREUR la vérification "Lower déjà fait aujourd'hui" — elle vivait dans la même condition que
+le cooldown retiré (`kneeToday || dKneeEff === 0`), et est partie avec lui alors que ce n'était
+pas demandé. L'Escalade, elle, n'avait de son côté JAMAIS eu cette vérification (contrairement
+à Upper/Basket/Course à pied/Foot, qui l'ont tous) — un gap préexistant, pas une régression du
+13/09, révélé par le même scénario de test.
+
+- **`packages/core/src/recommender.js`** : bloc BAS DU CORPS — nouvelle branche `else if
+  (lowerToday)` (avant le calcul de suggestion), avoid "Lower déjà fait aujourd'hui —
+  deuxième dose déconseillée", même texte que Basket/Course/Foot pour le même cas. Bloc
+  ESCALADE — nouvelle branche `else if (climbToday)`, même traitement. **Scope
+  volontairement étroit** : `lowerToday`/`climbToday` (déjà calculés plus haut, testent le
+  type EXACT fait aujourd'hui) plutôt que `kneeToday`/`dKnee` (n'importe quelle activité
+  taguée "genou" aujourd'hui, Basket compris) — utiliser la version large aurait réintroduit
+  une partie de la contrainte que Yoann venait justement de faire retirer la veille (un
+  Basket fait aujourd'hui ne doit toujours PAS bloquer Lower).
+- **Testé en Node** : scénario exact de Yoann (Lower C + Escalade loggés aujourd'hui) →
+  aucun des deux suggéré, tous deux dans "à éviter" avec le bon motif, seul "Repos/mobilité"
+  reste proposé ; sans rien loggé aujourd'hui → comportement normal inchangé ; **non-régression
+  clé** : un Basket loggé aujourd'hui (sans Lower) ne bloque toujours PAS Lower — le
+  changement du 13/09 reste intact. **Testé dans l'aperçu**, mêmes données que Yoann
+  (knee en base, Lower C + Escalade aujourd'hui) : "Prochaine séance" affiche uniquement
+  Repos/mobilité, "à éviter" liste Lower A/B et Escalade avec "déjà fait(e) aujourd'hui —
+  deuxième dose déconseillée", aucune erreur console.
+
+Build `apps/perso` ET `apps/public` propres.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
