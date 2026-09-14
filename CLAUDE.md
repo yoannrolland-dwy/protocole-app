@@ -3247,6 +3247,49 @@ l'alimentation jusqu'à hier soir — confirmé avec Yoann, comportement déjà 
 
 Build `apps/perso` ET `apps/public` propres.
 
+## Correctif recommandeur — Lower C jamais suggérable automatiquement (14/09/2026, apps/perso v3.80.2)
+
+Yoann a signalé : "Le recommandeur ne m'a pas recommandé le lower C alors que j'ai match
+dimanche." Diagnostic confirmé, incohérence entre deux décisions prises séparément : la carte
+"Planning idéal" (onglet TDEE) annonce bien "Lower C (HSR lourd)" le lundi d'une semaine avec
+match, mais le couplage recommandeur (`WEEKLY_PLAN_FAMILIES`, 05/09/2026) ne peut bonifier
+que des types réellement générés par `recommendSessions` — et Lower C avait été
+**volontairement exclu** de la suggestion automatique le 01/09/2026 ("choix manuel de Yoann
+selon son calendrier de matchs"). Résultat : le bonus "Lower" ne pouvait profiter qu'à Lower
+A/B, jamais à Lower C, qui n'apparaissait donc structurellement jamais dans "Prochaine
+séance", même les lundis de semaine avec match. Confirmé avec Yoann que son match du
+20/09/2026 était bien enregistré (Réglages → Planning Basket fixe) — **décision explicite de
+revenir sur celle du 01/09** : Lower C doit désormais être suggérable automatiquement.
+
+- **`packages/core/src/recommender.js`, nouveau paramètre optionnel `matchWeek`** (booléen,
+  additif) : absent/faux → comportement identique bit pour bit à avant (`variant("Lower A",
+  "Lower B")`, comme depuis toujours). Vrai → le bloc "BAS DU CORPS" suggère directement
+  `"Lower C"` au lieu d'alterner A/B — seul effet de ce paramètre, tout le reste du scoring
+  (genou, fatigue, sommeil) reste partagé sans distinction, `isLower()` incluait déjà Lower C
+  dans les décomptes `lower7`/`dLower` depuis le 01/09. L'avoid genou rouge référence aussi
+  `"Lower C"` (au lieu de `"Lower A / B"`) quand `matchWeek` est vrai, pour ne jamais avertir
+  sur un type qui ne sera de toute façon pas proposé cette semaine-là.
+- **`apps/perso/src/App.jsx`, nouvelle fonction `isMatchWeek(basketSchedule)`** : extraite de
+  `familiesForToday` (même détection déjà en place depuis le 05/09 — un match ce dimanche,
+  fin de la semaine lundi-dimanche, via `basketSchedule.matchDates`), réutilisée par les DEUX
+  appels à `recommendSessions`/`buildCoachPrompt` (Dashboard et Coach IA) pour ne jamais avoir
+  deux verdicts différents. `familiesForToday` inchangée en sortie, juste réécrite par-dessus
+  ce nouveau helper partagé.
+- **`packages/core/src/coach/prompt.js`** : `matchWeek` ajouté au sac de données de
+  `buildCoachPrompt`, transmis tel quel à `recommendSessions` — même mécanisme additif que
+  `weeklyPlan`/`basketSchedule` avant lui. `apps/public` non affecté (ne fournit pas ce champ,
+  n'a de toute façon pas "Lower C" dans son catalogue de types).
+- **Testé en Node** : sans `matchWeek`, la suggestion Lower reste A ou B (non-régression,
+  jamais C) ; avec `matchWeek: true`, Lower C est bien suggéré et Lower A/B disparaissent des
+  suggestions ; genou rouge + `matchWeek` → l'avoid référence "Lower C" (pas "Lower A / B") ;
+  genou rouge sans `matchWeek` → comportement inchangé. `isMatchWeek` revérifié avec la vraie
+  date du jour (lundi 14/09/2026) : résout bien dimanche 20/09/2026 comme prochain dimanche,
+  match détecté correctement. **Testé dans l'aperçu** : genou en base, planning avec match le
+  20/09 seedé → "Prochaine séance" affiche "Lower C" en tête (score 59) avec le texte "Planning
+  idéal du jour : Lower — bonus de priorité", aucune erreur console.
+
+Build `apps/perso` ET `apps/public` propres.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,

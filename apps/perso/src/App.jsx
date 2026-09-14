@@ -46,7 +46,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.80.1";
+const APP_VERSION = "3.80.2";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -233,7 +233,7 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
 /* ============================================================
    TAB — DASHBOARD
    ============================================================ */
-function Dashboard({ weight, sleep, knee, rhr, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule, weeklyPlan }) {
+function Dashboard({ weight, sleep, knee, rhr, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule, weeklyPlan, matchWeek }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast ? round(wLast.kg - tgtW) : null;
@@ -244,7 +244,7 @@ function Dashboard({ weight, sleep, knee, rhr, macros, steps, targets, training,
   const mToday = macros.find((m) => m.date === today());
   const kcalToday = mToday ? Math.round(kcalOfEntry(mToday)) : null;
 
-  const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee, sleep, targets, scheme, basketSchedule, weeklyPlan, energy }), [training, knee, sleep, targets, scheme, basketSchedule, weeklyPlan, energy]);
+  const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee, sleep, targets, scheme, basketSchedule, weeklyPlan, energy, matchWeek }), [training, knee, sleep, targets, scheme, basketSchedule, weeklyPlan, energy, matchWeek]);
 
   const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
   const waterToday = mToday?.water ?? 0;
@@ -2026,20 +2026,29 @@ const WEEKLY_PLAN_FAMILIES = {
 };
 
 /**
- * Familles du planning idéal pour AUJOURD'HUI, à passer telles quelles à `recommendSessions`
- * (`weeklyPlan`) — le recommandeur ne sait rien du planning lui-même, juste matcher une
- * famille à un type suggéré (bonus modéré, jamais un remplacement, voir recommender.js).
- *
- * Variante avec/sans match détectée AUTOMATIQUEMENT depuis `basketSchedule.matchDates` : un
- * match ce dimanche (fin de la semaine en cours, lundi-dimanche) → "avecMatch", sinon
- * "sansMatch". Décision explicite de Yoann (05/09/2026) plutôt qu'un réglage manuel à
- * rebasculer chaque semaine — cohérent avec le planning déjà configuré en Réglages.
+ * Vrai si un match est prévu ce dimanche (fin de la semaine en cours, lundi-dimanche) —
+ * détecté AUTOMATIQUEMENT depuis `basketSchedule.matchDates`. Décision explicite de Yoann
+ * (05/09/2026) plutôt qu'un réglage manuel à rebasculer chaque semaine. Extrait de
+ * `familiesForToday` le 14/09/2026 pour être réutilisé aussi par `recommendSessions`
+ * (`matchWeek`, packages/core/src/recommender.js) : jusque-là le recommandeur ne pouvait
+ * jamais suggérer Lower C, même un lundi de semaine avec match où la carte "Planning idéal"
+ * l'annonce explicitement — retour de Yoann après l'avoir constaté en usage réel.
  */
-function familiesForToday(basketSchedule) {
+function isMatchWeek(basketSchedule) {
   const dow = new Date().getDay(); // 0=dimanche...6=samedi
   const daysUntilSunday = dow === 0 ? 0 : 7 - dow;
   const sundayKey = shiftDateKey(today(), daysUntilSunday);
-  const variant = basketSchedule?.matchDates?.includes(sundayKey) ? "avecMatch" : "sansMatch";
+  return !!basketSchedule?.matchDates?.includes(sundayKey);
+}
+
+/**
+ * Familles du planning idéal pour AUJOURD'HUI, à passer telles quelles à `recommendSessions`
+ * (`weeklyPlan`) — le recommandeur ne sait rien du planning lui-même, juste matcher une
+ * famille à un type suggéré (bonus modéré, jamais un remplacement, voir recommender.js).
+ */
+function familiesForToday(basketSchedule) {
+  const dow = new Date().getDay(); // 0=dimanche...6=samedi
+  const variant = isMatchWeek(basketSchedule) ? "avecMatch" : "sansMatch";
   return WEEKLY_PLAN_FAMILIES[variant][dow] || [];
 }
 
@@ -2833,6 +2842,7 @@ export default function App({ silent = false } = {}) {
         weight, sleep, training, knee, macros, notes, steps, targets, phase,
         foodLog: getSync("foodLog", []), foodOverrides: getSync("foodOverrides", {}),
         profile, journal, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule),
+        matchWeek: isMatchWeek(basketSchedule),
         energy: computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps }),
       }, note),
     buildBriefing: () =>
@@ -2913,7 +2923,7 @@ export default function App({ silent = false } = {}) {
           <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, climbScheme, setClimbScheme, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule) }} openSettings={() => setShowSettings(true)} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule), matchWeek: isMatchWeek(basketSchedule) }} openSettings={() => setShowSettings(true)} />}
             {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
             {tab === "sleep" && <SleepTab {...{ sleep, rhr, steps, save }} />}
             {tab === "steps" && <StepsTab {...{ steps, save }} />}

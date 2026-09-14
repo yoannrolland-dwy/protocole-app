@@ -76,6 +76,13 @@ function isScheduledBasket(basketSchedule, dateKey) {
 // déjà résolue par l'appelant (apps/perso/src/App.jsx) selon le jour de la semaine ET la
 // variante avec/sans match — le recommandeur reste agnostique du contenu du planning
 // lui-même, il ne sait que matcher une famille à un type de séance suggéré.
+// `matchWeek` (14/09/2026, optionnel, additif) : vrai si un match est prévu ce dimanche
+// (résolu par l'appelant depuis `basketSchedule.matchDates`, même logique que la variante
+// "avecMatch"/"sansMatch" du planning idéal). Absent/faux → comportement identique bit pour
+// bit à avant (Lower reste `variant("Lower A","Lower B")`). Vrai → bascule la suggestion
+// "BAS DU CORPS" vers Lower C (semaine à volume réduit, une seule séance) plutôt que
+// d'alterner A/B — c'est le seul effet de ce paramètre, le reste du scoring (charge,
+// fatigue, genou) est partagé sans distinction.
 const PLAN_BONUS = 18;
 function matchesPlanFamily(type, family) {
   if (family === "Repos") return type.startsWith("Repos");
@@ -92,13 +99,17 @@ function applyPlanBonus(sugg, weeklyPlan) {
   });
 }
 
-export function recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme, extraSports, basketSchedule, weeklyPlan, energy }) {
+export function recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme, extraSports, basketSchedule, weeklyPlan, energy, matchWeek }) {
   const t0 = today();
   const isUpper = (t) => t.type === "Upper A" || t.type === "Upper B";
   // "Lower C" (01/09/2026, semaine avec match) compte dans le volume/dernier-fait Lower
-  // affiché, mais reste hors de `variant("Lower A","Lower B")` — jamais suggéré/évité
-  // automatiquement, uniquement choisi à la main. Le gate de sécurité genou (dKnee, plus bas)
-  // reste correct dans tous les cas : il est déjà basé sur `chargeTags`, pas sur ce littéral.
+  // affiché. Jusqu'au 14/09/2026, elle restait hors de `variant("Lower A","Lower B")` —
+  // jamais suggérée/évitée automatiquement. Revu ce jour-là (retour de Yoann : le
+  // recommandeur ne proposait jamais Lower C malgré la carte "Planning idéal" qui l'annonce
+  // le lundi d'une semaine avec match) : `matchWeek` (optionnel, additif — voir plus bas)
+  // bascule désormais la suggestion vers Lower C plutôt que A/B. Le gate de sécurité genou
+  // (dKnee, plus bas) reste correct dans tous les cas : il est déjà basé sur `chargeTags`,
+  // pas sur ce littéral.
   const isLower = (t) => t.type === "Lower A" || t.type === "Lower B" || t.type === "Lower C";
   // `d >= 0` indispensable : sans lui, une entrée datée dans le futur (le sélecteur de
   // date le permet) donne un écart négatif, donc « <= n » est vrai et elle compte dans
@@ -295,9 +306,9 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   // exclusions "déjà fait aujourd'hui", un souci de fatigue générale plutôt que de tendon,
   // hors scope de cette demande) : rien d'autre n'a changé.
   if (kneeRed) {
-    push(avoid, "Lower A / B", 0, `Genou : ${kLast.baseline === false ? "pas revenu à la base sous 24 h" : `douleur ${painLast}/10`}. Attendre le retour à la base.`);
+    push(avoid, matchWeek ? "Lower C" : "Lower A / B", 0, `Genou : ${kLast.baseline === false ? "pas revenu à la base sous 24 h" : `douleur ${painLast}/10`}. Attendre le retour à la base.`);
   } else {
-    const loV = variant("Lower A", "Lower B");
+    const loV = matchWeek ? "Lower C" : variant("Lower A", "Lower B");
     let loScore = 20 + (2 - lower7) * 12 + cap(dLower) - (kneeAmber ? AMBER_PENALTY.genou["Lower A"] : 0);
     let loReason = `Lower ${lower7}/2 cette semaine · dernier ${ago(dLower)}.`;
     if (kneeUnknown) loReason += ` ${kneeNote} Charge prudente, tempo 6 s.`;
