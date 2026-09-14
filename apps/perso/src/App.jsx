@@ -46,7 +46,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.80.3";
+const APP_VERSION = "3.80.4";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -2333,58 +2333,15 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <ScreenHeader title="Réglages" right={<Btn variant="ghost" onClick={onClose}><X size={16} /></Btn>} />
 
-      {/* Réordonné le 14/09/2026 (retour de Yoann : "c'est un peu le bordel") — du plus
-          fréquemment utilisé au moins fréquent. Sauvegarde en tête : c'est le seul réglage
-          avec un rappel actif (bandeau + notification hebdo), donc celui qui demande le plus
-          souvent une action. "Objectif temporaire" retiré de l'écran (jugé inutile par
-          Yoann) — `targets.cut` reste intact en interne, juste plus affiché nulle part ; le
-          Coach IA (clé API/modèle, contexte permanent, carnet de bord, revue de fond) est
-          regroupé tout en bas, quasi jamais utilisé au quotidien. */}
-
-      <Card>
-        <Label style={{ marginBottom: 8 }}>Sauvegarde des données</Label>
-        {/* Bandeau d'alerte : c'est lui, pas le bouton, qui fait que la sauvegarde a lieu. */}
-        {isBackupStale(lastCloudBackup) && (
-          <div style={{
-            background: C.dangerBg, border: `1.5px solid ${C.danger}`, borderRadius: 8,
-            padding: "9px 11px", marginBottom: 10,
-          }}>
-            <div style={{ fontSize: 11, color: C.danger, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>
-              ⚠ Sauvegarde hors du téléphone
-            </div>
-            <Body style={{ color: C.dangerText, fontSize: 11, marginTop: 3 }}>
-              {lastCloudBackup
-                ? `Dernière il y a ${daysSinceBackup(lastCloudBackup)} jours (${fmt(lastCloudBackup)}).`
-                : "Jamais faite."} Perdre ou casser le téléphone effacerait tout l'historique.
-            </Body>
-          </div>
-        )}
-        <Btn variant="primary" onClick={doExport} style={{ width: "100%" }}>
-          <Download size={14} style={{ display: "inline", marginRight: 4 }} />Sauvegarder hors du téléphone
-        </Btn>
-        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
-          {Capacitor.isNativePlatform()
-            ? "Ouvre le partage Android : envoie le fichier vers Drive, un mail ou Fichiers. Rappel automatique au bout d'une semaine sans sauvegarde."
-            : "Télécharge le fichier JSON complet. Vider les données du navigateur effacerait l'app."}
-          {lastCloudBackup && !isBackupStale(lastCloudBackup) ? ` Dernière : ${fmt(lastCloudBackup)}.` : ""}
-        </Body>
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.divider}` }}>
-          <label>
-            <span style={{
-              display: "block", textAlign: "center", background: C.card, color: C.accent,
-              border: `1.5px solid ${C.accent}`, borderRadius: 8, padding: "9px 12px",
-              fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, cursor: "pointer",
-            }}><Upload size={14} style={{ display: "inline", marginRight: 4 }} />Restaurer un fichier</span>
-            <input type="file" accept="application/json" onChange={doImport} style={{ display: "none" }} />
-          </label>
-        </div>
-        {Capacitor.isNativePlatform() && (
-          <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
-            Sauvegarde auto locale (dossier Documents/Protocole) : {lastAutoBackup ? `dernière le ${fmt(lastAutoBackup)}` : "pas encore faite"}.
-            Ne remplace pas celle ci-dessus : elle reste sur le téléphone, donc elle disparaît avec lui.
-          </Body>
-        )}
-      </Card>
+      {/* Réordonné le 14/09/2026 (retour de Yoann : "c'est un peu le bordel"), puis affiné le
+          même jour après un premier essai trop grossier ("mettre un rappel actif en tête" ≠
+          "utilisé souvent" — Sauvegarde n'est en fait PAS un réglage fréquent malgré son
+          bandeau/sa notification). Ordre final confirmé par Yoann réglage par réglage : du
+          plus fréquemment utilisé au moins fréquent, sans regrouper "Coach IA" comme un seul
+          bloc — contexte permanent/carnet de bord/revue de fond sont utilisés souvent, clé
+          API/modèle quasi jamais, donc les deux moitiés ne sont plus adjacentes. "Objectif
+          temporaire" reste retiré de l'écran (jugé inutile) — `targets.cut` reste intact en
+          interne, juste plus affiché nulle part. */}
 
       <BasketScheduleCard basketSchedule={basketSchedule} setBasketSchedule={setBasketSchedule} />
 
@@ -2438,52 +2395,6 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
       </Card>
 
       <Card>
-        <Label style={{ marginBottom: 8 }}>Système de cotation escalade</Label>
-        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
-          "Couleur de salle" reste la valeur par défaut. Changer de système n'efface rien :
-          les blocs déjà enregistrés dans l'ancien système restent comptés dans le volume de
-          la séance, juste hors échelle pour le classement par niveau.
-        </Body>
-        <Pills options={[{ key: "gym", label: "Couleur de salle" }, { key: "fontainebleau", label: "Fontainebleau" }]}
-          value={climbScheme} onChange={setClimbScheme} />
-      </Card>
-
-      {Capacitor.isNativePlatform() && (
-        <Card>
-          <Label style={{ marginBottom: 8 }}>Health Connect · pas, sommeil & macros</Label>
-          <Body style={{ fontSize: 12, color: C.text2, marginBottom: 10 }}>
-            {healthSync.status === "running" && "Synchronisation en cours…"}
-            {healthSync.status === "ok" && `À jour · dernière synchro ${new Date(healthSync.at).toLocaleTimeString("fr-FR")}`}
-            {healthSync.status === "unavailable" && "Health Connect indisponible sur cet appareil."}
-            {healthSync.status === "denied" && "Accès refusé — autorise pas, sommeil, nutrition et hydratation dans Health Connect."}
-            {healthSync.status === "error" && `Erreur : ${healthSync.message}`}
-            {healthSync.status === "idle" && "Pas encore synchronisé."}
-          </Body>
-          <Btn variant="outline" onClick={onHealthSync} style={{ width: "100%" }} disabled={healthSync.status === "running"}>
-            Synchroniser maintenant
-          </Btn>
-          <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
-            Synchronise automatiquement au lancement et à chaque retour au premier plan. Écrase toujours la valeur locale du jour concerné.
-          </Body>
-        </Card>
-      )}
-
-      <Label style={{ marginTop: 4, marginBottom: -2, color: C.muted }}>Coach IA</Label>
-
-      <Card>
-        <Label style={{ marginBottom: 8 }}>Coach IA · clé API Anthropic</Label>
-        <TextInput type="password" value={k} onChange={(e) => setK(e.target.value)} placeholder="sk-ant-..." style={{ marginBottom: 10 }} />
-        <Label style={{ marginBottom: 6 }}>Modèle</Label>
-        <TextInput value={m} onChange={(e) => setM(e.target.value)} placeholder="claude-sonnet-5" style={{ marginBottom: 12 }} />
-        <Btn variant="primary" onClick={() => { setApiKey(k.trim()); setModel(m.trim() || "claude-sonnet-5"); setMsg("Réglages enregistrés."); }} style={{ width: "100%" }}>
-          Enregistrer
-        </Btn>
-        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
-          Clé stockée uniquement sur cet appareil, envoyée directement à l'API Anthropic. Chaque analyse consomme des crédits.
-        </Body>
-      </Card>
-
-      <Card>
         <Label style={{ marginBottom: 8 }}>Coach IA · contexte permanent</Label>
         <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 8 }}>
           Envoyé à chaque analyse comme une contrainte. C'est ici que vit ton objectif en cours —
@@ -2534,6 +2445,95 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
             <textarea rows={6} readOnly value={briefing}
               style={{ ...inputStyle(false), fontFamily: C.mono, fontSize: 9.5, fontWeight: 400, resize: "vertical", marginTop: 6 }} />
           </>
+        )}
+      </Card>
+
+      <Card>
+        <Label style={{ marginBottom: 8 }}>Système de cotation escalade</Label>
+        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
+          "Couleur de salle" reste la valeur par défaut. Changer de système n'efface rien :
+          les blocs déjà enregistrés dans l'ancien système restent comptés dans le volume de
+          la séance, juste hors échelle pour le classement par niveau.
+        </Body>
+        <Pills options={[{ key: "gym", label: "Couleur de salle" }, { key: "fontainebleau", label: "Fontainebleau" }]}
+          value={climbScheme} onChange={setClimbScheme} />
+      </Card>
+
+      {Capacitor.isNativePlatform() && (
+        <Card>
+          <Label style={{ marginBottom: 8 }}>Health Connect · pas, sommeil & macros</Label>
+          <Body style={{ fontSize: 12, color: C.text2, marginBottom: 10 }}>
+            {healthSync.status === "running" && "Synchronisation en cours…"}
+            {healthSync.status === "ok" && `À jour · dernière synchro ${new Date(healthSync.at).toLocaleTimeString("fr-FR")}`}
+            {healthSync.status === "unavailable" && "Health Connect indisponible sur cet appareil."}
+            {healthSync.status === "denied" && "Accès refusé — autorise pas, sommeil, nutrition et hydratation dans Health Connect."}
+            {healthSync.status === "error" && `Erreur : ${healthSync.message}`}
+            {healthSync.status === "idle" && "Pas encore synchronisé."}
+          </Body>
+          <Btn variant="outline" onClick={onHealthSync} style={{ width: "100%" }} disabled={healthSync.status === "running"}>
+            Synchroniser maintenant
+          </Btn>
+          <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
+            Synchronise automatiquement au lancement et à chaque retour au premier plan. Écrase toujours la valeur locale du jour concerné.
+          </Body>
+        </Card>
+      )}
+
+      <Card>
+        <Label style={{ marginBottom: 8 }}>Coach IA · clé API Anthropic</Label>
+        <TextInput type="password" value={k} onChange={(e) => setK(e.target.value)} placeholder="sk-ant-..." style={{ marginBottom: 10 }} />
+        <Label style={{ marginBottom: 6 }}>Modèle</Label>
+        <TextInput value={m} onChange={(e) => setM(e.target.value)} placeholder="claude-sonnet-5" style={{ marginBottom: 12 }} />
+        <Btn variant="primary" onClick={() => { setApiKey(k.trim()); setModel(m.trim() || "claude-sonnet-5"); setMsg("Réglages enregistrés."); }} style={{ width: "100%" }}>
+          Enregistrer
+        </Btn>
+        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
+          Clé stockée uniquement sur cet appareil, envoyée directement à l'API Anthropic. Chaque analyse consomme des crédits.
+        </Body>
+      </Card>
+
+      <Card>
+        <Label style={{ marginBottom: 8 }}>Sauvegarde des données</Label>
+        {/* Bandeau d'alerte : c'est lui, pas le bouton, qui fait que la sauvegarde a lieu. */}
+        {isBackupStale(lastCloudBackup) && (
+          <div style={{
+            background: C.dangerBg, border: `1.5px solid ${C.danger}`, borderRadius: 8,
+            padding: "9px 11px", marginBottom: 10,
+          }}>
+            <div style={{ fontSize: 11, color: C.danger, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>
+              ⚠ Sauvegarde hors du téléphone
+            </div>
+            <Body style={{ color: C.dangerText, fontSize: 11, marginTop: 3 }}>
+              {lastCloudBackup
+                ? `Dernière il y a ${daysSinceBackup(lastCloudBackup)} jours (${fmt(lastCloudBackup)}).`
+                : "Jamais faite."} Perdre ou casser le téléphone effacerait tout l'historique.
+            </Body>
+          </div>
+        )}
+        <Btn variant="primary" onClick={doExport} style={{ width: "100%" }}>
+          <Download size={14} style={{ display: "inline", marginRight: 4 }} />Sauvegarder hors du téléphone
+        </Btn>
+        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
+          {Capacitor.isNativePlatform()
+            ? "Ouvre le partage Android : envoie le fichier vers Drive, un mail ou Fichiers. Rappel automatique au bout d'une semaine sans sauvegarde."
+            : "Télécharge le fichier JSON complet. Vider les données du navigateur effacerait l'app."}
+          {lastCloudBackup && !isBackupStale(lastCloudBackup) ? ` Dernière : ${fmt(lastCloudBackup)}.` : ""}
+        </Body>
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.divider}` }}>
+          <label>
+            <span style={{
+              display: "block", textAlign: "center", background: C.card, color: C.accent,
+              border: `1.5px solid ${C.accent}`, borderRadius: 8, padding: "9px 12px",
+              fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, cursor: "pointer",
+            }}><Upload size={14} style={{ display: "inline", marginRight: 4 }} />Restaurer un fichier</span>
+            <input type="file" accept="application/json" onChange={doImport} style={{ display: "none" }} />
+          </label>
+        </div>
+        {Capacitor.isNativePlatform() && (
+          <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
+            Sauvegarde auto locale (dossier Documents/Protocole) : {lastAutoBackup ? `dernière le ${fmt(lastAutoBackup)}` : "pas encore faite"}.
+            Ne remplace pas celle ci-dessus : elle reste sur le téléphone, donc elle disparaît avec lui.
+          </Body>
         )}
       </Card>
 

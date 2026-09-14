@@ -3320,6 +3320,31 @@ Pur réordonnancement UI, `apps/public` n'a pas la même écran Réglages (Onboa
   temporaire" bien absent, aucune erreur console. Build `apps/perso` ET `apps/public` propres
   (`apps/public` non affecté, aucun fichier partagé touché).
 
+### Affinage le même jour : la fréquence réelle d'usage, pas le rappel actif (apps/perso v3.80.4)
+
+Retour de Yoann sur le premier essai : "sauvegarde et restaurer un fichier peuvent aussi être
+en bas. en fait il faut classer les parties par ordre d'utilisation, de fréquence." L'erreur
+de raisonnement identifiée : avoir déduit "rappel actif (bandeau + notification hebdo) ⇒
+réglage fréquent" — un rappel qui pousse À agir n'est pas la même chose qu'un réglage
+réellement ouvert souvent. Plutôt que de re-deviner une seconde fois, question posée
+directement (par réglage, lesquels sont vraiment utilisés souvent) au lieu de raffiner sur une
+hypothèse déjà invalidée une fois.
+
+- **Ordre final confirmé par Yoann, réglage par réglage** (plus fréquent → moins fréquent) :
+  Planning Basket fixe → Phase → Cibles macro de base (+ poids cible) → Cible eau de base →
+  Coach IA · contexte permanent → Coach IA · carnet de bord → Revue de fond claude.ai →
+  Système de cotation escalade → Health Connect (natif) → Coach IA · clé API + modèle →
+  Sauvegarde des données (Sauvegarder/Restaurer).
+- **Le bloc "Coach IA" n'est plus un groupe contigu** : contexte permanent/carnet de bord/
+  revue de fond sont utilisés souvent (remontés au milieu, à la suite des cibles macro/eau),
+  tandis que clé API/modèle reste quasi jamais touché (redescendu près du bas, juste avant
+  Sauvegarde). Le label de section "Coach IA" ajouté au premier essai est retiré : chaque
+  carte porte déjà son propre titre "Coach IA · …", donc plus besoin d'un séparateur commun
+  une fois le groupe scindé en deux positions non adjacentes.
+- **Testé dans l'aperçu** : ordre re-vérifié exact (Planning Basket → Phase → Cibles macro →
+  Eau → contexte permanent → carnet de bord → revue de fond → escalade → clé API → Sauvegarde
+  en tout dernier), aucune erreur console.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
