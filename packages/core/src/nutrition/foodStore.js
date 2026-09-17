@@ -330,7 +330,7 @@ const score = (s) => s.freq + 2 * s.mealFreq + Math.max(0, 14 - s.days);
  * "Vos aliments habituels" (un essai raté, un aliment qu'on ne mange plus), sans jamais
  * toucher à l'historique réel des jours déjà enregistrés.
  *
- * Deux correctifs du 07/08/2026 (retour direct de Yoann, « des favoris disparaissent ») :
+ * Trois correctifs du 07/08/2026 (retour direct de Yoann, « des favoris disparaissent ») :
  * - **Pas de limite** (`limit` par défaut infini) : l'ancien plafond de 25 pouvait couper
  *   des aliments réellement logués souvent dès que plus de 25 refs distincts apparaissaient
  *   dans la fenêtre de 60 j — `usageStats` la borne déjà, un second plafond était de trop.
@@ -340,8 +340,20 @@ const score = (s) => s.freq + 2 * s.mealFreq + Math.max(0, 14 - s.days);
  *   observée. L'épinglage est une intention manuelle et durable, pas un signal de
  *   fréquence récente : on va chercher sa dernière occurrence dans TOUT l'historique.
  * - **Tri par repas** (point b, même retour) : les aliments épinglés d'abord, puis ceux
- *   déjà logués À CE repas précis (`mealFreq > 0`), puis le reste — un aliment très
- *   fréquent à un AUTRE repas ne doit plus passer devant un vrai habitué de celui-ci.
+ *   déjà logués À CE repas précis (`mealFreq > 0`), puis le reste.
+ *
+ * **Correctif du 17/09/2026** (retour de Yoann : une fève de soja jamais mangée en
+ * "Extra"/"Petit-déjeuner" remontait quand même en tête de la liste pour ces repas-là) :
+ * le tri par repas ci-dessus atténuait le problème sans le résoudre — un aliment jamais
+ * logué À CE repas pouvait encore dominer le niveau "le reste" (par pure fréquence
+ * globale) dès que ce repas n'avait lui-même aucun historique, et un aliment ÉPINGLÉ
+ * passait même AVANT le tri par repas, en tête de TOUS les repas sans distinction.
+ * Quand `meal` est fourni (ajout depuis une carte repas), la liste ne montre désormais
+ * QUE les aliments avec `mealFreq > 0` pour CE repas précis — épinglage compris : un
+ * aliment épinglé mais jamais mangé à ce repas n'y apparaît plus du tout, il reste
+ * disponible via la recherche classique. Sans `meal` (sélecteur d'ingrédients de
+ * recette, `IngredientPicker` — un ingrédient n'est pas lié à un repas), comportement
+ * strictement inchangé : épinglés d'abord, puis le reste par fréquence globale.
  */
 export function suggestions(log, { meal, pins = [], muted = [], limit = Infinity, date = todayKey() } = {}) {
   const stats = usageStats(log, { meal, date });
@@ -354,6 +366,7 @@ export function suggestions(log, { meal, pins = [], muted = [], limit = Infinity
   }
   return [...stats.values()]
     .filter((s) => !hidden.has(s.ref))
+    .filter((s) => !meal || s.mealFreq > 0)
     .map((s) => ({ ...s, _s: score(s) + (pinned.has(s.ref) ? 1000 : 0) }))
     .sort((a, b) => {
       const tier = (s) => (pinned.has(s.ref) ? 0 : meal && s.mealFreq > 0 ? 1 : 2);

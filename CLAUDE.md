@@ -3376,6 +3376,46 @@ pas demandé. L'Escalade, elle, n'avait de son côté JAMAIS eu cette vérificat
 
 Build `apps/perso` ET `apps/public` propres.
 
+## Correctif favoris — filtrage strict par repas (17/09/2026, apps/perso+public v3.80.6)
+
+Yoann : "je n'ai jamais mangé de fève de soja dans 'extra' ou 'petit déjeuner' donc il ne
+doit pas se retrouver en haut de la liste" — demande explicite de revérifier le code
+(`packages/core/src/nutrition/foodStore.js`). Le tri par repas déjà en place depuis le
+07/08/2026 (épinglés → déjà mangés à CE repas → le reste) **atténuait** le problème sans le
+résoudre : deux trous identifiés.
+1. Un aliment **épinglé** passait toujours en tête (niveau 0), **avant même** le tri par
+   repas — un épinglage suivait donc l'utilisateur sur TOUS les repas, y compris ceux où
+   l'aliment n'a jamais mis les pieds.
+2. Un aliment jamais mangé à CE repas mais très fréquent À UN AUTRE (niveau "le reste", trié
+   par fréquence globale) pouvait dominer ce niveau dès que le repas courant n'avait
+   lui-même aucun historique — et comme ce niveau devenait alors le seul contenu affiché, il
+   se retrouvait de fait en tête de la liste.
+
+- **`suggestions()`** (`foodStore.js`) : nouveau filtre `.filter((s) => !meal || s.mealFreq >
+  0)` — quand `meal` est fourni (ajout depuis une carte repas de l'onglet Macro), la liste ne
+  montre plus QUE les aliments réellement mangés à CE repas précis, épinglage compris. Un
+  aliment épinglé mais jamais mangé à ce repas n'apparaît plus du tout pour lui (reste
+  accessible via la recherche classique) — décision confirmée par Yoann (plutôt que "épinglé
+  en bas de liste"), après question posée explicitement.
+- **`IngredientPicker`** (création de recette, seul appelant SANS `meal` — un ingrédient
+  n'est pas lié à un repas) : comportement **strictement inchangé**, le filtre ne s'applique
+  que si `meal` est fourni.
+- **Partagé `packages/core`, donc les deux apps en bénéficient** — `apps/public` utilise le
+  même `suggestions()` avec la même signature (`FoodSearch.jsx` des deux apps, vérifié
+  identique).
+- **Testé en Node** : aliment mangé 20× au déjeuner mais jamais en "extra" → absent de la
+  liste "extra" même si "extra" a un autre historique (Chips) ; repas totalement vierge
+  (petit-déjeuner) → liste vide, aucun repli par fréquence ; même aliment épinglé → toujours
+  absent d'un repas où il n'a jamais été mangé ; au déjeuner (son vrai repas) → apparaît
+  normalement ; **non-régression** : sans `meal` (recette), comportement identique à avant,
+  épinglé toujours en tête. **Testé dans l'aperçu** (`apps/perso`) : "Petit-déjeuner"
+  affiche "Rien encore. Cherchez un aliment." malgré la fève de soja épinglée et mangée 20×
+  au déjeuner ; "Extra" affiche uniquement "Chips" (son vrai historique), fève de soja
+  absente. Aucune erreur console. `apps/public` non testé en direct (pas de session Supabase
+  active) — port automatique via `packages/core`, build propre.
+
+Build `apps/perso` ET `apps/public` propres.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
