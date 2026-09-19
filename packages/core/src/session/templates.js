@@ -239,19 +239,20 @@ export const BASKET_PROTOCOLS = {
     sub: "session soirée · attention au sommeil qui suit",
     blocks: [
       { h: "Avant", items: [
-        "Repas normal 18h-18h30 si possible (protéines + glucides + légumes), 2h30-3h avant.",
-        "Sinon collation 20h-20h15 (45-60 min avant) : 30-40 g glucides rapides (pain, fruit) + whey si peu de protéines depuis le repas de midi.",
+        "Repas normal 18h-18h30 si possible (protéines + glucides + légumes), 2h30-3h avant — macros suivies normalement dans l'onglet Macro, pas de cible dédiée ici.",
+        "Sinon collation 20h-20h15 (45-60 min avant), cible 35 g G. Ex. 65 g de pain (≈2 tranches) → 6 g P / 36 g G / 1 g L / ~175 kcal, ou 175 g de banane (≈1,5 fruit) → 2 g P / 35 g G / 0 g L / ~155 kcal.",
+        "+ whey 30 g si peu de protéines depuis le repas de midi → 25 g P / 2 g G / 1 g L / ~120 kcal.",
         "Hydratation : 500 ml dans les 2h précédentes.",
         "Caféine : à éviter après 18h-19h — la séance finit tard (~22h30), risque de perturber l'endormissement.",
       ]},
       { h: "Pendant", items: [
         "21h-22h30 : eau 500-750 ml par petites gorgées aux pauses.",
-        "Si séance intense >1h avec sprints/sauts répétés : 20 g glucides rapides à la pause si sensation de fatigue.",
+        "Si séance intense >1h avec sprints/sauts répétés : 20 g de bonbons à la pause si sensation de fatigue → 16 g G / ~72 kcal.",
       ]},
       { h: "Après", items: [
-        "22h30+ : whey 30 g dans les 30 min (≈25 g protéines).",
-        "Si dîner déjà pris avant la séance : 20-30 g glucides supplémentaires suffisent avec la whey.",
-        "Si pas dîné avant : repas léger et digeste (protéines maigres + glucides + légumes), éviter l'excès de lipides/fibres qui ralentit la digestion en fin de soirée.",
+        "22h30+ : whey 30 g dans les 30 min → 25 g P / 2 g G / 1 g L / ~120 kcal.",
+        "Si dîner déjà pris avant la séance : whey seule suffit, pas de glucides supplémentaires nécessaires (timing des glucides post-effort sans effet démontré au-delà de 24h avant la prochaine séance).",
+        "Si pas dîné avant : repas léger et digeste (protéines maigres + glucides + légumes), éviter l'excès de lipides/fibres qui ralentit la digestion en fin de soirée — macros suivies normalement dans l'onglet Macro.",
         "Terminer le repas ~1h avant le coucher pour ne pas nuire à l'endormissement.",
         "Eau : compléter les pertes (repère : 1 kg perdu ≈ 1 L à boire en plus).",
       ]},
@@ -262,17 +263,19 @@ export const BASKET_PROTOCOLS = {
     sub: "session midi · déjeuner décalé",
     blocks: [
       { h: "Avant", items: [
-        "Petit-déj normal 7h-8h (glucides + protéines).",
-        "Collation 11h15-11h30 (30-45 min avant) : 20-30 g glucides rapides (banane, pain, bonbons) + eau 300-400 ml. Whey si petit-déj léger en protéines.",
+        "Petit-déj normal 7h-8h (glucides + protéines) — macros suivies normalement dans l'onglet Macro.",
+        "Collation 11h15-11h30 (30-45 min avant), cible 25 g G. Ex. 45 g de pain → 4 g P / 25 g G / 0 g L / ~120 kcal, ou 125 g de banane (≈1 fruit) → 1 g P / 25 g G / 0 g L / ~110 kcal, ou 30 g de bonbons → 24 g G / ~110 kcal.",
+        "+ eau 300-400 ml.",
+        "+ whey 30 g si petit-déj léger en protéines → 25 g P / 2 g G / 1 g L / ~120 kcal.",
         "Caféine : 200 mg 30-45 min avant si utile — pas de souci pour le sommeil à cette heure.",
       ]},
       { h: "Pendant", items: [
         "12h-13h/13h30 : eau 500-750 ml.",
-        "Si séance longue (>1h) ou intense : 20 g glucides à la pause.",
+        "Si séance longue (>1h) ou intense : 20 g de bonbons à la pause → 16 g G / ~72 kcal.",
       ]},
       { h: "Après (vrai déjeuner décalé)", items: [
-        "Si le déjeuner est retardé de plus de 30-45 min après la séance : whey 20-25 g immédiatement pour ne pas attendre à jeun.",
-        "Déjeuner complet dès que possible : protéines 150 g + glucides 150-200 g + légumes + huile d'olive crue 10 g.",
+        "Si le déjeuner est retardé de plus de 30-45 min après la séance : whey 20 g immédiatement pour ne pas attendre à jeun → 17 g P / 1 g G / 1 g L / ~80 kcal.",
+        "Déjeuner complet dès que possible : poulet ou poisson 150 g (45 g P / 6 g L / ~247 kcal) + riz blanc ou patate douce 175 g (5 g P / 49 g G / ~227 kcal) + légumes 200 g (4 g P / 8 g G / ~50 kcal) + huile d'olive crue 10 g (10 g L / ~90 kcal). Total : 54 g P / 57 g G / 16 g L / ~615 kcal.",
         "Eau : compléter les pertes de la séance.",
       ]},
     ],
@@ -286,8 +289,8 @@ export const BASKET_PROTOCOLS = {
         "Caféine : 1 cachet 200 mg.",
       ]},
       { h: "10-15 min après le réveil", items: [
-        "Petit-déj pré-match : pain blanc 2-3 tranches + miel + whey.",
-        "(Pas de banane → remplacer par 1 tranche de pain en plus, ou 20 g de bonbons.)",
+        "Petit-déj pré-match : pain blanc 70 g (≈2-3 tranches) + miel 15 g + whey 30 g → 31 g P / 53 g G / 2 g L / ~355 kcal.",
+        "(Pas de banane → remplacer par 1 tranche de pain en plus (≈30 g) → +3 g P / 17 g G / ~80 kcal, ou 20 g de bonbons → 16 g G / ~72 kcal.)",
       ]},
       { h: "20-40 min après le petit-déj", items: [
         "Marche 15-20 min, allure tranquille — active circulation et digestion.",
@@ -300,14 +303,14 @@ export const BASKET_PROTOCOLS = {
         "Hydratation continue : 400-500 ml d'eau par petites gorgées.",
       ]},
       { h: "9h20-9h25 (pré-match)", items: [
-        "Bonbons 30 g + eau 250 ml.",
+        "Bonbons 30 g → 24 g G / ~110 kcal. + eau 250 ml.",
       ]},
       { h: "9h45 — Échauffement", items: [
         "Gorgées d'eau régulières.",
       ]},
       { h: "Pendant le match (10h30-12h)", items: [
         "Temps morts : 100-150 ml eau.",
-        "Mi-temps (~11h15) : 250 ml eau + 20 g bonbons si creux.",
+        "Mi-temps (~11h15) : 250 ml eau + 20 g bonbons si creux → 16 g G / ~72 kcal.",
         "Q3/Q4 : 100-150 ml eau par pause.",
         "Total visé : 800 ml-1 L d'eau.",
       ]},
