@@ -290,7 +290,6 @@ export const BASKET_PROTOCOLS = {
       ]},
       { h: "10-15 min après le réveil", items: [
         "Petit-déj pré-match : pain blanc 70 g (≈2-3 tranches) + miel 15 g + whey 30 g → 31 g P / 53 g G / 2 g L / ~355 kcal.",
-        "(Pas de banane → remplacer par 1 tranche de pain en plus (≈30 g) → +3 g P / 17 g G / ~80 kcal, ou 20 g de bonbons → 16 g G / ~72 kcal.)",
       ]},
       { h: "20-40 min après le petit-déj", items: [
         "Marche 15-20 min, allure tranquille — active circulation et digestion.",
