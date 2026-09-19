@@ -46,7 +46,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.81.1";
+const APP_VERSION = "3.82.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -879,14 +879,25 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
       groupe: ex.groupe, mouvement: ex.mouvement, materiel: ex.materiel, tendon: ex.tendon, famille: ex.famille, series };
   });
 
-  const [start, setStart] = useState(() => initial?.start ?? new Date().toTimeString().slice(0, 5));
+  // Brouillon auto-sauvegardé (localStorage, hors DATA_KEYS — voir Règles absolues #1) :
+  // capture la séance en cours dès qu'une série est cochée, pour survivre à un changement
+  // d'onglet ou une fermeture de l'app (TrainTab démonte tout son état à chaque changement
+  // d'onglet, ce qui effaçait la séance en cours avant ce correctif). Calculé une seule fois
+  // au montage (`useState` paresseux) : ne matche que si type/date/séance éditée coïncident,
+  // sinon on reconstruit normalement depuis l'historique.
+  const [savedDraft] = useState(() => {
+    const d = getSync("trainingDraft", null);
+    const match = d && d.type === type && d.date === date && (d.editingId ?? null) === (initial?.id ?? null) && Array.isArray(d.exos);
+    return match ? d : null;
+  });
+  const [start, setStart] = useState(() => savedDraft?.start ?? initial?.start ?? new Date().toTimeString().slice(0, 5));
   // Durée + RPE (04/09/2026) : seuls les types marqués `withMeta` (Basket, désormais un
   // carnet d'exercices comme Upper/Lower) les capturent — sans ça, le passage de Basket en
   // "muscu" aurait fait perdre ces deux champs déjà lus par le Coach IA et "Dernières
   // séances", jusque-là propres aux séances non-muscu (voir TrainTab).
-  const [duration, setDuration] = useState(() => initial?.duration ?? 60);
-  const [rpe, setRpe] = useState(() => initial?.rpe ?? 7);
-  const [exos, setExos] = useState(buildExos);
+  const [duration, setDuration] = useState(() => savedDraft?.duration ?? initial?.duration ?? 60);
+  const [rpe, setRpe] = useState(() => savedDraft?.rpe ?? initial?.rpe ?? 7);
+  const [exos, setExos] = useState(() => savedDraft?.exos ?? buildExos());
   const [open, setOpen] = useState(0);
   const [hist, setHist] = useState(null);
   // Substitution (bibliothèque d'exercices, 01/09/2026) : index de l'exercice dont le
@@ -943,6 +954,15 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
   }, [tRem]);
   // Filet de sécurité : pas d'alarme fantôme si on quitte le carnet minuteur en route.
   useEffect(() => () => { clearInterval(tRef.current); cancelRestAlarm(); }, []);
+
+  // Écrit le brouillon à chaque changement (série cochée, poids/reps modifiés, minuteur
+  // réglé...) — pas seulement à la validation finale. `type`/`date`/`initial` sont stables
+  // pour la durée de vie de ce composant (remonté via `key` par TrainTab si l'un d'eux
+  // change vraiment), sauf `date` qui peut changer en cours de séance (DateField) : inclus
+  // pour que le brouillon reste rattaché à la bonne date.
+  useEffect(() => {
+    store.set("trainingDraft", { type, date, editingId: initial?.id ?? null, start, duration, rpe, exos });
+  }, [type, date, initial, start, duration, rpe, exos]);
 
   // Les notifications système doublent le décompte JS : elles seules sont fiables
   // écran verrouillé. `openName` sert à afficher l'exercice concerné dans la notif.
@@ -1022,6 +1042,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
   };
 
   const validate = () => {
+    store.set("trainingDraft", null);
     onSave({
       id: initial?.id ?? `${date}-${type}-${Date.now()}`,
       date, type, start,
@@ -1290,7 +1311,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
         <Btn variant="primary" onClick={validate} style={{ flex: 1 }}>
           <CheckCircle2 size={14} style={{ display: "inline", marginRight: 4 }} />{initial ? "Enregistrer les modifications" : "Valider la séance"}
         </Btn>
-        <Btn variant="ghost" onClick={onCancel}>Annuler</Btn>
+        <Btn variant="ghost" onClick={() => { store.set("trainingDraft", null); onCancel(); }}>Annuler</Btn>
       </div>
     </div>
   );
@@ -1572,19 +1593,29 @@ const blocStep = {
 };
 
 function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme }) {
-  const [open, setOpen] = useState(null);
+  // Brouillon auto-sauvegardé (localStorage, hors DATA_KEYS — voir Règles absolues #1) :
+  // restaure au montage la séance laissée en cours (TrainTab démonte tout son état à
+  // chaque changement d'onglet, ce qui effaçait la séance avant ce correctif). Lu une
+  // seule fois (`useState` paresseux). `TEMPLATES[d.type]` vérifié pour ne jamais rouvrir
+  // sur un type devenu invalide.
+  const [draft0] = useState(() => getSync("trainingDraft", null));
+  const [open, setOpen] = useState(() => (draft0?.type && TEMPLATES[draft0.type]) ? draft0.type : null);
   const [progress, setProgress] = useState(false);
-  const [date, setDate] = useState(today());
-  const [startTime, setStartTime] = useState(() => new Date().toTimeString().slice(0, 5));
-  const [duration, setDuration] = useState(60);
-  const [rpe, setRpe] = useState(7);
-  const [blocs, setBlocs] = useState([]);
+  const [date, setDate] = useState(() => draft0?.date ?? today());
+  const [startTime, setStartTime] = useState(() => draft0?.start ?? new Date().toTimeString().slice(0, 5));
+  const [duration, setDuration] = useState(() => draft0?.duration ?? 60);
+  const [rpe, setRpe] = useState(() => draft0?.rpe ?? 7);
+  const [blocs, setBlocs] = useState(() => draft0?.blocs ?? []);
   // Séance déjà enregistrée en cours de modification (référence exacte de l'objet
   // dans `training`) — null quand on démarre une nouvelle séance à blanc.
-  const [editing, setEditing] = useState(null);
+  const [editing, setEditing] = useState(() => {
+    const id = draft0?.editingId;
+    return id ? (training.find((t) => t.id === id) ?? null) : null;
+  });
 
   const pickType = (type) => {
     const sel = open === type;
+    store.set("trainingDraft", null);
     setEditing(null);
     setDate(today());
     setStartTime(new Date().toTimeString().slice(0, 5));
@@ -1595,6 +1626,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme }) {
   };
 
   const editSession = (t) => {
+    store.set("trainingDraft", null);
     setEditing(t);
     setDate(t.date);
     setStartTime(t.start ?? new Date().toTimeString().slice(0, 5));
@@ -1609,6 +1641,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme }) {
       // Champ omis quand il n'y a rien à dire : une séance sans blocs saisis reste
       // exactement la même entrée qu'avant V5 (et le recommandeur le voit).
       ...(type === "Escalade" && blocs.length ? { blocs } : {}) };
+    store.set("trainingDraft", null);
     save.training((editing ? training.map((x) => (x === editing ? rec : x)) : [...training, rec]).sort(byDate));
     setOpen(null); setEditing(null);
   };
@@ -1616,6 +1649,14 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme }) {
     save.training((editing ? training.map((x) => (x === editing ? rec : x)) : [...training, rec]).sort(byDate));
     setOpen(null); setEditing(null);
   };
+
+  // Brouillon Escalade (blocs saisis via BlocsField) — même protection que le carnet muscu,
+  // gérée ici puisque Escalade reste rendue directement par TrainTab (kind "sport", pas de
+  // MuscuLogger). Ignoré tant qu'un autre type est ouvert.
+  useEffect(() => {
+    if (open !== "Escalade") return;
+    store.set("trainingDraft", { type: "Escalade", date, editingId: editing?.id ?? null, start: startTime, duration, rpe, blocs });
+  }, [open, date, editing, startTime, duration, rpe, blocs]);
 
   const vol = {};
   training.filter((t) => daysBetween(t.date, today()) <= 14).forEach((t) => { vol[t.type] = (vol[t.type] || 0) + 1; });
@@ -1680,7 +1721,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme }) {
             <Btn variant="primary" onClick={() => logSession(open)} style={{ flex: 1 }}>
               <CheckCircle2 size={14} style={{ display: "inline", marginRight: 4 }} />{editing ? "Enregistrer les modifications" : "Enregistrer"}
             </Btn>
-            <Btn variant="ghost" onClick={() => { setOpen(null); setEditing(null); }}>Annuler</Btn>
+            <Btn variant="ghost" onClick={() => { store.set("trainingDraft", null); setOpen(null); setEditing(null); }}>Annuler</Btn>
           </div>
         </Card>
       )}

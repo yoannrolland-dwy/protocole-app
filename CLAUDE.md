@@ -3434,6 +3434,10 @@ Build `apps/perso` ET `apps/public` propres.
    `elbowLog` est un troisième cas particulier depuis le 05/09/2026 : le coude a été
    retiré (plus aucun code ne le lit/l'écrit, voir plus bas), la clé reste dans
    `DATA_KEYS` uniquement pour ne pas perdre l'historique déjà exporté.
+   `trainingDraft` (19/09/2026, brouillon auto-sauvegardé du carnet en cours — voir
+   chantier dédié plus bas) est une quatrième exception volontaire : état éphémère lié à
+   l'appareil au moment présent, pas une donnée à restaurer sur un autre appareil ou à une
+   autre date — ne jamais l'ajouter à `DATA_KEYS`.
 2. **Toujours vérifier que le build passe** (`npm run build --workspace=apps/perso`,
    depuis la racine du monorepo) avant de considérer une modification terminée.
 3. **Bumper `APP_VERSION`** (dans `apps/perso/src/App.jsx`) et `"version"` (dans
@@ -3571,6 +3575,41 @@ côté natif (`Capacitor.isNativePlatform()`), le service worker est désenregis
 caches vidés au démarrage — l'APK fait toujours foi, aucune popup de ce type ne peut plus
 apparaître sur l'app native (confirmé par Yoann le 06/08/2026 : jamais vue). Cette popup
 reste normale et à accepter uniquement si elle apparaît dans un navigateur (PWA).
+
+## Chantier RawCare — Brouillon auto-sauvegardé du carnet de séance (19/09/2026, apps/perso v3.82.0)
+
+Retour de Yoann : quitter l'onglet Séances en cours de carnet (ex. pour vérifier Macro)
+annulait toute la séance — rien n'était perdu qu'à la validation finale ("Valider la
+séance"), car `TrainTab` est démonté à chaque changement d'onglet
+(`{tab === "train" && <TrainTab .../>}` dans `App.jsx`), détruisant tout son état React
+(type ouvert, date, et dans `MuscuLogger` chaque série cochée/poids/reps saisis).
+
+- **Nouvelle clé `trainingDraft`, volontairement hors `DATA_KEYS`** (voir Règles absolues
+  #1, quatrième exception) : état éphémère de "ce qui est en cours dans le carnet
+  maintenant", pas une donnée à restaurer sur un export/import.
+- **`MuscuLogger` écrit son propre brouillon** (`{ type, date, editingId, start, duration,
+  rpe, exos }`) via un `useEffect` déclenché à chaque changement de `exos`/`start`/
+  `duration`/`rpe` — donc dès qu'une série est cochée, pas seulement à la validation. Au
+  montage, un brouillon correspondant exactement (même type/date/séance éditée) est
+  restauré à la place de la reconstruction habituelle depuis l'historique.
+- **`TrainTab` restaure `open`/`date`/`editing` au montage** depuis le même brouillon (avec
+  garde-fou `TEMPLATES[type]` pour ignorer un brouillon devenu invalide) : rouvrir l'onglet
+  Séances après l'avoir quitté en pleine séance rouvre directement le carnet là où il en
+  était, sans repasser par le sélecteur de type.
+- **Escalade (kind "sport", rendue directement par `TrainTab`, pas par `MuscuLogger`)**
+  bénéficie du même mécanisme côté blocs saisis (`BlocsField`) — même bug, même correctif.
+- **Nettoyage explicite du brouillon** à la validation (`validate()`/`logSession`) et à
+  l'annulation (bouton "Annuler", des deux écrans) — une séance terminée ou abandonnée
+  volontairement ne doit pas ressusciter au prochain lancement. Démarrer un nouveau type
+  (`pickType`) ou rouvrir une séance passée pour modification (`editSession`) efface aussi
+  tout brouillon existant, pour ne jamais mélanger deux séances.
+- **Aucun impact sur `trainingLog`, le recommandeur, le Coach IA, les records ou le TDEE** :
+  rien de tout cela ne lit le brouillon, seul `MuscuLogger`/`TrainTab` le lisent au montage.
+  Le comportement de "Valider la séance" est strictement inchangé.
+- **Testé dans l'aperçu** : série cochée sur Upper A, changement d'onglet (Macro) puis
+  retour sur Séances → carnet rouvert automatiquement avec la série toujours cochée ;
+  "Annuler" puis retour sur Séances → sélecteur de type vide (pas de résurrection) ;
+  validation puis retour → sélecteur de type vide. Build `apps/perso` propre.
 
 ## Comment je veux qu'on travaille
 
