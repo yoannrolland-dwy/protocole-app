@@ -3419,7 +3419,7 @@ Build `apps/perso` ET `apps/public` propres.
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
-   `trainingLog`, `kneeLog`, `elbowLog`, `rhrLog`, `macroLog`, `noteLog`, `stepsLog`, `targets`,
+   `trainingLog`, `kneeLog`, `elbowLog`, `rhrLog`, `napLog`, `macroLog`, `noteLog`, `stepsLog`, `targets`,
    `phase`, `hsrWeek`, `climbScheme`, `basketSchedule`, `apiKey`, `model`, `coachProfile`,
    `coachJournal`, `foodLog`, `foodPins`, `foodMuted`, `foodPortions`, `foodRecipes`,
    `foodOverrides` —
@@ -3610,6 +3610,68 @@ séance"), car `TrainTab` est démonté à chaque changement d'onglet
   retour sur Séances → carnet rouvert automatiquement avec la série toujours cochée ;
   "Annuler" puis retour sur Séances → sélecteur de type vide (pas de résurrection) ;
   validation puis retour → sélecteur de type vide. Build `apps/perso` propre.
+
+## Chantier RawCare — Gestion des siestes (23/09/2026, apps/perso v3.83.0)
+
+Yoann a demandé comment PROTOCOLE devrait gérer les siestes (la montre les détecte
+automatiquement). Discussion scientifique d'abord (une sieste n'appartient ni à la nuit
+d'avant ni à celle d'après — épisode de récupération à part ; risque uniquement sur la nuit
+SUIVANTE si trop longue/tardive), puis diagnostic technique confirmé par Yoann : la montre
+enregistre bien les siestes comme n'importe quel `SleepSessionRecord` Health Connect.
+
+- **Bug réel confirmé, pas hypothétique** : le découpage "jour de sommeil" (`sleepDayOf`,
+  fenêtre midi-veille à midi-jour même, `HealthNutritionPlugin.kt`) regroupait TOUT
+  enregistrement tombant dans cette fenêtre — une sieste à 14h tombe dans la fenêtre qui se
+  termine à midi le LENDEMAIN, donc se faisait fusionner silencieusement dans la nuit
+  suivante, faussant sa durée, sa qualité, ET la FC repos calculée dessus
+  (`readRestingHeartRate`, qui réutilise le même découpage).
+- **`isNap(r)`** (nouveau helper privé) : classifie une session comme sieste si son heure de
+  DÉBUT tombe entre 12h et 18h — jamais une heure de coucher plausible, y compris après un
+  match tardif. Heuristique simple, assumée : Health Connect n'a aucun champ natif
+  distinguant sieste et nuit.
+- **`readSleep()`** : sépare siestes/nuits AVANT le calcul (`partition`), exclut les siestes
+  du calcul de nuit (comportement inchangé pour les vraies nuits), et renvoie un nouveau
+  champ `naps` — durée sommée par date CALENDAIRE (pas "jour de sommeil", qui n'a de sens que
+  pour une nuit).
+- **`readRestingHeartRate()`** : mêmes sessions de sieste exclues du calcul de FC repos
+  nocturne (`.filterNot { isNap(it) }`) — sans ça, la FC (plus élevée en sieste qu'en sommeil
+  profond, surtout après une séance) aurait continué de fausser la nuit suivante.
+- **Nouvelle clé `napLog`** (`{date, minutes}`, ajoutée à `DATA_KEYS`) : remontée par
+  `healthSync.js`/`App.jsx` exactement comme `rhrLog` (pas de saisie manuelle, pas de champ
+  `source` à arbitrer).
+- **Affichage dans l'onglet Énergie, à côté du vrai sommeil** (demande explicite) : ligne
+  "+ sieste aujourd'hui : Xh XX" sous la carte "Dernière nuit", visible uniquement si une
+  sieste existe pour la date du jour.
+- **Bonus sieste dans le score d'énergie (revirement le même jour)** : premier jet livré sans
+  toucher au score ("la science ne rattache pas une sieste à une nuit"), mais Yoann a
+  raisonnablement objecté qu'une sieste redonne un vrai regain de vigilance mesurable — ça
+  mérite de compter. Nuance retenue : les 4 modules existants (FC repos/sommeil/activité/
+  régularité) restent des signaux de récupération DE FOND, qu'une sieste ne "répare" pas ;
+  mais un **5e module séparé "Sieste"** (`packages/core/src/energy.js`, `MODULE_MAX.nap = 5`,
+  `scoreNapModule`) capture le regain de vigilance à part, **additif et plafonné à 5 pts**,
+  jamais mêlé aux poids déjà calibrés des 4 autres. Barème : plein bonus dès 20 min (seuil
+  "power nap", jamais de sommeil profond), plafonné pareil jusqu'à 90 min (pas de pénalité
+  pour l'éventuelle inertie de réveil en zone 30-70 min, hors de portée d'un score journalier
+  unique), rien de plus au-delà de 90 min. `computeEnergyScore` plafonne désormais le total à
+  100 (`Math.min(100, ...)`) — une sieste peut combler un score un peu juste, jamais pousser
+  un score déjà excellent au-dessus de la barre. Absence de sieste = `points: 0` (fait connu,
+  jamais `null`), donc ce module ne bloque jamais le calcul même sans sieste. Branché aux 4
+  appels de `computeEnergyScore` dans `App.jsx` (Dashboard, onglet Énergie, widget natif,
+  sac de données Coach IA) — jamais deux verdicts différents pour la même réalité.
+  **Exception délibérée** : `sleepEnergyCorrelation` (`insights.js`, corrélation qualité de
+  sommeil ↔ score d'énergie) ne reçoit PAS `napLog` — l'objectif de cette mesure est
+  d'isoler l'effet de la qualité de sommeil seule, qu'un bonus sieste le même jour
+  contaminerait.
+- **`apps/public` non concerné** pour la synchro (Health Connect est natif `apps/perso`
+  uniquement) ; `packages/core/src/energy.js` est partagé, donc son build a été revérifié.
+- **Testé** : build `apps/perso` + `apps/public` propres, `./gradlew assembleDebug` propre
+  (Kotlin compile). Script Node dédié (8 assertions) sur `computeEnergyScore` : score
+  inchangé sans sieste, bonus plein à 20 min, bonus partiel arrondi à 10 min, plafonné à
+  120 min, aucun effet d'une sieste d'un autre jour, total jamais > 100 même avec les 4
+  modules déjà au maximum. Vérifié dans l'aperçu (module "Sieste" affiché dans le détail du
+  score, "+ sieste aujourd'hui" sous "Dernière nuit"), aucune erreur console.
+  **Non testé en conditions réelles sur l'appareil** (nécessite une vraie sieste détectée par
+  la montre) — à confirmer par Yoann après installation.
 
 ## Comment je veux qu'on travaille
 

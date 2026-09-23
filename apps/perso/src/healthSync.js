@@ -76,6 +76,7 @@ export async function syncHealthConnect() {
   const sleepByDate = {};
   const weightByDate = {};
   const rhrByDate = {};
+  const napsByDate = {};
 
   try {
     if (canSteps) {
@@ -96,12 +97,16 @@ export async function syncHealthConnect() {
       // Lecteur natif plutôt que Health.readSamples("sleep") : ce dernier ne rapporte que la
       // période (coucher→réveil), jamais le détail par phase — donc jamais de durée réelle ni
       // de qualité calculable. Voir HealthNutritionPlugin.readSleep().
-      const { days } = await HealthNutrition.readSleep({
+      const { days, naps } = await HealthNutrition.readSleep({
         startDate: start.toISOString(), endDate: end.toISOString(),
       });
       Object.entries(days || {}).forEach(([date, d]) => {
         sleepByDate[date] = { hours: round2(d.hours), ...(d.quality != null ? { quality: d.quality } : {}) };
       });
+      // Siestes détectées par la montre (23/09/2026, gestion des siestes) : déjà exclues du
+      // calcul de nuit côté natif (voir HealthNutritionPlugin.readSleep/isNap), remontées ici
+      // à part sous leur propre date calendaire.
+      Object.entries(naps || {}).forEach(([date, minutes]) => { napsByDate[date] = minutes; });
     }
 
     if (canWeight) {
@@ -121,5 +126,5 @@ export async function syncHealthConnect() {
     return { status: "error", message: String(e) };
   }
 
-  return { status: "ok", stepsByDate, sleepByDate, weightByDate, rhrByDate };
+  return { status: "ok", stepsByDate, sleepByDate, weightByDate, rhrByDate, napsByDate };
 }

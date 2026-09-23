@@ -65,7 +65,7 @@ function trailingAvg(log, key, t0, { days = 7, minPoints = 3 } = {}) {
   return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
 
-const MODULE_MAX = { rhr: 30, sleep: 30, steps: 25, regularity: 15 };
+const MODULE_MAX = { rhr: 30, sleep: 30, steps: 25, regularity: 15, nap: 5 };
 
 function scoreRhrModule(rhrLog, t0) {
   const today = (rhrLog || []).find((e) => e.date === t0);
@@ -130,24 +130,46 @@ function scoreRegularityModule(sleepLog, t0) {
     reason: `${diffMin >= 0 ? "+" : ""}${diffMin} min vs moyenne 7 j.` };
 }
 
+// Bonus sieste (23/09/2026, gestion des siestes) : la science montre qu'une sieste courte
+// redonne un vrai regain de vigilance pour le reste de la journée — contrairement aux 4
+// modules ci-dessus, qui restent des signaux de récupération DE FOND (FC repos, sommeil de
+// la nuit, régularité) qu'une sieste ne "répare" pas. Volontairement un module À PART,
+// additif et plafonné bas (5 pts), jamais mêlé aux 100 pts déjà calibrés des 4 autres —
+// une sieste peut compenser un score un peu juste, jamais gonfler un score déjà excellent
+// au-delà de 100 (`computeEnergyScore` plafonne le total).
+// 0-20 min : "power nap", jamais de sommeil profond, plein effet dès 20 min. 20-90 min :
+// toujours bénéfique (une éventuelle inertie transitoire au réveil est hors de portée d'un
+// score journalier unique), plafonné au même bonus. >90 min : pas de bonus supplémentaire,
+// ce n'est plus une sieste de performance. Jamais `null` (l'absence de sieste est un fait
+// connu, pas une donnée manquante) : ce module ne bloque donc jamais le calcul du total.
+function scoreNapModule(napLog, t0) {
+  const nap = (napLog || []).find((e) => e.date === t0);
+  if (!nap || !nap.minutes) return { key: "nap", label: "Sieste", max: MODULE_MAX.nap, points: 0, reason: "Pas de sieste aujourd'hui." };
+  const points = nap.minutes > 90 ? MODULE_MAX.nap : Math.round(Math.min(1, nap.minutes / 20) * MODULE_MAX.nap);
+  return { key: "nap", label: "Sieste", max: MODULE_MAX.nap, points, minutes: nap.minutes,
+    reason: `${fmtHM(nap.minutes / 60)} de sieste aujourd'hui — regain de vigilance.` };
+}
+
 /**
  * @param t0       date (yyyy-MM-dd) du matin noté — "hier" pour les pas, "cette nuit" pour
  *                 le sommeil, sont dérivés de `t0`.
  * @param rhrLog   journal FC repos `{ date, bpm }` (Health Connect, natif seulement).
  * @param sleepLog journal sommeil `{ date, hours, quality? }` (déjà existant).
  * @param stepsLog journal pas `{ date, count }` (déjà existant).
+ * @param napLog   journal siestes `{ date, minutes }` (Health Connect, natif seulement).
  * @returns `{ status: "ok", total, modules }` ou `{ status: "insufficient", modules }` —
  *          jamais un total inventé si un module manque de donnée : mieux vaut un motif
  *          honnête qu'un chiffre sur 100 qui ne veut rien dire pour 1/4 de sa base.
  */
-export function computeEnergyScore(t0, { rhrLog, sleepLog, stepsLog } = {}) {
+export function computeEnergyScore(t0, { rhrLog, sleepLog, stepsLog, napLog } = {}) {
   const modules = [
     scoreRhrModule(rhrLog, t0),
     scoreSleepDurationModule(sleepLog, t0),
     scoreStepsModule(stepsLog, t0),
     scoreRegularityModule(sleepLog, t0),
+    scoreNapModule(napLog, t0),
   ];
   const allOk = modules.every((m) => m.points != null);
   if (!allOk) return { status: "insufficient", modules };
-  return { status: "ok", total: modules.reduce((a, m) => a + m.points, 0), modules };
+  return { status: "ok", total: Math.min(100, modules.reduce((a, m) => a + m.points, 0)), modules };
 }

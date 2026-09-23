@@ -70,6 +70,33 @@ class HealthNutritionPlugin : Plugin() {
     }
 
     /**
+     * Sieste (23/09/2026, gestion des siestes) : une session dont l'heure de DÉBUT tombe
+     * l'après-midi (12h-18h, jamais une heure de coucher plausible même après un match tardif)
+     * n'est pas une vraie nuit — la montre l'enregistre pourtant comme n'importe quel
+     * `SleepSessionRecord`. Sans ce tri, le découpage "jour de sommeil" (fenêtre midi-midi,
+     * voir `readSleep()`) la fusionnait silencieusement dans la nuit SUIVANTE (une sieste à
+     * 14h tombe dans la fenêtre qui se termine à midi le lendemain), faussant sa durée/qualité
+     * ET la FC repos calculée dessus (`readRestingHeartRate`).
+     */
+    private fun isNap(r: SleepSessionRecord): Boolean {
+        val hour = r.startTime.atZone(java.time.ZoneId.systemDefault()).hour
+        return hour in 12..17
+    }
+
+    private fun calendarDayOf(instant: Instant): String =
+        instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString()
+
+    // STAGE_TYPE_AWAKE=1, OUT_OF_BED=3, AWAKE_IN_BED=7 (androidx.health.connect), exclus du
+    // temps réellement endormi. Repli sur la période brute si aucune phase n'est disponible —
+    // même logique que la boucle de nuit dans `readSleep()`.
+    private fun asleepMinutes(r: SleepSessionRecord): Double {
+        val periodeMin = (r.endTime.epochSecond - r.startTime.epochSecond) / 60.0
+        if (r.stages.isEmpty()) return periodeMin
+        return r.stages.filter { it.stage !in setOf(1, 3, 7) }
+            .sumOf { (it.endTime.epochSecond - it.startTime.epochSecond) / 60.0 }
+    }
+
+    /**
      * Outil de diagnostic (non utilisé par la synchro normale) — dump brut du contenu de
      * Health Connect : nutrition, hydratation, poids, pas, avec pour chaque enregistrement
      * la source (`dataOrigin`) et l'horodatage de dernière écriture (`lastModifiedTime`).
@@ -188,10 +215,19 @@ class HealthNutritionPlugin : Plugin() {
                 // Même précaution que pour les macros : une réinstallation d'app source pourrait
                 // réécrire un historique sans purger l'ancien. On ne garde que l'enregistrement
                 // le plus récemment écrit par (source, instant de début).
-                val records = hc.readRecords(ReadRecordsRequest(SleepSessionRecord::class, range))
+                val allRecords = hc.readRecords(ReadRecordsRequest(SleepSessionRecord::class, range))
                     .records
                     .groupBy { "${it.metadata.dataOrigin.packageName}|${it.startTime}" }
                     .values.map { grp -> grp.maxByOrNull { it.metadata.lastModifiedTime }!! }
+
+                // Siestes détectées séparément (voir isNap()) : exclues du calcul de nuit
+                // ci-dessous, sommées à part sous leur propre date CALENDAIRE (pas "jour de
+                // sommeil", qui n'a de sens que pour une vraie nuit).
+                val (napRecords, records) = allRecords.partition { isNap(it) }
+                val napsOut = JSObject()
+                napRecords.groupBy { calendarDayOf(it.startTime) }.forEach { (day, group) ->
+                    napsOut.put(day, Math.round(group.sumOf { asleepMinutes(it) }).toInt())
+                }
 
                 // Jour de sommeil = fenêtre de midi (veille) à midi (jour même), pas le jour
                 // calendaire strict : avant midi, on reste sur le jour en cours (fin de nuit) ;
@@ -256,7 +292,7 @@ class HealthNutritionPlugin : Plugin() {
                     if (quality != null) entry.put("quality", quality)
                     out.put(day, entry)
                 }
-                call.resolve(JSObject().put("days", out))
+                call.resolve(JSObject().put("days", out).put("naps", napsOut))
             } catch (e: Exception) {
                 call.reject("Lecture sommeil impossible : ${e.message}")
             }
@@ -339,9 +375,13 @@ class HealthNutritionPlugin : Plugin() {
                     return d.toString()
                 }
 
+                // Siestes exclues (mêmes isNap()/même raison que readSleep()) : leur FC, plus
+                // élevée qu'en sommeil profond nocturne surtout après une séance, fausserait
+                // sinon la FC repos de la nuit suivante à laquelle elles seraient rattachées.
                 val sleepRecords = readAllRecords(hc, SleepSessionRecord::class, range)
                     .groupBy { "${it.metadata.dataOrigin.packageName}|${it.startTime}" }
                     .values.map { grp -> grp.maxByOrNull { it.metadata.lastModifiedTime }!! }
+                    .filterNot { isNap(it) }
 
                 if (sleepRecords.isEmpty()) { call.resolve(JSObject().put("days", JSObject())); return@launch }
 

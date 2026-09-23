@@ -64,7 +64,7 @@ export const store = {
 export const DATA_KEYS = [
   // "elbowLog" reste ici uniquement pour ne pas perdre l'historique déjà exporté (le coude a
   // été retiré le 05/09/2026, plus aucun code ne le lit ni ne l'écrit — voir CLAUDE.md).
-  "weightLog", "sleepLog", "trainingLog", "kneeLog", "elbowLog", "rhrLog", "macroLog", "noteLog", "stepsLog",
+  "weightLog", "sleepLog", "trainingLog", "kneeLog", "elbowLog", "rhrLog", "napLog", "macroLog", "noteLog", "stepsLog",
   "targets", "phase", "hsrWeek", "model", "climbScheme", "basketSchedule",
   "coachProfile", "coachJournal",
   "foodLog", "foodPins", "foodMuted", "foodPortions", "foodRecipes", "foodOverrides",

@@ -46,7 +46,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.82.0";
+const APP_VERSION = "3.83.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -233,13 +233,13 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
 /* ============================================================
    TAB — DASHBOARD
    ============================================================ */
-function Dashboard({ weight, sleep, knee, rhr, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule, weeklyPlan, matchWeek }) {
+function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule, weeklyPlan, matchWeek }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast ? round(wLast.kg - tgtW) : null;
 
   const lastNightDash = lastN(sleep, 1)[0];
-  const energy = useMemo(() => computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps }), [rhr, sleep, steps]);
+  const energy = useMemo(() => computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps }), [rhr, sleep, steps, naps]);
 
   const mToday = macros.find((m) => m.date === today());
   const kcalToday = mToday ? Math.round(kcalOfEntry(mToday)) : null;
@@ -573,7 +573,7 @@ function InsightsCard({ insights }) {
   );
 }
 
-function SleepTab({ sleep, rhr, steps, save }) {
+function SleepTab({ sleep, rhr, steps, naps, save }) {
   const [date, setDate] = useState(today());
   const cur = sleep.find((s) => s.date === date);
   const initH = lastN(sleep, 1)[0]?.hours ?? 7.5;
@@ -594,7 +594,7 @@ function SleepTab({ sleep, rhr, steps, save }) {
   const quality7 = avg(last7.filter((s) => s.quality != null).map((s) => s.quality));
   const lastNight = lastN(sleep, 1)[0];
   const data = lastN(sleep, 21).map((s) => ({ date: fmt(s.date), hours: s.hours }));
-  const energy = useMemo(() => computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps }), [rhr, sleep, steps]);
+  const energy = useMemo(() => computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps }), [rhr, sleep, steps, naps]);
   const sleepScore = computeSleepScore(lastNight);
   // Score de sommeil dans le temps + répartition par palier (13/09/2026, demande explicite) :
   // jusqu'ici le score (0-100, combine durée+qualité) n'était visible QUE pour la dernière
@@ -604,6 +604,9 @@ function SleepTab({ sleep, rhr, steps, save }) {
   const paliers = { Excellent: 0, Bon: 0, Correct: 0, Risque: 0 };
   last21.forEach((s) => { const sc = computeSleepScore(s); if (sc != null) paliers[scoreLabel(sc)]++; });
   const paliersTotal = Object.values(paliers).reduce((a, b) => a + b, 0);
+  // Sieste du jour (23/09/2026) : affichée à titre informatif à côté du vrai sommeil, jamais
+  // fusionnée dedans — voir le commentaire sur `naps` plus haut.
+  const todayNap = naps.find((n) => n.date === today());
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -637,6 +640,11 @@ function SleepTab({ sleep, rhr, steps, save }) {
             }} />
           )) : <Body style={{ fontSize: 11, color: C.dim }}>Aucune nuit enregistrée.</Body>}
         </div>
+        {todayNap && (
+          <Body style={{ fontSize: 11, color: C.accent, marginTop: 10 }}>
+            + sieste aujourd'hui : {fmtHM(todayNap.minutes / 60)}
+          </Body>
+        )}
       </Card>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -2601,6 +2609,12 @@ export default function App({ silent = false } = {}) {
   // même famille que weightLog/stepsLog. Vide sur la PWA (jamais synchronisée), le score
   // d'énergie affiche alors "pas assez de données" plutôt qu'un chiffre inventé.
   const [rhr, setRhr] = useState([]);
+  // Siestes détectées par la montre (Health Connect, natif seulement — 23/09/2026, gestion
+  // des siestes) : `{date, minutes}`. Jamais de saisie manuelle (comme rhrLog), pas de champ
+  // "source" à arbitrer. Affichées à titre informatif dans l'onglet Énergie, à côté du vrai
+  // sommeil — volontairement PAS intégrées au score d'énergie/de sommeil pour l'instant (la
+  // science ne les rattache ni à la nuit d'avant ni à celle d'après, voir la discussion).
+  const [naps, setNaps] = useState([]);
   const [macros, setMacros] = useState([]);
   const [steps, setSteps] = useState([]);
   const [notes, setNotes] = useState([]);
@@ -2640,6 +2654,7 @@ export default function App({ silent = false } = {}) {
       setTraining(migratedTraining);
       setKnee(await store.get("kneeLog", []));
       setRhr(await store.get("rhrLog", []));
+      setNaps(await store.get("napLog", []));
       setMacros(await store.get("macroLog", []));
       setSteps(await store.get("stepsLog", []));
       setNotes(await store.get("noteLog", []));
@@ -2726,6 +2741,14 @@ export default function App({ silent = false } = {}) {
         return next;
       });
     }
+    if (Object.keys(result.napsByDate || {}).length) {
+      setNaps((prev) => {
+        let next = prev;
+        Object.entries(result.napsByDate).forEach(([date, minutes]) => { next = upsert(next, { date, minutes }); });
+        store.set("napLog", next);
+        return next;
+      });
+    }
     setHealthSync({ status: "ok", at: new Date().toISOString() });
   };
 
@@ -2789,7 +2812,7 @@ export default function App({ silent = false } = {}) {
     if (loading || !Capacitor.isNativePlatform()) return;
     const wLast = lastN(weight, 1)[0];
     const lastNightDash = lastN(sleep, 1)[0];
-    const energyDash = computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps });
+    const energyDash = computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps });
     const mToday = macros.find((m) => m.date === today());
     const kcalToday = mToday ? Math.round(kcalOfEntry(mToday)) : null;
     const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
@@ -2815,7 +2838,7 @@ export default function App({ silent = false } = {}) {
       // une tuile aussi étroite — condensé pour rester sur une ligne comme les autres notes.
       sync: { value: "", note: `MAJ ${new Date().toLocaleTimeString("fr-FR")}` },
     });
-  }, [loading, weight, sleep, macros, steps, training, targets]);
+  }, [loading, weight, sleep, macros, steps, training, targets, naps]);
 
   const save = {
     weight: (v) => { setWeight(v); store.set("weightLog", v); },
@@ -2823,6 +2846,7 @@ export default function App({ silent = false } = {}) {
     training: (v) => { setTraining(v); store.set("trainingLog", v); },
     knee: (v) => { setKnee(v); store.set("kneeLog", v); },
     rhr: (v) => { setRhr(v); store.set("rhrLog", v); },
+    naps: (v) => { setNaps(v); store.set("napLog", v); },
     macros: (v) => { setMacros(v); store.set("macroLog", v); },
     steps: (v) => { setSteps(v); store.set("stepsLog", v); },
     notes: (v) => { setNotes(v); store.set("noteLog", v); },
@@ -2861,7 +2885,7 @@ export default function App({ silent = false } = {}) {
         foodLog: getSync("foodLog", []), foodOverrides: getSync("foodOverrides", {}),
         profile, journal, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule),
         matchWeek: isMatchWeek(basketSchedule),
-        energy: computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps }),
+        energy: computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps }),
       }, note),
     buildBriefing: () =>
       buildCoachBriefing({
@@ -2941,9 +2965,9 @@ export default function App({ silent = false } = {}) {
           <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, climbScheme, setClimbScheme, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule), matchWeek: isMatchWeek(basketSchedule) }} openSettings={() => setShowSettings(true)} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule), matchWeek: isMatchWeek(basketSchedule) }} openSettings={() => setShowSettings(true)} />}
             {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
-            {tab === "sleep" && <SleepTab {...{ sleep, rhr, steps, save }} />}
+            {tab === "sleep" && <SleepTab {...{ sleep, rhr, steps, naps, save }} />}
             {tab === "steps" && <StepsTab {...{ steps, save }} />}
             {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, scheme }} />}
             {tab === "pain" && <PainTab {...{ knee, save, hsrWeek }} />}
