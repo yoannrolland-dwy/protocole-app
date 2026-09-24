@@ -3705,6 +3705,27 @@ le 7 j, **avec un avertissement explicite**.
   Aperçu : section affichée avec des valeurs cohérentes sur un historique synthétique "retour
   de vacances", aucune erreur console. Build `apps/perso` ET `apps/public` propres.
 
+### Correctif le même jour : % de jours loggés plafonné sous 100 % (v3.84.1)
+
+Yoann : "je ne comprends pas pourquoi je ne suis pas à 100 %, j'ai tout loggé". Cause : la
+fenêtre va jusqu'à aujourd'hui (la pesée du matin sert au calcul), mais les kcal du jour en
+cours sont toujours exclues (journée incomplète, correctif du 13/09) — 28 jours parfaitement
+saisis s'affichaient donc à 96 % (27/28), 86 % sur 7 j. Trois options comparées avec Yoann ;
+retenue : **% = jours loggés ÷ jours TERMINÉS de la fenêtre** (calories jusqu'à hier + pesée
+de ce matin, exactement les données qu'utilise le calcul). Écartées : ignorer la pesée du
+matin (jette la mesure la plus fraîche, et le % ne concerne de toute façon que les kcal) ;
+compter les kcal du jour incomplètes (afficherait "loggée" une journée à moitié remplie, et
+réintroduirait le bug du 13/09 si elles entraient dans la moyenne).
+
+- **Affichage seulement** : nouveau champ additif `loggedDays` renvoyé par `computeTDEE` et
+  `tdeeOverWindow`, helper `loggedPct` (`App.jsx`) utilisé par la carte principale ET la
+  comparaison des fenêtres. `loggedRate` (seuil 70 %, fiabilité) reste calculé comme avant —
+  aucune règle validée touchée.
+- **Testé** : script Node — `computeTDEE`/`tdeeOverWindow` identiques au commit précédent hors
+  le nouveau champ (avec et sans trous de saisie) ; 7/14/21/28 j complets → 100 % ; des trous
+  réels restent visibles (1 jour sur 4 manquant → 78 %). `apps/public` non modifié (non
+  demandé).
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.

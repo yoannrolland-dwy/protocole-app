@@ -94,7 +94,7 @@ function windowStats(kcalByDate, weightLog, start, end) {
   let logged = 0;
   for (let i = 0; i < days; i++) if (kcalByDate[shiftDate(start, i)] != null) logged++;
   const weighed = (weightLog || []).filter((w) => w.kg != null && w.date >= start && w.date <= end).length;
-  return { days, loggedRate: logged / days, weighRate: Math.min(1, weighed / days) };
+  return { days, logged, loggedRate: logged / days, weighRate: Math.min(1, weighed / days) };
 }
 
 function meanKcal(kcalByDate, start, end) {
@@ -187,14 +187,14 @@ export function computeTDEE({ weightLog, kcalByDate, today, cutStart = null }) {
     };
   }
 
-  const { start, days, loggedRate, weighRate } = chosen;
+  const { start, days, logged, loggedRate, weighRate } = chosen;
   const calc = tdeeOnWindow(kcalByDate, weightLog, start, today);
   if (!calc) return { status: "insufficient", reason: "poids ou apports absents sur la fenêtre retenue" };
 
   return {
     status: "ok",
     tdee: calc.tdee, meanIntake: calc.meanIntake, deltaKg: calc.deltaKg,
-    windowStart: start, windowEnd: today, days,
+    windowStart: start, windowEnd: today, days, loggedDays: logged,
     loggedRate: round2(loggedRate), weighRate: round2(weighRate),
     reliability: reliabilityOf({ days, loggedRate, weighRate, overlapsWater }),
     overlapsWater,
@@ -233,13 +233,13 @@ export function tdeeOverWindow({ weightLog, kcalByDate, today, days, cutStart = 
   if (!earliestWeight) return { status: "insufficient", days, reason: "aucune pesée enregistrée" };
   const start = shiftDate(today, -(days - 1));
   if (start < earliestWeight) return { status: "insufficient", days, reason: "historique trop court" };
-  const { loggedRate, weighRate } = windowStats(kcalByDate, weightLog, start, today);
+  const { logged, loggedRate, weighRate } = windowStats(kcalByDate, weightLog, start, today);
   if (loggedRate < MIN_LOGGED_RATE) return { status: "insufficient", days, reason: "trop peu de jours loggés" };
   const calc = tdeeOnWindow(kcalByDate, weightLog, start, today);
   if (!calc) return { status: "insufficient", days, reason: "poids ou apports absents" };
   const overlapsWater = !!cutStart && start <= shiftDate(cutStart, WATER_PHASE_DAYS - 1) && today >= cutStart;
   return {
-    status: "ok", days, ...calc, windowStart: start, windowEnd: today,
+    status: "ok", days, ...calc, windowStart: start, windowEnd: today, loggedDays: logged,
     loggedRate: round2(loggedRate), weighRate: round2(weighRate),
     reliability: reliabilityOf({ days, loggedRate, weighRate, overlapsWater }),
   };

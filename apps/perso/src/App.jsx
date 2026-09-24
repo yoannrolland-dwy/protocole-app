@@ -46,7 +46,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.84.0";
+const APP_VERSION = "3.84.1";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -1968,6 +1968,13 @@ const TDEE_RELIABILITY_LABEL = { fiable: "fiable", moyenne: "moyenne", faible: "
  * Carte "Dépense estimée" (V7). Jamais un chiffre non fiable : tant qu'il n'y a pas assez
  * de recul (14 j mini, 70 % des apports loggés), affiche pourquoi plutôt qu'un nombre.
  */
+// % de jours loggés AFFICHÉ (24/09/2026) : sur les seuls jours TERMINÉS de la fenêtre. La
+// fenêtre va jusqu'à aujourd'hui (pesée du matin, qui reflète les apports jusqu'à hier soir),
+// mais les kcal du jour en cours sont toujours exclues (journée incomplète, voir
+// buildKcalByDate) — sans ce décompte, 28 jours parfaitement saisis s'affichaient à 96 %.
+// Affichage seulement : `loggedRate` (seuils de fiabilité/70 %) reste calculé comme avant.
+const loggedPct = (r) => Math.min(100, Math.round((r.loggedDays / Math.max(1, r.days - 1)) * 100));
+
 // Comparaison des fenêtres (24/09/2026) : une ligne par longueur fixe, sous l'estimation de
 // référence. Le 7 j est gardé (demande explicite) mais toujours marqué "indicatif" — sur 7 j,
 // une variation d'eau de 0,5 kg décale le résultat d'environ ±550 kcal/j.
@@ -1985,7 +1992,7 @@ function TdeeWindows({ windows }) {
             <span style={{ fontFamily: C.mono, fontSize: 12 }}>
               <span style={{ fontWeight: 800, color: C.text }}>{w.tdee}</span>
               <span style={{ fontSize: 10, color: TDEE_RELIABILITY_COLOR[w.reliability], marginLeft: 6 }}>{TDEE_RELIABILITY_LABEL[w.reliability]}</span>
-              <span style={{ fontSize: 10, color: C.dim, marginLeft: 6 }}>{Math.round(w.loggedRate * 100)}%</span>
+              <span style={{ fontSize: 10, color: C.dim, marginLeft: 6 }}>{loggedPct(w)}%</span>
             </span>
           ) : (
             <span style={{ fontSize: 10, color: C.dim }}>{w.reason}</span>
@@ -2036,7 +2043,7 @@ function TdeeCard({ result, deficitReel, trend, windows }) {
         </span> contre la cible affichée.
       </Body>
       <Body style={{ fontSize: 10, color: C.dim, marginTop: 8, fontFamily: C.mono }}>
-        Fenêtre : {fmt(result.windowStart)} → {fmt(result.windowEnd)} · {Math.round(result.loggedRate * 100)}% des jours loggés · {Math.round(result.weighRate * 100)}% pesés
+        Fenêtre : {fmt(result.windowStart)} → {fmt(result.windowEnd)} · {loggedPct(result)}% des jours loggés · {Math.round(result.weighRate * 100)}% pesés
       </Body>
       <Body style={{ fontSize: 10, color: C.dim, marginTop: 2, fontFamily: C.mono }}>
         Tendance de poids sur la fenêtre : {result.deltaKg > 0 ? "+" : ""}{result.deltaKg} kg
