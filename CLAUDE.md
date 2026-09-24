@@ -3673,6 +3673,38 @@ enregistre bien les siestes comme n'importe quel `SleepSessionRecord` Health Con
   **Non testé en conditions réelles sur l'appareil** (nécessite une vraie sieste détectée par
   la montre) — à confirmer par Yoann après installation.
 
+## TDEE — comparaison des fenêtres 7/14/21/28 j (24/09/2026, apps/perso v3.84.0)
+
+Yoann rentrait de vacances il y a pile 28 jours et doutait de la fiabilité de l'estimation
+sur 28 j. Intuition confirmée par simulation : l'eau/glycogène stockés en vacances repartent
+les premiers jours du retour, la balance baisse plus que le déficit réel ne l'explique, et
+le 28 j **surestime** la dépense (scénario synthétique : 2921 kcal/j pour une vraie valeur
+≈ 2640). Challengé avant de coder : sur 7 j, une variation d'eau de 0,5 kg décale le résultat
+d'environ ±550 kcal/j (±275 sur 14 j, ±180 sur 21 j, ±140 sur 28 j) — Yoann a tenu à garder
+le 7 j, **avec un avertissement explicite**.
+
+- **`tdeeOverWindow`** (nouveau, `packages/core/src/tdee.js`) : TDEE sur une fenêtre de
+  longueur FIXE, sans recherche de meilleure fenêtre ni plancher à 14 j — sert à COMPARER,
+  pas à remplacer l'estimation de référence (`computeTDEE`, inchangée : elle reste celle
+  utilisée par le déficit réel, les Constats, le Bilan et le Coach IA). Mêmes garde-fous :
+  jamais de chiffre si la fenêtre dépasse l'historique de pesées ou < 70 % de jours loggés.
+  Une fenêtre < 14 j reste toujours en fiabilité "faible" (`reliabilityOf` existant).
+- **Formule factorisée** (`tdeeOnWindow`, privée) : `computeTDEE` et `tdeeOverWindow`
+  partagent exactement le même calcul — jamais deux formules différentes.
+- **UI** : section "Comparaison des fenêtres" dans la carte "Dépense estimée" (onglet TDEE),
+  une ligne par fenêtre (hors celle déjà retenue par l'estimation de référence, pour ne pas
+  l'afficher deux fois), avec fiabilité et % de jours loggés. Le 7 j est marqué
+  "· indicatif", et une note explique la lecture : fenêtres qui convergent = chiffre solide ;
+  la plus longue qui s'écarte = sans doute polluée par un événement ancien. Le problème du
+  retour de vacances se résorbe de lui-même en ~1 semaine (la fenêtre glisse).
+- **Non propagé au Coach IA ni à `apps/public`** (non demandé).
+- **Testé** : script Node — `computeTDEE` et `tdeeTrend` identiques au caractère près à
+  l'ancienne version (comparée via `git show HEAD`) sur 5 scénarios (vacances, sans vacances,
+  trous de saisie, sèche récente/ancienne) ; `tdeeOverWindow(28)` = estimation de référence
+  quand celle-ci retient 28 j ; garde-fous historique trop court / < 70 % loggés vérifiés.
+  Aperçu : section affichée avec des valeurs cohérentes sur un historique synthétique "retour
+  de vacances", aucune erreur console. Build `apps/perso` ET `apps/public` propres.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.

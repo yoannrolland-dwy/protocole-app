@@ -188,25 +188,60 @@ export function computeTDEE({ weightLog, kcalByDate, today, cutStart = null }) {
   }
 
   const { start, days, loggedRate, weighRate } = chosen;
-  const mean = meanKcal(kcalByDate, start, today);
-  const smoothed = smoothedWeightSeries(weightLog);
-  const trendStart = trendAt(smoothed, start), trendEnd = trendAt(smoothed, today);
-  if (mean == null || trendStart == null || trendEnd == null) {
-    return { status: "insufficient", reason: "poids ou apports absents sur la fenêtre retenue" };
-  }
-
-  const deltaKg = round2(trendEnd - trendStart);
-  // TDEE = apports_moyens − (Δ_tendance_kg × 7700 / nb_jours). Vérification de signe :
-  // 2200 kcal/j, −0,5 kg sur 14 j → 2200 − (−0,5×7700/14) = 2200+275 = 2475 kcal/j.
-  const tdee = Math.round(mean - (deltaKg * KCAL_PER_KG) / days);
+  const calc = tdeeOnWindow(kcalByDate, weightLog, start, today);
+  if (!calc) return { status: "insufficient", reason: "poids ou apports absents sur la fenêtre retenue" };
 
   return {
     status: "ok",
-    tdee, meanIntake: Math.round(mean), deltaKg,
+    tdee: calc.tdee, meanIntake: calc.meanIntake, deltaKg: calc.deltaKg,
     windowStart: start, windowEnd: today, days,
     loggedRate: round2(loggedRate), weighRate: round2(weighRate),
     reliability: reliabilityOf({ days, loggedRate, weighRate, overlapsWater }),
     overlapsWater,
+  };
+}
+
+// Calcul commun à `computeTDEE` et `tdeeOverWindow` — une seule formule, jamais deux.
+// TDEE = apports_moyens − (Δ_tendance_kg × 7700 / nb_jours). Vérification de signe :
+// 2200 kcal/j, −0,5 kg sur 14 j → 2200 − (−0,5×7700/14) = 2200+275 = 2475 kcal/j.
+function tdeeOnWindow(kcalByDate, weightLog, start, today) {
+  const days = daysBetween(start, today) + 1;
+  const mean = meanKcal(kcalByDate, start, today);
+  const smoothed = smoothedWeightSeries(weightLog);
+  const trendStart = trendAt(smoothed, start), trendEnd = trendAt(smoothed, today);
+  if (mean == null || trendStart == null || trendEnd == null) return null;
+  const deltaKg = round2(trendEnd - trendStart);
+  return { tdee: Math.round(mean - (deltaKg * KCAL_PER_KG) / days), meanIntake: Math.round(mean), deltaKg };
+}
+
+/**
+ * TDEE sur une fenêtre de longueur FIXE (24/09/2026, comparaison 7/14/21/28 j dans l'onglet
+ * TDEE) — contrairement à `computeTDEE`, aucune recherche de la meilleure fenêtre et aucun
+ * plancher à 14 jours : sert à COMPARER les fenêtres entre elles, pas à produire l'estimation
+ * de référence. Si elles convergent, le chiffre est solide ; si la plus longue s'écarte, elle
+ * est sans doute polluée par un événement ancien (ex. retour de vacances : l'eau/glycogène
+ * stockés repartent, la balance baisse plus que le déficit réel, la dépense est surestimée).
+ * Une fenêtre sous 14 j reste toujours en fiabilité "faible" (`reliabilityOf`) : sur 7 j, une
+ * variation d'eau de 0,5 kg décale le résultat d'environ ±550 kcal/j.
+ * Même garde-fou que `computeTDEE` : jamais un chiffre si la fenêtre dépasse l'historique de
+ * pesées ou si moins de 70 % des jours ont des apports loggés.
+ */
+export function tdeeOverWindow({ weightLog, kcalByDate, today, days, cutStart = null }) {
+  const earliestWeight = (weightLog || [])
+    .filter((w) => w.kg != null)
+    .reduce((min, w) => (!min || w.date < min ? w.date : min), null);
+  if (!earliestWeight) return { status: "insufficient", days, reason: "aucune pesée enregistrée" };
+  const start = shiftDate(today, -(days - 1));
+  if (start < earliestWeight) return { status: "insufficient", days, reason: "historique trop court" };
+  const { loggedRate, weighRate } = windowStats(kcalByDate, weightLog, start, today);
+  if (loggedRate < MIN_LOGGED_RATE) return { status: "insufficient", days, reason: "trop peu de jours loggés" };
+  const calc = tdeeOnWindow(kcalByDate, weightLog, start, today);
+  if (!calc) return { status: "insufficient", days, reason: "poids ou apports absents" };
+  const overlapsWater = !!cutStart && start <= shiftDate(cutStart, WATER_PHASE_DAYS - 1) && today >= cutStart;
+  return {
+    status: "ok", days, ...calc, windowStart: start, windowEnd: today,
+    loggedRate: round2(loggedRate), weighRate: round2(weighRate),
+    reliability: reliabilityOf({ days, loggedRate, weighRate, overlapsWater }),
   };
 }
 

@@ -16,7 +16,7 @@ import { isBackupStale, daysSinceBackup, scheduleBackupReminder } from "./cloudB
 import { exoProgress, exerciseList, exerciseSessions, exerciseTrend, isTimeMode, setLabel,
          beats, recordToBeat, recordsBySession, painOutOfBase, progressiveOverloadSuggestion } from "@rawcare/core/training";
 import { SCHEMES, gradeIndex, ISSUES, climbSummary, climbLabel } from "@rawcare/core/climbing";
-import { realDeficit, MIN_WINDOW_DAYS as MIN_TDEE_DAYS, tdeeTrend } from "@rawcare/core/tdee";
+import { realDeficit, MIN_WINDOW_DAYS as MIN_TDEE_DAYS, tdeeTrend, tdeeOverWindow } from "@rawcare/core/tdee";
 import { TEMPLATES, TYPES, DEFAULT_WEIGHTS, HSR_TABLE, hsrForWeek, hsrParse, parseSecs,
          PERI, BASKET_PROTOCOLS } from "@rawcare/core/session/templates";
 import { refSet, lastPerf, perfHistory, lastExerciseSets, medianTarget } from "@rawcare/core/session/perf";
@@ -46,7 +46,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.83.0";
+const APP_VERSION = "3.84.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -1968,7 +1968,40 @@ const TDEE_RELIABILITY_LABEL = { fiable: "fiable", moyenne: "moyenne", faible: "
  * Carte "Dépense estimée" (V7). Jamais un chiffre non fiable : tant qu'il n'y a pas assez
  * de recul (14 j mini, 70 % des apports loggés), affiche pourquoi plutôt qu'un nombre.
  */
-function TdeeCard({ result, deficitReel, trend }) {
+// Comparaison des fenêtres (24/09/2026) : une ligne par longueur fixe, sous l'estimation de
+// référence. Le 7 j est gardé (demande explicite) mais toujours marqué "indicatif" — sur 7 j,
+// une variation d'eau de 0,5 kg décale le résultat d'environ ±550 kcal/j.
+function TdeeWindows({ windows }) {
+  if (!windows?.length) return null;
+  return (
+    <>
+      <Label style={{ marginTop: 12, marginBottom: 4 }}>Comparaison des fenêtres</Label>
+      {windows.map((w) => (
+        <div key={w.days} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "5px 0", borderTop: `1px solid ${C.divider}` }}>
+          <span style={{ fontSize: 11, color: C.text2, fontFamily: C.mono }}>
+            {w.days} j{w.days < MIN_TDEE_DAYS && <span style={{ color: C.muted }}> · indicatif</span>}
+          </span>
+          {w.status === "ok" ? (
+            <span style={{ fontFamily: C.mono, fontSize: 12 }}>
+              <span style={{ fontWeight: 800, color: C.text }}>{w.tdee}</span>
+              <span style={{ fontSize: 10, color: TDEE_RELIABILITY_COLOR[w.reliability], marginLeft: 6 }}>{TDEE_RELIABILITY_LABEL[w.reliability]}</span>
+              <span style={{ fontSize: 10, color: C.dim, marginLeft: 6 }}>{Math.round(w.loggedRate * 100)}%</span>
+            </span>
+          ) : (
+            <span style={{ fontSize: 10, color: C.dim }}>{w.reason}</span>
+          )}
+        </div>
+      ))}
+      <Body style={{ fontSize: 10, color: C.dim, marginTop: 6 }}>
+        Si les fenêtres convergent, le chiffre est solide. Si la plus longue s'écarte, elle est
+        sans doute polluée par un événement ancien (retour de vacances : l'eau repart, la dépense
+        est surestimée). Le 7 j est très bruité : 0,5 kg d'eau ≈ ±550 kcal/j — à ne pas lire seul.
+      </Body>
+    </>
+  );
+}
+
+function TdeeCard({ result, deficitReel, trend, windows }) {
   if (result.status !== "ok") {
     return (
       <Card>
@@ -1977,6 +2010,7 @@ function TdeeCard({ result, deficitReel, trend }) {
           Pas encore assez de données ({result.reason}). Il faut au moins {MIN_TDEE_DAYS} jours
           de pesées et d'apports enregistrés, avec au moins 70 % des jours loggés.
         </Body>
+        <TdeeWindows windows={windows} />
       </Card>
     );
   }
@@ -2013,6 +2047,7 @@ function TdeeCard({ result, deficitReel, trend }) {
           la dépense réelle est probablement plus proche de la fourchette basse.
         </Body>
       )}
+      <TdeeWindows windows={windows} />
       {trendPoints.length >= 2 && (
         <>
           <Label style={{ marginTop: 12, marginBottom: 6 }}>Tendance · 8 semaines</Label>
@@ -2119,12 +2154,14 @@ function PerformanceTab({ macros, targets, training, weight }) {
   const deficitReel = tdeeToday.status === "ok" ? realDeficit(kcalTargetToday, tdeeToday.tdee) : null;
   // Historique du TDEE semaine par semaine (13/09/2026, demande explicite) : même donnée que
   // `tdeeToday` (kcal réelles fusionnées), juste rejouée à des dates passées.
-  const tdeeHistory = tdeeTrend({
-    weightLog: weight,
-    kcalByDate: buildKcalByDate({ foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}), macros, today: today() }),
-    cutStart: targets.cut?.enabled !== false && targets.cut?.start ? targets.cut.start : null,
-    todayDate: today(), weeks: 8,
-  });
+  const tdeeKcalByDate = buildKcalByDate({ foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}), macros, today: today() });
+  const tdeeCutStart = targets.cut?.enabled !== false && targets.cut?.start ? targets.cut.start : null;
+  const tdeeHistory = tdeeTrend({ weightLog: weight, kcalByDate: tdeeKcalByDate, cutStart: tdeeCutStart, todayDate: today(), weeks: 8 });
+  // Comparaison des fenêtres 7/14/21/28 j (24/09/2026, demande explicite) — hors fenêtre déjà
+  // retenue par l'estimation de référence, pour ne pas l'afficher deux fois.
+  const tdeeWindows = [7, 14, 21, 28]
+    .filter((d) => tdeeToday.status !== "ok" || d !== tdeeToday.days)
+    .map((d) => tdeeOverWindow({ weightLog: weight, kcalByDate: tdeeKcalByDate, today: today(), days: d, cutStart: tdeeCutStart }));
 
   // Moyenne hebdomadaire glissante, 7 jours (13/09/2026 — remplace l'ancienne moyenne lun-ven :
   // les cheat meals de Yoann ne suivent pas un jour fixe, exclure le week-end n'avait donc pas
@@ -2168,7 +2205,7 @@ function PerformanceTab({ macros, targets, training, weight }) {
       </Card>
 
       {/* Dépense énergétique adaptative (V7) */}
-      <TdeeCard result={tdeeToday} deficitReel={deficitReel} trend={tdeeHistory} />
+      <TdeeCard result={tdeeToday} deficitReel={deficitReel} trend={tdeeHistory} windows={tdeeWindows} />
 
       {/* Planning hebdomadaire idéal — référence affichée, jamais appliquée automatiquement */}
       <Card>
