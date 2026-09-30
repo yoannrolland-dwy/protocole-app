@@ -3726,6 +3726,21 @@ réintroduirait le bug du 13/09 si elles entraient dans la moyenne).
   réels restent visibles (1 jour sur 4 manquant → 78 %). `apps/public` non modifié (non
   demandé).
 
+## Carte resto — contenu de la carte traité comme donnée, pas comme consigne (30/09/2026, v3.84.2)
+
+Suite d'un scan AgentShield (`/ecc:security-scan`) sur le dépôt : note D (57/100), mais 565
+des 567 « critiques » étaient les hash `integrity` de `package-lock.json` (faux positifs
+vérifiés ligne par ligne) et le reste visait `CLAUDE.md` comme s'il s'agissait du prompt
+système d'un agent public — non applicable, volontairement PAS traité (pas de boilerplate
+OWASP dans ce fichier). Le seul point retenu venait d'un jugement hors scanner : le
+`SYSTEM_PROMPT` de Carte resto (`RestaurantMenu.jsx`, les deux apps) lit une page web
+tierce arbitraire via `web_fetch` sans dire que ce contenu est une donnée. Ajout d'une règle
+(n°6 côté perso, n°4 côté public, dont le prompt est plus ancien) : consignes trouvées dans la
+page ou l'image à ignorer, continuer d'appliquer les règles du prompt. Rayon d'action de toute
+façon limité (réponse contrainte à un schéma JSON de plats, validée par l'utilisateur avant
+ajout au journal). Non testé avec un vrai appel API — sur une carte normale, le comportement
+attendu est « aucun changement ». Build `apps/perso` ET `apps/public` propres.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.
