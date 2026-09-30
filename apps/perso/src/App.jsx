@@ -46,7 +46,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.84.2";
+const APP_VERSION = "3.84.3";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -2304,14 +2304,23 @@ function BasketScheduleCard({ basketSchedule, setBasketSchedule }) {
     setNewDate("");
   };
   const removeMatch = (d) => setBasketSchedule({ ...basketSchedule, matchDates: matchDates.filter((x) => x !== d) });
+  // Liste repliée par défaut (30/09/2026) : une saison entière = 22 dates, trop long à
+  // dérouler dans les Réglages. Replié = seulement les 3 prochains matchs (les dates passées
+  // n'ont plus aucun effet sur le recommandeur) ; "Voir tout" déplie la saison complète.
+  const [showAll, setShowAll] = useState(false);
+  const t0 = today();
+  const upcoming = matchDates.filter((d) => d >= t0);
+  const shown = showAll ? matchDates : upcoming.slice(0, 3);
+  const hiddenCount = matchDates.length - shown.length;
 
   return (
     <Card>
       <Label style={{ marginBottom: 8 }}>Planning Basket fixe</Label>
       <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
         Le recommandeur sait qu'un Basket est prévu avant même que tu l'aies loggé : il évite
-        de proposer un Lower le même jour, applique déjà le repos de 48 h le lendemain, et le
-        propose en priorité ("c'est le jour de l'entraînement") le jour même.
+        de proposer un Lower le même jour, le propose en priorité ("c'est le jour de
+        l'entraînement") le jour même, et bascule sur le planning "semaine avec match" dès
+        qu'un match tombe le dimanche.
       </Body>
 
       <Label style={{ marginBottom: 6 }}>Entraînement hebdomadaire</Label>
@@ -2338,14 +2347,23 @@ function BasketScheduleCard({ basketSchedule, setBasketSchedule }) {
         <Body style={{ fontSize: 11, color: C.dim }}>Aucune date de match enregistrée.</Body>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {matchDates.map((d) => (
+          {shown.map((d) => (
             <div key={d} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 2px", borderBottom: `1px solid ${C.divider}` }}>
-              <span style={{ fontSize: 12, color: C.text, fontFamily: C.mono }}>{fmt(d)}</span>
+              <span style={{ fontSize: 12, color: d < t0 ? C.dim : C.text, fontFamily: C.mono }}>{fmt(d)}</span>
               <button onClick={() => removeMatch(d)} style={{ background: "none", border: "none", cursor: "pointer", color: C.dim, padding: 4 }}>
                 <X size={13} />
               </button>
             </div>
           ))}
+          {(hiddenCount > 0 || showAll) && (
+            <button onClick={() => setShowAll((v) => !v)} style={{
+              background: "none", border: "none", cursor: "pointer", padding: "8px 2px 2px",
+              textAlign: "left", color: C.accent, fontSize: 11, fontWeight: 700,
+              textTransform: "uppercase", letterSpacing: 1, fontFamily: "inherit",
+            }}>
+              {showAll ? "Réduire" : `Voir tout (${matchDates.length})`}
+            </button>
+          )}
         </div>
       )}
     </Card>

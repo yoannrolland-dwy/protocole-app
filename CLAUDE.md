@@ -3741,6 +3741,23 @@ façon limité (réponse contrainte à un schéma JSON de plats, validée par l'
 ajout au journal). Non testé avec un vrai appel API — sur une carte normale, le comportement
 attendu est « aucun changement ». Build `apps/perso` ET `apps/public` propres.
 
+## Planning Basket — saison chargée, liste repliée (30/09/2026, apps/perso v3.84.3)
+
+- **Les 22 dates de match de la saison 2026-2027** (calendrier fourni en image par Yoann, toutes
+  un dimanche, du 04/10/2026 au 13/06/2027) ont été injectées directement dans `basketSchedule.
+  matchDates` de l'app native via `adb` + Chrome DevTools Protocol, sans saisie manuelle —
+  méthode et piège (le `force-stop` immédiat perd l'écriture) documentés dans la mémoire
+  `project-native-localstorage-write`. Fusion avec l'existant (mercredi/vendredi + 20/09 déjà
+  saisi), rien écrasé ; persistance prouvée après un vrai redémarrage à froid.
+- **Carte « Planning Basket fixe » repliée par défaut** (`BasketScheduleCard`, App.jsx) : une
+  saison = 22 lignes, trop long dans les Réglages. Replié = les **3 prochains** matchs
+  seulement (les dates passées n'ont plus d'effet sur le recommandeur) ; « Voir tout (N) »
+  déplie la saison complète, dates passées en estompé (`C.dim`), « Réduire » referme. État
+  d'affichage local, aucune donnée touchée. Le texte de la carte a été corrigé au passage : il
+  promettait encore « le repos de 48 h le lendemain », gate retiré le 13/09/2026.
+- Testé dans l'aperçu avec les 23 dates seedées (replié : 3 lignes + bouton ; déplié : 23
+  lignes, 20/09 estompé, bouton « Réduire »), aucune erreur console. Build `apps/perso` propre.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.
