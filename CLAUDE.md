@@ -3757,6 +3757,15 @@ attendu est « aucun changement ». Build `apps/perso` ET `apps/public` propres.
   promettait encore « le repos de 48 h le lendemain », gate retiré le 13/09/2026.
 - Testé dans l'aperçu avec les 23 dates seedées (replié : 3 lignes + bouton ; déplié : 23
   lignes, 20/09 estompé, bouton « Réduire »), aucune erreur console. Build `apps/perso` propre.
+- **Dates passées purgées au chargement (v3.84.4, même jour)** : question posée à Yoann
+  (masquer en gardant la donnée vs supprimer) — **il a choisi la suppression** (« je ne vois
+  pas l'intérêt de garder des données inutiles »). Dans l'effet de chargement d'`App`, toute
+  date strictement antérieure à `today()` est retirée de `basketSchedule.matchDates` et la clé
+  réécrite seulement si quelque chose a été retiré (même pattern que la migration Leg curl).
+  Un match le jour même est conservé (`isMatchWeek` en a besoin le dimanche). L'estompage des
+  dates passées dans la carte, devenu sans objet, a été retiré. Conséquence assumée : plus
+  d'historique des matchs joués — un futur croisement Bilan « match ↔ douleur genou » devrait
+  s'appuyer sur les séances Basket loguées dans `trainingLog`, pas sur ce planning.
 
 ## Comment je veux qu'on travaille
 

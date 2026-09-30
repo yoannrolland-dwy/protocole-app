@@ -46,7 +46,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.84.3";
+const APP_VERSION = "3.84.4";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -2305,12 +2305,12 @@ function BasketScheduleCard({ basketSchedule, setBasketSchedule }) {
   };
   const removeMatch = (d) => setBasketSchedule({ ...basketSchedule, matchDates: matchDates.filter((x) => x !== d) });
   // Liste repliée par défaut (30/09/2026) : une saison entière = 22 dates, trop long à
-  // dérouler dans les Réglages. Replié = seulement les 3 prochains matchs (les dates passées
-  // n'ont plus aucun effet sur le recommandeur) ; "Voir tout" déplie la saison complète.
+  // dérouler dans les Réglages. Replié = seulement les 3 prochains matchs ; "Voir tout"
+  // déplie la saison complète. Aucune date passée ici : elles sont purgées au chargement
+  // (voir l'effet de chargement d'`App`), décision de Yoann — inutile de garder une donnée
+  // sans effet.
   const [showAll, setShowAll] = useState(false);
-  const t0 = today();
-  const upcoming = matchDates.filter((d) => d >= t0);
-  const shown = showAll ? matchDates : upcoming.slice(0, 3);
+  const shown = showAll ? matchDates : matchDates.slice(0, 3);
   const hiddenCount = matchDates.length - shown.length;
 
   return (
@@ -2349,7 +2349,7 @@ function BasketScheduleCard({ basketSchedule, setBasketSchedule }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {shown.map((d) => (
             <div key={d} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 2px", borderBottom: `1px solid ${C.divider}` }}>
-              <span style={{ fontSize: 12, color: d < t0 ? C.dim : C.text, fontFamily: C.mono }}>{fmt(d)}</span>
+              <span style={{ fontSize: 12, color: C.text, fontFamily: C.mono }}>{fmt(d)}</span>
               <button onClick={() => removeMatch(d)} style={{ background: "none", border: "none", cursor: "pointer", color: C.dim, padding: 4 }}>
                 <X size={13} />
               </button>
@@ -2729,7 +2729,17 @@ export default function App({ silent = false } = {}) {
       setPhaseState(await store.get("phase", "seche"));
       setHsrWeekState(await store.get("hsrWeek", 1));
       setClimbSchemeState(await store.get("climbScheme", "gym"));
-      setBasketScheduleState(await store.get("basketSchedule", { weekly: [], matchDates: [] }));
+      // Purge des dates de match passées (30/09/2026, décision explicite de Yoann) : une date
+      // passée n'a plus aucun effet (le recommandeur ne regarde que le dimanche à venir) et
+      // n'a pas à encombrer la liste des Réglages. Strictement antérieure à aujourd'hui : un
+      // match le jour même reste, `isMatchWeek` en a besoin le dimanche. La clé n'est réécrite
+      // que si quelque chose a été retiré — même pattern que la migration Leg curl ci-dessus.
+      const rawSchedule = await store.get("basketSchedule", { weekly: [], matchDates: [] });
+      const allMatches = rawSchedule.matchDates || [];
+      const futureMatches = allMatches.filter((d) => d >= today());
+      const purgedSchedule = futureMatches.length === allMatches.length ? rawSchedule : { ...rawSchedule, matchDates: futureMatches };
+      if (purgedSchedule !== rawSchedule) store.set("basketSchedule", purgedSchedule);
+      setBasketScheduleState(purgedSchedule);
       setApiKeyState(await store.get("apiKey", ""));
       setModelState(await store.get("model", "claude-sonnet-5"));
       // Profil : amorcé une seule fois avec les règles auparavant codées en dur, pour que
