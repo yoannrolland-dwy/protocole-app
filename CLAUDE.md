@@ -3965,9 +3965,10 @@ Premier retour après l'install : « ça me propose 210 g de protéines alors qu
   14 j), chaque étape réévaluée sur du réel. Discuté honnêtement : +200 kcal ≈ +37 g de
   glucides, quelques centaines de grammes d'eau au plus — mais un pas plus petit limite la
   correction si le déficit mesuré était surestimé.
-- **Point d'attention non tranché** : avec l'arrondi à 5 g (décision 10), un palier de +100
-  donne en réalité **+125 kcal** (+20 G = 80, +5 L = 45) — d'où le « 2925 » affiché pour des
-  cibles à 2800. Arrondir les lipides au gramme donnerait ~+102. À décider avec Yoann.
+- **Arrondi à 5 g conservé, tranché par Yoann** : un palier de +100 donne en réalité
+  **+125 kcal** (+20 G = 80, +5 L = 45) — d'où le « 2925 » affiché pour des cibles à 2800.
+  Alternative proposée (lipides au gramme, ≈ +98) refusée : « 2925 ça me va ». Ne pas
+  « corriger » sans nouvelle demande.
 - **Vérifié** : 15 assertions Node (`r3b-test.mjs`) + hash des 3 anciennes phases identique
   (capture post-R4) + aperçu rejouant exactement son scénario (210/270 → protéines 200 →
   recalcul « 200 P » → glucides 280 → historique vidé, pas d'observation, proposition sur les
