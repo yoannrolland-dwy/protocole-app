@@ -3,7 +3,7 @@
 // au jalon 5 (le recommandeur en avait besoin) ; le reste arrive au jalon 6. Pur, contenu
 // inchangé.
 
-import { today } from "./dateUtils.js";
+import { today, daysBetween, round } from "./dateUtils.js";
 import { resolveLog, totals, entriesFor } from "./nutrition/foodStore.js";
 import { computeTDEE, mergeKcalSeries } from "./tdee.js";
 
@@ -21,9 +21,36 @@ export const PHASES = {
   seche:       { label: "Sèche",       target: 93, msg: "Déficit modéré. Protéines hautes (≥ 2,2 g/kg) pour préserver le muscle en descendant vers 93 kg." },
   maintenance: { label: "Maintenance", target: null, msg: "Équilibre calorique. Protéines hautes maintenues. Poids cible éditable." },
   prise:       { label: "Prise",       target: 95, msg: "Léger surplus (~+10 %). Protéines hautes. Gain propre vers 95 kg (plafond de phase)." },
+  // Recomposition (chantier R, 02/10/2026) : perte de gras lente + prise de muscle. Phase
+  // AJOUTÉE, pas un renommage de Maintenance (apps/public lit PHASES, un compte stocké en
+  // "maintenance" planterait). `noTarget` : aucun poids cible, et surtout PAS de repli sur
+  // `weightMaintenance` — le pilotage se fait sur la moyenne glissante 7 j (voir
+  // `weightTrend7`), jamais sur un chiffre à atteindre.
+  recomposition: { label: "Recomposition", target: null, noTarget: true, msg: "Perte de gras lente + prise de muscle. Pas de poids cible : pilotage par la moyenne 7 j et le palier de la semaine." },
 };
 export const phaseTarget = (phase, targets) =>
-  PHASES[phase].target != null ? PHASES[phase].target : (targets.weightMaintenance ?? 96);
+  PHASES[phase].target != null ? PHASES[phase].target
+    : PHASES[phase].noTarget ? null
+    : (targets.weightMaintenance ?? 96);
+
+// Tendance de poids sur moyenne glissante 7 j (chantier R, 02/10/2026) : en Recomposition,
+// ces chiffres remplacent le poids cible partout (tuile Dashboard, onglet Poids, Coach IA).
+// Même calcul que `summary.poids` du Coach IA, qui l'utilise désormais — jamais deux
+// moyennes différentes pour la même réalité. Fenêtres en jours calendaires depuis `t0`
+// (0-6, 7-13, 14-20), moyenne des pesées présentes, `null` si aucune pesée dans la fenêtre.
+// `deltaWeek`/`deltaWeekPrev` = variation en kg d'une semaine à la suivante (positif = prise).
+export const weightTrend7 = (weight, t0 = today()) => {
+  const avg = (a, b) => {
+    const v = weight.filter((e) => { const d = daysBetween(e.date, t0); return d >= a && d <= b; }).map((e) => e.kg).filter((x) => x != null);
+    return v.length ? round(v.reduce((s, x) => s + x, 0) / v.length) : null;
+  };
+  const avg7 = avg(0, 6), avg7prev = avg(7, 13), avg7prev2 = avg(14, 20);
+  return {
+    avg7, avg7prev, avg7prev2,
+    deltaWeek: avg7 != null && avg7prev != null ? round(avg7 - avg7prev, 2) : null,
+    deltaWeekPrev: avg7prev != null && avg7prev2 != null ? round(avg7prev - avg7prev2, 2) : null,
+  };
+};
 
 // Fenêtre d'objectif temporaire : les cibles macro basculent automatiquement dedans, et
 // reviennent seules aux cibles de base une fois la date de fin passée. Lit `base.cut`, donc

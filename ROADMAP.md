@@ -15,7 +15,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | V5 | Escalade : suivi des blocs | moyen | ✅ 03/08/2026 (v3.47.0, cotations par couleur) |
 | V6 | Corriger les valeurs d'un aliment | petit | ✅ 03/08/2026 (v3.48.0, rétroactif) |
 | V7 | Dépense énergétique adaptative (TDEE calculé) | gros | ✅ 04/08/2026 (v3.49.0) |
-| R1 | Recomposition : nouvelle phase, fin du poids cible, pilotage par tendance 7 j | moyen | ⬜ spécifié le 02/10/2026 |
+| R1 | Recomposition : nouvelle phase, fin du poids cible, pilotage par tendance 7 j | moyen | ✅ 02/10/2026 (v3.85.0) |
 | R2 | Recomposition : zone de déficit dans l'onglet TDEE + historique des paliers | moyen | ⬜ |
 | R3 | Recomposition : « Palier de la semaine » (moteur + carte + Appliquer + coach) | gros | ⬜ |
 | R4 | Recomposition : bloc de règles Coach IA attaché à la phase | petit | ⬜ |

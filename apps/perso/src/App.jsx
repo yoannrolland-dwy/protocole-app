@@ -26,7 +26,7 @@ import { computeEnergyScore, computeSleepScore, scoreLabel } from "@rawcare/core
 import { computeFreeInsights } from "@rawcare/core/insights";
 import { computeBilanFacts } from "@rawcare/core/bilan";
 import { PHASES, phaseTarget as phaseTargetCore, DEFAULT_TARGETS, targetsForDate,
-         kcalFromMacros, kcalOfEntry, tdeeNow, weeklyKcalTrend, buildKcalByDate } from "@rawcare/core/targets";
+         kcalFromMacros, kcalOfEntry, tdeeNow, weeklyKcalTrend, buildKcalByDate, weightTrend7 } from "@rawcare/core/targets";
 import { buildCoachPrompt, buildCoachBriefing, buildBilanPrompt, splitCarnet, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
@@ -46,7 +46,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.84.4";
+const APP_VERSION = "3.85.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -236,7 +236,10 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
 function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule, weeklyPlan, matchWeek }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
-  const wDelta = wLast ? round(wLast.kg - tgtW) : null;
+  const wDelta = wLast && tgtW != null ? round(wLast.kg - tgtW) : null;
+  // Recomposition (chantier R) : pas de poids cible, la tuile montre la moyenne 7 j et son
+  // delta hebdo à la place (même calcul que l'onglet Poids et le Coach IA).
+  const wTrend = tgtW == null ? weightTrend7(weight, today()) : null;
 
   const lastNightDash = lastN(sleep, 1)[0];
   const energy = useMemo(() => computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps }), [rhr, sleep, steps, naps]);
@@ -267,8 +270,10 @@ function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, tra
   // 3 paires, toutes cliquables vers l'onglet correspondant.
   const tiles = [
     { label: "Poids", tab: "weight", val: wLast ? wLast.kg : "—", unit: "kg",
-      note: `cible ${tgtW}`, color: C.text,
-      extra: wDelta != null ? { txt: `${wDelta > 0 ? "▲" : "▼"}${Math.abs(wDelta)}`, col: wDelta > 0 ? C.danger : C.accent } : null },
+      note: tgtW != null ? `cible ${tgtW}` : `moy. 7 j ${wTrend?.avg7 ?? "—"}`, color: C.text,
+      extra: wDelta != null ? { txt: `${wDelta > 0 ? "▲" : "▼"}${Math.abs(wDelta)}`, col: wDelta > 0 ? C.danger : C.accent }
+        : wTrend?.deltaWeek != null ? { txt: `${wTrend.deltaWeek > 0 ? "▲" : "▼"}${Math.abs(wTrend.deltaWeek)}/sem`, col: wTrend.deltaWeek > 0 ? C.danger : C.accent }
+        : null },
     { label: "Pas", tab: "steps", val: stepsToday.toLocaleString("fr-FR"), unit: "",
       note: `/ ${STEPS_TARGET.toLocaleString("fr-FR")}`, color: C.text,
       bar: Math.min(100, (stepsToday / STEPS_TARGET) * 100) },
@@ -403,6 +408,11 @@ function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, tra
    ============================================================ */
 function WeightTab({ weight, targets, save, phase }) {
   const tgtW = phaseTarget(phase, targets);
+  // Recomposition (chantier R) : pas de cible, sous-titre et badge affichent la tendance 7 j.
+  const wTrend = tgtW == null ? weightTrend7(weight, today()) : null;
+  const trendLabel = wTrend?.avg7 != null
+    ? `moy. 7 j ${wTrend.avg7} kg${wTrend.deltaWeek != null ? ` · ${wTrend.deltaWeek > 0 ? "+" : ""}${wTrend.deltaWeek} kg/sem` : ""}`
+    : "moy. 7 j —";
   const [date, setDate] = useState(today());
   const cur = weight.find((w) => w.date === date);
   const [kg, setKg] = useState(lastN(weight, 1)[0]?.kg ?? 95);
@@ -415,12 +425,12 @@ function WeightTab({ weight, targets, save, phase }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader title="Poids" subtitle={`${PHASES[phase].label} · cible ${tgtW} kg`} />
+      <ScreenHeader title="Poids" subtitle={`${PHASES[phase].label} · ${tgtW != null ? `cible ${tgtW} kg` : trendLabel}`} />
 
       <Card style={{ padding: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
           <Label style={{ fontSize: 10, letterSpacing: 1.5 }}>Actuel</Label>
-          <span style={{ fontSize: 11, color: C.accent, fontWeight: 700 }}>cible {tgtW} kg</span>
+          <span style={{ fontSize: 11, color: C.accent, fontWeight: 700 }}>{tgtW != null ? `cible ${tgtW} kg` : trendLabel}</span>
         </div>
         <div style={{ margin: "6px 0 12px" }}><Big value={wLast ? wLast.kg : "—"} unit="kg" /></div>
         {data.length > 1 ? (
@@ -431,7 +441,7 @@ function WeightTab({ weight, targets, save, phase }) {
                 <XAxis dataKey="date" tick={chartAxis} interval="preserveEnd" />
                 <YAxis domain={["dataMin - 1", "dataMax + 1"]} tick={chartAxis} />
                 <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle} />
-                <ReferenceLine y={tgtW} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
+                {tgtW != null && <ReferenceLine y={tgtW} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />}
                 <Line type="monotone" dataKey="kg" stroke={C.text} strokeWidth={2} dot={{ r: 2, fill: C.text }} />
               </LineChart>
             </ResponsiveContainer>

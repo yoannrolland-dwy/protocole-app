@@ -211,7 +211,10 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
 
       <Card>
         <Label style={{ marginBottom: 8 }}>Phase</Label>
-        <Pills options={Object.entries(PHASES).map(([k, v]) => ({ key: k, label: v.label }))} value={phase} onChange={setPhase} small />
+        {/* "recomposition" (chantier R apps/perso, 02/10/2026) masquée ici pour l'instant :
+            `phaseTarget` local retomberait sur 96 kg et l'UI publique ne gère pas un poids
+            cible null. À ouvrir si un bêta-testeur le demande, pas par réflexe. */}
+        <Pills options={Object.entries(PHASES).filter(([k]) => k !== "recomposition").map(([k, v]) => ({ key: k, label: v.label }))} value={phase} onChange={setPhase} small />
         <Body style={{ marginTop: 8, fontSize: 11 }}>{PHASES[phase].msg}</Body>
       </Card>
 

@@ -13,7 +13,7 @@ import { recommendSessions } from "../recommender.js";
 import { buildZones, DEFAULT_ZONES } from "../pain.js";
 import { exoProgress } from "../training.js";
 import { climbSummary } from "../climbing.js";
-import { PHASES, phaseTarget, targetsForDate, kcalFromMacros, kcalOfEntry, isCutWindow, tdeeNow } from "../targets.js";
+import { PHASES, phaseTarget, targetsForDate, kcalFromMacros, kcalOfEntry, isCutWindow, tdeeNow, weightTrend7 } from "../targets.js";
 import { realDeficit } from "../tdee.js";
 import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor } from "../nutrition/foodStore.js";
 
@@ -108,9 +108,17 @@ export function buildCoachPrompt(data, note) {
   // Macros (`tdeeNow`) — jamais deux chiffres différents pour la même réalité.
   const tdeeResult = tdeeNow({ foodLog, overrides: foodOverrides, macros, weight, targets });
   const tgtW = phaseTarget(phase, targets);
+  // Recomposition (chantier R, 02/10/2026) : pas de poids cible, le system l'annonce et donne
+  // le mode de pilotage à la place. Les 3 autres phases gardent leur phrase à l'identique.
+  const phaseClause = tgtW != null
+    ? `Phase ${PHASES[phase].label}, poids cible ${tgtW} kg.`
+    : `Phase ${PHASES[phase].label} — pas de poids cible, pilotage par la moyenne glissante 7 j (et son delta d'une semaine à l'autre).`;
   const win = (arr, a, b) => arr.filter((e) => { const d = daysBetween(e.date, today()); return d >= a && d <= b; });
   const avgKey = (arr, k) => { const v = arr.map((e) => e[k]).filter((x) => x != null); return v.length ? round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
-  const w7 = avgKey(win(weight, 0, 6), "kg"), w14 = avgKey(win(weight, 7, 13), "kg");
+  // Moyennes 7 j du poids : même fonction que la tuile Dashboard / l'onglet Poids
+  // (`weightTrend7`, chantier R) — valeurs identiques à l'ancien calcul local `avgKey`.
+  const wt = weightTrend7(weight, today());
+  const w7 = wt.avg7, w14 = wt.avg7prev;
   const m7 = win(macros, 0, 6);
   const sessCount = (a, b) => { const o = {}; win(training, a, b).forEach((t) => { o[t.type] = (o[t.type] || 0) + 1; }); return o; };
   // Verdict du recommandeur ("Prochaine séance") : recalculé ici avec les mêmes données,
@@ -244,7 +252,10 @@ export function buildCoachPrompt(data, note) {
 
   const summary = {
     phase: PHASES[phase].label, poids_cible: tgtW,
-    poids: { dernier: lastN(weight, 1)[0]?.kg ?? null, moy_7j: w7, moy_7j_precedents: w14, tendance_kg_sur_semaine: (w7 != null && w14 != null) ? round(w7 - w14) : null },
+    poids: { dernier: lastN(weight, 1)[0]?.kg ?? null, moy_7j: w7, moy_7j_precedents: w14, tendance_kg_sur_semaine: (w7 != null && w14 != null) ? round(w7 - w14) : null,
+      // 3e semaine seulement en Recomposition (règle "perte > 0,3 kg/sem sur 2 semaines") —
+      // ajoutée aux autres phases, elle changerait leur prompt, vérifié identique par hash.
+      ...(PHASES[phase].noTarget ? { moy_7j_il_y_a_2_sem: wt.avg7prev2, tendance_kg_sem_precedente: wt.deltaWeekPrev } : {}) },
     macros_moy_7j: { proteines: avgKey(m7, "protein"), glucides: avgKey(m7, "carbs"), lipides: avgKey(m7, "fat"), fibres: avgKey(m7, "fiber"), eau_ml: avgKey(m7, "water") },
     cibles: { proteines: atToday.protein, glucides: atToday.carbs, lipides: atToday.fat, fibres: atToday.fiber, eau_ml: targets.water },
     // Sommeil et genou : ces agrégats remplacent les tableaux bruts 14 j qui étaient
@@ -320,7 +331,7 @@ ${profile.trim()}` : "";
   // `identity` (RawCare, chantier Coach IA public) : remplace la clause nommée "de Yoann,
   // 43 ans, athlète (...)" — absente pour apps/perso, comportement identique à avant.
   const who = identity ?? "de Yoann, 43 ans, athlète (muscu/basket/escalade)";
-  const system = `Tu es le coach personnel tout-en-un ${who} : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. Phase ${PHASES[phase].label}, poids cible ${tgtW} kg. ${tendinopathiesClause}Protéines hautes prioritaires. Escalade = volume tirage, jamais empilée le jour d'un Upper ; ne pas cumuler les expositions genou.${tempBlock}${profileBlock}`;
+  const system = `Tu es le coach personnel tout-en-un ${who} : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. ${phaseClause} ${tendinopathiesClause}Protéines hautes prioritaires. Escalade = volume tirage, jamais empilée le jour d'un Upper ; ne pas cumuler les expositions genou.${tempBlock}${profileBlock}`;
 
   // Le paragraphe sur l'échelle de cotation dépend du schéma actif (RawCare Phase 1,
   // 06/08/2026) : "gym" est propre à la salle de l'utilisateur, donc l'explication complète
@@ -374,6 +385,10 @@ Puis, APRÈS ta conclusion, écris la ligne \`${CARNET_MARK}\` seule, et en dess
  */
 export function buildBilanPrompt({ facts, phase, targets, profile, identity, notes }) {
   const tgtW = phaseTarget(phase, targets);
+  // Même clause de phase que le prompt quotidien (Recomposition = pas de poids cible).
+  const phaseClause = tgtW != null
+    ? `Phase ${PHASES[phase].label}, poids cible ${tgtW} kg.`
+    : `Phase ${PHASES[phase].label} — pas de poids cible, pilotage par la moyenne glissante 7 j (et son delta d'une semaine à l'autre).`;
   // Seules les clauses de rééduc servent ici (pas l'état du jour, hors sujet pour un bilan
   // long terme) — `{}` en logs suffit, `zoneState` retombe sur un état neutre inutilisé.
   const zonesForCoach = buildZones(DEFAULT_ZONES, {}, today());
@@ -425,7 +440,7 @@ export function buildBilanPrompt({ facts, phase, targets, profile, identity, not
 
 CONTEXTE PERMANENT écrit par ${authorLabel} — à traiter comme des contraintes, pas des suggestions :
 ${profile.trim()}` : "";
-  const system = `Tu es le coach personnel tout-en-un ${who} : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. Phase ${PHASES[phase].label}, poids cible ${tgtW} kg. ${tendinopathiesClause}${profileBlock}`;
+  const system = `Tu es le coach personnel tout-en-un ${who} : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. ${phaseClause} ${tendinopathiesClause}${profileBlock}`;
 
   // Notes de contexte sur la fenêtre du bilan (pas seulement 14 jours comme le prompt
   // quotidien) : sur 3 mois, c'est la récurrence qui est le signal ("insomnie" notée 6 fois

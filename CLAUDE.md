@@ -3767,6 +3767,48 @@ attendu est « aucun changement ». Build `apps/perso` ET `apps/public` propres.
   d'historique des matchs joués — un futur croisement Bilan « match ↔ douleur genou » devrait
   s'appuyer sur les séances Basket loguées dans `trainingLog`, pas sur ce planning.
 
+## Chantier R — Recomposition corporelle, R1 : phase + fin du poids cible (02/10/2026, apps/perso v3.85.0)
+
+Spec complète et décisions dans `ROADMAP.md` (section « Chantier R », 12 décisions prises
+par question explicite le 02/10/2026 — ne pas les rouvrir sans raison). R1 = premier des
+4 lots.
+
+- **`PHASES.recomposition`** (`packages/core/src/targets.js`) : phase **ajoutée**, pas un
+  renommage de `maintenance` (apps/public lit `PHASES`, un compte stocké en `"maintenance"`
+  planterait). `target: null, noTarget: true` → `phaseTarget()` renvoie **`null`** pour cette
+  phase, sans repli sur `weightMaintenance` (contrairement à Maintenance). Le `phaseTarget`
+  local d'`App.jsx` (surcouche sèche/prise éditables) hérite de ce `null` sans changement.
+- **`weightTrend7(weight, t0)`** (nouveau, `targets.js`) : moyennes 7 j (`avg7`), semaine
+  précédente (`avg7prev`), il y a 2 semaines (`avg7prev2`), et deltas hebdo à 2 décimales.
+  **Une seule fonction pour l'UI et le Coach IA** : `prompt.js` l'utilise désormais pour ses
+  `w7`/`w14` (mêmes valeurs que l'ancien `avgKey` local — vérifié par hash).
+- **Affichage sans poids cible** (`App.jsx`) : tuile Dashboard Poids → note « moy. 7 j X »
+  + extra « ▲/▼ Y/sem » ; onglet Poids → sous-titre et badge « moy. 7 j X kg · ±Y kg/sem »,
+  `ReferenceLine` masquée (`tgtW != null &&`). Carte Phase des Réglages : « Recomposition »
+  apparaît automatiquement dans les Pills (dérivées de `PHASES`), aucun Stepper de poids
+  cible pour elle, son `msg` explique le pilotage.
+- **Coach IA** (`coach/prompt.js`, quotidien ET bilan) : `phaseClause` remplace « Phase X,
+  poids cible N kg » par « Phase Recomposition — pas de poids cible, pilotage par la moyenne
+  glissante 7 j (et son delta d'une semaine à l'autre) » quand `tgtW` est null.
+  `summary.poids` gagne `moy_7j_il_y_a_2_sem` et `tendance_kg_sem_precedente` **en
+  recomposition seulement** — précision de spec prise en implémentant : les ajouter aux
+  autres phases aurait changé leur prompt, contraire à l'exigence de non-régression.
+- **`apps/public`** : « recomposition » filtrée du Pills Phase de `Onboarding.jsx` (décision 1
+  de la spec — son `phaseTarget` local retomberait sur 96 kg et son UI ne gère pas un
+  `null`). À ouvrir sur demande d'un bêta-testeur, pas par réflexe.
+- **Vérifié** : script Node (`r1-baseline.mjs`, scratchpad) capturant les hash sha256 de
+  `system`/`user`/bilan pour sèche/maintenance/prise, `heure_analyse` normalisée (sinon deux
+  captures à des minutes d'écart divergent — piège rencontré au premier essai), code
+  d'origine restauré via `git stash` pour la capture « avant » : **identiques au caractère
+  près**. Aperçu (21 pesées seedées, phase recomposition) : badge, tuile « ▼0.2/sem · MOY.
+  7 J 94.3 », onglet Poids « Recomposition · moy. 7 j 94.3 kg · -0.2 kg/sem », aucune
+  occurrence de « cible », `ReferenceLine` absente ; phase Prise → « cible 95 kg » et
+  `ReferenceLine` présente (en Sèche elle est absente parce que 93 kg est hors de la plage Y
+  du graphique seedé, pas à cause du changement) ; aucune erreur console. Build `apps/perso`
+  ET `apps/public` propres.
+- **Non fait (lots suivants)** : zone de recomposition TDEE + `targetHistory` (R2), « Palier
+  de la semaine » (R3), bloc de règles coach attaché à la phase (R4).
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.
