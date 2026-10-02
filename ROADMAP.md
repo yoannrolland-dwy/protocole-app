@@ -15,6 +15,10 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | V5 | Escalade : suivi des blocs | moyen | ✅ 03/08/2026 (v3.47.0, cotations par couleur) |
 | V6 | Corriger les valeurs d'un aliment | petit | ✅ 03/08/2026 (v3.48.0, rétroactif) |
 | V7 | Dépense énergétique adaptative (TDEE calculé) | gros | ✅ 04/08/2026 (v3.49.0) |
+| R1 | Recomposition : nouvelle phase, fin du poids cible, pilotage par tendance 7 j | moyen | ⬜ spécifié le 02/10/2026 |
+| R2 | Recomposition : zone de déficit dans l'onglet TDEE + historique des paliers | moyen | ⬜ |
+| R3 | Recomposition : « Palier de la semaine » (moteur + carte + Appliquer + coach) | gros | ⬜ |
+| R4 | Recomposition : bloc de règles Coach IA attaché à la phase | petit | ⬜ |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il
 alimente le recommandeur + le Coach IA. V2 tôt parce que c'est une protection, pas
@@ -480,3 +484,190 @@ du poids et des apports, alors que le JS peut le lui donner exact.
 - **Photos de progression** et **tour de taille** : alignés avec l'objectif visuel
   du profil coach, mais pas retenus dans cette vague. Les photos imposeraient un
   stockage hors localStorage et hors export JSON (sinon la sauvegarde explose).
+
+---
+
+# Chantier R — Recomposition corporelle (spécifié le 02/10/2026)
+
+Yoann passe de Maintenance à une **recomposition corporelle** (perte de gras lente + prise
+de muscle). Point de départ : prompt rédigé par son suivi IA dans une autre conversation,
+challengé point par point dans Claude Code, puis 7 décisions prises par question explicite.
+Quatre lots, chacun buildé, testé (Node + aperçu), commité sur `dev` et documenté dans
+`CLAUDE.md` avant le suivant ; install native à la fin. Pour lancer : « GO R1 ».
+
+État au 02/10/2026 : cibles réelles 2800 kcal / 210 P / 270 G / 90 L (Yoann passera les
+protéines à 200 lui-même sous quelques jours — l'app ne touche jamais aux cibles toute seule).
+
+## Décisions prises (ne pas rouvrir sans raison)
+
+1. **Ajouter une phase `recomposition`, PAS renommer `maintenance`.** `PHASES` est dans
+   `packages/core` et `apps/public` le lit (`Onboarding.jsx` construit ses Pills dessus,
+   `defaultTargets.js` lit `PHASES[phase]`) : renommer la clé planterait tout compte public
+   stocké en `"maintenance"`. Additif, zéro migration. **Masquée du picker `apps/public`
+   pour l'instant** (son `phaseTarget` local retomberait sur 96 kg et son UI ne gère pas un
+   poids cible `null`) — à ouvrir plus tard si un bêta-testeur le demande, pas par réflexe.
+2. **Aucun poids cible en recomposition.** `PHASES.recomposition.target = null` ET pas de
+   repli sur `weightMaintenance` (contrairement à Maintenance) : `phaseTarget()` renvoie
+   `null`. Le pilotage se fait sur la **moyenne glissante 7 j** et son delta vs la semaine
+   précédente (déjà calculés pour le coach : `summary.poids.moy_7j` /
+   `moy_7j_precedents` / `tendance_kg_sur_semaine`). Ajouter la 3e semaine (`moy_7j` d'il
+   y a 2 semaines) pour que « perte > 0,3 kg/sem sur 2 semaines » soit vérifiable.
+3. **Les cibles ne sont jamais modifiées automatiquement.** Le coach juge les protéines sur
+   la moyenne hebdomadaire **contre la cible réelle de l'app** (`cibles.proteines`, déjà
+   transmise) — aucun « ~200 g » codé en dur.
+4. **Zone de recomposition = apports RÉELS moyens − dépense, sur 14 j ET 21 j.** Pas
+   `realDeficit` (= cible du jour − dépense, le déficit *prévu*, pas celui *réalisé*) et pas
+   le 7 j (trop bruité, déjà marqué « indicatif » depuis v3.84.0). Barème : surplus (≤ 0) =
+   hors objectif ; 0-100 = sous la zone ; **100-300 = visée** ; 300-500 = haut ; > 500 = trop
+   élevé pour gagner du muscle (Murphy & Koehler 2022). Les deux fenêtres sont affichées
+   côte à côte ; si elles ne sont pas dans la même zone, le dire plutôt que choisir.
+5. **Sommeil : la règle short sleeper du 13-17/08/2026 est conservée.** Le prompt d'origine
+   voulait piloter sur la durée et ignorer « la qualité Samsung Health » — erreur de
+   contexte : le score n'est pas celui de Samsung, il est calculé nativement depuis les
+   phases Health Connect (efficacité + temps endormi). En recomposition, le sommeil devient
+   un levier de récupération prioritaire **jugé sur le score qualité/sommeil, jamais sur
+   la durée**. Recommandeur et score d'énergie inchangés.
+6. **Règles coach : partage code / profil.** Dans le code, attaché à la phase (s'active en
+   Recomposition, disparaît en changeant de phase, comme le bloc sèche `tempBlock`) : tout
+   ce qui est structurel (voir R4). Dans le contexte permanent (Réglages, sans rebuild) :
+   le texte d'objectif personnel. Les seuils chiffrés (kg/sem, taille des paliers) vivent
+   dans le moteur R3 — ils sont des constantes documentées, pas du texte libre.
+7. **Historique des paliers automatique** (`targetHistory`, nouvelle clé `DATA_KEYS`) : le
+   coach ne peut pas appliquer « ignorer la hausse de poids 2 semaines après une hausse »
+   sans savoir QUAND les cibles ont changé — l'app ne stocke que les cibles actuelles.
+   Alimenté par `saveTargets` (si les kcal de base changent) et par le bouton « Appliquer »
+   de R3. Pas d'amorçage à la date du jour (ça créerait à tort une période d'observation).
+8. **« Palier de la semaine » = module séparé, PAS le recommandeur de séance.** « Prochaine
+   séance » répond à « que fais-je aujourd'hui », ceci à « combien je mange cette semaine ».
+   `packages/core/src/palier.js`, pur, même verdict transmis au Coach IA (jamais deux avis).
+9. **Proposition FIGÉE par semaine** : calculée une fois le dimanche à partir de 14 h
+   (locale), stockée, affichée toute la semaine suivante. Jamais un chiffre recalculé chaque
+   jour au gré du bruit de la balance. Bouton **« Appliquer »** = un tap pour écrire les
+   cibles + l'entrée `targetHistory`. Rien ne change sans ce tap.
+10. **Répartition d'un palier : 75 % glucides / 25 % lipides**, arrondis à 5 g, protéines
+    et fibres jamais touchées. Pas plus de ±200 kcal par palier.
+11. **Pas de notification dimanche 14 h** (Yoann ouvre l'app tous les jours ; notifs
+    proactives déjà écartées le 07/09/2026). Carte sur le **Dashboard, sous « Constats »**.
+12. Tendinopathies, Silbernagel, règles escalade/basket, planning hebdo, recommandeur de
+    séance : **rien ne bouge**.
+
+## R1 — Phase « Recomposition », fin du poids cible
+
+### Ce qui change
+- `packages/core/src/targets.js` : `PHASES.recomposition = { label: "Recomposition",
+  target: null, noFallback: true, msg: "Perte de gras lente + prise de muscle. Pas de poids
+  cible : pilotage par la moyenne 7 j et le palier de la semaine." }`. `phaseTarget()`
+  renvoie `null` pour cette phase (pas de repli `weightMaintenance`).
+- `apps/perso/src/App.jsx` : `phaseTarget` local idem. Partout où `tgtW` est affiché, un
+  `null` affiche à la place **« moy. 7 j X kg · ±Y kg/sem »** : sous-titre de l'onglet
+  Poids, `ReferenceLine` du graphique (masquée), tuile Dashboard, carte Phase des Réglages
+  (aucun Stepper de poids cible pour cette phase, le `msg` explique).
+- `packages/core/src/coach/prompt.js` (quotidien ET bilan) : `"Phase X, poids cible N kg"`
+  devient, si `tgtW == null`, `"Phase Recomposition — pas de poids cible, pilotage par la
+  moyenne glissante 7 j"`. `summary.poids` gagne `moy_7j_il_y_a_2_sem` et
+  `tendance_kg_sem_precedente`.
+- `apps/public/src/Onboarding.jsx` : Pills filtrées sur `k !== "recomposition"` (décision 1).
+
+### Pièges
+- `insights.js` (projection fin de sèche) dépend de `targets.cut`, pas de la phase : rien à
+  toucher. `recommender.js` lit `isCutWindow`, pas la phase : rien à toucher.
+- Le prompt pour `seche`/`maintenance`/`prise` doit rester **identique au caractère près**
+  (vérifier par hash avant/après, méthode Phase 0).
+
+### Tests attendus
+- Aperçu, phase = recomposition : aucun « cible », tendance 7 j affichée partout, Réglages
+  sans Stepper de poids cible. Phase = sèche : strictement comme avant.
+- Script Node : `buildCoachPrompt` identique pour les 3 anciennes phases ; pour
+  recomposition, `system` sans « poids cible », `summary.poids` avec les 3 semaines.
+
+## R2 — Zone de recomposition (onglet TDEE) + `targetHistory`
+
+### Ce qui change
+- `packages/core/src/tdee.js` : `computeTDEE`/`tdeeOverWindow` exposent `intakeMean`
+  (déjà calculé en interne, jamais renvoyé). Nouvelle `recompZone(deficit)` → `{ zone, label }`
+  selon le barème de la décision 4 (`deficit = tdee − intakeMean`, positif = déficit).
+- `TdeeCard` (App.jsx) : section « Zone de recomposition », visible seulement en phase
+  recomposition — deux lignes 14 j / 21 j (via `tdeeOverWindow`) avec badge coloré
+  (accent = visée, ambre = haut / sous la zone, danger = trop élevé / surplus), et une phrase
+  si les deux fenêtres divergent. La ligne « déficit vs cible » existante reste.
+- Coach : `summary.depense_estimee.recomposition = { j14: {deficit_reel, zone}, j21: {...} }`
+  en phase recomposition seulement.
+- `store.js` : `targetHistory` dans `DATA_KEYS`, forme `[{ date, kcal, protein, carbs, fat,
+  fiber, source: "manual" | "palier" }]`. `saveTargets` ajoute une entrée si les kcal de
+  base (`kcalFromMacros` des 4 macros) diffèrent de la dernière entrée. Transmis au coach
+  (`summary.paliers`, 90 j max) avec la consigne « ignorer une hausse de poids dans les 14 j
+  qui suivent une hausse de kcal ».
+
+### Tests attendus
+- Node : `recompZone` sur chaque seuil et sur les bornes exactes (0, 100, 300, 500).
+- Aperçu : historique synthétique où 14 j et 21 j tombent dans des zones différentes → phrase
+  de divergence ; changer les cibles dans les Réglages crée une entrée `targetHistory`,
+  resauvegarder sans changer les kcal n'en crée pas.
+
+## R3 — « Palier de la semaine »
+
+### Moteur (`packages/core/src/palier.js`, pur, testable en Node)
+`recommendTargets({ today, phase, targets, weight, tdee14, tdee21, targetHistory,
+loggedRate7 })` → `{ weekOf, action: "hold" | "up" | "down", deltaKcal, proposed: { protein,
+carbs, fat, fiber, kcal }, reasons: [...], blocked: null | raison }`.
+- **Observation** : si la dernière entrée `targetHistory` a moins de 14 jours → `hold`,
+  raison « observation J+N/14 » (bloquant, prime sur tout le reste).
+- **Données** : `loggedRate7 < 0,7`, ou 14 j/21 j indisponibles, ou dans des zones non
+  adjacentes → `hold` avec la raison. Jamais un chiffre inventé.
+- **Hausse** : déficit réel (14 j et 21 j d'accord) entre 300 et 500 → +150 ; > 500 → +200 ;
+  OU perte > 0,3 kg/sem sur les 2 dernières semaines (`moy_7j` vs `moy_7j_precedents` vs
+  il y a 2 sem) → +150.
+- **Baisse** : moyenne 7 j en hausse 2-3 semaines de suite, ou surplus → −100.
+- **Sinon** : `hold`, « zone visée, maintenir ».
+- Répartition : décision 10. Plafond ±200. Constantes nommées en tête de fichier.
+- `weekOf` = lundi suivant le dimanche 14 h courant (arithmétique locale, famille
+  `shiftDateKey`, jamais UTC).
+
+### Figement + carte
+- Nouvelle clé `palierWeekly` (`DATA_KEYS`) : `{ weekOf, computedAt, result, appliedAt }`.
+  Au chargement/retour au premier plan : si `now ≥ dimanche 14 h` et aucune entrée pour le
+  `weekOf` à venir → calculer et stocker. Avant dimanche 14 h : afficher l'entrée de la
+  semaine en cours, ou « Première proposition dimanche à 14 h ».
+- `PalierCard` (Dashboard, sous `InsightsCard`) : titre « Palier de la semaine du lundi X »,
+  verdict + raisons chiffrées, cibles proposées vs actuelles, bouton **Appliquer** (écrit
+  `targets` + `targetHistory` source `"palier"`, puis « Appliqué ✓ »). Un `hold` n'a pas de
+  bouton. Visible seulement en phase recomposition.
+- Coach : `summary.palier_semaine` (verdict + appliqué ou non) + consigne : commenter /
+  nuancer ce verdict, ne pas en inventer un autre (même contrat que `recommandeur`).
+
+### Pièges
+- Dimanche après un match : poids du matin déshydraté — la moyenne 7 j l'absorbe, c'est
+  précisément pourquoi aucun poids isolé n'entre dans le moteur.
+- Ne pas recalculer si l'app est ouverte plusieurs fois le dimanche : idempotent par `weekOf`.
+- « Appliquer » doit passer par `saveTargets` (une seule voie d'écriture des cibles).
+
+### Tests attendus
+- Node (≥ 8 scénarios) : perte 0,4 kg/sem × 2 → +150 ; déficit 600 → +200 ; poids en hausse
+  3 sem → −100 ; observation J+9 → hold même avec déficit 600 ; 60 % loggé → hold ; 14 j
+  « visée » / 21 j « trop » → hold divergence ; répartition +150 → +30 G / +5 L (arrondis) ;
+  `weekOf` à dimanche 13 h 59 vs 14 h 01.
+- Aperçu : historique synthétique, horloge réelle — vérifier l'état « avant dimanche 14 h »
+  et un figement forcé (seed `palierWeekly`), bouton Appliquer → cibles changées, entrée
+  `targetHistory` créée, carte en « Appliqué ✓ », Coach IA (`buildBriefing`) montrant le
+  même verdict.
+
+## R4 — Bloc de règles Coach IA attaché à la phase
+
+`PHASES.recomposition.coach` (texte) injecté dans le `system` quotidien ET bilan quand
+`phase === "recomposition"`, à la place du « poids cible » :
+- pas de poids cible, pilotage moy. 7 j ; un poids stable n'est **jamais** un échec (le corps
+  change sans que la balance bouge) ;
+- déficit visé 100-300 kcal/j réels ; ~500 empêche les gains de masse maigre (Murphy &
+  Koehler 2022) ; une progression en force seule ne prouve pas une prise de muscle ;
+- après chaque hausse de kcal (dates dans `paliers`), ignorer une petite hausse de poids
+  pendant 14 j (eau/glycogène) ;
+- surcharge progressive jugée surtout sur le haut du corps ; presse à cuisses et leg
+  extension suivent le protocole HSR, volontairement plafonnés par la rééduc du genou — une
+  stagnation là-dessus n'est pas un problème à signaler (`progressiveOverloadSuggestion` les
+  exclut déjà, mais `exoProgress` les montre encore au coach) ;
+- protéines jugées sur la moyenne hebdo contre la cible de l'app ; un dépassement ponctuel
+  sans dépassement calorique n'est pas un problème ;
+- sommeil = levier de récupération prioritaire, jugé sur le score qualité/sommeil, jamais sur
+  la durée (short sleeper) ;
+- s'appuyer sur `palier_semaine` et `depense_estimee.recomposition` plutôt que recalculer.
+Vérifier par hash que les 3 autres phases produisent un prompt identique.
