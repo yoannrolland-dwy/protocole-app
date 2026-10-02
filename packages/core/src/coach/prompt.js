@@ -110,9 +110,12 @@ export function buildCoachPrompt(data, note) {
   const tgtW = phaseTarget(phase, targets);
   // Recomposition (chantier R, 02/10/2026) : pas de poids cible, le system l'annonce et donne
   // le mode de pilotage à la place. Les 3 autres phases gardent leur phrase à l'identique.
+  // R4 : les règles attachées à la phase (`PHASES[phase].coach`, targets.js) suivent la clause,
+  // plus le renvoi aux champs du prompt QUOTIDIEN (`palier_semaine`, `depense_estimee.
+  // recomposition`) que le bilan n'a pas — d'où la phrase ajoutée ici et pas dans `coach`.
   const phaseClause = tgtW != null
     ? `Phase ${PHASES[phase].label}, poids cible ${tgtW} kg.`
-    : `Phase ${PHASES[phase].label} — pas de poids cible, pilotage par la moyenne glissante 7 j (et son delta d'une semaine à l'autre).`;
+    : `Phase ${PHASES[phase].label} — pas de poids cible, pilotage par la moyenne glissante 7 j (et son delta d'une semaine à l'autre).${PHASES[phase].coach ? ` ${PHASES[phase].coach} Appuie-toi sur \`palier_semaine\` et \`depense_estimee.recomposition\` (déjà calculés) plutôt que de recalculer.` : ""}`;
   const win = (arr, a, b) => arr.filter((e) => { const d = daysBetween(e.date, today()); return d >= a && d <= b; });
   const avgKey = (arr, k) => { const v = arr.map((e) => e[k]).filter((x) => x != null); return v.length ? round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
   // Moyennes 7 j du poids : même fonction que la tuile Dashboard / l'onglet Poids
@@ -417,10 +420,12 @@ Puis, APRÈS ta conclusion, écris la ligne \`${CARNET_MARK}\` seule, et en dess
  */
 export function buildBilanPrompt({ facts, phase, targets, profile, identity, notes }) {
   const tgtW = phaseTarget(phase, targets);
-  // Même clause de phase que le prompt quotidien (Recomposition = pas de poids cible).
+  // Même clause de phase que le prompt quotidien (Recomposition = pas de poids cible), avec les
+  // règles R4 attachées à la phase — sans le renvoi aux champs `palier_semaine`/
+  // `depense_estimee.recomposition`, absents du bilan.
   const phaseClause = tgtW != null
     ? `Phase ${PHASES[phase].label}, poids cible ${tgtW} kg.`
-    : `Phase ${PHASES[phase].label} — pas de poids cible, pilotage par la moyenne glissante 7 j (et son delta d'une semaine à l'autre).`;
+    : `Phase ${PHASES[phase].label} — pas de poids cible, pilotage par la moyenne glissante 7 j (et son delta d'une semaine à l'autre).${PHASES[phase].coach ? ` ${PHASES[phase].coach}` : ""}`;
   // Seules les clauses de rééduc servent ici (pas l'état du jour, hors sujet pour un bilan
   // long terme) — `{}` en logs suffit, `zoneState` retombe sur un état neutre inutilisé.
   const zonesForCoach = buildZones(DEFAULT_ZONES, {}, today());

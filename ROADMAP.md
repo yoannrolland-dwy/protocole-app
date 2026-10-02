@@ -18,7 +18,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | R1 | Recomposition : nouvelle phase, fin du poids cible, pilotage par tendance 7 j | moyen | ✅ 02/10/2026 (v3.85.0) |
 | R2 | Recomposition : zone de déficit dans l'onglet TDEE + historique des paliers | moyen | ✅ 02/10/2026 (v3.86.0) |
 | R3 | Recomposition : « Palier de la semaine » (moteur + carte + Appliquer + coach) | gros | ✅ 02/10/2026 (v3.87.0) |
-| R4 | Recomposition : bloc de règles Coach IA attaché à la phase | petit | ⬜ |
+| R4 | Recomposition : bloc de règles Coach IA attaché à la phase | petit | ✅ 02/10/2026 (v3.88.0) |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il
 alimente le recommandeur + le Coach IA. V2 tôt parce que c'est une protection, pas

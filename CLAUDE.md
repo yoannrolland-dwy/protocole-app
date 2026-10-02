@@ -3906,6 +3906,47 @@ toute seule** : seul le bouton « Appliquer » écrit.
   les kcal) créera une entrée `targetHistory` → le premier vrai palier ne pourra être proposé
   que 14 jours plus tard. Voulu (période d'observation), pas un bug.
 
+## Chantier R — R4 : bloc de règles Coach IA attaché à la phase (02/10/2026, apps/perso v3.88.0)
+
+Dernier lot du chantier R. Partage code/profil décidé par Yoann : le STRUCTUREL vit dans le
+code attaché à la phase, les chiffres personnels dans le moteur `palier.js` (constantes
+documentées), le texte d'objectif dans son contexte permanent (Réglages, sans rebuild).
+
+- **`PHASES.recomposition.coach`** (`packages/core/src/targets.js`) : texte injecté dans le
+  `system` du Coach IA **quotidien ET bilan** via `phaseClause` (`prompt.js`), tant que la
+  phase est active — disparaît en changeant de phase, comme le bloc sèche. Contenu : tendance
+  sur la moyenne 7 j (jamais un poids isolé) ; un poids stable n'est JAMAIS un échec ; déficit
+  visé 100-300 kcal/j réels ; ~500 kcal/j bloque les gains de masse maigre (Murphy & Koehler
+  2022) ; force seule ≠ prise de muscle ; 14 j d'observation après une hausse (eau/glycogène) ;
+  surcharge progressive jugée surtout sur le haut du corps, presse/leg extension plafonnés par
+  le protocole HSR (pas un problème à signaler) ; protéines sur la moyenne hebdo contre la
+  cible de l'app ; sommeil = levier prioritaire **jugé sur le score qualité, jamais la durée**
+  (short sleeper — décision 5 de la spec, règle du 13-17/08/2026 conservée).
+- Le renvoi « Appuie-toi sur `palier_semaine` et `depense_estimee.recomposition` » n'est ajouté
+  que dans le prompt QUOTIDIEN (le bilan n'a pas ces champs — ne pas pointer vers des données
+  absentes).
+- **Texte propre à Yoann dans un fichier partagé** (HSR genou, short sleeper) : acceptable
+  parce que la phase est masquée du picker `apps/public` (R1) — un bêta-testeur ne peut pas
+  l'atteindre. Si la phase est un jour ouverte au public, ce bloc devra être généralisé (comme
+  `identity`/`zones` l'ont été pour le reste du prompt).
+- **Vérifié** : hash `system`/`user`/bilan identiques pour sèche/maintenance/prise (capture
+  post-R3) ; 11 assertions Node (`r4-test.mjs`) — bloc présent dans les deux `system` en
+  recomposition, chacune des 6 règles retrouvée, renvoi aux champs seulement côté quotidien,
+  aucun bloc en sèche. `system` quotidien recomposition : 1 710 caractères (contre ~580
+  avant le chantier — coût d'entrée négligeable, quelques centaines de tokens stables, en
+  préfixe). Build `apps/perso` ET `apps/public` propres.
+
+### Chantier R — bilan et ce qui reste
+
+Les 4 lots sont livrés (v3.85.0 → v3.88.0, un commit chacun sur `dev`). **Ce que Yoann doit
+faire lui-même après l'install** : Réglages → Phase → « Recomposition » (la phase stockée
+reste « Maintenance » tant qu'il ne la bascule pas) ; ajuster ses protéines à 200 g quand il
+le souhaite ; coller dans « Coach IA · contexte permanent » son texte d'objectif personnel
+(le `SEED_COACH_PROFILE` d'origine parle encore de la sèche d'août). **Non fait, volontaire** :
+`apps/public` n'a accès à aucune de ces briques (phase masquée) ; pas de notification dimanche
+14 h (décision 11) ; le bilan 3 mois ne reçoit ni `paliers` ni `palier_semaine` (à ajouter si
+l'usage le demande).
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.

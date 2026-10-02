@@ -26,7 +26,18 @@ export const PHASES = {
   // "maintenance" planterait). `noTarget` : aucun poids cible, et surtout PAS de repli sur
   // `weightMaintenance` — le pilotage se fait sur la moyenne glissante 7 j (voir
   // `weightTrend7`), jamais sur un chiffre à atteindre.
-  recomposition: { label: "Recomposition", target: null, noTarget: true, msg: "Perte de gras lente + prise de muscle. Pas de poids cible : pilotage par la moyenne 7 j et le palier de la semaine." },
+  recomposition: {
+    label: "Recomposition", target: null, noTarget: true,
+    msg: "Perte de gras lente + prise de muscle. Pas de poids cible : pilotage par la moyenne 7 j et le palier de la semaine.",
+    // Règles de coaching attachées à la phase (chantier R, R4, 02/10/2026) : injectées dans le
+    // `system` du Coach IA (quotidien + bilan) tant que la phase est active, disparaissent en
+    // changeant de phase — comme le bloc sèche. Partage code/profil décidé par Yoann : ici le
+    // STRUCTUREL (ce que l'app sait), les chiffres personnels (kg/sem, taille des paliers)
+    // vivent dans le moteur `palier.js`, le texte d'objectif dans son contexte permanent.
+    // Contenu propre à Yoann (HSR genou, short sleeper) : la phase est masquée du picker
+    // apps/public (voir Onboarding.jsx), ce texte ne peut donc pas atteindre un bêta-testeur.
+    coach: "Recomposition corporelle : juge la tendance sur la moyenne glissante 7 j comparée aux semaines précédentes, jamais sur un poids isolé ; un poids stable n'est JAMAIS un échec (le corps change sans que la balance bouge). Déficit visé 100-300 kcal/j RÉELS (apports loggés − dépense) ; vers 500 kcal/j de déficit les gains de masse maigre sont bloqués (Murphy & Koehler 2022), et une progression en force seule ne prouve pas une prise de muscle. Après chaque hausse de kcal, ignore une petite hausse de poids pendant 14 jours (eau/glycogène). Surcharge progressive : juge surtout le haut du corps ; presse à cuisses et leg extension suivent le protocole HSR, volontairement plafonnés par la rééduc du genou — une stagnation là-dessus n'est pas un problème à signaler. Protéines : juge la moyenne hebdomadaire contre la cible de l'app, un dépassement ponctuel sans dépassement calorique n'est pas un problème. Sommeil : levier de récupération prioritaire en recomposition, jugé sur le score qualité/sommeil, jamais sur la durée (short sleeper).",
+  },
 };
 export const phaseTarget = (phase, targets) =>
   PHASES[phase].target != null ? PHASES[phase].target
