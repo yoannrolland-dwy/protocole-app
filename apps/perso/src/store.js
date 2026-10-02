@@ -66,6 +66,9 @@ export const DATA_KEYS = [
   // été retiré le 05/09/2026, plus aucun code ne le lit ni ne l'écrit — voir CLAUDE.md).
   "weightLog", "sleepLog", "trainingLog", "kneeLog", "elbowLog", "rhrLog", "napLog", "macroLog", "noteLog", "stepsLog",
   "targets", "phase", "hsrWeek", "model", "climbScheme", "basketSchedule",
+  // Historique des paliers de cibles (chantier R, R2, 02/10/2026) : le Coach IA et le
+  // "Palier de la semaine" (R3) ont besoin de savoir QUAND les kcal ont changé.
+  "targetHistory",
   "coachProfile", "coachJournal",
   "foodLog", "foodPins", "foodMuted", "foodPortions", "foodRecipes", "foodOverrides",
 ];

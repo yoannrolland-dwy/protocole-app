@@ -267,3 +267,30 @@ export function tdeeTrend({ weightLog, kcalByDate, cutStart = null, todayDate, w
  * (pas de déficit malgré l'intention). Calcul centralisé pour ne jamais diverger entre
  * l'écran Macros et le Coach IA. */
 export const realDeficit = (targetKcalToday, tdee) => Math.round(targetKcalToday - tdee);
+
+// --- zone de recomposition (chantier R, R2, 02/10/2026) ------------------------------
+// Déficit RÉEL = dépense estimée − apports moyens LOGGÉS sur la fenêtre (positif = déficit).
+// Pas `realDeficit` : celui-ci compare la CIBLE à la dépense (le déficit prévu), ici c'est
+// ce qui a été réellement mangé qui compte. Barème validé par Yoann (prompt d'origine +
+// Murphy & Koehler 2022 : ~500 kcal/j de déficit empêche les gains de masse maigre) :
+//   ≤ 0 surplus (hors objectif) · 0-100 sous la zone · 100-300 VISÉE · 300-500 haut ·
+//   > 500 trop élevé. Bornes : 100 et 300 inclus dans "visée", 500 inclus dans "haut".
+export const RECOMP_ZONE_LABEL = {
+  surplus: "surplus — hors objectif",
+  sous: "sous la zone (< 100)",
+  visee: "zone visée (100-300)",
+  haut: "acceptable mais haut (300-500)",
+  trop: "trop élevé pour gagner du muscle (> 500)",
+};
+export function recompZone(deficit) {
+  if (deficit == null) return null;
+  const zone = deficit <= 0 ? "surplus" : deficit < 100 ? "sous" : deficit <= 300 ? "visee" : deficit <= 500 ? "haut" : "trop";
+  return { zone, label: RECOMP_ZONE_LABEL[zone] };
+}
+/** Lecture de recomposition d'un résultat `computeTDEE`/`tdeeOverWindow` : `null` si pas de
+ * chiffre (jamais une zone inventée), sinon `{ deficit, zone, label }`. */
+export const recompReading = (r) => {
+  if (!r || r.status !== "ok" || r.meanIntake == null) return null;
+  const deficit = Math.round(r.tdee - r.meanIntake);
+  return { deficit, ...recompZone(deficit) };
+};

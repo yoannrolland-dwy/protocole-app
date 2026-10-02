@@ -3809,6 +3809,49 @@ par question explicite le 02/10/2026 — ne pas les rouvrir sans raison). R1 = p
 - **Non fait (lots suivants)** : zone de recomposition TDEE + `targetHistory` (R2), « Palier
   de la semaine » (R3), bloc de règles coach attaché à la phase (R4).
 
+## Chantier R — R2 : zone de recomposition TDEE + historique des paliers (02/10/2026, apps/perso v3.86.0)
+
+- **`recompZone(deficit)` / `recompReading(result)`** (`packages/core/src/tdee.js`) : déficit
+  RÉEL = `tdee − meanIntake` (apports moyens **loggés** sur la fenêtre), positif = déficit.
+  **Pas `realDeficit`** (= cible − dépense, le déficit *prévu*) — en recomposition c'est ce
+  qui a été mangé qui compte. Barème : ≤ 0 surplus · < 100 sous la zone · **100-300 visée**
+  (bornes incluses) · 300-500 haut (500 inclus) · > 500 trop élevé (Murphy & Koehler 2022).
+  `meanIntake` était déjà renvoyé par `computeTDEE`/`tdeeOverWindow`, rien à changer dans la
+  formule.
+- **`recompWindows({foodLog, overrides, macros, weight, targets})`** (`targets.js`) : 14 j ET
+  21 j via `tdeeOverWindow` (mêmes entrées que `tdeeNow` : kcal réelles, corrections V6,
+  journée en cours exclue). **Une fonction pour la carte TDEE et le Coach IA.** Jamais le 7 j
+  (trop bruité).
+- **UI** (`RecompZone` dans `App.jsx`, rendue par `TdeeCard`) : section « Zone de
+  recomposition » sous le déficit vs cible, visible seulement si `PHASES[phase].noTarget`
+  (`PerformanceTab` reçoit désormais `phase`). Une ligne par fenêtre (déficit signé + libellé
+  de zone coloré : accent = visée, ambre = haut/sous, danger = trop/surplus), phrase dédiée si
+  les deux fenêtres ne tombent pas dans la même zone. La ligne « déficit vs cible » reste.
+- **Clé `targetHistory`** (ajoutée à `DATA_KEYS`) : `[{date, kcal, protein, carbs, fat, fiber,
+  source: "manual" | "palier"}]`. Écrite par `save.targets(v, source)` **seulement si les kcal
+  de base changent** par rapport à l'état précédent (un poids cible ou la fenêtre de sèche ne
+  créent rien) ; plusieurs changements le même jour = une seule entrée (la dernière remplace).
+  Pas d'amorçage à la date du jour sur un historique vide (créerait à tort une période
+  d'observation de 14 j). `source: "palier"` réservé au bouton « Appliquer » de R3.
+- **Coach IA** (`prompt.js`) : `summary.depense_estimee.recomposition = { j14, j21 }` (déficit
+  réel, zone, libellé, fiabilité — ou `statut` si la fenêtre manque) + consigne « lecture de
+  référence, ne pas en choisir une si elles divergent », **en recomposition seulement** ;
+  `summary.paliers` (90 j, chronologique) + bloc « PALIERS DE CIBLES » avec la règle des 14 j
+  d'observation après une hausse, **dès qu'un historique existe, quelle que soit la phase**
+  (phase-agnostique : savoir quand les kcal ont changé sert à toute analyse). Sans historique
+  et hors recomposition, prompt identique au caractère près (hash vérifié contre la capture
+  post-R1).
+- **Vérifié** : 15 assertions Node (`r2-test.mjs`, scratchpad) — bornes exactes 0/1/99/100/
+  300/301/500/501, `null` sans chiffre, `recompWindows` sur 30 j synthétiques (14 j : 2835 −
+  2560 = 275 « visée »), blocs `recomposition`/`paliers` présents/absents selon phase et
+  historique (une entrée à J−120 bien exclue des 90 j). Aperçu : mêmes chiffres −275/−260
+  « zone visée » affichés sur l'onglet TDEE, section absente en sèche ; Réglages : « + » sur
+  Protéines → 1 entrée (date du jour, 2490 kcal, 220 g, manual), second « + » espacé d'une
+  seconde → toujours 1 entrée mise à jour (225 g, 2510 kcal), « + » sur le poids cible Sèche
+  → aucune entrée. Aucune erreur console. Build `apps/perso` ET `apps/public` propres.
+  **Piège de test** : deux clics synchrones dans le même tick JS voient le même état React
+  (le second ne « remplace » rien de visible) — espacer les clics pour tester ce cas.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.

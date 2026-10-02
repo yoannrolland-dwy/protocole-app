@@ -5,7 +5,7 @@
 
 import { today, daysBetween, round } from "./dateUtils.js";
 import { resolveLog, totals, entriesFor } from "./nutrition/foodStore.js";
-import { computeTDEE, mergeKcalSeries } from "./tdee.js";
+import { computeTDEE, mergeKcalSeries, tdeeOverWindow, recompReading } from "./tdee.js";
 
 // `cut` = fenêtre d'objectif temporaire (sèche avant vacances). Rangée DANS `targets`
 // plutôt que dans une constante de module, pour deux raisons : elle devient éditable dans
@@ -172,4 +172,23 @@ export function tdeeNow({ foodLog, overrides, macros, weight, targets }) {
   const kcalByDate = buildKcalByDate({ foodLog, overrides, macros, today: t0 });
   const cutStart = targets.cut?.enabled !== false && targets.cut?.start ? targets.cut.start : null;
   return computeTDEE({ weightLog: weight, kcalByDate, today: t0, cutStart });
+}
+
+/**
+ * Zone de recomposition sur 14 j ET 21 j (chantier R, R2, 02/10/2026) — jamais le 7 j, trop
+ * bruité. Mêmes entrées que `tdeeNow` (kcal réelles fusionnées, corrections V6, journée en
+ * cours exclue), même `tdeeOverWindow` que la comparaison des fenêtres de l'onglet TDEE.
+ * UNE fonction partagée par la carte TDEE et le Coach IA — jamais deux chiffres différents
+ * pour la même réalité. Chaque fenêtre porte sa `reading` (`recompReading`, tdee.js) ou
+ * `null` si la fenêtre n'a pas assez de données.
+ */
+export function recompWindows({ foodLog, overrides, macros, weight, targets }) {
+  const t0 = today();
+  const kcalByDate = buildKcalByDate({ foodLog, overrides, macros, today: t0 });
+  const cutStart = targets.cut?.enabled !== false && targets.cut?.start ? targets.cut.start : null;
+  const mk = (days) => {
+    const r = tdeeOverWindow({ weightLog: weight, kcalByDate, today: t0, days, cutStart });
+    return { ...r, reading: recompReading(r) };
+  };
+  return { j14: mk(14), j21: mk(21) };
 }

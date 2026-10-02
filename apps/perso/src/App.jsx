@@ -26,7 +26,7 @@ import { computeEnergyScore, computeSleepScore, scoreLabel } from "@rawcare/core
 import { computeFreeInsights } from "@rawcare/core/insights";
 import { computeBilanFacts } from "@rawcare/core/bilan";
 import { PHASES, phaseTarget as phaseTargetCore, DEFAULT_TARGETS, targetsForDate,
-         kcalFromMacros, kcalOfEntry, tdeeNow, weeklyKcalTrend, buildKcalByDate, weightTrend7 } from "@rawcare/core/targets";
+         kcalFromMacros, kcalOfEntry, tdeeNow, weeklyKcalTrend, buildKcalByDate, weightTrend7, recompWindows } from "@rawcare/core/targets";
 import { buildCoachPrompt, buildCoachBriefing, buildBilanPrompt, splitCarnet, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
@@ -46,7 +46,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.85.0";
+const APP_VERSION = "3.86.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -2018,7 +2018,43 @@ function TdeeWindows({ windows }) {
   );
 }
 
-function TdeeCard({ result, deficitReel, trend, windows }) {
+// Zone de recomposition (chantier R, R2, 02/10/2026) : déficit RÉEL = apports moyens loggés −
+// dépense estimée, sur 14 j ET 21 j (jamais le 7 j, trop bruité). Pas `realDeficit` (cible −
+// dépense = le déficit PRÉVU, pas celui réalisé). Barème dans tdee.js (`recompZone`). Les
+// deux fenêtres sont affichées côte à côte ; si elles ne tombent pas dans la même zone, on
+// le dit plutôt que d'en choisir une. Visible seulement en phase Recomposition (`recomp` null
+// sinon). Même fonction (`recompWindows`) que le Coach IA.
+const RECOMP_ZONE_COLOR = { visee: C.accent, haut: "#e8a33d", sous: "#e8a33d", trop: C.danger, surplus: C.danger };
+function RecompZone({ recomp }) {
+  if (!recomp) return null;
+  const rows = [["14 j", recomp.j14], ["21 j", recomp.j21]];
+  const ok = rows.filter(([, r]) => r.status === "ok");
+  const diverge = ok.length === 2 && ok[0][1].reading.zone !== ok[1][1].reading.zone;
+  return (
+    <>
+      <Label style={{ marginTop: 12, marginBottom: 4 }}>Zone de recomposition</Label>
+      {rows.map(([lbl, r]) => (
+        <div key={lbl} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, padding: "5px 0", borderTop: `1px solid ${C.divider}` }}>
+          <span style={{ fontSize: 11, color: C.text2, fontFamily: C.mono, flexShrink: 0 }}>{lbl}</span>
+          {r.status === "ok" ? (
+            <span style={{ fontFamily: C.mono, fontSize: 12, textAlign: "right" }}>
+              <span style={{ fontWeight: 800, color: C.text }}>{r.reading.deficit > 0 ? "−" : "+"}{Math.abs(r.reading.deficit)} kcal/j</span>
+              <span style={{ fontSize: 10, color: RECOMP_ZONE_COLOR[r.reading.zone], marginLeft: 6 }}>{r.reading.label}</span>
+            </span>
+          ) : (
+            <span style={{ fontSize: 10, color: C.dim }}>{r.reason}</span>
+          )}
+        </div>
+      ))}
+      <Body style={{ fontSize: 10, color: C.dim, marginTop: 6 }}>
+        {diverge ? "Les deux fenêtres ne tombent pas dans la même zone : attendre qu'elles convergent avant de conclure. " : ""}
+        Déficit réel = apports moyens loggés − dépense estimée sur la fenêtre (pas la cible). Visée en recomposition : 100 à 300 kcal/j.
+      </Body>
+    </>
+  );
+}
+
+function TdeeCard({ result, deficitReel, trend, windows, recomp }) {
   if (result.status !== "ok") {
     return (
       <Card>
@@ -2027,6 +2063,7 @@ function TdeeCard({ result, deficitReel, trend, windows }) {
           Pas encore assez de données ({result.reason}). Il faut au moins {MIN_TDEE_DAYS} jours
           de pesées et d'apports enregistrés, avec au moins 70 % des jours loggés.
         </Body>
+        <RecompZone recomp={recomp} />
         <TdeeWindows windows={windows} />
       </Card>
     );
@@ -2052,6 +2089,7 @@ function TdeeCard({ result, deficitReel, trend, windows }) {
           {deficitReel > 0 ? "+" : ""}{deficitReel} kcal/j
         </span> contre la cible affichée.
       </Body>
+      <RecompZone recomp={recomp} />
       <Body style={{ fontSize: 10, color: C.dim, marginTop: 8, fontFamily: C.mono }}>
         Fenêtre : {fmt(result.windowStart)} → {fmt(result.windowEnd)} · {loggedPct(result)}% des jours loggés · {Math.round(result.weighRate * 100)}% pesés
       </Body>
@@ -2156,7 +2194,7 @@ function familiesForToday(basketSchedule) {
 /* ============================================================
    TAB — PERFORMANCE
    ============================================================ */
-function PerformanceTab({ macros, targets, training, weight }) {
+function PerformanceTab({ macros, targets, training, weight, phase }) {
   const [showPeri, setShowPeri] = useState(false);
   const [basketProto, setBasketProto] = useState("soir21h");
   const [planVariant, setPlanVariant] = useState("sansMatch");
@@ -2179,6 +2217,10 @@ function PerformanceTab({ macros, targets, training, weight }) {
   const tdeeWindows = [7, 14, 21, 28]
     .filter((d) => tdeeToday.status !== "ok" || d !== tdeeToday.days)
     .map((d) => tdeeOverWindow({ weightLog: weight, kcalByDate: tdeeKcalByDate, today: today(), days: d, cutStart: tdeeCutStart }));
+  // Zone de recomposition (R2) : seulement en phase Recomposition, même fonction que le Coach IA.
+  const recomp = PHASES[phase]?.noTarget
+    ? recompWindows({ foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}), macros, weight, targets })
+    : null;
 
   // Moyenne hebdomadaire glissante, 7 jours (13/09/2026 — remplace l'ancienne moyenne lun-ven :
   // les cheat meals de Yoann ne suivent pas un jour fixe, exclure le week-end n'avait donc pas
@@ -2222,7 +2264,7 @@ function PerformanceTab({ macros, targets, training, weight }) {
       </Card>
 
       {/* Dépense énergétique adaptative (V7) */}
-      <TdeeCard result={tdeeToday} deficitReel={deficitReel} trend={tdeeHistory} windows={tdeeWindows} />
+      <TdeeCard result={tdeeToday} deficitReel={deficitReel} trend={tdeeHistory} windows={tdeeWindows} recomp={recomp} />
 
       {/* Planning hebdomadaire idéal — référence affichée, jamais appliquée automatiquement */}
       <Card>
@@ -2699,6 +2741,9 @@ export default function App({ silent = false } = {}) {
   // (calendrier de matchs, irrégulier — pas un simple jour de semaine). Défaut vide : aucun
   // effet sur le recommandeur tant que rien n'est configuré dans les Réglages.
   const [basketSchedule, setBasketScheduleState] = useState({ weekly: [], matchDates: [] });
+  // Historique des paliers de cibles (chantier R, R2, 02/10/2026) : une entrée par changement
+  // des kcal de base, voir `save.targets`. Clé `targetHistory` (DATA_KEYS).
+  const [targetHistory, setTargetHistory] = useState([]);
   const [apiKey, setApiKeyState] = useState("");
   const [model, setModelState] = useState("claude-sonnet-5");
   const [coachProfile, setCoachProfileState] = useState("");
@@ -2738,6 +2783,7 @@ export default function App({ silent = false } = {}) {
       setTargets({ ...DEFAULT_TARGETS, ...storedTargets, cut: { ...DEFAULT_TARGETS.cut, ...(storedTargets.cut || {}) } });
       setPhaseState(await store.get("phase", "seche"));
       setHsrWeekState(await store.get("hsrWeek", 1));
+      setTargetHistory(await store.get("targetHistory", []));
       setClimbSchemeState(await store.get("climbScheme", "gym"));
       // Purge des dates de match passées (30/09/2026, décision explicite de Yoann) : une date
       // passée n'a plus aucun effet (le recommandeur ne regarde que le dimanche à venir) et
@@ -2932,7 +2978,22 @@ export default function App({ silent = false } = {}) {
     macros: (v) => { setMacros(v); store.set("macroLog", v); },
     steps: (v) => { setSteps(v); store.set("stepsLog", v); },
     notes: (v) => { setNotes(v); store.set("noteLog", v); },
-    targets: (v) => { setTargets(v); store.set("targets", v); },
+    // Historique des paliers (chantier R, R2) : une entrée datée à chaque changement des kcal
+    // de BASE (jamais pour un poids cible ou la fenêtre de sèche) — le Coach IA et le "Palier
+    // de la semaine" (R3) ont besoin de savoir QUAND les cibles ont changé. Comparé à l'état
+    // précédent, pas à la dernière entrée : pas d'amorçage à la date du jour sur un
+    // historique vide (ça créerait à tort une période d'observation de 14 j). Plusieurs
+    // changements le même jour = une seule entrée (la dernière remplace).
+    targets: (v, source = "manual") => {
+      const kcalOf = (t) => Math.round(kcalFromMacros(t.protein, t.carbs, t.fat, t.fiber));
+      if (kcalOf(v) !== kcalOf(targets)) {
+        const entry = { date: today(), kcal: kcalOf(v), protein: v.protein, carbs: v.carbs, fat: v.fat, fiber: v.fiber, source };
+        const sameDay = targetHistory.at(-1)?.date === entry.date;
+        const next = sameDay ? [...targetHistory.slice(0, -1), entry] : [...targetHistory, entry];
+        setTargetHistory(next); store.set("targetHistory", next);
+      }
+      setTargets(v); store.set("targets", v);
+    },
   };
   const setPhase = (v) => { setPhaseState(v); store.set("phase", v); };
   const setHsrWeek = (v) => { setHsrWeekState(v); store.set("hsrWeek", v); };
@@ -2966,7 +3027,7 @@ export default function App({ silent = false } = {}) {
         weight, sleep, training, knee, macros, notes, steps, targets, phase,
         foodLog: getSync("foodLog", []), foodOverrides: getSync("foodOverrides", {}),
         profile, journal, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule),
-        matchWeek: isMatchWeek(basketSchedule),
+        matchWeek: isMatchWeek(basketSchedule), targetHistory,
         energy: computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps }),
       }, note),
     buildBriefing: () =>
@@ -3053,7 +3114,7 @@ export default function App({ silent = false } = {}) {
             {tab === "steps" && <StepsTab {...{ steps, save }} />}
             {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, scheme }} />}
             {tab === "pain" && <PainTab {...{ knee, save, hsrWeek }} />}
-            {tab === "perf" && <PerformanceTab {...{ macros, targets, training, weight }} />}
+            {tab === "perf" && <PerformanceTab {...{ macros, targets, training, weight, phase }} />}
             {tab === "macro" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} apiKey={apiKey} model={model} />}
           </>
         )}
