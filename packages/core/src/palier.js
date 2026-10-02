@@ -17,7 +17,14 @@ export const PALIER = {
   OBSERVATION_DAYS: 14,        // après un palier : eau/glycogène bougent, on ne juge pas
   MIN_LOGGED_RATE: 0.7,        // part des 7 derniers jours avec des apports loggés
   LOSS_TOO_FAST_KG_WEEK: 0.3,  // perte > 0,3 kg/sem deux semaines de suite → remonter
-  UP_SMALL: 150, UP_BIG: 200, DOWN: 100, MAX_STEP: 200,
+  // Pas FIXE de 100 kcal dans les deux sens (02/10/2026, choix de Yoann après un premier
+  // +200 jugé trop brutal — rétention d'eau, tendons) : plus lent à converger quand le déficit
+  // est grand (2-3 paliers espacés de 14 j), mais chaque étape est réévaluée sur du réel.
+  STEP_UP: 100, STEP_DOWN: 100, MAX_STEP: 100,
+  // Un changement de cibles ne compte comme PALIER (et ne déclenche l'observation) que si le
+  // changement NET sur la journée atteint 100 kcal — une retouche protéines/glucides à total
+  // constant n'en est pas un (même décision du 02/10/2026).
+  MIN_CHANGE_KCAL: 100,
   CARBS_SHARE: 0.75,           // un palier se répartit 75 % glucides / 25 % lipides
   ROUND_G: 5,                  // arrondi des grammes
   SUNDAY_HOUR: 14,             // la proposition de la semaine suivante existe dès dimanche 14 h
@@ -25,6 +32,28 @@ export const PALIER = {
 
 // Zones adjacentes = lecture cohérente ; deux fenêtres à plus d'un cran d'écart = désaccord.
 const ZONE_RANK = { surplus: 0, sous: 1, visee: 2, haut: 3, trop: 4 };
+
+/**
+ * Une entrée `targetHistory` est un vrai palier si elle vient du bouton « Appliquer »
+ * (`source: "palier"`), ou si son changement net atteint `MIN_CHANGE_KCAL` — mesuré contre
+ * `prevKcal` (kcal en début de journée, écrit par `save.targets` depuis le 02/10/2026) ou, à
+ * défaut, contre l'entrée précédente. Une entrée sans aucun point de comparaison (ancienne
+ * entrée isolée) n'est PAS un palier : un delta inconnu ne prouve rien.
+ */
+export const isPalierEntry = (e, prev) => {
+  if (!e) return false;
+  if (e.source === "palier") return true;
+  const ref = e.prevKcal ?? prev?.kcal ?? null;
+  return ref != null && Math.abs(e.kcal - ref) >= PALIER.MIN_CHANGE_KCAL;
+};
+
+/** Dernier VRAI palier de l'historique (ou `null`). */
+export const lastPalier = (targetHistory) => {
+  const h = [...(targetHistory || [])].filter((p) => p?.date).sort(byDate);
+  let last = null;
+  h.forEach((e, i) => { if (isPalierEntry(e, h[i - 1])) last = e; });
+  return last;
+};
 
 /**
  * Lundi de la semaine à laquelle s'applique la proposition courante. Du lundi au samedi, et
@@ -67,8 +96,9 @@ export function recommendTargets({ now = new Date(), targets, trend, recomp, tar
   const t0 = localDateKey(now);
   const hold = (reason, extra = {}) => ({ weekOf, action: "hold", deltaKcal: 0, proposed: null, reasons: [reason], blocked: reason, ...extra });
 
-  // 1. Période d'observation après le dernier palier — prime sur tout le reste.
-  const last = [...(targetHistory || [])].filter((p) => p?.date).sort(byDate).at(-1);
+  // 1. Période d'observation après le dernier VRAI palier (≥ MIN_CHANGE_KCAL net, ou appliqué
+  //    depuis la carte) — prime sur tout le reste.
+  const last = lastPalier(targetHistory);
   if (last) {
     const since = daysBetween(last.date, t0);
     if (since < PALIER.OBSERVATION_DAYS) {
@@ -93,15 +123,16 @@ export function recommendTargets({ now = new Date(), targets, trend, recomp, tar
   const sg = (x) => `${x > 0 ? "+" : ""}${x}`;
   if (d1 != null) reasons.push(`Poids moy. 7 j : ${sg(d1)} kg/sem${d2 != null ? ` (semaine d'avant ${sg(d2)})` : ""}`);
 
-  // 3. Hausse (déficit trop fort, ou perte trop rapide deux semaines de suite).
+  // 3. Hausse (déficit trop fort, ou perte trop rapide deux semaines de suite) — toujours
+  //    +STEP_UP, quelle que soit l'ampleur du déficit : le palier suivant viendra 14 j plus tard.
   let delta = 0;
   const lossTooFast = d1 != null && d2 != null && d1 <= -PALIER.LOSS_TOO_FAST_KG_WEEK && d2 <= -PALIER.LOSS_TOO_FAST_KG_WEEK;
-  if (deficit > 500) { delta = PALIER.UP_BIG; reasons.push("Déficit > 500 kcal/j : trop élevé pour gagner du muscle"); }
-  else if (deficit > 300) { delta = PALIER.UP_SMALL; reasons.push("Déficit 300-500 kcal/j : haut pour une recomposition"); }
-  else if (lossTooFast) { delta = PALIER.UP_SMALL; reasons.push(`Perte > ${PALIER.LOSS_TOO_FAST_KG_WEEK} kg/sem deux semaines de suite`); }
+  if (deficit > 500) { delta = PALIER.STEP_UP; reasons.push("Déficit > 500 kcal/j : trop élevé pour gagner du muscle — remonter par paliers de 100"); }
+  else if (deficit > 300) { delta = PALIER.STEP_UP; reasons.push("Déficit 300-500 kcal/j : haut pour une recomposition"); }
+  else if (lossTooFast) { delta = PALIER.STEP_UP; reasons.push(`Perte > ${PALIER.LOSS_TOO_FAST_KG_WEEK} kg/sem deux semaines de suite`); }
   // 4. Baisse (surplus, ou moyenne 7 j qui remonte deux semaines de suite).
-  else if (deficit <= 0) { delta = -PALIER.DOWN; reasons.push("Surplus : hors objectif"); }
-  else if (d1 != null && d2 != null && d1 > 0 && d2 > 0) { delta = -PALIER.DOWN; reasons.push("Moyenne 7 j en hausse deux semaines de suite"); }
+  else if (deficit <= 0) { delta = -PALIER.STEP_DOWN; reasons.push("Surplus : hors objectif"); }
+  else if (d1 != null && d2 != null && d1 > 0 && d2 > 0) { delta = -PALIER.STEP_DOWN; reasons.push("Moyenne 7 j en hausse deux semaines de suite"); }
   // 5. Sinon : maintenir.
   else reasons.push(deficit < 100 ? "Légèrement sous la zone visée : maintenir et observer" : "Zone visée : maintenir");
 

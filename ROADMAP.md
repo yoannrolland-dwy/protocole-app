@@ -545,7 +545,13 @@ protéines à 200 lui-même sous quelques jours — l'app ne touche jamais aux c
    jour au gré du bruit de la balance. Bouton **« Appliquer »** = un tap pour écrire les
    cibles + l'entrée `targetHistory`. Rien ne change sans ce tap.
 10. **Répartition d'un palier : 75 % glucides / 25 % lipides**, arrondis à 5 g, protéines
-    et fibres jamais touchées. Pas plus de ±200 kcal par palier.
+    et fibres jamais touchées. **Amendé le 02/10/2026 après le premier usage réel : pas FIXE
+    de ±100 kcal** (le +150/+200 initial jugé trop brutal — rétention d'eau, tendons), et un
+    changement manuel de cibles ne compte comme palier (ne déclenche l'observation de 14 j)
+    que si le changement **net sur la journée atteint 100 kcal** — une retouche protéines/
+    glucides à total constant n'en est pas un. Une proposition non appliquée se **recalcule
+    immédiatement** si les cibles sont modifiées à la main (un changement manuel est une
+    décision, pas du bruit).
 11. **Pas de notification dimanche 14 h** (Yoann ouvre l'app tous les jours ; notifs
     proactives déjà écartées le 07/09/2026). Carte sur le **Dashboard, sous « Constats »**.
 12. Tendinopathies, Silbernagel, règles escalade/basket, planning hebdo, recommandeur de

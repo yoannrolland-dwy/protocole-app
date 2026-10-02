@@ -47,7 +47,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.88.0";
+const APP_VERSION = "3.88.1";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -3048,12 +3048,22 @@ export default function App({ silent = false } = {}) {
     // précédent, pas à la dernière entrée : pas d'amorçage à la date du jour sur un
     // historique vide (ça créerait à tort une période d'observation de 14 j). Plusieurs
     // changements le même jour = une seule entrée (la dernière remplace).
+    // Correctif du 02/10/2026 (retour de Yoann : −10 g protéines puis +10 g glucides à total
+    // constant avaient été enregistrés comme un palier) : l'entrée du jour porte `prevKcal`
+    // = kcal en DÉBUT de journée, et c'est le changement NET du jour qui compte. Si une
+    // retouche ramène exactement au point de départ, l'entrée du jour est supprimée ; sous
+    // 100 kcal net elle reste journalisée mais n'est pas un palier (`isPalierEntry`, palier.js).
     targets: (v, source = "manual") => {
       const kcalOf = (t) => Math.round(kcalFromMacros(t.protein, t.carbs, t.fat, t.fiber));
-      if (kcalOf(v) !== kcalOf(targets)) {
-        const entry = { date: today(), kcal: kcalOf(v), protein: v.protein, carbs: v.carbs, fat: v.fat, fiber: v.fiber, source };
-        const sameDay = targetHistory.at(-1)?.date === entry.date;
-        const next = sameDay ? [...targetHistory.slice(0, -1), entry] : [...targetHistory, entry];
+      const nextKcal = kcalOf(v), prevState = kcalOf(targets);
+      if (nextKcal !== prevState) {
+        const d = today();
+        const sameDay = targetHistory.at(-1)?.date === d ? targetHistory.at(-1) : null;
+        const rest = sameDay ? targetHistory.slice(0, -1) : targetHistory;
+        const prevKcal = sameDay?.prevKcal ?? prevState;
+        const next = nextKcal === prevKcal && sameDay?.source !== "palier"
+          ? rest // retour au point de départ : la journée n'a rien changé
+          : [...rest, { date: d, kcal: nextKcal, prevKcal, protein: v.protein, carbs: v.carbs, fat: v.fat, fiber: v.fiber, source: sameDay?.source === "palier" ? "palier" : source }];
         setTargetHistory(next); store.set("targetHistory", next);
       }
       setTargets(v); store.set("targets", v);
@@ -3064,10 +3074,18 @@ export default function App({ silent = false } = {}) {
   // plus la semaine courante (`palierWeekOf`, bascule dimanche 14 h) : idempotent, l'app
   // peut être ouverte dix fois le dimanche sans recalcul. Mêmes fonctions que le reste de
   // l'app (`weightTrend7`, `recompWindows`) — jamais deux chiffres différents.
+  // Correctif du 02/10/2026 : la proposition mémorise les cibles sur lesquelles elle s'est
+  // basée (`baseTargets`). Si Yoann les modifie à la main ensuite (et qu'elle n'a pas été
+  // appliquée), elle se recalcule tout de suite au lieu d'afficher une photo périmée — un
+  // changement manuel est une décision explicite, pas du bruit de balance. Une proposition
+  // déjà appliquée reste figée (ses cibles sont forcément différentes de la base).
   useEffect(() => {
     if (loading || !PHASES[phase]?.noTarget) return;
     const wk = palierWeekOf(new Date());
-    if (palierWeekly?.weekOf === wk) return;
+    const baseNow = { protein: targets.protein, carbs: targets.carbs, fat: targets.fat, fiber: targets.fiber };
+    const sameWeek = palierWeekly?.weekOf === wk;
+    const baseChanged = !palierWeekly?.appliedAt && JSON.stringify(palierWeekly?.baseTargets ?? null) !== JSON.stringify(baseNow);
+    if (sameWeek && !baseChanged) return;
     const foodLog = getSync("foodLog", []), overrides = getSync("foodOverrides", {});
     const kcalByDate = buildKcalByDate({ foodLog, overrides, macros, today: today() });
     const result = recommendTargets({
@@ -3075,7 +3093,7 @@ export default function App({ silent = false } = {}) {
       recomp: recompWindows({ foodLog, overrides, macros, weight, targets }),
       targetHistory, loggedRate7: loggedRateLastDays(kcalByDate, today()),
     });
-    const next = { weekOf: wk, computedAt: new Date().toISOString(), result, appliedAt: null };
+    const next = { weekOf: wk, computedAt: new Date().toISOString(), baseTargets: baseNow, result, appliedAt: null };
     setPalierWeekly(next); store.set("palierWeekly", next);
   }, [loading, phase, palierWeekly, weight, macros, targets, targetHistory, palierTick]);
   // Bouton « Appliquer » : la SEULE voie d'écriture des cibles reste `save.targets` (qui

@@ -15,6 +15,7 @@ import { exoProgress } from "../training.js";
 import { climbSummary } from "../climbing.js";
 import { PHASES, phaseTarget, targetsForDate, kcalFromMacros, kcalOfEntry, isCutWindow, tdeeNow, weightTrend7, recompWindows } from "../targets.js";
 import { realDeficit } from "../tdee.js";
+import { isPalierEntry } from "../palier.js";
 import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor } from "../nutrition/foodStore.js";
 
 // Amorçage du profil permanent : reprend mot pour mot les règles de coaching qui étaient
@@ -133,7 +134,11 @@ export function buildCoachPrompt(data, note) {
   // Historique des paliers de cibles (R2, clé `targetHistory`) : seul moyen pour le coach de
   // savoir QUAND les kcal ont changé — sans ça, "ignorer la hausse de poids 2 semaines après
   // une hausse" est inapplicable. 90 j, du plus ancien au plus récent. Absent/vide → aucun bloc.
-  const paliers = (targetHistory || []).filter((p) => p?.date && daysBetween(p.date, today()) <= 90).sort((a, b) => (a.date < b.date ? -1 : 1))
+  // Seuls les VRAIS paliers (≥ 100 kcal net, ou appliqués depuis la carte) sont montrés au
+  // coach — une retouche à total constant n'a pas à déclencher sa règle des 14 j.
+  const histSorted = (targetHistory || []).filter((p) => p?.date).sort((a, b) => (a.date < b.date ? -1 : 1));
+  const paliers = histSorted
+    .filter((p, i) => isPalierEntry(p, histSorted[i - 1]) && daysBetween(p.date, today()) <= 90)
     .map((p) => ({ date: p.date, kcal: p.kcal, P: p.protein, G: p.carbs, L: p.fat, F: p.fiber, source: p.source }));
   const m7 = win(macros, 0, 6);
   const sessCount = (a, b) => { const o = {}; win(training, a, b).forEach((t) => { o[t.type] = (o[t.type] || 0) + 1; }); return o; };

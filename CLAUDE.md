@@ -3936,6 +3936,43 @@ documentées), le texte d'objectif dans son contexte permanent (Réglages, sans 
   avant le chantier — coût d'entrée négligeable, quelques centaines de tokens stables, en
   préfixe). Build `apps/perso` ET `apps/public` propres.
 
+### Correctifs post-install, le même jour (v3.88.1) — retour de Yoann sur la carte Palier
+
+Premier retour après l'install : « ça me propose 210 g de protéines alors qu'on avait dit
+200 », puis « 2800 → 3000 c'est pas trop ? ». Diagnostic : Yoann avait baissé les protéines
+210 → 200 et monté les glucides 270 → 280 (total inchangé, 2800) **après** le premier calcul
+— deux défauts de conception révélés, plus un choix de calibrage.
+
+- **Proposition périmée** : `proposed` était une photo des cibles au moment du calcul, jamais
+  rafraîchie ; « Appliquer » aurait remis 210 g. Fix : `palierWeekly.baseTargets` mémorise les
+  cibles de base du calcul ; l'effet **recalcule immédiatement** si elles diffèrent des cibles
+  actuelles et que la proposition n'a pas été appliquée (un changement manuel est une décision
+  explicite, pas du bruit de balance — le figement ne protège que du second). Une proposition
+  déjà appliquée reste figée. Sur le téléphone, l'ancienne entrée sans `baseTargets` se
+  recalcule une fois au premier lancement.
+- **Faux palier** : deux retouches successives à total constant (−40 puis +40 kcal) avaient
+  laissé une entrée `targetHistory` → 14 j d'observation à tort. Fix : l'entrée du jour porte
+  `prevKcal` (kcal en DÉBUT de journée) ; un retour exact au point de départ **supprime**
+  l'entrée ; et un changement ne compte comme palier que si le **net** atteint
+  `PALIER.MIN_CHANGE_KCAL = 100` (`isPalierEntry`/`lastPalier`, palier.js — utilisés par
+  l'observation ET par le filtre `paliers` du Coach IA). Une entrée ancienne sans aucun repère
+  (`prevKcal` absent, pas d'entrée précédente) n'est **pas** un palier : un delta inconnu ne
+  prouve rien — c'est ce qui neutralise l'entrée fantôme déjà présente sur le téléphone sans
+  manipulation. `source: "palier"` (bouton Appliquer) compte toujours.
+- **Pas fixe ±100 kcal** (`STEP_UP`/`STEP_DOWN`/`MAX_STEP = 100`, décision 10 amendée) : le
+  +200 de la règle d'origine (déficit > 500) a été jugé trop brutal par Yoann (rétention
+  d'eau, tendons pour l'escalade/le basket). Plus lent à converger (2-3 paliers espacés de
+  14 j), chaque étape réévaluée sur du réel. Discuté honnêtement : +200 kcal ≈ +37 g de
+  glucides, quelques centaines de grammes d'eau au plus — mais un pas plus petit limite la
+  correction si le déficit mesuré était surestimé.
+- **Point d'attention non tranché** : avec l'arrondi à 5 g (décision 10), un palier de +100
+  donne en réalité **+125 kcal** (+20 G = 80, +5 L = 45) — d'où le « 2925 » affiché pour des
+  cibles à 2800. Arrondir les lipides au gramme donnerait ~+102. À décider avec Yoann.
+- **Vérifié** : 15 assertions Node (`r3b-test.mjs`) + hash des 3 anciennes phases identique
+  (capture post-R4) + aperçu rejouant exactement son scénario (210/270 → protéines 200 →
+  recalcul « 200 P » → glucides 280 → historique vidé, pas d'observation, proposition sur les
+  vraies cibles). Build `apps/perso` ET `apps/public` propres.
+
 ### Chantier R — bilan et ce qui reste
 
 Les 4 lots sont livrés (v3.85.0 → v3.88.0, un commit chacun sur `dev`). **Ce que Yoann doit
