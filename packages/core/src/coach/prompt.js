@@ -102,7 +102,7 @@ export const mealsFor = (log, date) => {
  */
 export function buildCoachPrompt(data, note) {
   const { weight, sleep, training, knee, macros, notes, steps, targets, phase,
-    foodLog, foodOverrides, profile, journal, scheme, zones, painLogs, identity, basketSchedule, weeklyPlan, energy, matchWeek, targetHistory } = data;
+    foodLog, foodOverrides, profile, journal, scheme, zones, painLogs, identity, basketSchedule, weeklyPlan, energy, matchWeek, targetHistory, palier } = data;
 
   // Dépense adaptative (V7) : mêmes données, même calcul que la carte de l'onglet
   // Macros (`tdeeNow`) — jamais deux chiffres différents pour la même réalité.
@@ -296,7 +296,18 @@ export function buildCoachPrompt(data, note) {
       ...(recompSummary ? { recomposition: recompSummary } : {}),
     } : { statut: "pas assez de données", ...(recompSummary ? { recomposition: recompSummary } : {}) },
     ...(paliers.length ? { paliers } : {}),
+    // "Palier de la semaine" (R3) : verdict figé calculé par le JS (packages/core/src/palier.js),
+    // transmis tel quel — même contrat que `recommandeur` : le coach le commente/nuance, il
+    // n'en invente pas un autre. Absent hors recomposition → rien n'est ajouté.
+    ...(palier?.result ? { palier_semaine: {
+      semaine_du: palier.weekOf, action: palier.result.action, delta_kcal: palier.result.deltaKcal,
+      cibles_proposees: palier.result.proposed, raisons: palier.result.reasons,
+      applique: palier.appliedAt ? `oui (${palier.appliedAt})` : "non",
+    } } : {}),
   };
+  const palierInstr = palier?.result
+    ? ` Le champ \`palier_semaine\` est la proposition de cibles de la semaine, déjà calculée par le JS (observation 14 j après un palier, déficit réel 14/21 j, tendance de poids) : commente-la, nuance-la ou signale un désaccord argumenté, mais ne propose JAMAIS un autre palier chiffré de ton côté, et ne pousse pas à l'appliquer si \`applique\` vaut "non" — c'est son choix.`
+    : "";
   const recompInstr = recompSummary
     ? ` En Recomposition, \`depense_estimee.recomposition\` donne le déficit RÉEL (apports moyens loggés − dépense, PAS la cible) sur 14 et 21 j avec sa zone (visée 100-300, haut 300-500, trop élevé > 500, surplus = hors objectif) : c'est la lecture de référence, utilise-la telle quelle ; si les deux fenêtres ne tombent pas dans la même zone, dis-le au lieu d'en choisir une.`
     : "";
@@ -379,7 +390,7 @@ ${notesTxt ? `\nNOTES DE CONTEXTE écrites par ${authorLabel} (14 j, ex. alcool,
 ${(journal || "").trim() ? `CARNET DE BORD — état que TU as écrit à la fin de ta dernière analyse. C'est ta mémoire : appuie-toi dessus pour enchaîner (a-t-il appliqué ce que tu avais demandé ? où en est la progression ?) au lieu de repartir de zéro.\n${journal.trim()}\n` : "CARNET DE BORD : vide, c'est ta première analyse. Tu le créeras en fin de réponse.\n"}
 Structure ta réponse en deux temps :
 1. **Aujourd'hui / les prochaines 24h** : à partir du bloc TEMPS RÉEL, dis-lui concrètement quoi faire (ou éviter) MAINTENANT — ${["séance", "nutrition", "hydratation", "récupération", painMentionShort ? `douleurs (${painMentionShort})` : null].filter(Boolean).join(", ")} — en te basant sur ce qui s'est passé hier et sur les notes de contexte. \`repas_hier\`/\`repas_aujourdhui\` donnent le détail réel des aliments par repas (pas seulement les totaux macros) : commente la COMPOSITION si elle appelle un conseil concret (répartition protéique entre repas, repas trop pauvre/trop riche en fibres, timing autour de l'entraînement) — pas une simple relecture de la liste. Le champ \`recommandeur\` (dans RÉSUMÉ 14 JOURS) donne déjà un verdict calculé sur la séance du jour (score + motif, alternatives, à éviter) : appuie-toi dessus au lieu d'en recalculer un autre de ton côté — commente-le, nuance-le ou signale un désaccord argumenté si tu vois un facteur qu'il ignore, mais ne propose pas une séance différente sans le dire explicitement.
-2. **Tendance de fond (14 jours)** : ce qui se dessine sur la durée et ce qu'il faut ajuster pour la semaine à venir, EN CORRÉLANT explicitement poids, kcal, macros, fibres et eau à partir du dataset JOUR PAR JOUR (ex. un pic de poids coïncide-t-il avec un pic de glucides/sodium la veille plutôt qu'un vrai surplus calorique ? un manque de fibres ou d'eau coïncide-t-il avec une stagnation ?). Le champ \`depense_estimee\` (dans RÉSUMÉ 14 JOURS) donne déjà la dépense énergétique réelle calculée par le JS (tendance de poids lissée vs apports réels) avec sa fiabilité et sa fenêtre : utilise CE chiffre pour le déficit plutôt que d'en estimer un toi-même à la louche à partir du poids et des apports bruts. S'il chevauche la perte hydrique du début de sèche (\`chevauche_perte_eau\`) ou si la fiabilité est "faible", dis-le explicitement et nuance en conséquence — ne présente jamais ce chiffre comme définitif dans ce cas. S'il vaut "pas assez de données", n'invente pas de dépense chiffrée.${recompInstr}
+2. **Tendance de fond (14 jours)** : ce qui se dessine sur la durée et ce qu'il faut ajuster pour la semaine à venir, EN CORRÉLANT explicitement poids, kcal, macros, fibres et eau à partir du dataset JOUR PAR JOUR (ex. un pic de poids coïncide-t-il avec un pic de glucides/sodium la veille plutôt qu'un vrai surplus calorique ? un manque de fibres ou d'eau coïncide-t-il avec une stagnation ?). Le champ \`depense_estimee\` (dans RÉSUMÉ 14 JOURS) donne déjà la dépense énergétique réelle calculée par le JS (tendance de poids lissée vs apports réels) avec sa fiabilité et sa fenêtre : utilise CE chiffre pour le déficit plutôt que d'en estimer un toi-même à la louche à partir du poids et des apports bruts. S'il chevauche la perte hydrique du début de sèche (\`chevauche_perte_eau\`) ou si la fiabilité est "faible", dis-le explicitement et nuance en conséquence — ne présente jamais ce chiffre comme définitif dans ce cas. S'il vaut "pas assez de données", n'invente pas de dépense chiffrée.${recompInstr}${palierInstr}
 Traite explicitement CHAQUE domaine : ${["poids (bruit quotidien vs moyenne glissante)", "macros (protéines jour le jour, reste en moyenne 7j)", "eau (jours de basket +1L)", "sommeil (impact récup)", "pas quotidiens (corrélation activité/résultat)", "séances (équilibre Upper/Lower, progressive overload exercice par exercice, gestion de charge sur l'escalade)", painDomainClause].filter(Boolean).join(", ")}.
 Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reciter les données brutes (cite seulement les chiffres qui appuient un conseil) : va droit aux conseils, en bullet points courts. Limite stricte : 500 mots maximum au total — écourte les détails plutôt que de laisser une section inachevée, et termine toujours par une phrase de conclusion complète. Ce n'est pas un avis médical.
 

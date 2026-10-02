@@ -3852,6 +3852,60 @@ par question explicite le 02/10/2026 — ne pas les rouvrir sans raison). R1 = p
   **Piège de test** : deux clics synchrones dans le même tick JS voient le même état React
   (le second ne « remplace » rien de visible) — espacer les clics pour tester ce cas.
 
+## Chantier R — R3 : « Palier de la semaine » (02/10/2026, apps/perso v3.87.0)
+
+Répond à « combien je mange cette semaine » (le recommandeur de séance répond à « que
+fais-je aujourd'hui ») : chaque semaine, l'app PROPOSE de monter/baisser/maintenir les
+cibles kcal pour rester dans la zone de recomposition. **Elle ne modifie jamais les cibles
+toute seule** : seul le bouton « Appliquer » écrit.
+
+- **`packages/core/src/palier.js`** (nouveau, pur, testable en Node) : `recommendTargets({
+  now, targets, trend, recomp, targetHistory, loggedRate7 })` → `{ weekOf, action: hold|up|
+  down, deltaKcal, proposed, reasons[], blocked, observation? }`. Entrées déjà calculées
+  ailleurs (`weightTrend7`, `recompWindows`, clé `targetHistory`) — jamais deux calculs.
+  Constantes `PALIER` en tête de fichier (observation 14 j, 70 % loggé, perte > 0,3 kg/sem,
+  +150/+200/−100, plafond ±200, 75 % glucides / 25 % lipides arrondis à 5 g, dimanche 14 h).
+  Ordre des règles : **observation** (dernier palier < 14 j → `hold` bloquant, prime sur
+  tout) → **données** (< 70 % loggé, 14/21 j indisponibles, ou zones à plus d'un cran d'écart
+  → `hold` bloquant avec la raison) → **hausse** (déficit moyen 14/21 j > 500 → +200 ;
+  300-500 → +150 ; perte > 0,3 kg/sem deux semaines de suite → +150) → **baisse** (surplus,
+  ou moy. 7 j en hausse deux semaines de suite → −100) → sinon `hold` non bloquant
+  (« zone visée : maintenir », ou « légèrement sous la zone »). Protéines/fibres jamais
+  touchées. `palierWeekOf(now)` : lundi de la semaine courante, sauf dimanche ≥ 14 h → lundi
+  suivant (arithmétique locale). `loggedRateLastDays` compte les 7 jours TERMINÉS.
+- **Figement** (`App.jsx`, clé `palierWeekly` dans `DATA_KEYS` : `{ weekOf, computedAt, result,
+  appliedAt }`) : un `useEffect` ne calcule que si `!loading`, phase recomposition, et
+  `palierWeekly.weekOf !== palierWeekOf(new Date())` — idempotent, l'app peut s'ouvrir dix
+  fois le dimanche sans recalcul ; `palierTick` incrémenté dans le listener `resume` natif
+  pour revérifier la semaine au retour au premier plan. Avant la toute première semaine :
+  « Première proposition dimanche à partir de 14 h ». Le calcul est lazy : si l'app n'est pas
+  ouverte dimanche après 14 h, la proposition se calcule à la première ouverture de la
+  semaine (données « à ce moment-là »), puis reste figée.
+- **`PalierCard`** (Dashboard, sous « Constats », recomposition seulement) : verdict
+  (`+150 kcal/j` accent / `−100` ambre / « Maintenir » muted, « en attente » si bloqué),
+  raisons chiffrées, « Actuel » vs « Proposé » (kcal + P/G/L/F), bouton **« Appliquer à
+  partir de lundi »** → `save.targets(…, "palier")` (seule voie d'écriture des cibles, donc
+  entrée `targetHistory` automatique) + `appliedAt` → « Appliqué ✓ le JJ/MM ». « Déjà en
+  place » si les cibles correspondent déjà. Un `hold` n'a pas de bouton.
+- **Coach IA** (`prompt.js`) : `summary.palier_semaine` (semaine, action, delta, cibles
+  proposées, raisons, appliqué oui/non) + consigne « commente/nuance, ne propose JAMAIS un
+  autre palier chiffré, ne pousse pas à appliquer » — même contrat que `recommandeur`.
+  Absent hors recomposition : prompt identique (hash vérifié contre la capture post-R2).
+- **Vérifié** : 18 assertions Node (`r3-test.mjs`, scratchpad) — les 8 scénarios de la spec
+  (perte 0,4 × 2 → +150 ; déficit 600 → +200 avec 310 G / 95 L ; hausse × 2 → −100 avec 250 G /
+  85 L ; observation J+9 bloque malgré un déficit 600 ; 60 % loggé bloque ; 14 j visée / 21 j
+  trop → désaccord ; split +150 → +30 G / +5 L ; `weekOf` dimanche 13 h 59 vs 14 h 01) + zones
+  adjacentes (moyenne décide), surplus, zone visée non bloquante, sous la zone, plafond,
+  `loggedRateLastDays` (jour en cours ignoré), `palier_semaine` dans le prompt. Aperçu : seed
+  30 j (perte ~0,5 kg/sem, 2200 kcal loggés, cibles 2800) → carte « +150 kcal/j », déficit
+  moyen 436 « haut », proposé 2965 · 300 G / 95 L ; Appliquer → cibles écrites, `targetHistory`
+  `[02/10, 2965, 300, 95, "palier"]`, « Appliqué ✓ le 02/10 » ; rechargement → `computedAt`
+  identique (pas de recalcul), toujours appliqué ; sèche → aucune carte ; aucune erreur
+  console. Build `apps/perso` ET `apps/public` propres.
+- **Conséquence pratique pour Yoann** : son passage manuel à 200 g de protéines (s'il change
+  les kcal) créera une entrée `targetHistory` → le premier vrai palier ne pourra être proposé
+  que 14 jours plus tard. Voulu (période d'observation), pas un bug.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.

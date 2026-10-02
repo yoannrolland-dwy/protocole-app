@@ -17,7 +17,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | V7 | Dépense énergétique adaptative (TDEE calculé) | gros | ✅ 04/08/2026 (v3.49.0) |
 | R1 | Recomposition : nouvelle phase, fin du poids cible, pilotage par tendance 7 j | moyen | ✅ 02/10/2026 (v3.85.0) |
 | R2 | Recomposition : zone de déficit dans l'onglet TDEE + historique des paliers | moyen | ✅ 02/10/2026 (v3.86.0) |
-| R3 | Recomposition : « Palier de la semaine » (moteur + carte + Appliquer + coach) | gros | ⬜ |
+| R3 | Recomposition : « Palier de la semaine » (moteur + carte + Appliquer + coach) | gros | ✅ 02/10/2026 (v3.87.0) |
 | R4 | Recomposition : bloc de règles Coach IA attaché à la phase | petit | ⬜ |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il

@@ -69,6 +69,9 @@ export const DATA_KEYS = [
   // Historique des paliers de cibles (chantier R, R2, 02/10/2026) : le Coach IA et le
   // "Palier de la semaine" (R3) ont besoin de savoir QUAND les kcal ont changé.
   "targetHistory",
+  // Proposition hebdomadaire figée du "Palier de la semaine" (R3) : { weekOf, computedAt,
+  // result, appliedAt } — recalculée seulement quand la semaine change.
+  "palierWeekly",
   "coachProfile", "coachJournal",
   "foodLog", "foodPins", "foodMuted", "foodPortions", "foodRecipes", "foodOverrides",
 ];

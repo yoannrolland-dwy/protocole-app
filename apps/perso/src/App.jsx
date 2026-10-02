@@ -27,6 +27,7 @@ import { computeFreeInsights } from "@rawcare/core/insights";
 import { computeBilanFacts } from "@rawcare/core/bilan";
 import { PHASES, phaseTarget as phaseTargetCore, DEFAULT_TARGETS, targetsForDate,
          kcalFromMacros, kcalOfEntry, tdeeNow, weeklyKcalTrend, buildKcalByDate, weightTrend7, recompWindows } from "@rawcare/core/targets";
+import { recommendTargets, palierWeekOf, loggedRateLastDays } from "@rawcare/core/palier";
 import { buildCoachPrompt, buildCoachBriefing, buildBilanPrompt, splitCarnet, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
@@ -46,7 +47,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.86.0";
+const APP_VERSION = "3.87.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -233,7 +234,61 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
 /* ============================================================
    TAB — DASHBOARD
    ============================================================ */
-function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule, weeklyPlan, matchWeek }) {
+// « Palier de la semaine » (chantier R, R3, 02/10/2026) : la proposition figée de la semaine
+// (voir l'effet dédié dans `App`), ses raisons chiffrées, et le bouton « Appliquer » — un tap
+// écrit les cibles via `save.targets` (source "palier") et date `appliedAt`. Un `hold` n'a pas
+// de bouton. Visible seulement en phase Recomposition (rendu conditionnel dans `Dashboard`).
+const PALIER_COLOR = { up: C.accent, down: "#e8a33d", hold: C.muted };
+function PalierCard({ palier, targets, onApply }) {
+  const r = palier?.result;
+  if (!r) {
+    return (
+      <Card>
+        <Label style={{ marginBottom: 6 }}>Palier de la semaine</Label>
+        <Body style={{ fontSize: 11, color: C.dim }}>Première proposition dimanche à partir de 14 h.</Body>
+      </Card>
+    );
+  }
+  const cur = { protein: targets.protein, carbs: targets.carbs, fat: targets.fat, fiber: targets.fiber, kcal: Math.round(kcalFromMacros(targets.protein, targets.carbs, targets.fat, targets.fiber)) };
+  const p = r.proposed;
+  const alreadyInPlace = p && ["protein", "carbs", "fat", "fiber"].every((k) => cur[k] === p[k]);
+  const verdict = r.action === "up" ? `+${r.deltaKcal} kcal/j` : r.action === "down" ? `−${Math.abs(r.deltaKcal)} kcal/j` : "Maintenir";
+  const macroLine = (t) => `${t.kcal} kcal · ${t.protein} P / ${t.carbs} G / ${t.fat} L / ${t.fiber} F`;
+  return (
+    <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+        <Label>Palier de la semaine</Label>
+        <span style={{ fontSize: 10, color: C.dim, fontFamily: C.mono }}>semaine du {fmt(palier.weekOf)}</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+        <span style={{ fontFamily: C.mono, fontSize: 22, fontWeight: 800, color: PALIER_COLOR[r.action] }}>{verdict}</span>
+        {r.blocked && <span style={{ fontSize: 10, color: C.dim, textTransform: "uppercase", letterSpacing: 1 }}>en attente</span>}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 8 }}>
+        {r.reasons.map((x, i) => (
+          <Body key={i} style={{ fontSize: 10.5, color: i === 0 ? C.text2 : C.dim }}>· {x}</Body>
+        ))}
+      </div>
+      {p && (
+        <>
+          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 2, fontFamily: C.mono }}>
+            <Body style={{ fontSize: 10.5, color: C.dim }}>Actuel&nbsp;&nbsp;: {macroLine(cur)}</Body>
+            <Body style={{ fontSize: 10.5, color: C.text }}>Proposé : {macroLine(p)}</Body>
+          </div>
+          {palier.appliedAt ? (
+            <Body style={{ fontSize: 11, color: C.accent, marginTop: 10, fontWeight: 700 }}>Appliqué ✓ le {fmt(palier.appliedAt)}</Body>
+          ) : alreadyInPlace ? (
+            <Body style={{ fontSize: 11, color: C.muted, marginTop: 10 }}>Déjà en place dans tes cibles.</Body>
+          ) : (
+            <Btn variant="primary" onClick={onApply} style={{ marginTop: 10, width: "100%" }}>Appliquer à partir de lundi</Btn>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
+function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule, weeklyPlan, matchWeek, palier, onApplyPalier }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast && tgtW != null ? round(wLast.kg - tgtW) : null;
@@ -392,6 +447,9 @@ function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, tra
 
       {/* Constats gratuits */}
       <InsightsCard insights={insights} />
+
+      {/* Palier de la semaine (R3) — recomposition seulement */}
+      {PHASES[phase]?.noTarget && <PalierCard palier={palier} targets={targets} onApply={onApplyPalier} />}
 
       {/* Coach IA */}
       <CoachIA coach={coach} todayNote={todayNote} saveNote={saveNote} saveJournal={saveJournal} />
@@ -2744,6 +2802,11 @@ export default function App({ silent = false } = {}) {
   // Historique des paliers de cibles (chantier R, R2, 02/10/2026) : une entrée par changement
   // des kcal de base, voir `save.targets`. Clé `targetHistory` (DATA_KEYS).
   const [targetHistory, setTargetHistory] = useState([]);
+  // "Palier de la semaine" (R3) : proposition FIGÉE par semaine (`weekOf` = lundi), jamais un
+  // chiffre recalculé chaque jour au gré du bruit de la balance. `palierTick` force une
+  // revérification au retour au premier plan (la semaine a pu changer entre-temps).
+  const [palierWeekly, setPalierWeekly] = useState(null);
+  const [palierTick, setPalierTick] = useState(0);
   const [apiKey, setApiKeyState] = useState("");
   const [model, setModelState] = useState("claude-sonnet-5");
   const [coachProfile, setCoachProfileState] = useState("");
@@ -2784,6 +2847,7 @@ export default function App({ silent = false } = {}) {
       setPhaseState(await store.get("phase", "seche"));
       setHsrWeekState(await store.get("hsrWeek", 1));
       setTargetHistory(await store.get("targetHistory", []));
+      setPalierWeekly(await store.get("palierWeekly", null));
       setClimbSchemeState(await store.get("climbScheme", "gym"));
       // Purge des dates de match passées (30/09/2026, décision explicite de Yoann) : une date
       // passée n'a plus aucun effet (le recommandeur ne regarde que le dimanche à venir) et
@@ -2926,7 +2990,7 @@ export default function App({ silent = false } = {}) {
   // Resynchro à chaque retour au premier plan (pas seulement au lancement à froid)
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
-    const handle = CapacitorApp.addListener("resume", () => { runHealthSync(); doAutoBackup(); });
+    const handle = CapacitorApp.addListener("resume", () => { runHealthSync(); doAutoBackup(); setPalierTick((t) => t + 1); });
     return () => { handle.then((h) => h.remove()); };
   }, []);
 
@@ -2995,6 +3059,34 @@ export default function App({ silent = false } = {}) {
       setTargets(v); store.set("targets", v);
     },
   };
+  // "Palier de la semaine" (R3) — calcul figé par semaine. Ne tourne qu'une fois les données
+  // chargées (`loading`), en phase Recomposition, et seulement si la semaine stockée n'est
+  // plus la semaine courante (`palierWeekOf`, bascule dimanche 14 h) : idempotent, l'app
+  // peut être ouverte dix fois le dimanche sans recalcul. Mêmes fonctions que le reste de
+  // l'app (`weightTrend7`, `recompWindows`) — jamais deux chiffres différents.
+  useEffect(() => {
+    if (loading || !PHASES[phase]?.noTarget) return;
+    const wk = palierWeekOf(new Date());
+    if (palierWeekly?.weekOf === wk) return;
+    const foodLog = getSync("foodLog", []), overrides = getSync("foodOverrides", {});
+    const kcalByDate = buildKcalByDate({ foodLog, overrides, macros, today: today() });
+    const result = recommendTargets({
+      targets, trend: weightTrend7(weight, today()),
+      recomp: recompWindows({ foodLog, overrides, macros, weight, targets }),
+      targetHistory, loggedRate7: loggedRateLastDays(kcalByDate, today()),
+    });
+    const next = { weekOf: wk, computedAt: new Date().toISOString(), result, appliedAt: null };
+    setPalierWeekly(next); store.set("palierWeekly", next);
+  }, [loading, phase, palierWeekly, weight, macros, targets, targetHistory, palierTick]);
+  // Bouton « Appliquer » : la SEULE voie d'écriture des cibles reste `save.targets` (qui
+  // journalise l'entrée `targetHistory`, ici avec `source: "palier"`).
+  const applyPalier = () => {
+    const p = palierWeekly?.result?.proposed;
+    if (!p) return;
+    save.targets({ ...targets, protein: p.protein, carbs: p.carbs, fat: p.fat, fiber: p.fiber }, "palier");
+    const next = { ...palierWeekly, appliedAt: today() };
+    setPalierWeekly(next); store.set("palierWeekly", next);
+  };
   const setPhase = (v) => { setPhaseState(v); store.set("phase", v); };
   const setHsrWeek = (v) => { setHsrWeekState(v); store.set("hsrWeek", v); };
   const setClimbScheme = (v) => { setClimbSchemeState(v); store.set("climbScheme", v); };
@@ -3027,7 +3119,7 @@ export default function App({ silent = false } = {}) {
         weight, sleep, training, knee, macros, notes, steps, targets, phase,
         foodLog: getSync("foodLog", []), foodOverrides: getSync("foodOverrides", {}),
         profile, journal, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule),
-        matchWeek: isMatchWeek(basketSchedule), targetHistory,
+        matchWeek: isMatchWeek(basketSchedule), targetHistory, palier: palierWeekly,
         energy: computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps }),
       }, note),
     buildBriefing: () =>
@@ -3108,7 +3200,7 @@ export default function App({ silent = false } = {}) {
           <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, climbScheme, setClimbScheme, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule), matchWeek: isMatchWeek(basketSchedule) }} openSettings={() => setShowSettings(true)} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule), matchWeek: isMatchWeek(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier }} openSettings={() => setShowSettings(true)} />}
             {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
             {tab === "sleep" && <SleepTab {...{ sleep, rhr, steps, naps, save }} />}
             {tab === "steps" && <StepsTab {...{ steps, save }} />}
