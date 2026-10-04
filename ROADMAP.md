@@ -788,7 +788,7 @@ chantier, chacun buildé/testé/commité, install native à la fin de chaque lot
 `packages/core/test/wip/` (copiés pour ne pas les perdre), `App.jsx` 3 352 lignes, bundle
 838 KB (245 KB gzip — pas un chantier).
 
-## T1 — Tests committés
+## T1 — Tests committés ✅ livré le 04/10/2026 (apps/perso v3.93.0, voir CLAUDE.md)
 - `packages/core/test/*.test.mjs` avec `node --test` (aucune dépendance). Script `npm test` à
   la racine, et un hook pre-commit qui le lance (bloquant). Porter les scripts de `test/wip/`
   (remplacer les chemins absolus par des imports relatifs, rendre les dates déterministes via

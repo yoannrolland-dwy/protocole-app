@@ -10,12 +10,19 @@
 // entre le nombre de pas de Samsung Health et celui affiché par PROTOCOLE.
 export const localDateKey = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-export const today = () => localDateKey(new Date());
+// Horloge injectable (chantier T1, 04/10/2026) — RÉSERVÉE AUX TESTS. `today()`/`nowHM()`
+// lisent `_now()` au lieu de `new Date()` directement : un test appelle `setClock(() => new
+// Date(2026, 9, 4, 10))` pour figer la date et obtenir des sorties (prompt Coach IA,
+// recommandeur) déterministes, comparables à une capture datée. Sans appel à `setClock`, le
+// comportement est strictement celui d'avant (`new Date()`). L'app ne l'appelle jamais.
+let _now = () => new Date();
+export const setClock = (fn) => { _now = typeof fn === "function" ? fn : () => new Date(); };
+export const today = () => localDateKey(_now());
 // Heure locale actuelle "HH:MM" (07/08/2026) — le Coach IA n'avait jusqu'ici que la date,
 // jamais l'heure : il jugeait les données "aujourd'hui" (pas, macros, eau) par rapport à la
 // cible du jour ENTIER, même lancé à 8h du matin. Sert à situer l'analyse dans la journée.
 export const nowHM = () => {
-  const d = new Date();
+  const d = _now();
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
 // Décale une clé "YYYY-MM-DD" de `days` jours, en arithmétique LOCALE pure (construction via

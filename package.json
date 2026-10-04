@@ -4,5 +4,9 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "scripts": {
+    "test": "node --test \"packages/core/test/*.test.mjs\"",
+    "prepare": "git config core.hooksPath .githooks || true"
+  }
 }

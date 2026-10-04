@@ -1,0 +1,6 @@
+#!/bin/sh
+# Hook pre-commit (chantier T1, 04/10/2026) : lance les tests de @rawcare/core et BLOQUE le
+# commit s'ils échouent. Activé par `git config core.hooksPath .githooks` (fait par le script
+# `prepare` de package.json à chaque `npm install`).
+cd "$(git rev-parse --show-toplevel)" || exit 1
+npm test --silent || { echo; echo "✗ Tests en échec — commit bloqué. Corriger les tests avant de committer."; exit 1; }

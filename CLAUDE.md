@@ -3439,7 +3439,12 @@ Build `apps/perso` ET `apps/public` propres.
    l'appareil au moment présent, pas une donnée à restaurer sur un autre appareil ou à une
    autre date — ne jamais l'ajouter à `DATA_KEYS`.
 2. **Toujours vérifier que le build passe** (`npm run build --workspace=apps/perso`,
-   depuis la racine du monorepo) avant de considérer une modification terminée.
+   depuis la racine du monorepo) **et que `npm test` est vert** avant de considérer une
+   modification terminée. Depuis le chantier T1 (04/10/2026), un hook pre-commit lance
+   `npm test` et bloque le commit s'il échoue — ne jamais le contourner ; si une capture
+   datée (`packages/core/test/snapshots/`) diffère, c'est soit une régression à corriger,
+   soit un changement voulu à acter avec `UPDATE_SNAPSHOTS=1 npm test` (et à expliquer dans
+   le commit).
 3. **Bumper `APP_VERSION`** (dans `apps/perso/src/App.jsx`) et `"version"` (dans
    `apps/perso/package.json`) à chaque changement livré.
 4. **Déployer sur le MÊME site Netlify existant**, jamais en créer un
@@ -4143,6 +4148,48 @@ coché des séries de rowing dans la journée, pas parce que la séance s'appell
   demain hors planning / planifié. Prompt Coach IA identique (avant/après le même jour).
   Aperçu : dimanche 21h match loggé → « Pourquoi pas les autres ? (5) » sous Demain, sans
   quitter le Dashboard au tap, aucune erreur console. Build `apps/perso` ET `apps/public` propres.
+
+## Chantier T — T1 : tests committés (04/10/2026, apps/perso v3.93.0)
+
+Spec dans `ROADMAP.md` (« Chantier T »). Jusqu'ici, zéro test committé : 11 scripts bruts
+(`packages/core/test/wip/`, chemins absolus, dates relatives à `today()`) relancés à la main.
+T1 les transforme en suite `node --test` (aucune dépendance), lancée par `npm test` à la racine
+et par un hook pre-commit bloquant.
+
+- **`packages/core/test/*.test.mjs`** — 7 fichiers, **55 tests** : `templates` (reps ≤ 12,
+  Full Body, Mobilité sans charge), `recommender` (gates, planning par défaut, `heavyPullDoneOn`,
+  Full Body/postMatch, Lower C), `nextSession` (créneaux, aujourd'hui/demain, `notProposed`),
+  `palier` (seuils, split 5 g, `weekOf`, `isPalierEntry`), `tdee` (zone de recomposition,
+  `recompWindows`), `coach-prompt` (recomposition, paliers, `palier_semaine`, bloc R4, S2).
+  Helpers partagés dans `test/_helpers.mjs` (planning réel de Yoann, fabriques de séances,
+  `summaryOf`, `snapshot`).
+- **Les trois régressions de septembre ont leur test nommé** : « déjà fait aujourd'hui »
+  (14/09, Lower C + Escalade loggés → tous deux écartés, Repos seul ; et un Basket loggé ne
+  bloque toujours PAS Lower), Lower C jamais suggéré (14/09, `matchWeek` → Lower C), notes
+  absentes du Bilan (07/09, fenêtre 90 j : J−60 incluse, J−120 exclue, aucun bloc sans note).
+- **Horloge injectable `setClock(fn)`** (`packages/core/src/dateUtils.js`, additif) :
+  `today()`/`nowHM()` lisent `_now()` au lieu de `new Date()`. **Réservée aux tests** — l'app ne
+  l'appelle jamais, défaut strictement inchangé. C'était le seul moyen de rendre déterministes
+  les sorties qui passent par `today()` (prompt Coach IA : ~20 appels dans `prompt.js`,
+  réécrire tout ça en `asOf` aurait été un refactor risqué pour un bénéfice de test). Tous les
+  tests figent l'horloge au **dimanche 04/10/2026 10:00** (`fixClock()`), hors fenêtre de
+  sèche, dimanche de match dans le planning de test.
+- **Captures datées** (`test/snapshots/`) : `recommender.json` (11 scénarios, sortie complète)
+  et `coach-prompt.json` (system/user quotidien + bilan pour les **4 phases**, texte complet
+  plutôt qu'un hash — un écart se lit en diff). Fichier absent → écrit ; sinon comparé en
+  `deepEqual`. **`UPDATE_SNAPSHOTS=1 npm test` ré-écrit** : c'est l'acte volontaire qui remplace
+  les captures avant/après manuelles via `git stash` des chantiers R/S.
+- **Attente corrigée en portant r3** : les tests r3 d'origine attendaient encore le barème
+  ±150/±200 remplacé par le pas fixe ±100 en v3.88.1 (r3b) — alignés sur le comportement
+  actuel. Et une assertion ajoutée a documenté un fait V7 : pour des dates sans `foodLog`,
+  `recompWindows` lit `macroLog` en 4/4/9 (200/260/80 → 2560), pas son champ `kcal`.
+- **Hook pre-commit** : `.githooks/pre-commit` (committé) + `git config core.hooksPath
+  .githooks`, posé par le script `prepare` du `package.json` racine à chaque `npm install`
+  (avec `|| true` pour ne jamais casser l'install Netlify). Vérifié : code de sortie 1 avec un
+  test en échec, 0 quand tout est vert.
+- **`test/wip/` supprimé** ; `cdp.mjs` (utilitaire adb + CDP, pas un test) déplacé en
+  `apps/perso/scripts/cdp.mjs` — mémoire `project_native_localstorage_write` mise à jour.
+- Build `apps/perso` ET `apps/public` propres. Aucun changement de comportement de l'app.
 
 ## Comment je veux qu'on travaille
 

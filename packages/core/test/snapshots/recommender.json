@@ -1,0 +1,255 @@
+{
+  "vide": {
+    "suggestions": [
+      {
+        "type": "Upper A",
+        "score": 51,
+        "reason": "Upper 0/2 cette semaine · dernier jamais fait."
+      },
+      {
+        "type": "Lower A",
+        "score": 41,
+        "reason": "Lower 0/2 cette semaine · dernier jamais fait. Douleur genou jamais notée — prudence par défaut. Charge prudente, tempo 6 s."
+      },
+      {
+        "type": "Escalade",
+        "score": 17,
+        "reason": "0× cette semaine · dernière jamais fait. Compte comme volume tirage : à placer un jour Lower ou off."
+      }
+    ],
+    "avoid": []
+  },
+  "genouRouge": {
+    "suggestions": [
+      {
+        "type": "Upper A",
+        "score": 69,
+        "reason": "Upper 0/2 cette semaine · dernier jamais fait. Genou à ménager → c'est l'option sûre, jambes au repos."
+      },
+      {
+        "type": "Repos / mobilité",
+        "score": 45,
+        "reason": "Décharge : mobilité douce + routine de rééduc autonome."
+      },
+      {
+        "type": "Escalade",
+        "score": 17,
+        "reason": "0× cette semaine · dernière jamais fait. Compte comme volume tirage : à placer un jour Lower ou off."
+      }
+    ],
+    "avoid": [
+      {
+        "type": "Lower A / B",
+        "score": 0,
+        "reason": "Genou : pas revenu à la base sous 24 h. Attendre le retour à la base."
+      },
+      {
+        "type": "Basket",
+        "score": 0,
+        "reason": "Sauts et changements de direction : à proscrire tant que le genou n'est pas revenu à sa base."
+      }
+    ]
+  },
+  "genouAmbre": {
+    "suggestions": [
+      {
+        "type": "Upper A",
+        "score": 51,
+        "reason": "Upper 0/2 cette semaine · dernier jamais fait."
+      },
+      {
+        "type": "Lower A",
+        "score": 41,
+        "reason": "Lower 0/2 cette semaine · dernier jamais fait. Genou sensible (4/10) → charge prudente, tempo 6 s."
+      },
+      {
+        "type": "Escalade",
+        "score": 17,
+        "reason": "0× cette semaine · dernière jamais fait. Compte comme volume tirage : à placer un jour Lower ou off."
+      }
+    ],
+    "avoid": []
+  },
+  "lowerAujourdhui": {
+    "suggestions": [
+      {
+        "type": "Upper A",
+        "score": 51,
+        "reason": "Upper 0/2 cette semaine · dernier jamais fait."
+      },
+      {
+        "type": "Escalade",
+        "score": 23,
+        "reason": "0× cette semaine · dernière jamais fait. Compte comme volume tirage : à placer un jour Lower ou off. Lower déjà fait aujourd'hui : bon jour pour l'escalade (pas de conflit coude)."
+      },
+      {
+        "type": "Repos / mobilité",
+        "score": 5,
+        "reason": "1 j consécutifs d'entraînement."
+      }
+    ],
+    "avoid": [
+      {
+        "type": "Lower A / B",
+        "score": 0,
+        "reason": "Lower déjà fait aujourd'hui — deuxième dose déconseillée."
+      },
+      {
+        "type": "Basket",
+        "score": 0,
+        "reason": "Expo genou déjà faite aujourd'hui — deuxième dose déconseillée."
+      }
+    ]
+  },
+  "upperHierEscalade": {
+    "suggestions": [
+      {
+        "type": "Lower A",
+        "score": 51,
+        "reason": "Lower 0/2 cette semaine · dernier jamais fait."
+      },
+      {
+        "type": "Upper B",
+        "score": 33,
+        "reason": "Upper 1/2 cette semaine · dernier hier."
+      },
+      {
+        "type": "Basket",
+        "score": 17,
+        "reason": "0× cette semaine · dernier jamais fait. Passer par l'échauffement guidé."
+      }
+    ],
+    "avoid": []
+  },
+  "sommeilCourt": {
+    "suggestions": [
+      {
+        "type": "Upper A",
+        "score": 45,
+        "reason": "Upper 0/2 cette semaine · dernier jamais fait. Sommeil de qualité faible (5h, qualité 1/4) → séance allégée ou repos conseillé."
+      },
+      {
+        "type": "Lower A",
+        "score": 45,
+        "reason": "Lower 0/2 cette semaine · dernier jamais fait. Sommeil de qualité faible (5h, qualité 1/4) → séance allégée ou repos conseillé."
+      },
+      {
+        "type": "Repos / mobilité",
+        "score": 19,
+        "reason": "0 j consécutifs d'entraînement. 2 nuits courtes ou de mauvaise qualité sur les 3 derniers jours."
+      }
+    ],
+    "avoid": []
+  },
+  "charge": {
+    "suggestions": [
+      {
+        "type": "Upper B",
+        "score": 15,
+        "reason": "Upper 2/2 cette semaine · dernier hier. 7 séances sur les 3 derniers jours → fatigue à surveiller."
+      },
+      {
+        "type": "Repos / mobilité",
+        "score": 13,
+        "reason": "3 j consécutifs d'entraînement. 7 séances sur les 3 derniers jours → fatigue à surveiller."
+      },
+      {
+        "type": "Escalade",
+        "score": 12,
+        "reason": "1× cette semaine · dernière il y a 2 j. Compte comme volume tirage : à placer un jour Lower ou off. Lower déjà fait aujourd'hui : bon jour pour l'escalade (pas de conflit coude). 7 séances sur les 3 derniers jours → fatigue à surveiller."
+      }
+    ],
+    "avoid": [
+      {
+        "type": "Lower A / B",
+        "score": 0,
+        "reason": "Lower déjà fait aujourd'hui — deuxième dose déconseillée."
+      },
+      {
+        "type": "Basket",
+        "score": 0,
+        "reason": "Expo genou déjà faite aujourd'hui — deuxième dose déconseillée."
+      }
+    ]
+  },
+  "planUpper": {
+    "suggestions": [
+      {
+        "type": "Upper A",
+        "score": 61,
+        "reason": "Upper 0/2 cette semaine · dernier jamais fait. Planning idéal du jour : Upper — proposition par défaut."
+      },
+      {
+        "type": "Lower A",
+        "score": 51,
+        "reason": "Lower 0/2 cette semaine · dernier jamais fait."
+      },
+      {
+        "type": "Basket",
+        "score": 17,
+        "reason": "0× cette semaine · dernier jamais fait. Passer par l'échauffement guidé."
+      }
+    ],
+    "avoid": []
+  },
+  "planLowerMatch": {
+    "suggestions": [
+      {
+        "type": "Lower C",
+        "score": 61,
+        "reason": "Lower 0/2 cette semaine · dernier jamais fait. Planning idéal du jour : Lower — proposition par défaut."
+      },
+      {
+        "type": "Upper A",
+        "score": 51,
+        "reason": "Upper 0/2 cette semaine · dernier jamais fait."
+      },
+      {
+        "type": "Basket",
+        "score": 17,
+        "reason": "0× cette semaine · dernier jamais fait. Passer par l'échauffement guidé."
+      }
+    ],
+    "avoid": []
+  },
+  "postMatch": {
+    "suggestions": [
+      {
+        "type": "Full Body",
+        "score": 61,
+        "reason": "Lower 0/2 cette semaine · dernier jamais fait. Lendemain de match : Full Body (HSR genou + chaîne postérieure à 2-3 reps en réserve + pecs/dos/épaules). Planning idéal du jour : Full Body — proposition par défaut."
+      },
+      {
+        "type": "Upper A",
+        "score": 51,
+        "reason": "Upper 0/2 cette semaine · dernier jamais fait."
+      },
+      {
+        "type": "Basket",
+        "score": 17,
+        "reason": "0× cette semaine · dernier jamais fait. Passer par l'échauffement guidé."
+      }
+    ],
+    "avoid": []
+  },
+  "basketPrevu": {
+    "suggestions": [
+      {
+        "type": "Basket",
+        "score": 999,
+        "reason": "C'est le jour de l'entraînement — Basket prévu aujourd'hui. Passer par l'échauffement guidé."
+      },
+      {
+        "type": "Upper A",
+        "score": 51,
+        "reason": "Upper 0/2 cette semaine · dernier jamais fait."
+      },
+      {
+        "type": "Lower A",
+        "score": 51,
+        "reason": "Lower 0/2 cette semaine · dernier jamais fait."
+      }
+    ],
+    "avoid": []
+  }
+}
