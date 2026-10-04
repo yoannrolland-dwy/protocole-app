@@ -48,7 +48,7 @@ export function exoProgress(sessions) {
     s.exercices.forEach((e) => {
       const b = bestSet(e);
       if (!b) return;
-      (byExo[e.nom] ||= []).push({ d: s.date, mode: e.mode, ...b });
+      (byExo[e.nom] ||= []).push({ d: s.date, mode: e.mode, rir: e.rir ?? null, ...b });
     });
   });
   return Object.entries(byExo).map(([nom, hist]) => {
@@ -66,6 +66,9 @@ export function exoProgress(sessions) {
       exo: nom,
       series_max: h.map((x) => `${x.d.slice(5)} ${isTimeMode(x.mode) ? `${x.val}s` : `${x.poids}x${x.val}`}`),
       tendance,
+      // Reps en réserve (T4, 04/10/2026) : une par séance, dans le même ordre que `series_max`
+      // (`null` = non renseigné). Clé omise si aucune séance n'en a — prompt identique à avant.
+      ...(h.some((x) => x.rir != null) ? { rir: h.map((x) => x.rir ?? null) } : {}),
     };
   });
 }
@@ -102,7 +105,7 @@ export function exerciseSessions(training, nom) {
       const best = bestSet(e);
       if (!best) return null;
       return {
-        date: s.date, type: s.type, mode: e.mode, perLeg: !!e.perLeg,
+        date: s.date, type: s.type, mode: e.mode, perLeg: !!e.perLeg, rir: e.rir ?? null,
         best, score: setScore(best, e.mode),
         series: (e.series || []).filter((x) => x.fait && (+x.poids > 0 || +x.val > 0)),
       };
@@ -304,10 +307,15 @@ export function progressiveOverloadSuggestion(sessions, nom) {
 
   // Étend la fenêtre en remontant tant que chaque paire consécutive reste "stable" — pas
   // figée à PLATEAU_STABLE_STREAK, pour connaître la vraie durée du plateau.
+  // T4 (04/10/2026) : une paire « stable » dont le RIR a AUGMENTÉ n'est pas un plateau — même
+  // série faite avec plus de reps en réserve = effort qui baisse = progression réelle. La paire
+  // ne compte que si les deux RIR sont renseignés ; sinon (donnée absente) la règle d'avant.
+  const rirUp = (cur, prev) => cur.rir != null && prev.rir != null && cur.rir > prev.rir;
   let start = sessions.length - 1;
   while (start > 0
     && !beats(sessions[start].best, sessions[start - 1].best, last.mode)
-    && !beats(sessions[start - 1].best, sessions[start].best, last.mode)) {
+    && !beats(sessions[start - 1].best, sessions[start].best, last.mode)
+    && !rirUp(sessions[start], sessions[start - 1])) {
     start--;
   }
   const streak = sessions.slice(start);

@@ -4253,6 +4253,36 @@ seulement (`apps/perso/src/App.jsx`), aucun changement dans `packages/core`.
   console. Pas de nouveau test Node (UI pure) ; 62 tests toujours verts. Build `apps/perso` ET
   `apps/public` propres.
 
+## Chantier T — T4 : reps en réserve par exercice (04/10/2026, apps/perso v3.96.0)
+
+Spec dans `ROADMAP.md`. Doute explicite de Yoann à vérifier à l'usage : utile seulement si
+rempli honnêtement — d'où un champ OPTIONNEL, jamais imposé, jamais présélectionné.
+
+- **Donnée** : `rir` (0, 1, 2 ou 3 = « 3+ ») sur l'entrée d'**exercice** du `trainingLog` (pas
+  par série), **additif** — clé absente si non renseigné, aucune migration, les séances
+  antérieures restent identiques au bit près. `validate()` ne l'écrit que si non null ;
+  `buildExos` le recharge à la réouverture d'une séance en modification ; `substitute()` le
+  remet à null (un autre exercice = un autre effort).
+- **Carnet** (`MuscuLogger`) : rangée « Reps en réserve » 0 / 1 / 2 / 3+ sous la grille de
+  séries, exercice ouvert seulement, re-tap = désélection. Absente en mode « temps ».
+- **`packages/core/src/training.js`** : `exerciseSessions` porte `rir` (null si absent) ;
+  `exoProgress` ajoute `rir: [...]` (même ordre que `series_max`) **seulement si une séance en
+  a** ; `progressiveOverloadSuggestion` : une paire « stable » dont le RIR a **augmenté** (les
+  deux renseignés) casse la série de plateau — même série faite avec plus de reps en réserve =
+  effort qui baisse = progression. RIR constant, en baisse, ou absent sur l'une des deux
+  séances → règle d'avant inchangée.
+- **Coach IA** (`prompt.js`) : légende « "rir" = reps en réserve… une série identique avec plus
+  de RIR est une progression » ajoutée à PROGRESSION PAR EXERCICE **seulement si un exercice
+  porte un RIR** — prompt identique à avant sinon (capture datée T1 inchangée).
+- **Fiche Progression** (`ExerciseDetail`) : « 32 kg × 9 · RIR 2 » à côté de la meilleure
+  série quand renseigné.
+- **Tests** : `training.test.mjs`, 6 tests (RIR porté, plateau inchangé sans RIR, RIR qui monte
+  casse le plateau, RIR constant/baisse/partiel sans effet, `exoProgress` avec/sans clé, légende
+  du prompt conditionnelle) — **68 tests** au total. Aperçu (375 px) : chip 2 sélectionnée,
+  séance validée → `rir: 2` persisté sur le seul exercice renseigné (clé absente ailleurs),
+  fiche « 32 kg × 9 · RIR 2 », réouverture en modification → chip 2 présélectionnée. Aucune
+  erreur console. Build `apps/perso` ET `apps/public` propres.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.

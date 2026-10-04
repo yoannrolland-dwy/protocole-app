@@ -814,7 +814,7 @@ chantier, chacun buildé/testé/commité, install native à la fin de chaque lot
   (`pickType`), au lieu de l'onglet Séances puis la tuile. Pas de bouton quand la journée est
   fermée.
 
-## T4 — Reps en réserve par exercice
+## T4 — Reps en réserve par exercice ✅ livré le 04/10/2026 (apps/perso v3.96.0, voir CLAUDE.md)
 - Choix 0 / 1 / 2 / 3+ **par exercice** (pas par série), optionnel, stocké dans l'entrée
   d'exercice du `trainingLog` (`rir`, additif — aucune migration). Doute explicite de Yoann à
   vérifier à l'usage : utile seulement si rempli honnêtement.

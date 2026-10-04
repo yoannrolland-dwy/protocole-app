@@ -48,7 +48,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.95.0";
+const APP_VERSION = "3.96.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -1034,7 +1034,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
         consigne: lib ? lib.c : ex.c, def: savedDef, last: savedLast,
         groupe: lib ? lib.groupe : ex.groupe, mouvement: lib ? lib.mouvement : ex.mouvement,
         materiel: lib ? lib.materiel : ex.materiel, tendon: lib ? lib.tendon : ex.tendon,
-        famille: ex.famille, origine: wasSubstituted ? ex.n : undefined,
+        famille: ex.famille, origine: wasSubstituted ? ex.n : undefined, rir: savedEx.rir ?? null,
         series: savedEx.series.map((s) => ({ poids: s.poids, val: s.val, fait: s.fait, leg: s.leg })) };
     }
 
@@ -1056,7 +1056,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
       : [...Array(nSeries)].map((_, k) => mk(null, k));
     return { nom: ex.n, mode: ex.mode, perLeg: !!ex.perLeg, opt: !!ex.opt, rest: ex.rest,
       target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${ex.s} × ${ex.r}`, consigne: ex.c, def, last,
-      groupe: ex.groupe, mouvement: ex.mouvement, materiel: ex.materiel, tendon: ex.tendon, famille: ex.famille, series };
+      groupe: ex.groupe, mouvement: ex.mouvement, materiel: ex.materiel, tendon: ex.tendon, famille: ex.famille, rir: null, series };
   });
 
   // Brouillon auto-sauvegardé (localStorage, hors DATA_KEYS — voir Règles absolues #1) :
@@ -1187,6 +1187,8 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
     return { ...e, series: [...e.series, { poids: proto.poids ?? "", val: proto.val ?? medianTarget(e.target), fait: false, leg }] };
   }));
   const rmSet = (ei, si) => setExos((p) => p.map((e, i) => i !== ei ? e : { ...e, series: e.series.filter((_, j) => j !== si) }));
+  // T4 : RIR par exercice (0/1/2/3+ → 0/1/2/3), re-tap = désélection (optionnel, jamais imposé).
+  const setRir = (ei, v) => setExos((p) => p.map((e, i) => i !== ei ? e : { ...e, rir: e.rir === v ? null : v }));
 
   // Substitue un exercice par une alternative de la bibliothèque (même groupe/mouvement,
   // donc même sollicitation tendon — voir CLAUDE.md). Le NOM/materiel/tendon/consigne
@@ -1214,7 +1216,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
       // `origine` garde le nom du gabarit d'ORIGINE (pas le précédent remplacement) à
       // travers plusieurs substitutions successives — c'est lui qui permet de
       // retrouver le bon exercice à la réouverture de la séance (voir buildExos).
-      return { ...e, nom: lib.n, consigne: lib.c, groupe: lib.groupe, mouvement: lib.mouvement,
+      return { ...e, rir: null, nom: lib.n, consigne: lib.c, groupe: lib.groupe, mouvement: lib.mouvement,
         materiel: lib.materiel, tendon: lib.tendon, famille: lib.famille, def, last, series,
         origine: e.origine ?? e.nom };
     }));
@@ -1229,6 +1231,8 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
       ...(template.withMeta ? { duration: round(duration), rpe } : {}),
       exercices: exos.map((e) => ({
         nom: e.nom, mode: e.mode, perLeg: e.perLeg, origine: e.origine,
+        // T4 : reps en réserve par exercice, optionnel — clé absente si non renseigné (additif).
+        ...(e.rir != null ? { rir: e.rir } : {}),
         series: e.series
           .filter((s) => s.poids !== "" || s.val !== "" || s.fait)
           .map((s) => ({ poids: s.poids === "" ? 0 : +s.poids, val: s.val === "" ? 0 : +s.val, fait: s.fait, leg: s.leg })),
@@ -1425,6 +1429,23 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
                   </>
                 )}
 
+                {/* Reps en réserve (T4, 04/10/2026) : un choix par EXERCICE, pas par série ;
+                    optionnel — rien de présélectionné, re-tap pour effacer. Pas en mode temps. */}
+                {e.mode !== "temps" && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 9, color: C.muted, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, marginRight: 2 }}>Reps en réserve</span>
+                    {[0, 1, 2, 3].map((v) => {
+                      const on = e.rir === v;
+                      return (
+                        <button key={v} onClick={() => setRir(ei, v)} style={{
+                          minWidth: 30, height: 26, padding: "0 8px", borderRadius: 6, cursor: "pointer", fontFamily: C.mono, fontSize: 11, fontWeight: 800,
+                          background: on ? C.accent : C.bg, color: on ? "#000" : C.muted, border: `1.5px solid ${on ? C.accent : C.border}`,
+                        }}>{v === 3 ? "3+" : v}</button>
+                      );
+                    })}
+                  </div>
+                )}
+
                 <div style={{ display: "flex", gap: 12, marginTop: 12, alignItems: "center" }}>
                   <button onClick={() => { const s = e.mode === "temps" ? parseSecs(e.target) : e.rest; fireTimer(s); recordLast(ei, s); }}
                     style={{ background: "none", border: "none", color: C.accent, fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
@@ -1578,7 +1599,9 @@ function ExerciseDetail({ training, knee, nom, onBack }) {
           <div key={i} style={{ padding: "9px 0", borderTop: `1px solid ${C.divider}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <span style={{ fontSize: 12, color: C.text, fontWeight: 700, fontFamily: C.mono }}>{fmt(s.date)}</span>
-              <span style={{ fontSize: 12, color: C.accent, fontWeight: 800, fontFamily: C.mono }}>{setLabel(s.best, s.mode)}</span>
+              <span style={{ fontSize: 12, color: C.accent, fontWeight: 800, fontFamily: C.mono }}>
+                {setLabel(s.best, s.mode)}{s.rir != null && <span style={{ fontSize: 10, color: C.muted, fontWeight: 400 }}> · RIR {s.rir === 3 ? "3+" : s.rir}</span>}
+              </span>
             </div>
             <div style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono, marginTop: 3 }}>
               {s.series.map((x, j) => (
