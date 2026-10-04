@@ -4101,6 +4101,49 @@ le recommandeur ne connaissait que la date, jamais l'heure.
   Basket · 999 » (planifié, ouvert tant qu'il n'est pas loggé) + même ligne de demain. Aucune
   erreur console. Build `apps/perso` ET `apps/public` propres.
 
+## Escalade selon le tirage réellement fait + « Pourquoi pas les autres ? » (04/10/2026, apps/perso v3.92.0)
+
+Deux demandes de Yoann après S2 : (1) l'escalade ne doit être bloquée que s'il a réellement
+coché des séries de rowing dans la journée, pas parce que la séance s'appelle Upper/Full Body ;
+(2) pour CHAQUE séance non proposée, une phrase qui dit pourquoi.
+
+- **`heavyPullDoneOn(training, dateKey)`** (`recommender.js`, exporté) : noms des exercices qui
+  chargent la **flexion du coude** (`tendon: "coude"` ET `mouvement: "tirage"` ou `groupe:
+  "biceps"` — rowing, tirage vertical, leurs variantes de la bibliothèque, et **curl marteau**)
+  avec au moins une série **cochée** (`fait`) ce jour-là, quel que soit le type de séance
+  (Upper A/B, Full Body…), y compris via `origine` (exercice substitué). Séances « Mobilité »
+  ignorées (l'iso coude de rééduc ne bloque jamais). Face pull exclu (arrière d'épaule, léger).
+  Métadonnées lues par nom dans `TEMPLATES` + `EXERCISE_LIBRARY`. **Discuté avec Yoann** : le
+  plan horizontal/vertical compte moins que la prise (supination = plus de biceps ; neutre/
+  pronation = brachial/brachio-radial) et le volume de flexion du coude ; l'escalade charge la
+  flexion du coude en isométrie, surtout en pronation. Aucune étude ne lie directement « tirage
+  puis escalade le même jour » au tendon distal du biceps : c'est une gestion de charge
+  prudente, dit tel quel. Curl marteau ajouté à sa demande (exclu au premier jet — incohérent
+  avec cette logique) ; option « lever la règle » (coude sans douleur depuis septembre)
+  proposée et non retenue. Le bloc ESCALADE l'utilise à la place de `upperToday` : raison
+  « Tirage / flexion du coude déjà faits aujourd'hui (…) ». Un Upper/Full Body sans aucune de
+  ces séries cochée n'empêche plus l'escalade. `upperToday` reste utilisé ailleurs (basket même
+  jour, catalogue) — inchangé.
+- **`notProposed`** (`nextSession.js`, aujourd'hui ET demain) : une entrée `{ type, kind,
+  reason }` pour chaque type de `TEMPLATES` (hors Mobilité) non affiché. `kind` : `closed`
+  (match joué), `avoid` (raison du recommandeur ; « Upper A / B » couvre les deux variantes),
+  `slot` (créneau passé, déjà une séance, basket pas au planning), `priority` (« Moins
+  prioritaire (score N) »), `variant` (alternance A/B, semaine de match → Lower C, lendemain de
+  match → Full Body, Full Body seulement le lendemain d'un match). **Demain** applique aussi la
+  règle « basket seulement au planning » : un basket hors planning n'y est ni proposé ni
+  expliqué par un simple score (défaut repéré dans l'aperçu, corrigé avant livraison).
+- **UI** : composant `WhyNot` sous chaque bloc de la carte, **replié par défaut** (« Pourquoi
+  pas les autres ? (N) »), `stopPropagation` pour ne pas ouvrir l'onglet Séances. Aujourd'hui
+  il masque les `avoid` (déjà en rouge au-dessus) et `closed` (la note suffit) ; demain il
+  montre tout (la ligne « À éviter » de demain n'a pas de raison).
+- **Vérifié** : 21 assertions S1 (test « jeudi Upper » mis à jour : avec rowing COCHÉ) + 24
+  nouvelles (`s3-test.mjs`) — rowing coché/non coché, tirage vertical, face pull seul (autorisé),
+  curl marteau coché (bloqué), iso coude de mobilité (jamais bloquant), variante bibliothèque, toutes les séances expliquées dans 4 situations × 2 horizons,
+  phrases attendues (alternance, planning, Full Body, créneau, lendemain de match), basket de
+  demain hors planning / planifié. Prompt Coach IA identique (avant/après le même jour).
+  Aperçu : dimanche 21h match loggé → « Pourquoi pas les autres ? (5) » sous Demain, sans
+  quitter le Dashboard au tap, aucune erreur console. Build `apps/perso` ET `apps/public` propres.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.

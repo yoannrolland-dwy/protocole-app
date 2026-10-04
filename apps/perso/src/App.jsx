@@ -47,7 +47,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.91.0";
+const APP_VERSION = "3.92.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -234,6 +234,32 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
 /* ============================================================
    TAB — DASHBOARD
    ============================================================ */
+// « Pourquoi pas les autres ? » (04/10/2026, demande de Yoann) : une phrase pour chaque type
+// de séance non proposé (`notProposed`, nextSession.js). Replié par défaut — la carte est déjà
+// longue sur téléphone. `stopPropagation` : la carte entière ouvre l'onglet Séances au tap.
+function WhyNot({ items }) {
+  const [open, setOpen] = useState(false);
+  if (!items?.length) return null;
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }} style={{
+        background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit",
+        fontSize: 10.5, color: C.muted, textDecoration: "underline", textUnderlineOffset: 2,
+      }}>{open ? "Masquer" : `Pourquoi pas les autres ? (${items.length})`}</button>
+      {open && (
+        <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+          {items.map((x) => (
+            <div key={x.type} style={{ fontSize: 10.5, lineHeight: 1.4 }}>
+              <span style={{ color: x.kind === "avoid" ? C.dangerText : C.text2, fontWeight: 700 }}>{x.type}</span>
+              <span style={{ color: C.dim }}> — {x.reason}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // « Palier de la semaine » (chantier R, R3, 02/10/2026) : la proposition figée de la semaine
 // (voir l'effet dédié dans `App`), ses raisons chiffrées, et le bouton « Appliquer » — un tap
 // écrit les cibles via `save.targets` (source "palier") et date `appliedAt`. Un `hold` n'a pas
@@ -461,6 +487,7 @@ function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, tra
             ))}
           </div>
         )}
+        <WhyNot items={(next.today.notProposed || []).filter((x) => x.kind !== "avoid" && x.kind !== "closed")} />
         {/* Demain (S2) : toujours affiché — prévision, sous réserve du genou et de la nuit. */}
         <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
           <Label style={{ fontSize: 9, color: C.accent, marginBottom: 4 }}>
@@ -477,6 +504,7 @@ function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, tra
             </div>
           )}
           <div style={{ fontSize: 10, color: C.muted, marginTop: 4, fontStyle: "italic" }}>{next.tomorrow.caveat}</div>
+          <WhyNot items={next.tomorrow.notProposed} />
         </div>
       </Card>
 

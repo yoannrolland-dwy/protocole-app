@@ -30,6 +30,32 @@ import { SPORTS_CATALOG } from "./session/catalog.js";
 import { climbLoad } from "./climbing.js";
 import { isCutWindow } from "./targets.js";
 import { exerciseSessions, exerciseTrend } from "./training.js";
+import { EXERCISE_LIBRARY } from "./session/exercises.js";
+
+// Flexion du coude CHARGÉE (04/10/2026, demande de Yoann) : ce qui empêche l'escalade le même
+// jour n'est plus le TYPE de séance (« Upper fait aujourd'hui ») mais ce qui a été réellement
+// fait — au moins une série COCHÉE d'un exercice taggé coude qui charge la flexion : tirages
+// horizontal ET vertical (rowing, tirage vertical, variantes poulie/disque) et curl marteau
+// (flexion pure, même prise neutre que l'escalade — ajouté après discussion : le plan
+// horizontal/vertical compte moins que la prise et le volume de flexion du coude). Face pull
+// exclu (arrière d'épaule, charge légère). La mobilité (iso coude de rééduc) ne compte jamais.
+// Gestion de charge prudente, pas une conclusion de recherche (dit à Yoann). Métadonnées lues
+// par nom dans les gabarits + la bibliothèque (le journal n'enregistre que `nom`/`origine`).
+const EXO_META = (() => {
+  const m = new Map();
+  Object.values(TEMPLATES).forEach((t) => (t.exos || []).forEach((e) => { if (!m.has(e.n)) m.set(e.n, e); }));
+  EXERCISE_LIBRARY.forEach((e) => { if (!m.has(e.n)) m.set(e.n, e); });
+  return m;
+})();
+const isHeavyPull = (nom) => { const e = nom && EXO_META.get(nom); return !!e && e.tendon === "coude" && (e.mouvement === "tirage" || e.groupe === "biceps"); };
+/** Noms des exercices de tirage lourd avec au moins une série cochée à la date `dateKey`. */
+export function heavyPullDoneOn(training, dateKey) {
+  const names = new Set();
+  (training || []).filter((t) => t.date === dateKey && t.type !== "Mobilité").forEach((t) => (t.exercices || []).forEach((e) => {
+    if ((isHeavyPull(e.nom) || isHeavyPull(e.origine)) && (e.series || []).some((x) => x.fait)) names.add(e.nom);
+  }));
+  return [...names];
+}
 
 // Pénalité (score) quand la zone associée à ce tag est ambre, par type de séance porteur du
 // tag. Magnitude différente par type (l'escalade pèse plus lourd sur le coude que l'Upper, à
@@ -289,6 +315,8 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   const upperToday = todayTypes.some((x) => x.startsWith("Upper") || x === "Full Body");
   const lowerToday = todayTypes.some((x) => x.startsWith("Lower") || x === "Full Body");
   const climbToday = todayTypes.includes("Escalade");
+  // Remplace `upperToday` pour l'escalade (04/10/2026) : séries de tirage réellement cochées.
+  const pullToday = heavyPullDoneOn(training, t0);
   const kneeToday = todayTypes.some((x) => chargeTagsOf(x)?.includes("genou"));
   // Sports du catalogue étendu réellement actifs pour cet utilisateur (Lot F) — absent/vide
   // pour apps/perso, donc aucun des trois blocs ci-dessous ne pousse de suggestion/avoid.
@@ -392,8 +420,8 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
     push(avoid, "Escalade", 0, `Coude : ${E.redWhy}. C'est la séance qui charge le plus le tendon distal du biceps — attendre le retour à la base.`);
   } else if (climbToday) {
     push(avoid, "Escalade", 0, "Escalade déjà faite aujourd'hui — deuxième dose déconseillée.");
-  } else if (upperToday) {
-    push(avoid, "Escalade", 0, "Upper déjà fait aujourd'hui — l'escalade ajoute du volume de tirage (coude).");
+  } else if (pullToday.length) {
+    push(avoid, "Escalade", 0, `Tirage / flexion du coude déjà faits aujourd'hui (${pullToday.join(", ")}) — l'escalade ajouterait une grosse dose de flexion du coude.`);
   } else {
     let cScore = 10 + cap(dClimb) - (dClimb <= 1 ? climbPen : 0) + (lowerToday ? 6 : 0);
     let cReason = `${climb7}× cette semaine · dernière ${ago(dClimb)}. Compte comme volume tirage : à placer un jour Lower ou off.`;
