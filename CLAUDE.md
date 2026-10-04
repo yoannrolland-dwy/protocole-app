@@ -4077,6 +4077,30 @@ le recommandeur ne connaissait que la date, jamais l'heure.
   les 3 avec planning gardent le même ordre (score planifié 61 au lieu de 69). Prompt Coach IA
   identique (avant/après le même jour). Build `apps/perso` ET `apps/public` propres.
 
+## Chantier S — S2 : carte à deux lignes + Coach IA (04/10/2026, apps/perso v3.91.0)
+
+- **Carte « Prochaine séance »** (Dashboard) : calculée par `nextSessions` (S1) au lieu de
+  `recommendSessions` directement. Bloc **« Aujourd'hui »** (top + alternatives + « À éviter
+  aujourd'hui », ou la note « journée terminée — mobilité possible » quand `closed`) et bloc
+  **« Demain · <jour JJ/MM> »** toujours affiché (top, raison, « À éviter : … » compact, mention
+  « Prévision — sous réserve de ton genou et de ta nuit »). Le Dashboard reçoit désormais
+  `planFor: planForDate(basketSchedule)` au lieu de `weeklyPlan`/`matchWeek`/`postMatch`.
+  **Horloge** : un `setInterval` de 5 min (`clock`) force le recalcul — un créneau se ferme à
+  12h/14h sans aucune nouvelle donnée. L'import direct de `recommendSessions` dans `App.jsx`
+  est retiré (plus utilisé).
+- **Coach IA** (`prompt.js`) : `summary.recommandeur` gagne `journee` (« en cours » ou
+  « terminée — <note> ») et `demain` (`{ date, type, motif }`), plus la consigne « journée
+  terminée → ne propose aucune séance aujourd'hui, parle de demain ». Uniquement si
+  `nextSession` est fourni (apps/perso) : sans lui (apps/public), prompt identique au caractère
+  près (vérifié avant/après le même jour via `git stash`). Le `top` du recommandeur reste le
+  calcul « jour entier » — c'est `journee` qui dit au modèle s'il est encore pertinent.
+- **Vérifié** : 3 assertions Node (`s2-test.mjs` : dimanche 21h10 match loggé → `journee`
+  terminée, `demain` Full Body, consigne présente). Aperçu à l'heure RÉELLE (dimanche 21h40) :
+  match loggé → « Aujourd'hui : Match joué aujourd'hui : journée terminée — mobilité possible »
+  + « Demain · lundi 05/10 : Full Body · 61 » ; match pas encore loggé → « Aujourd'hui :
+  Basket · 999 » (planifié, ouvert tant qu'il n'est pas loggé) + même ligne de demain. Aucune
+  erreur console. Build `apps/perso` ET `apps/public` propres.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.

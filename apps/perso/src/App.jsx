@@ -21,13 +21,13 @@ import { TEMPLATES, TYPES, DEFAULT_WEIGHTS, HSR_TABLE, hsrForWeek, hsrParse, par
          PERI, BASKET_PROTOCOLS } from "@rawcare/core/session/templates";
 import { refSet, lastPerf, perfHistory, lastExerciseSets, medianTarget } from "@rawcare/core/session/perf";
 import { EXERCISE_LIBRARY } from "@rawcare/core/session/exercises";
-import { recommendSessions } from "@rawcare/core/recommender";
 import { computeEnergyScore, computeSleepScore, scoreLabel } from "@rawcare/core/energy";
 import { computeFreeInsights } from "@rawcare/core/insights";
 import { computeBilanFacts } from "@rawcare/core/bilan";
 import { PHASES, phaseTarget as phaseTargetCore, DEFAULT_TARGETS, targetsForDate,
          kcalFromMacros, kcalOfEntry, tdeeNow, weeklyKcalTrend, buildKcalByDate, weightTrend7, recompWindows } from "@rawcare/core/targets";
 import { recommendTargets, palierWeekOf, loggedRateLastDays } from "@rawcare/core/palier";
+import { nextSessions } from "@rawcare/core/nextSession";
 import { buildCoachPrompt, buildCoachBriefing, buildBilanPrompt, splitCarnet, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
 import { syncHealthConnect } from "./healthSync.js";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "./timerNotify.js";
@@ -47,7 +47,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.90.0";
+const APP_VERSION = "3.91.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -288,7 +288,7 @@ function PalierCard({ palier, targets, onApply }) {
   );
 }
 
-function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule, weeklyPlan, matchWeek, postMatch, palier, onApplyPalier }) {
+function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule, planFor, palier, onApplyPalier }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast && tgtW != null ? round(wLast.kg - tgtW) : null;
@@ -302,7 +302,18 @@ function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, tra
   const mToday = macros.find((m) => m.date === today());
   const kcalToday = mToday ? Math.round(kcalOfEntry(mToday)) : null;
 
-  const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee, sleep, targets, scheme, basketSchedule, weeklyPlan, energy, matchWeek, postMatch }), [training, knee, sleep, targets, scheme, basketSchedule, weeklyPlan, energy, matchWeek, postMatch]);
+  // Recommandeur temporel (chantier S, S2, 04/10/2026) : « Aujourd'hui » (ce qui reste faisable à
+  // cette heure) + « Demain » (prévision), via `nextSessions` (packages/core/src/nextSession.js).
+  // `clock` force un recalcul toutes les 5 min : l'heure change même sans nouvelle donnée
+  // (un créneau se ferme à 12h/14h). Le retour au premier plan re-rend déjà le Dashboard.
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => { const id = setInterval(() => setClock(Date.now()), 5 * 60 * 1000); return () => clearInterval(id); }, []);
+  const next = useMemo(() => nextSessions({
+    now: new Date(clock),
+    base: { training, knee, sleep, targets, scheme, basketSchedule, energy },
+    planFor,
+  }), [training, knee, sleep, targets, scheme, basketSchedule, energy, clock]);
+  const { suggestions, avoid } = next.today;
 
   const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
   const waterToday = mToday?.water ?? 0;
@@ -415,11 +426,18 @@ function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, tra
             <span style={{ fontSize: 10.5, color: "#e8a33d", lineHeight: 1.4 }}>Douleur genou pas notée aujourd'hui — le recommandeur reste prudent par défaut sans cette info.</span>
           </div>
         )}
-        <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginBottom: 3 }}>
-          <div style={{ fontSize: 16, color: C.text, fontWeight: 800 }}>{suggestions[0]?.type}</div>
-          <div style={{ fontFamily: C.mono, fontSize: 10, color: C.dim }}>{suggestions[0]?.score}</div>
-        </div>
-        <Body>{suggestions[0]?.reason}</Body>
+        <Label style={{ fontSize: 9, color: C.accent, marginBottom: 4 }}>Aujourd'hui</Label>
+        {next.today.status === "closed" ? (
+          <Body style={{ fontSize: 11.5, color: C.text2 }}>{next.today.note}</Body>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginBottom: 3 }}>
+              <div style={{ fontSize: 16, color: C.text, fontWeight: 800 }}>{suggestions[0]?.type}</div>
+              <div style={{ fontFamily: C.mono, fontSize: 10, color: C.dim }}>{suggestions[0]?.score}</div>
+            </div>
+            <Body>{suggestions[0]?.reason}</Body>
+          </>
+        )}
         {suggestions.slice(1).map((r) => (
           <div key={r.type} style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.divider}` }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
@@ -443,6 +461,23 @@ function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, tra
             ))}
           </div>
         )}
+        {/* Demain (S2) : toujours affiché — prévision, sous réserve du genou et de la nuit. */}
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+          <Label style={{ fontSize: 9, color: C.accent, marginBottom: 4 }}>
+            Demain · {new Date(next.tomorrow.date + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "numeric" })}
+          </Label>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 7, marginBottom: 3 }}>
+            <div style={{ fontSize: 14, color: C.text, fontWeight: 800 }}>{next.tomorrow.suggestions[0]?.type ?? "—"}</div>
+            <div style={{ fontFamily: C.mono, fontSize: 9.5, color: C.dim }}>{next.tomorrow.suggestions[0]?.score}</div>
+          </div>
+          {next.tomorrow.suggestions[0] && <div style={{ fontSize: 10.5, color: C.dim, lineHeight: 1.4 }}>{next.tomorrow.suggestions[0].reason}</div>}
+          {next.tomorrow.avoid.length > 0 && (
+            <div style={{ fontSize: 10.5, color: C.dangerText, lineHeight: 1.4, marginTop: 4 }}>
+              À éviter : {next.tomorrow.avoid.map((a) => a.type).join(", ")}
+            </div>
+          )}
+          <div style={{ fontSize: 10, color: C.muted, marginTop: 4, fontStyle: "italic" }}>{next.tomorrow.caveat}</div>
+        </div>
       </Card>
 
       {/* Constats gratuits */}
@@ -3166,6 +3201,9 @@ export default function App({ silent = false } = {}) {
         foodLog: getSync("foodLog", []), foodOverrides: getSync("foodOverrides", {}),
         profile, journal, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule),
         matchWeek: isMatchWeek(basketSchedule), postMatch: isPostMatchDay(basketSchedule), targetHistory, palier: palierWeekly,
+        // Recommandeur temporel (S2) : même verdict Aujourd'hui/Demain que la carte du Dashboard.
+        nextSession: nextSessions({ now: new Date(), base: { training, knee, sleep, targets, scheme, basketSchedule,
+          energy: computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps }) }, planFor: planForDate(basketSchedule) }),
         energy: computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps }),
       }, note),
     buildBriefing: () =>
@@ -3246,7 +3284,7 @@ export default function App({ silent = false } = {}) {
           <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, climbScheme, setClimbScheme, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule), matchWeek: isMatchWeek(basketSchedule), postMatch: isPostMatchDay(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier }} openSettings={() => setShowSettings(true)} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme, basketSchedule, planFor: planForDate(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier }} openSettings={() => setShowSettings(true)} />}
             {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
             {tab === "sleep" && <SleepTab {...{ sleep, rhr, steps, naps, save }} />}
             {tab === "steps" && <StepsTab {...{ steps, save }} />}

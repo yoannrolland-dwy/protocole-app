@@ -20,7 +20,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | R3 | Recomposition : « Palier de la semaine » (moteur + carte + Appliquer + coach) | gros | ✅ 02/10/2026 (v3.87.0) |
 | R4 | Recomposition : bloc de règles Coach IA attaché à la phase | petit | ✅ 02/10/2026 (v3.88.0) |
 | S1 | Recommandeur temporel : créneaux, horizon aujourd'hui/demain, planning par défaut (core) | moyen | ✅ 04/10/2026 (v3.90.0) |
-| S2 | Recommandeur temporel : carte à deux lignes + Coach IA | petit | ⬜ |
+| S2 | Recommandeur temporel : carte à deux lignes + Coach IA | petit | ✅ 04/10/2026 (v3.91.0) |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il
 alimente le recommandeur + le Coach IA. V2 tôt parce que c'est une protection, pas
