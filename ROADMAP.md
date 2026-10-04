@@ -19,7 +19,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | R2 | Recomposition : zone de déficit dans l'onglet TDEE + historique des paliers | moyen | ✅ 02/10/2026 (v3.86.0) |
 | R3 | Recomposition : « Palier de la semaine » (moteur + carte + Appliquer + coach) | gros | ✅ 02/10/2026 (v3.87.0) |
 | R4 | Recomposition : bloc de règles Coach IA attaché à la phase | petit | ✅ 02/10/2026 (v3.88.0) |
-| S1 | Recommandeur temporel : créneaux, horizon aujourd'hui/demain, planning par défaut (core) | moyen | ⬜ spécifié le 04/10/2026 |
+| S1 | Recommandeur temporel : créneaux, horizon aujourd'hui/demain, planning par défaut (core) | moyen | ✅ 04/10/2026 (v3.90.0) |
 | S2 | Recommandeur temporel : carte à deux lignes + Coach IA | petit | ⬜ |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il

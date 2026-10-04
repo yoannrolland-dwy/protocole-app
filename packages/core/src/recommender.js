@@ -84,18 +84,36 @@ function isScheduledBasket(basketSchedule, dateKey) {
 // d'alterner A/B — c'est le seul effet de ce paramètre, le reste du scoring (charge,
 // fatigue, genou) est partagé sans distinction.
 const PLAN_BONUS = 18;
+// Score réservé au basket planifié (entraînement fixe / match) : au-dessus de tout calcul.
+const SCHEDULED_SCORE = 999;
+// Planning idéal = proposition PAR DÉFAUT (chantier S, 04/10/2026, décision de Yoann —
+// remplace le bonus modéré +18 du 05/09/2026) : le type planifié encore en lice passe devant
+// toutes les autres suggestions (sauf le basket planifié), d'au moins `PLAN_LEAD` points.
+// Le recommandeur ne s'en écarte que pour une raison EXPLICITE : une sécurité (`avoid` —
+// genou, déjà fait aujourd'hui…, le type n'est alors même plus dans `sugg`) ou un signal de
+// fatigue (sommeil/charge/énergie), auquel cas l'ancien bonus modéré s'applique et la raison
+// le dit — le planning redevient adaptable ces jours-là.
+const PLAN_LEAD = 10;
 function matchesPlanFamily(type, family) {
   if (family === "Repos") return type.startsWith("Repos");
   return type.startsWith(family);
 }
-function applyPlanBonus(sugg, weeklyPlan) {
+function applyPlanBonus(sugg, weeklyPlan, fatigue) {
   if (!weeklyPlan?.length) return;
-  sugg.forEach((s) => {
+  const planned = sugg.filter((s) => weeklyPlan.some((f) => matchesPlanFamily(s.type, f)));
+  if (!planned.length) return;
+  const others = sugg.filter((s) => !planned.includes(s) && s.score < SCHEDULED_SCORE);
+  const maxOther = others.length ? Math.max(...others.map((s) => s.score)) : 0;
+  planned.forEach((s) => {
     const family = weeklyPlan.find((f) => matchesPlanFamily(s.type, f));
-    if (family) {
+    if (s.score >= SCHEDULED_SCORE) return; // basket planifié : déjà en tête, rien à ajouter
+    if (fatigue) {
       s.score += PLAN_BONUS;
-      s.reason += ` Planning idéal du jour : ${family} — bonus de priorité (reste adaptable).`;
+      s.reason += ` Planning idéal du jour : ${family} — signal de fatigue, le planning n'est pas imposé aujourd'hui.`;
+      return;
     }
+    s.score = Math.max(s.score, maxOther + PLAN_LEAD);
+    s.reason += ` Planning idéal du jour : ${family} — proposition par défaut.`;
   });
 }
 
@@ -105,8 +123,15 @@ function applyPlanBonus(sugg, weeklyPlan) {
 // Lower A/B/C. Absent/faux → comportement identique à avant. "Full Body" compte à la fois
 // comme Upper ET comme Lower dans les décomptes et les "déjà fait aujourd'hui" — il contient
 // les deux.
-export function recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme, extraSports, basketSchedule, weeklyPlan, energy, matchWeek, postMatch }) {
-  const t0 = today();
+// `asOf` (chantier S, 04/10/2026, optionnel) : date de référence de la recommandation, au
+// format "AAAA-MM-JJ". Absent → `today()`, comportement identique à avant. Sert à calculer
+// la séance de DEMAIN (`nextSession.js`) : toutes les fenêtres, "déjà fait aujourd'hui",
+// fraîcheur des relevés douleur et basket planifié dérivent de cette seule variable `t0` —
+// c'est la seule lecture de la date du jour dans ce module (audit du 04/10/2026).
+// `limit` (chantier S, optionnel, défaut 3) : nombre de suggestions renvoyées — `nextSession.js`
+// demande toute la liste pour filtrer par créneau AVANT de couper à 3.
+export function recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme, extraSports, basketSchedule, weeklyPlan, energy, matchWeek, postMatch, asOf, limit = 3 }) {
+  const t0 = asOf ?? today();
   const isUpper = (t) => t.type === "Upper A" || t.type === "Upper B" || t.type === "Full Body";
   // "Lower C" (01/09/2026, semaine avec match) compte dans le volume/dernier-fait Lower
   // affiché. Jusqu'au 14/09/2026, elle restait hors de `variant("Lower A","Lower B")` —
@@ -346,7 +371,7 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
     // Planning fixe (01/09/2026) : entraînement/match déjà prévu aujourd'hui — plus une
     // suggestion parmi d'autres à évaluer, une certitude. Score au-dessus de tout calcul
     // possible pour garantir la première place, texte dédié plutôt que le score habituel.
-    push(sugg, "Basket", 999, "C'est le jour de l'entraînement — Basket prévu aujourd'hui. Passer par l'échauffement guidé.");
+    push(sugg, "Basket", SCHEDULED_SCORE, "C'est le jour de l'entraînement — Basket prévu aujourd'hui. Passer par l'échauffement guidé.");
   } else {
     let bScore = 10 + cap(dBasket) - (kneeAmber ? AMBER_PENALTY.genou["Basket"] : 0) - (dKnee <= 1 ? 6 : 0);
     let bReason = `${basket7}× cette semaine · dernier ${ago(dBasket)}. Passer par l'échauffement guidé.`;
@@ -507,10 +532,10 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   // Bonus planning idéal — appliqué en dernier, après tous les signaux de sécurité et de
   // fatigue ci-dessus : un score déjà à 0 (bloqué ailleurs via `avoid`) ne repasse jamais
   // par `sugg`, donc jamais bonifié malgré lui.
-  applyPlanBonus(sugg, weeklyPlan);
+  applyPlanBonus(sugg, weeklyPlan, sleepPoor || loadHigh || energyLow);
 
   return {
-    suggestions: sugg.sort((a, b) => b.score - a.score).slice(0, 3),
+    suggestions: sugg.sort((a, b) => b.score - a.score).slice(0, limit),
     avoid,
   };
 }

@@ -47,7 +47,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.89.0";
+const APP_VERSION = "3.90.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -2231,10 +2231,15 @@ const WEEKLY_PLAN_FAMILIES = {
  * jamais suggérer Lower C, même un lundi de semaine avec match où la carte "Planning idéal"
  * l'annonce explicitement — retour de Yoann après l'avoir constaté en usage réel.
  */
-function isMatchWeek(basketSchedule) {
-  const dow = new Date().getDay(); // 0=dimanche...6=samedi
+// Jour de la semaine d'une clé "AAAA-MM-JJ" (arithmétique locale, jamais UTC).
+const dowOfKey = (k) => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d).getDay(); };
+
+// Les trois helpers de planning acceptent une date (chantier S, 04/10/2026) : le recommandeur
+// temporel calcule aussi la séance de DEMAIN. Défaut = aujourd'hui, comportement inchangé.
+function isMatchWeek(basketSchedule, dateKey = today()) {
+  const dow = dowOfKey(dateKey); // 0=dimanche...6=samedi
   const daysUntilSunday = dow === 0 ? 0 : 7 - dow;
-  const sundayKey = shiftDateKey(today(), daysUntilSunday);
+  const sundayKey = shiftDateKey(dateKey, daysUntilSunday);
   return !!basketSchedule?.matchDates?.includes(sundayKey);
 }
 
@@ -2243,14 +2248,21 @@ function isMatchWeek(basketSchedule) {
  * (`weeklyPlan`) — le recommandeur ne sait rien du planning lui-même, juste matcher une
  * famille à un type suggéré (bonus modéré, jamais un remplacement, voir recommender.js).
  */
-function familiesForToday(basketSchedule) {
+function familiesForToday(basketSchedule, dateKey = today()) {
   // Lendemain de match (04/10/2026) : le planning du jour devient "Full Body", quelle que soit
   // la variante de la semaine — prime sur Lower A/C du lundi.
-  if (isPostMatchDay(basketSchedule)) return ["Full Body"];
-  const dow = new Date().getDay(); // 0=dimanche...6=samedi
-  const variant = isMatchWeek(basketSchedule) ? "avecMatch" : "sansMatch";
+  if (isPostMatchDay(basketSchedule, dateKey)) return ["Full Body"];
+  const dow = dowOfKey(dateKey); // 0=dimanche...6=samedi
+  const variant = isMatchWeek(basketSchedule, dateKey) ? "avecMatch" : "sansMatch";
   return WEEKLY_PLAN_FAMILIES[variant][dow] || [];
 }
+
+/** Contexte de planning d'une date, au format attendu par `nextSessions` (`planFor`). */
+const planForDate = (basketSchedule) => (dateKey) => ({
+  weeklyPlan: familiesForToday(basketSchedule, dateKey),
+  matchWeek: isMatchWeek(basketSchedule, dateKey),
+  postMatch: isPostMatchDay(basketSchedule, dateKey),
+});
 
 /**
  * Vrai si un match a eu lieu HIER (04/10/2026) — en pratique le lundi qui suit un dimanche de
@@ -2258,8 +2270,8 @@ function familiesForToday(basketSchedule) {
  * match restent des jours de musculation normaux). Nécessite que la date d'hier survive à la
  * purge des dates passées (voir l'effet de chargement d'`App` : on garde ≥ hier).
  */
-function isPostMatchDay(basketSchedule) {
-  return !!basketSchedule?.matchDates?.includes(shiftDateKey(today(), -1));
+function isPostMatchDay(basketSchedule, dateKey = today()) {
+  return !!basketSchedule?.matchDates?.includes(shiftDateKey(dateKey, -1));
 }
 
 /* ============================================================

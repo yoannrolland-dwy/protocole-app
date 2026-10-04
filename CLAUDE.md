@@ -4034,6 +4034,49 @@ volume hebdo, proximité de l'échec (Robinson 2024), position étirée (Maeo 20
   presse en « 3 × 15RM » (table HSR semaine 1), date d'avant-hier purgée / hier gardée mais pas
   affichée. Aucune erreur console. Build `apps/perso` ET `apps/public` propres.
 
+## Chantier S — S1 : recommandeur temporel, core (04/10/2026, apps/perso v3.90.0)
+
+Spec et décisions dans `ROADMAP.md` (« Chantier S »). Constat de Yoann : dimanche 21h10 après
+un match, « Prochaine séance » proposait Lower C alors que le lendemain serait un Full Body —
+le recommandeur ne connaissait que la date, jamais l'heure.
+
+- **`recommendSessions`** : deux paramètres optionnels. **`asOf`** (date de référence, défaut
+  `today()`) — l'audit a montré qu'il n'y avait qu'UNE lecture de la date du jour dans le
+  module (`t0`), tout le reste en dérive, donc « demain » ne mélange jamais deux dates.
+  **`limit`** (défaut 3) — `nextSession.js` demande toute la liste pour filtrer par créneau
+  AVANT de couper à 3 (sinon l'escalade du midi, souvent 4e au score, disparaissait).
+- **Planning idéal = proposition par défaut** (`applyPlanBonus`, remplace le +18 du
+  05/09/2026) : le type planifié encore en lice reçoit `max(autres) + 10` (`PLAN_LEAD`), raison
+  « proposition par défaut ». Exceptions : basket planifié (`SCHEDULED_SCORE = 999`, déjà en
+  tête) ; **signal de fatigue** (sommeil/charge/énergie) → ancien bonus +18 et raison « le
+  planning n'est pas imposé aujourd'hui ». Un type écarté (`avoid`) n'est jamais promu.
+- **`packages/core/src/nextSession.js`** (nouveau, pur) : `nextSessions({ now, base, planFor })`
+  → `{ today: { status: open|closed, suggestions, avoid, note }, tomorrow: { date, suggestions,
+  avoid, caveat } }`. `slotOpen` : repos/mobilité toujours ; muscu avant 12h et seulement si
+  rien n'est loggé ; escalade jusqu'à 14h (2e séance comprise) ; basket **seulement planifié**
+  (jour fixe ou match), toute la journée tant qu'il n'est pas loggé. Mobilité loggée = jamais
+  une contrainte. Match loggé (Basket à une date de `matchDates`) → journée `closed`.
+  Aucune option d'entraînement restante → `closed` avec la note adaptée. Demain : `asOf`
+  = demain, planning de demain via `planFor`, **sans sommeil ni énergie** (inconnus) ; la
+  douleur genou d'aujourd'hui compte (relevé frais à J−1).
+- **Écart à la spec, signalé à Yoann** : après un **Full Body**, l'escalade du midi n'est PAS
+  proposée — le Full Body contient du rowing, donc la règle conservée « pas d'escalade le jour
+  d'un Upper » s'applique (`upperToday` inclut Full Body depuis v3.89.0). Après un Lower seul,
+  elle l'est.
+- **App** : `isMatchWeek`/`familiesForToday`/`isPostMatchDay` prennent une date (défaut
+  aujourd'hui, comportement inchangé) ; nouveau `planForDate(basketSchedule)` au format
+  `planFor`. **Pas encore branché à la carte** (lot S2) — seul le planning par défaut change
+  déjà le classement de la carte actuelle.
+- **Vérifié** : 21 assertions Node (`s1-test.mjs`) sur le vrai planning et les vraies dates de
+  match (dimanche 21h/13h match loggé → fermé + demain Full Body ; dimanche 9h → Basket ;
+  lundi Full Body loggé → plus de muscu, demain mardi Repos ; jeudi Upper loggé → pas
+  d'escalade ; lundi Lower loggé → escalade ; mercredi 15h → Basket ; mercredi 22h → fermé,
+  demain Upper ; samedi 15h → plus de créneau ; mobilité loggée ne ferme rien ; genou rouge
+  aujourd'hui ET demain ; planning par défaut + exception fatigue ; demain sans nudge
+  sommeil/énergie). Non-régression : 8 scénarios sans planning identiques au caractère près ;
+  les 3 avec planning gardent le même ordre (score planifié 61 au lieu de 69). Prompt Coach IA
+  identique (avant/après le même jour). Build `apps/perso` ET `apps/public` propres.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.
