@@ -19,6 +19,8 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | R2 | Recomposition : zone de déficit dans l'onglet TDEE + historique des paliers | moyen | ✅ 02/10/2026 (v3.86.0) |
 | R3 | Recomposition : « Palier de la semaine » (moteur + carte + Appliquer + coach) | gros | ✅ 02/10/2026 (v3.87.0) |
 | R4 | Recomposition : bloc de règles Coach IA attaché à la phase | petit | ✅ 02/10/2026 (v3.88.0) |
+| S1 | Recommandeur temporel : créneaux, horizon aujourd'hui/demain, planning par défaut (core) | moyen | ⬜ spécifié le 04/10/2026 |
+| S2 | Recommandeur temporel : carte à deux lignes + Coach IA | petit | ⬜ |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il
 alimente le recommandeur + le Coach IA. V2 tôt parce que c'est une protection, pas
@@ -677,3 +679,94 @@ carbs, fat, fiber, kcal }, reasons: [...], blocked: null | raison }`.
   la durée (short sleeper) ;
 - s'appuyer sur `palier_semaine` et `depense_estimee.recomposition` plutôt que recalculer.
 Vérifier par hash que les 3 autres phases produisent un prompt identique.
+
+---
+
+# Chantier S — Recommandeur temporel (spécifié le 04/10/2026)
+
+**Constat de Yoann** (dimanche 21h10, après un match) : « Prochaine séance » affichait Lower C
+alors que le lendemain serait un Full Body. Cause : `recommendSessions` ne connaît que la DATE,
+jamais l'heure, et ne raisonne que sur le planning du jour — à 21h il propose encore la séance
+du matin. Objectif : un recommandeur qui sait quelle heure il est, ce qui reste faisable
+aujourd'hui, et ce qui est prévu demain. Deux lots, chacun buildé/testé/commité, install à la
+fin. Pour lancer : « GO S1 ».
+
+## Décisions prises (questions posées le 04/10/2026, ne pas rouvrir sans raison)
+
+1. **Créneaux** (habitudes de Yoann, constantes nommées dans le core) :
+   - **Matin (< 12h)** : musculation (Upper A/B, Lower A/B/C, Full Body), escalade, mobilité.
+   - **Midi (12h-14h)** : escalade ; basket **s'il est au planning** (vendredi midi).
+   - **Soir (≥ 14h)** : rien, sauf le **basket au planning** (mercredi soir, ou un match).
+   - Un basket planifié (jour hebdo de `basketSchedule.weekly` ou date de `matchDates`) reste
+     « faisable aujourd'hui » jusqu'à ce qu'il soit loggé, quelle que soit l'heure.
+   - Ce sont des habitudes, pas des règles : rien n'est jamais bloqué à la saisie, seule la
+     suggestion affichée change.
+2. **Planning idéal = proposition PAR DÉFAUT** (remplace le bonus modéré +18 du 05/09/2026).
+   Le type du planning du jour sort en tête dès qu'il n'est pas écarté ; le recommandeur ne
+   s'en écarte que pour une raison EXPLICITE (genou, fatigue, déjà fait aujourd'hui, créneau
+   passé) et l'affiche. Basket planifié (999) reste au-dessus.
+3. **Deuxième séance dans la journée** : après une séance du matin, la carte peut encore
+   proposer l'**escalade le midi**, ou le **basket si c'est mercredi ou vendredi** (planning).
+   **La mobilité loggée n'est JAMAIS une contrainte** (ne ferme rien, ne compte pas comme
+   « séance du jour »). Règles existantes conservées telles quelles, notamment **pas
+   d'escalade le jour d'un Upper** (règle coude — signalée à Yoann, conservée par défaut tant
+   qu'il ne demande pas de la lever).
+4. **Un match loggé ferme la journée** — plus aucune proposition aujourd'hui, sauf la mobilité.
+   Un match = une séance Basket loggée à une date de `matchDates`. **Pas de double comptage**
+   dans la charge 3 jours (choix de Yoann). Le lendemain, le Full Body modéré s'applique déjà
+   (v3.89.0).
+5. **Deux lignes en permanence** sur la carte : « Aujourd'hui » (ce qui reste faisable, ou
+   « Journée terminée — mobilité possible ») et « Demain · <jour> » (prévision). Exemple de
+   Yoann : match fini à 13h → il veut déjà savoir ce qu'il fait le lendemain.
+6. **Demain est une prévision** : nuit, douleur genou du matin et score d'énergie de demain
+   sont inconnus → nudges sommeil/énergie NON appliqués à l'horizon demain (silence plutôt
+   qu'une donnée périmée), mention « sous réserve de ton genou et de ta nuit ». La douleur
+   genou d'aujourd'hui compte (relevé frais à J−1). La carte se recalcule le matin.
+7. Sécurité inchangée : genou rouge → Lower/Full Body/Basket écartés, quel que soit
+   l'horizon ou le planning.
+
+## S1 — Core (packages/core)
+
+- `recommendSessions` reçoit un paramètre optionnel **`asOf`** (date de référence, défaut
+  `today()`). Auditer TOUS les `today()` internes au module (`t0`, `isScheduledBasket`,
+  `buildZones`, fenêtres) pour qu'ils utilisent `asOf` — sinon « demain » mélangerait deux
+  dates. Absent → comportement identique bit pour bit (vérifier par diff sur les scénarios
+  existants, méthode Phase 0).
+- Nouveau module **`packages/core/src/nextSession.js`** (pur) : `nextSessions({ now, training,
+  knee, sleep, targets, scheme, basketSchedule, weeklyPlanFor, energy, ... })` →
+  `{ today: { status: "open"|"closed", suggestions, avoid, note }, tomorrow: { date, label,
+  suggestions, avoid, caveat } }`.
+  - **Aujourd'hui** = `recommendSessions(asOf: aujourd'hui)` puis filtrage par créneaux encore
+    ouverts à `now` (décision 1) ; match loggé aujourd'hui → `closed` (seule la mobilité
+    reste) ; séances du jour hors mobilité prises en compte pour la décision 3.
+  - **Demain** = `recommendSessions(asOf: demain)` avec `weeklyPlan`/`postMatch`/`matchWeek`
+    calculés pour demain, sans `energy` ni nudge sommeil (décision 6).
+  - `weeklyPlanFor(dateKey)` fourni par l'appelant (le planning idéal vit dans App.jsx) —
+    le core reste agnostique du contenu du planning.
+- Planning par défaut (décision 2) dans `applyPlanBonus` : le type planifié non écarté reçoit
+  `max(scores des autres) + 10` et la raison « Planning idéal du jour » ; plus de +18 fixe.
+- Les helpers App (`isMatchWeek`, `familiesForToday`, `isPostMatchDay`) prennent une date en
+  paramètre (défaut aujourd'hui).
+
+### Tests attendus (Node, ≥ 10 scénarios)
+Dimanche 21h après match loggé → aujourd'hui `closed`, demain Full Body ; dimanche 13h match
+loggé → idem ; lundi 10h Full Body loggé → aujourd'hui escalade midi proposable (Lower/Full
+Body le matin), demain = planning de mardi ; jeudi 10h Upper loggé → escalade NON proposée
+aujourd'hui (règle coude) ; mercredi 15h → aujourd'hui Basket (soir planifié) ; mercredi 22h
+basket loggé → `closed`, demain = jeudi Upper ; samedi 15h rien loggé → demain ; mobilité
+loggée le matin → ne ferme rien ; genou rouge → Lower/Full Body écartés aujourd'hui ET demain ;
+planning par défaut : type planifié en tête même si un autre type a un meilleur score brut ;
+`asOf` absent → sorties identiques à avant sur les scénarios Phase 0/1.
+
+## S2 — UI + Coach IA (apps/perso)
+
+- Carte « Prochaine séance » : deux blocs « Aujourd'hui » / « Demain · lundi » (titre de
+  demain = jour de la semaine), même style que l'actuelle ; « Journée terminée — mobilité
+  possible » quand `closed` ; mention de réserve sous « Demain ». Recalcul à chaque rendu du
+  Dashboard + au retour au premier plan (l'heure change).
+- Coach IA : `summary.recommandeur` garde `top`/`alternatives`/`a_eviter` pour aujourd'hui et
+  gagne `demain: { type, motif }` ; consigne inchangée (commenter, ne pas recalculer). Hash du
+  prompt identique quand rien ne change (comparaison avant/après LE MÊME JOUR, `git stash` —
+  piège rencontré le 04/10 : une capture d'un autre jour diffère par la date).
+- Aperçu : vérifier les 3 cas types de Yoann (dimanche soir après match, lundi matin après
+  Full Body, mercredi après-midi) en simulant l'heure (`now` injectable dans `nextSessions`).
