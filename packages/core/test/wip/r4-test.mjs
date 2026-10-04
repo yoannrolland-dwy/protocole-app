@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+const P = "/Users/yrolland/Documents/GitHub/protocole-app/packages/core/src";
+const { buildCoachPrompt, buildBilanPrompt } = await import(`${P}/coach/prompt.js`);
+const { DEFAULT_TARGETS, PHASES } = await import(`${P}/targets.js`);
+const { SCHEMES } = await import(`${P}/climbing.js`);
+const base = { weight: [], sleep: [], training: [], knee: [], macros: [], notes: [], steps: [], targets: DEFAULT_TARGETS, foodLog: [], foodOverrides: {}, profile: "", journal: "", scheme: SCHEMES.gym, basketSchedule: { weekly: [], matchDates: [] }, weeklyPlan: [], energy: null, matchWeek: false };
+const d = buildCoachPrompt({ ...base, phase: "recomposition" }, "");
+const b = buildBilanPrompt({ facts: { fenetreJours: 90 }, phase: "recomposition", targets: DEFAULT_TARGETS, profile: "", notes: [] });
+let n = 0; const ok = (c, m) => { assert.ok(c, m); n++; };
+ok(d.system.includes(PHASES.recomposition.coach), "quotidien : bloc de règles présent");
+ok(b.system.includes(PHASES.recomposition.coach), "bilan : bloc de règles présent");
+ok(d.system.includes("Appuie-toi sur `palier_semaine`"), "quotidien : renvoi aux champs du prompt");
+ok(!b.system.includes("palier_semaine"), "bilan : pas de renvoi à des champs absents");
+for (const w of ["poids stable n'est JAMAIS un échec", "Murphy & Koehler 2022", "14 jours (eau/glycogène)", "protocole HSR", "moyenne hebdomadaire contre la cible", "jamais sur la durée (short sleeper)"]) ok(d.system.includes(w), `règle : ${w}`);
+ok(!buildCoachPrompt({ ...base, phase: "seche" }, "").system.includes("Recomposition corporelle"), "sèche : aucun bloc");
+console.log(`${n} assertions OK · system quotidien recomposition = ${d.system.length} caractères`);

@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+const P = "/Users/yrolland/Documents/GitHub/protocole-app/packages/core/src";
+const { buildCoachPrompt } = await import(`${P}/coach/prompt.js`);
+const { nextSessions } = await import(`${P}/nextSession.js`);
+const { DEFAULT_TARGETS } = await import(`${P}/targets.js`);
+const { SCHEMES } = await import(`${P}/climbing.js`);
+const bs = { weekly: [3, 5], matchDates: ["2026-10-04"] };
+const planFor = (k) => ({ weeklyPlan: k === "2026-10-05" ? ["Full Body"] : ["Basket"], matchWeek: k === "2026-10-04", postMatch: k === "2026-10-05" });
+const training = [{ date: "2026-10-04", type: "Basket", exercices: [] }];
+const ns = nextSessions({ now: new Date(2026, 9, 4, 21, 10), base: { training, knee: [{ date: "2026-10-04", pain: 2, baseline: true }], sleep: [], targets: DEFAULT_TARGETS, scheme: SCHEMES.gym, basketSchedule: bs }, planFor });
+const base = { weight: [], sleep: [], training, knee: [], macros: [], notes: [], steps: [], targets: DEFAULT_TARGETS, foodLog: [], foodOverrides: {}, profile: "", journal: "", scheme: SCHEMES.gym, basketSchedule: bs, weeklyPlan: [], energy: null, matchWeek: false };
+const u = buildCoachPrompt({ ...base, phase: "recomposition", nextSession: ns }, "").user;
+const sum = JSON.parse(u.split("RÉSUMÉ 14 JOURS (moyennes fiables, tendance de fond) :\n")[1].split("\n\nJOUR PAR JOUR")[0]);
+assert.ok(/^terminée/.test(sum.recommandeur.journee), sum.recommandeur.journee);
+assert.equal(sum.recommandeur.demain.type, "Full Body");
+assert.ok(u.includes("ne propose AUCUNE séance pour aujourd'hui"));
+console.log("coach : journee =", sum.recommandeur.journee, "| demain =", sum.recommandeur.demain.type, "→ 3 assertions OK");

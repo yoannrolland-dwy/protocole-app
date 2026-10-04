@@ -21,6 +21,11 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | R4 | Recomposition : bloc de règles Coach IA attaché à la phase | petit | ✅ 02/10/2026 (v3.88.0) |
 | S1 | Recommandeur temporel : créneaux, horizon aujourd'hui/demain, planning par défaut (core) | moyen | ✅ 04/10/2026 (v3.90.0) |
 | S2 | Recommandeur temporel : carte à deux lignes + Coach IA | petit | ✅ 04/10/2026 (v3.91.0) |
+| T1 | Tests committés (`packages/core/test`, `npm test`, bloquant avant commit) | moyen | ⬜ spécifié le 04/10/2026 |
+| T2 | Volume hebdomadaire par groupe musculaire (carte, zéro donnée nouvelle) | petit | ⬜ |
+| T3 | Dashboard actionnable : genou en un tap + bouton « Démarrer » la séance proposée | petit | ⬜ |
+| T4 | Reps en réserve (RIR) par exercice, optionnel → plateau + Coach IA | moyen | ⬜ |
+| T5 | Bonus : retour haptique au cochage d'une série ; champ « alcool » en saisie libre | petit | ⬜ |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il
 alimente le recommandeur + le Coach IA. V2 tôt parce que c'est une protection, pas
@@ -770,3 +775,54 @@ planning par défaut : type planifié en tête même si un autre type a un meill
   piège rencontré le 04/10 : une capture d'un autre jour diffère par la date).
 - Aperçu : vérifier les 3 cas types de Yoann (dimanche soir après match, lundi matin après
   Full Body, mercredi après-midi) en simulant l'heure (`now` injectable dans `nextSessions`).
+
+
+---
+
+# Chantier T — Améliorations retenues le 04/10/2026 (tous les points acceptés par Yoann)
+
+Issu d'une revue libre (« quelles améliorations verrais-tu ? »), après la livraison des
+chantiers R et S. Ordre décidé : **T1 → T2 → T3 → T4**, T5 en bonus au passage. Une session par
+chantier, chacun buildé/testé/commité, install native à la fin de chaque lot. Pour lancer :
+« GO T1 ». Mesures prises le 04/10/2026 : 0 test commité, 11 scripts bruts dans
+`packages/core/test/wip/` (copiés pour ne pas les perdre), `App.jsx` 3 352 lignes, bundle
+838 KB (245 KB gzip — pas un chantier).
+
+## T1 — Tests committés
+- `packages/core/test/*.test.mjs` avec `node --test` (aucune dépendance). Script `npm test` à
+  la racine, et un hook pre-commit qui le lance (bloquant). Porter les scripts de `test/wip/`
+  (remplacer les chemins absolus par des imports relatifs, rendre les dates déterministes via
+  `asOf`/`now` plutôt que `today()` quand c'est possible, garder les captures de hash prompt
+  comme tests de non-régression datés). Supprimer `test/wip/` à la fin.
+- Trois régressions de septembre à transformer en tests nommés : « déjà fait aujourd'hui »
+  (14/09), Lower C jamais suggéré (14/09), notes absentes du bilan (07/09).
+
+## T2 — Volume hebdomadaire par groupe musculaire
+- Zéro donnée nouvelle : séries COCHÉES des 7 derniers jours, sommées par `groupe` (tag déjà
+  présent sur chaque exercice des gabarits + bibliothèque, lu par nom comme `heavyPullDoneOn`).
+- Carte dans l'onglet Séances (sous « Progression ») : une ligne par groupe, zone cible
+  10-20 séries/semaine pour les groupes prioritaires de Yoann (pecs, épaules), affichage
+  neutre pour les autres. Mode « temps » (gainage) exclu du décompte. Le Coach IA reçoit le
+  même tableau (`summary.volume_hebdo`).
+
+## T3 — Dashboard actionnable
+- La ligne d'alerte « douleur genou pas notée » devient une rangée de chips 0-10 directement
+  dans la carte « Prochaine séance » → écrit `kneeLog` (même règle que l'onglet Douleurs :
+  aucune valeur présélectionnée). Question « retour à la base ? » posée seulement si douleur
+  ≥ 1 (sinon baseline = true).
+- Bouton « Démarrer » sur la suggestion du jour : ouvre directement le carnet du type proposé
+  (`pickType`), au lieu de l'onglet Séances puis la tuile. Pas de bouton quand la journée est
+  fermée.
+
+## T4 — Reps en réserve par exercice
+- Choix 0 / 1 / 2 / 3+ **par exercice** (pas par série), optionnel, stocké dans l'entrée
+  d'exercice du `trainingLog` (`rir`, additif — aucune migration). Doute explicite de Yoann à
+  vérifier à l'usage : utile seulement si rempli honnêtement.
+- `progressiveOverloadSuggestion` : une série « stable » avec un RIR qui augmente n'est pas un
+  plateau (effort qui baisse = progression) ; `exoProgress` transmet le RIR au Coach IA.
+
+## T5 — Bonus
+- Haptique (`@capacitor/haptics`, natif seulement) au cochage d'une série — impulsion brève.
+- Champ « alcool (g) » optionnel dans `FreeEntry` (7 kcal/g, déjà le coefficient CIQUAL),
+  stocké dans la ligne `foodLog`, remonté au Coach IA (`alcool_g` dans macros hier/aujourd'hui).
+  Jamais une macro cible.
