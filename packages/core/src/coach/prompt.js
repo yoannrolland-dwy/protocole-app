@@ -12,6 +12,7 @@ import { today, nowHM, byDate, daysBetween, shiftDateKey, round, lastN } from ".
 import { recommendSessions } from "../recommender.js";
 import { buildZones, DEFAULT_ZONES } from "../pain.js";
 import { exoProgress } from "../training.js";
+import { volumeForCoach, PRIORITY_GROUPS, VOLUME_TARGET } from "../volume.js";
 import { climbSummary } from "../climbing.js";
 import { PHASES, phaseTarget, targetsForDate, kcalFromMacros, kcalOfEntry, isCutWindow, tdeeNow, weightTrend7, recompWindows } from "../targets.js";
 import { realDeficit } from "../tdee.js";
@@ -271,6 +272,8 @@ export function buildCoachPrompt(data, note) {
     ...painRealtime,
   };
 
+  const volumeRaw = volumeForCoach(training);
+  const volumeHebdo = Object.values(volumeRaw).some((n) => n > 0) ? volumeRaw : null;
   const summary = {
     phase: PHASES[phase].label, poids_cible: tgtW,
     poids: { dernier: lastN(weight, 1)[0]?.kg ?? null, moy_7j: w7, moy_7j_precedents: w14, tendance_kg_sur_semaine: (w7 != null && w14 != null) ? round(w7 - w14) : null,
@@ -288,6 +291,10 @@ export function buildCoachPrompt(data, note) {
     },
     pas_moy_7j: steps7 != null ? Math.round(steps7) : null,
     seances_7j: sessCount(0, 6), seances_14j: sessCount(0, 13),
+    // Volume hebdo par groupe musculaire (T2, 04/10/2026) : séries COCHÉES des 7 derniers jours
+    // (hors gainage/isométries), même calcul que la carte de l'onglet Séances. Omis si aucune
+    // série de muscu sur la semaine (le prompt reste alors identique à avant).
+    ...(volumeHebdo ? { volume_hebdo_series: volumeHebdo } : {}),
     ...painSummary,
     recommandeur: {
       top: reco.suggestions[0] ? { type: reco.suggestions[0].type, score: reco.suggestions[0].score, motif: reco.suggestions[0].reason } : null,
@@ -406,7 +413,7 @@ ${(journal || "").trim() ? `CARNET DE BORD — état que TU as écrit à la fin 
 Structure ta réponse en deux temps :
 1. **Aujourd'hui / les prochaines 24h** : à partir du bloc TEMPS RÉEL, dis-lui concrètement quoi faire (ou éviter) MAINTENANT — ${["séance", "nutrition", "hydratation", "récupération", painMentionShort ? `douleurs (${painMentionShort})` : null].filter(Boolean).join(", ")} — en te basant sur ce qui s'est passé hier et sur les notes de contexte. \`repas_hier\`/\`repas_aujourdhui\` donnent le détail réel des aliments par repas (pas seulement les totaux macros) : commente la COMPOSITION si elle appelle un conseil concret (répartition protéique entre repas, repas trop pauvre/trop riche en fibres, timing autour de l'entraînement) — pas une simple relecture de la liste. Le champ \`recommandeur\` (dans RÉSUMÉ 14 JOURS) donne déjà un verdict calculé sur la séance du jour (score + motif, alternatives, à éviter) : appuie-toi dessus au lieu d'en recalculer un autre de ton côté — commente-le, nuance-le ou signale un désaccord argumenté si tu vois un facteur qu'il ignore, mais ne propose pas une séance différente sans le dire explicitement.${nextSession ? " Si `recommandeur.journee` indique une journée terminée, ne propose AUCUNE séance pour aujourd'hui (au mieux de la mobilité) : parle de `recommandeur.demain`, la séance prévue demain (prévision, à confirmer avec le genou et la nuit)." : ""}
 2. **Tendance de fond (14 jours)** : ce qui se dessine sur la durée et ce qu'il faut ajuster pour la semaine à venir, EN CORRÉLANT explicitement poids, kcal, macros, fibres et eau à partir du dataset JOUR PAR JOUR (ex. un pic de poids coïncide-t-il avec un pic de glucides/sodium la veille plutôt qu'un vrai surplus calorique ? un manque de fibres ou d'eau coïncide-t-il avec une stagnation ?). Le champ \`depense_estimee\` (dans RÉSUMÉ 14 JOURS) donne déjà la dépense énergétique réelle calculée par le JS (tendance de poids lissée vs apports réels) avec sa fiabilité et sa fenêtre : utilise CE chiffre pour le déficit plutôt que d'en estimer un toi-même à la louche à partir du poids et des apports bruts. S'il chevauche la perte hydrique du début de sèche (\`chevauche_perte_eau\`) ou si la fiabilité est "faible", dis-le explicitement et nuance en conséquence — ne présente jamais ce chiffre comme définitif dans ce cas. S'il vaut "pas assez de données", n'invente pas de dépense chiffrée.${recompInstr}${palierInstr}
-Traite explicitement CHAQUE domaine : ${["poids (bruit quotidien vs moyenne glissante)", "macros (protéines jour le jour, reste en moyenne 7j)", "eau (jours de basket +1L)", "sommeil (impact récup)", "pas quotidiens (corrélation activité/résultat)", "séances (équilibre Upper/Lower, progressive overload exercice par exercice, gestion de charge sur l'escalade)", painDomainClause].filter(Boolean).join(", ")}.
+Traite explicitement CHAQUE domaine : ${["poids (bruit quotidien vs moyenne glissante)", "macros (protéines jour le jour, reste en moyenne 7j)", "eau (jours de basket +1L)", "sommeil (impact récup)", "pas quotidiens (corrélation activité/résultat)", `séances (équilibre Upper/Lower, progressive overload exercice par exercice, gestion de charge sur l'escalade${volumeHebdo ? `, volume hebdo par groupe — \`volume_hebdo_series\` : séries cochées sur 7 j, zone cible ${VOLUME_TARGET.min}-${VOLUME_TARGET.max} séries/semaine pour ${PRIORITY_GROUPS.join("/")} (prioritaires), les autres à titre indicatif` : ""})`, painDomainClause].filter(Boolean).join(", ")}.
 Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reciter les données brutes (cite seulement les chiffres qui appuient un conseil) : va droit aux conseils, en bullet points courts. Limite stricte : 500 mots maximum au total — écourte les détails plutôt que de laisser une section inachevée, et termine toujours par une phrase de conclusion complète. Ce n'est pas un avis médical.
 
 Puis, APRÈS ta conclusion, écris la ligne \`${CARNET_MARK}\` seule, et en dessous la version mise à jour du carnet de bord. Règles du carnet : c'est un ÉTAT, pas un journal — tu réécris la version complète à chaque fois, tu élagues ce qui est résolu ou périmé, tu gardes ce qui est en cours. ${CARNET_MAX_CHARS} caractères maximum. Y faire figurer : où en est la progression (chiffrée), ce que tu as demandé de changer et si ça a été appliqué, ce qui a marché ou pas, les points de vigilance en cours. Pas de conseils dedans, pas de redite de la réponse ci-dessus.`;

@@ -4191,6 +4191,39 @@ et par un hook pre-commit bloquant.
   `apps/perso/scripts/cdp.mjs` — mémoire `project_native_localstorage_write` mise à jour.
 - Build `apps/perso` ET `apps/public` propres. Aucun changement de comportement de l'app.
 
+## Chantier T — T2 : volume hebdomadaire par groupe musculaire (04/10/2026, apps/perso v3.94.0)
+
+Spec dans `ROADMAP.md`. Zéro donnée nouvelle : séries **cochées** (`fait`) des 7 derniers jours
+(jour en cours inclus), sommées par le tag `groupe` des gabarits/bibliothèque, lu par nom.
+
+- **`packages/core/src/session/exoMeta.js`** (nouveau) : `EXO_META`/`metaFor(nom)`, extraits de
+  `recommender.js` où la map servait déjà à `heavyPullDoneOn` — un seul endroit pour retrouver
+  `groupe`/`mouvement`/`tendon`/`famille` depuis un `nom` de journal (les gabarits ont priorité
+  sur la bibliothèque). `recommender.js` l'importe, comportement identique (tests T1 verts).
+- **`packages/core/src/volume.js`** (nouveau, pur) : `weeklyVolumeByGroup(training, { asOf, days })`
+  → `{ from, to, groups: [{ groupe, label, series, exercices, priority, status }] }` ;
+  `volumeForCoach` (forme compacte `{ pecs: 12, … }`) ; `groupOf(entry)` ; `zoneStatus`.
+  **Exclusions** : mode « temps » (lu sur l'entrée, repli sur le gabarit) — gainage, isométries,
+  cardio ; c'est aussi ce qui retire naturellement TOUT le contenu Basket/Mobilité (entièrement
+  en mode temps), sans cas particulier par type ; et les groupes `cardio`/`mobilite`. Un exercice
+  **substitué** compte pour le groupe de ce qui a été réellement fait (`nom`), repli sur
+  `origine` si le nom est inconnu. `PRIORITY_GROUPS = ["pecs","epaules"]`, `VOLUME_TARGET =
+  {10,20}` séries/semaine : les prioritaires portent un `status` (sous / dans / au-dessus) et
+  apparaissent même à 0 ; un autre groupe à 0 est omis.
+- **Carte « Volume · 7 jours »** (`VolumeCard`, onglet Séances, sous « Progression par
+  exercice ») : une ligne par groupe ; prioritaires en `N / 10-20` colorés (accent dans la zone,
+  ambre `#e8a33d` sous — même ambre que la fiabilité TDEE —, danger au-dessus) avec le libellé de
+  statut ; les autres en compte neutre (muted). Note de bas de carte explicite sur les exclusions.
+- **Coach IA** (`prompt.js`) : `summary.volume_hebdo_series` + mention dans le domaine « séances »
+  (zone cible pour pecs/epaules, les autres indicatifs) — **omis quand aucune série de muscu sur
+  7 j**, donc prompt identique à avant dans ce cas (la capture datée T1 n'a pas bougé). Partagé
+  par `apps/public` via le prompt commun (même mécanisme que tout le `summary`).
+- **Tests** : `volume.test.mjs`, 7 tests (fenêtre 7 j avec J−7 exclu, cochées seulement, mode
+  temps/Basket/Mobilité exclus, substitution, prioritaires à 0, bornes de zone, prompt avec/sans
+  séries) — 62 tests au total. Aperçu (375 px) : Pectoraux 6 et Épaules 6 « sous la zone », Dos 8,
+  Quadriceps 3, Mollets 4, planche et séance J−9 exclues, aucune erreur console. Build `apps/perso`
+  ET `apps/public` propres.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.

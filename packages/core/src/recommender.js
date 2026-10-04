@@ -30,7 +30,7 @@ import { SPORTS_CATALOG } from "./session/catalog.js";
 import { climbLoad } from "./climbing.js";
 import { isCutWindow } from "./targets.js";
 import { exerciseSessions, exerciseTrend } from "./training.js";
-import { EXERCISE_LIBRARY } from "./session/exercises.js";
+import { metaFor } from "./session/exoMeta.js";
 
 // Flexion du coude CHARGÉE (04/10/2026, demande de Yoann) : ce qui empêche l'escalade le même
 // jour n'est plus le TYPE de séance (« Upper fait aujourd'hui ») mais ce qui a été réellement
@@ -40,14 +40,8 @@ import { EXERCISE_LIBRARY } from "./session/exercises.js";
 // horizontal/vertical compte moins que la prise et le volume de flexion du coude). Face pull
 // exclu (arrière d'épaule, charge légère). La mobilité (iso coude de rééduc) ne compte jamais.
 // Gestion de charge prudente, pas une conclusion de recherche (dit à Yoann). Métadonnées lues
-// par nom dans les gabarits + la bibliothèque (le journal n'enregistre que `nom`/`origine`).
-const EXO_META = (() => {
-  const m = new Map();
-  Object.values(TEMPLATES).forEach((t) => (t.exos || []).forEach((e) => { if (!m.has(e.n)) m.set(e.n, e); }));
-  EXERCISE_LIBRARY.forEach((e) => { if (!m.has(e.n)) m.set(e.n, e); });
-  return m;
-})();
-const isHeavyPull = (nom) => { const e = nom && EXO_META.get(nom); return !!e && e.tendon === "coude" && (e.mouvement === "tirage" || e.groupe === "biceps"); };
+// par nom via `metaFor` (session/exoMeta.js, partagé avec le volume hebdo T2).
+const isHeavyPull = (nom) => { const e = metaFor(nom); return !!e && e.tendon === "coude" && (e.mouvement === "tirage" || e.groupe === "biceps"); };
 /** Noms des exercices de tirage lourd avec au moins une série cochée à la date `dateKey`. */
 export function heavyPullDoneOn(training, dateKey) {
   const names = new Set();

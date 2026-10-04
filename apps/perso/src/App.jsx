@@ -15,6 +15,7 @@ import { store, getSync, exportData, importData } from "./store.js";
 import { isBackupStale, daysSinceBackup, scheduleBackupReminder } from "./cloudBackup.js";
 import { exoProgress, exerciseList, exerciseSessions, exerciseTrend, isTimeMode, setLabel,
          beats, recordToBeat, recordsBySession, painOutOfBase, progressiveOverloadSuggestion } from "@rawcare/core/training";
+import { weeklyVolumeByGroup, VOLUME_TARGET } from "@rawcare/core/volume";
 import { SCHEMES, gradeIndex, ISSUES, climbSummary, climbLabel } from "@rawcare/core/climbing";
 import { realDeficit, MIN_WINDOW_DAYS as MIN_TDEE_DAYS, tdeeTrend, tdeeOverWindow } from "@rawcare/core/tdee";
 import { TEMPLATES, TYPES, DEFAULT_WEIGHTS, HSR_TABLE, hsrForWeek, hsrParse, parseSecs,
@@ -47,7 +48,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.93.0";
+const APP_VERSION = "3.94.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -1731,6 +1732,43 @@ const blocStep = {
   fontFamily: "inherit", lineHeight: 1,
 };
 
+
+// Carte « Volume · 7 jours » (onglet Séances, chantier T2). Lecture seule, dérivée de
+// `trainingLog` — aucune donnée nouvelle. Les groupes prioritaires affichent leur position
+// par rapport à la zone cible (accent = dans la zone, ambre = sous, danger = au-dessus) ; les
+// autres n'affichent que le compte, sans jugement.
+function VolumeCard({ training }) {
+  const { groups } = useMemo(() => weeklyVolumeByGroup(training), [training]);
+  const AMBER = "#e8a33d";
+  const statusColor = (st) => (st === "dans" ? C.accent : st === "sous" ? AMBER : C.danger);
+  const statusLabel = (st) => (st === "dans" ? "dans la zone" : st === "sous" ? "sous la zone" : "au-dessus");
+  const any = groups.some((g) => g.series > 0);
+  return (
+    <Card style={{ padding: "13px 14px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: any ? 8 : 4 }}>
+        <Label style={{ letterSpacing: 1.5 }}>Volume · 7 jours</Label>
+        <span style={{ fontFamily: C.mono, fontSize: 10, color: C.dim }}>séries cochées · cible {VOLUME_TARGET.min}-{VOLUME_TARGET.max}</span>
+      </div>
+      {groups.map((g) => (
+        <div key={g.groupe} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderTop: `1px solid ${C.divider}` }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+            <Body style={{ fontSize: 12, color: g.priority ? C.text : C.muted }}>{g.label}</Body>
+            {g.priority && g.series > 0 && (
+              <span style={{ fontSize: 10, color: statusColor(g.status) }}>{statusLabel(g.status)}</span>
+            )}
+          </div>
+          <span style={{ fontFamily: C.mono, fontSize: 13, fontWeight: 800, color: g.priority ? statusColor(g.status) : C.muted }}>
+            {g.series}{g.priority ? <span style={{ fontSize: 10, fontWeight: 400, color: C.dim }}> / {VOLUME_TARGET.min}-{VOLUME_TARGET.max}</span> : null}
+          </span>
+        </div>
+      ))}
+      <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
+        {any ? "Gainage et isométries non comptés. Pecs et épaules : groupes prioritaires, zone 10-20 séries/semaine." : "Aucune série de musculation cochée sur les 7 derniers jours."}
+      </Body>
+    </Card>
+  );
+}
+
 function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme }) {
   // Brouillon auto-sauvegardé (localStorage, hors DATA_KEYS — voir Règles absolues #1) :
   // restaure au montage la séance laissée en cours (TrainTab démonte tout son état à
@@ -1877,6 +1915,11 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme }) {
           <ChevronRight size={15} color={C.accent} />
         </div>
       </Card>
+
+      {/* Volume hebdo par groupe musculaire (T2, 04/10/2026) : séries cochées sur 7 jours,
+          hors gainage — même calcul que `volume_hebdo_series` envoyé au Coach IA. Zone cible
+          10-20 séries/sem. sur les groupes prioritaires (pecs, épaules), compte neutre ailleurs. */}
+      <VolumeCard training={training} />
 
       {/* Semaine HSR */}
       <Card>

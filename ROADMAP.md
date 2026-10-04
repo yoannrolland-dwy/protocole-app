@@ -797,7 +797,7 @@ chantier, chacun buildé/testé/commité, install native à la fin de chaque lot
 - Trois régressions de septembre à transformer en tests nommés : « déjà fait aujourd'hui »
   (14/09), Lower C jamais suggéré (14/09), notes absentes du bilan (07/09).
 
-## T2 — Volume hebdomadaire par groupe musculaire
+## T2 — Volume hebdomadaire par groupe musculaire ✅ livré le 04/10/2026 (apps/perso v3.94.0, voir CLAUDE.md)
 - Zéro donnée nouvelle : séries COCHÉES des 7 derniers jours, sommées par `groupe` (tag déjà
   présent sur chaque exercice des gabarits + bibliothèque, lu par nom comme `heavyPullDoneOn`).
 - Carte dans l'onglet Séances (sous « Progression ») : une ligne par groupe, zone cible
