@@ -805,7 +805,7 @@ chantier, chacun buildé/testé/commité, install native à la fin de chaque lot
   neutre pour les autres. Mode « temps » (gainage) exclu du décompte. Le Coach IA reçoit le
   même tableau (`summary.volume_hebdo`).
 
-## T3 — Dashboard actionnable
+## T3 — Dashboard actionnable ✅ livré le 04/10/2026 (apps/perso v3.95.0, voir CLAUDE.md)
 - La ligne d'alerte « douleur genou pas notée » devient une rangée de chips 0-10 directement
   dans la carte « Prochaine séance » → écrit `kneeLog` (même règle que l'onglet Douleurs :
   aucune valeur présélectionnée). Question « retour à la base ? » posée seulement si douleur

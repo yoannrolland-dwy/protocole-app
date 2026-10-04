@@ -48,7 +48,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.94.0";
+const APP_VERSION = "3.95.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -315,7 +315,45 @@ function PalierCard({ palier, targets, onApply }) {
   );
 }
 
-function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule, planFor, palier, onApplyPalier }) {
+
+// Saisie rapide de la douleur genou depuis le Dashboard (T3, 04/10/2026) — remplace la ligne
+// d'alerte « pas notée aujourd'hui ». Même règle que l'onglet Douleurs : AUCUNE valeur
+// présélectionnée. Un 0 s'enregistre au tap (retour à la base implicite) ; un chiffre ≥ 1 fait
+// apparaître la question « retour à la base ? », et c'est la réponse Oui/Non qui enregistre —
+// pas de bouton Enregistrer supplémentaire, deux taps au plus. Écrit `kneeLog` via le même
+// `save.knee`/`upsert` que PainTab, donc l'onglet Douleurs reflète la saisie immédiatement.
+function KneeQuickLog({ knee, saveKnee }) {
+  const [pain, setPain] = useState(null);
+  const AMBER = "#e8a33d";
+  const write = (p, baseline) => saveKnee(upsert(knee, { date: today(), pain: p, baseline }));
+  const pick = (p) => { if (p === 0) write(0, true); else setPain(p); };
+  const chip = (on, extra = {}) => ({
+    minWidth: 26, height: 28, padding: "0 6px", borderRadius: 6, cursor: "pointer", fontFamily: C.mono, fontSize: 12, fontWeight: 800,
+    background: on ? C.accent : C.card, color: on ? "#000" : C.muted, border: `1.5px solid ${on ? C.accent : C.border}`, ...extra,
+  });
+  return (
+    <div onClick={(e) => e.stopPropagation()} style={{ marginBottom: 10, padding: "8px 10px", borderRadius: 8, border: `1px solid ${AMBER}55`, background: `${AMBER}12` }}>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+        <AlertTriangle size={12} color={AMBER} style={{ flexShrink: 0 }} />
+        <span style={{ fontSize: 10.5, color: AMBER, lineHeight: 1.4 }}>Douleur genou aujourd'hui ? Sans cette info, le recommandeur reste prudent par défaut.</span>
+      </div>
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+        {Array.from({ length: 11 }, (_, i) => (
+          <button key={i} onClick={() => pick(i)} style={chip(pain === i)}>{i}</button>
+        ))}
+      </div>
+      {pain != null && pain >= 1 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, color: C.text2 }}>Retour à la douleur de base sous 24 h ?</span>
+          <button onClick={() => write(pain, true)} style={chip(false, { fontFamily: "inherit", fontSize: 11, padding: "0 10px" })}>Oui</button>
+          <button onClick={() => write(pain, false)} style={chip(false, { fontFamily: "inherit", fontSize: 11, padding: "0 10px", color: C.dangerText, borderColor: C.dangerBorder })}>Non</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule, planFor, palier, onApplyPalier, saveKnee, onStart }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast && tgtW != null ? round(wLast.kg - tgtW) : null;
@@ -447,12 +485,7 @@ function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, tra
       {/* Prochaine séance */}
       <Card accentLeft onClick={() => setTab("train")} style={{ padding: "13px 14px", cursor: "pointer" }}>
         <Label style={{ letterSpacing: 1.5, marginBottom: 5 }}>Prochaine séance</Label>
-        {!knee.some((k) => k.date === today()) && (
-          <div style={{ display: "flex", gap: 6, alignItems: "flex-start", marginBottom: 8 }}>
-            <AlertTriangle size={12} color="#e8a33d" style={{ marginTop: 1, flexShrink: 0 }} />
-            <span style={{ fontSize: 10.5, color: "#e8a33d", lineHeight: 1.4 }}>Douleur genou pas notée aujourd'hui — le recommandeur reste prudent par défaut sans cette info.</span>
-          </div>
-        )}
+        {!knee.some((k) => k.date === today()) && <KneeQuickLog knee={knee} saveKnee={saveKnee} />}
         <Label style={{ fontSize: 9, color: C.accent, marginBottom: 4 }}>Aujourd'hui</Label>
         {next.today.status === "closed" ? (
           <Body style={{ fontSize: 11.5, color: C.text2 }}>{next.today.note}</Body>
@@ -463,6 +496,13 @@ function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, tra
               <div style={{ fontFamily: C.mono, fontSize: 10, color: C.dim }}>{suggestions[0]?.score}</div>
             </div>
             <Body>{suggestions[0]?.reason}</Body>
+            {/* T3 : ouvrir directement le carnet du type proposé (pas de bouton pour Repos,
+                qui n'est pas un gabarit, ni quand la journée est fermée — branche ci-dessus). */}
+            {suggestions[0] && TEMPLATES[suggestions[0].type] && (
+              <Btn variant="primary" onClick={(e) => { e.stopPropagation(); onStart(suggestions[0].type); }} style={{ marginTop: 8, padding: "7px 12px", fontSize: 11 }}>
+                <Play size={12} style={{ display: "inline", marginRight: 5 }} />Démarrer {suggestions[0].type}
+              </Btn>
+            )}
           </>
         )}
         {suggestions.slice(1).map((r) => (
@@ -1769,7 +1809,7 @@ function VolumeCard({ training }) {
   );
 }
 
-function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme }) {
+function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme, startType, onStartConsumed }) {
   // Brouillon auto-sauvegardé (localStorage, hors DATA_KEYS — voir Règles absolues #1) :
   // restaure au montage la séance laissée en cours (TrainTab démonte tout son état à
   // chaque changement d'onglet, ce qui effaçait la séance avant ce correctif). Lu une
@@ -1790,8 +1830,14 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme }) {
     return id ? (training.find((t) => t.id === id) ?? null) : null;
   });
 
-  const pickType = (type) => {
-    const sel = open === type;
+  // T3 : arrivée via « Démarrer » (Dashboard) → ouvrir ce type d'emblée (force, pas de toggle),
+  // en écrasant un éventuel brouillon comme le ferait un tap sur la tuile.
+  useEffect(() => {
+    if (startType && TEMPLATES[startType]) { pickType(startType, true); onStartConsumed?.(); }
+  }, [startType]);
+
+  const pickType = (type, force = false) => {
+    const sel = !force && open === type;
     store.set("trainingDraft", null);
     setEditing(null);
     setDate(today());
@@ -2909,6 +2955,10 @@ export default function App({ silent = false } = {}) {
   const [sleep, setSleep] = useState([]);
   const [training, setTraining] = useState([]);
   const [knee, setKnee] = useState([]);
+  // T3 : type de séance à ouvrir directement dans le carnet depuis « Démarrer » (Dashboard).
+  // Consommé par TrainTab à son montage, puis remis à null.
+  const [startType, setStartType] = useState(null);
+  const startSession = (type) => { setStartType(type); setTab("train"); };
   // FC repos (Health Connect, natif seulement — 05/09/2026, score d'énergie) : `{date, bpm}`,
   // même famille que weightLog/stepsLog. Vide sur la PWA (jamais synchronisée), le score
   // d'énergie affiche alors "pas assez de données" plutôt qu'un chiffre inventé.
@@ -3355,11 +3405,11 @@ export default function App({ silent = false } = {}) {
           <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, climbScheme, setClimbScheme, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme, basketSchedule, planFor: planForDate(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier }} openSettings={() => setShowSettings(true)} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme, basketSchedule, planFor: planForDate(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier, saveKnee: save.knee, onStart: startSession }} openSettings={() => setShowSettings(true)} />}
             {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
             {tab === "sleep" && <SleepTab {...{ sleep, rhr, steps, naps, save }} />}
             {tab === "steps" && <StepsTab {...{ steps, save }} />}
-            {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, scheme }} />}
+            {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, scheme, startType }} onStartConsumed={() => setStartType(null)} />}
             {tab === "pain" && <PainTab {...{ knee, save, hsrWeek }} />}
             {tab === "perf" && <PerformanceTab {...{ macros, targets, training, weight, phase }} />}
             {tab === "macro" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} apiKey={apiKey} model={model} />}

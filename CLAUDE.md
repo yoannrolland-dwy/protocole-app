@@ -4224,6 +4224,35 @@ Spec dans `ROADMAP.md`. Zéro donnée nouvelle : séries **cochées** (`fait`) d
   Quadriceps 3, Mollets 4, planche et séance J−9 exclues, aucune erreur console. Build `apps/perso`
   ET `apps/public` propres.
 
+## Chantier T — T3 : Dashboard actionnable (04/10/2026, apps/perso v3.95.0)
+
+Spec dans `ROADMAP.md`. Deux actions directement dans la carte « Prochaine séance », UI
+seulement (`apps/perso/src/App.jsx`), aucun changement dans `packages/core`.
+
+- **Saisie rapide de la douleur genou** (`KneeQuickLog`) : remplace la ligne d'alerte « pas
+  notée aujourd'hui ». Rangée de chips 0-10, **aucune valeur présélectionnée** (même règle que
+  l'onglet Douleurs). Décision d'implémentation : **pas de bouton Enregistrer** — un **0**
+  s'enregistre au tap (`baseline: true` implicite) ; un chiffre **≥ 1** fait apparaître
+  « Retour à la douleur de base sous 24 h ? Oui / Non » et c'est cette réponse qui enregistre.
+  Deux taps au plus. Écrit via le même `save.knee` + `upsert` que `PainTab` (clé `kneeLog`
+  inchangée), le panneau disparaît dès qu'une entrée existe pour aujourd'hui, et l'onglet
+  Douleurs reflète la saisie. `stopPropagation` sur le panneau : la carte reste cliquable vers
+  Séances sans qu'un tap sur une chip n'y navigue.
+- **Bouton « Démarrer <type> »** sous la suggestion du jour, **seulement si la journée est
+  ouverte et que le type est un gabarit** (`TEMPLATES[type]`) — donc pas pour « Repos /
+  mobilité », qui n'est pas une séance à ouvrir, ni pour une journée fermée (branche `closed`).
+  Mécanique : état `startType` dans `App` (`startSession(type)` → `setTab("train")`), `TrainTab`
+  reçoit `startType` + `onStartConsumed` et, à son montage, appelle `pickType(type, force)`
+  (nouveau 2e argument : pas de toggle si le type était déjà ouvert) puis consomme l'état.
+  Même effet qu'un tap sur la tuile : brouillon écrasé, date/heure du jour.
+- **Testé dans l'aperçu (375 px)** : chips sans présélection ; tap 3 → question Oui/Non ; Oui →
+  `kneeLog = [{2026-10-04, 3, true}]`, panneau disparu, la raison de demain ne parle plus de
+  « prudence par défaut » ; horloge de la page figée à 9 h (via un `Date` surchargé, pris en
+  compte au tick suivant du `clock` 5 min du Dashboard) → « Démarrer Upper A » affiché ; tap →
+  onglet Séances avec le carnet Upper A ouvert (« débuté 09:00 · 0/8 exos »). Aucune erreur
+  console. Pas de nouveau test Node (UI pure) ; 62 tests toujours verts. Build `apps/perso` ET
+  `apps/public` propres.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.
