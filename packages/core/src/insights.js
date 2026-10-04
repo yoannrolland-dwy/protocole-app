@@ -131,7 +131,9 @@ export function cutProjection(weightLog, targets, tdeeResult, todayDate) {
 
 // "Mobilité" n'est pas une charge d'entraînement (même exclusion que `isLoadBearing` dans le
 // recommandeur, voir CLAUDE.md) — la signaler comme "délaissée" n'aurait pas de sens.
-const NON_LOAD_TYPES = new Set(["Mobilité"]);
+// "Full Body" (04/10/2026) : séance CONDITIONNELLE (seulement le lundi qui suit un match) —
+// la déclarer "délaissée" les semaines sans match serait faux. Exclue au même titre.
+const NON_LOAD_TYPES = new Set(["Mobilité", "Full Body"]);
 const NEGLECT_THRESHOLD_DAYS = 14;
 
 /**

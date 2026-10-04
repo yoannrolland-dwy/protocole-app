@@ -16,15 +16,22 @@ const TEMPLATES = {
       groupe: "pecs", mouvement: "poussee", materiel: "halteres", tendon: null, famille: "developpe-incline" },
     { n: "Rowing barre ou machine", s: 4, r: "8-10", rest: 120, mode: "reps", c: "prise pronation/neutre (coude)",
       groupe: "dos", mouvement: "tirage", materiel: "barre", tendon: "coude", famille: "rowing" },
-    { n: "Écarté poulie basse", s: 3, r: "12-15", rest: 90, mode: "reps", c: "ligne ascendante (haut des pecs)",
+    // Reps plafonnées à 12 (04/10/2026, demande de Yoann) : l'hypertrophie est très proche entre
+    // ~6 et ~30 reps tant que la série finit près de l'échec (Schoenfeld 2017/2021) — ce qui
+    // compte est le volume hebdo et la proximité de l'échec, pas le nombre de reps. Exercices
+    // et nombre de séries volontairement INCHANGÉS (choix explicite de Yoann).
+    { n: "Écarté poulie basse", s: 3, r: "10-12", rest: 90, mode: "reps", c: "ligne ascendante (haut des pecs) · bon étirement en bas",
       groupe: "pecs", mouvement: "isolation", materiel: "poulie", tendon: null },
     { n: "Extension triceps poulie haute", s: 3, r: "10-12", rest: 90, mode: "reps", c: "",
       groupe: "triceps", mouvement: "isolation", materiel: "poulie", tendon: null },
-    { n: "Élévations latérales haltères", s: 3, r: "12-15", rest: 75, mode: "reps", c: "variante haltères",
+    { n: "Élévations latérales haltères", s: 3, r: "10-12", rest: 75, mode: "reps", c: "variante haltères · sans élan",
       groupe: "epaules", mouvement: "isolation", materiel: "halteres", tendon: null },
-    { n: "Face pull", s: 3, r: "15", rest: 60, mode: "reps", c: "arrière d'épaule",
+    { n: "Face pull", s: 3, r: "10-12", rest: 60, mode: "reps", c: "arrière d'épaule",
       groupe: "epaules", mouvement: "tirage", materiel: "poulie", tendon: null },
-    { n: "Curl poignets pronation", s: 3, r: "15-20", rest: 60, mode: "reps", c: "léger, avant-bras",
+    // Curls poignets RÉDUITS 3×15-20 → 2×10-12 (04/10/2026) : douleur au poignet gauche sur ce
+    // seul mouvement. Choix de Yoann de les garder réduits plutôt que de les remplacer par du
+    // grip isométrique (dead hang / farmer walk, proposés) — à revoir si la douleur revient.
+    { n: "Curl poignets pronation", s: 2, r: "10-12", rest: 60, mode: "reps", c: "léger, avant-bras · stop si douleur poignet",
       groupe: "avant-bras", mouvement: "isolation", materiel: "halteres", tendon: null },
     { n: "Core — Planche", s: 3, r: "45-60 s", rest: 60, mode: "temps", c: "finisher · anti-extension · progresser par difficulté",
       groupe: "core", mouvement: "gainage", materiel: "aucun", tendon: null },
@@ -36,15 +43,15 @@ const TEMPLATES = {
       groupe: "dos", mouvement: "tirage", materiel: "machine", tendon: "coude", famille: "tirage-vertical" },
     { n: "Développé militaire haltères", s: 3, r: "8-10", rest: 120, mode: "reps", c: "",
       groupe: "epaules", mouvement: "poussee", materiel: "halteres", tendon: null, famille: "developpe-militaire" },
-    { n: "Rear delt machine (reverse pec deck)", s: 3, r: "12-15", rest: 75, mode: "reps", c: "arrière d'épaule",
+    { n: "Rear delt machine (reverse pec deck)", s: 3, r: "10-12", rest: 75, mode: "reps", c: "arrière d'épaule",
       groupe: "epaules", mouvement: "isolation", materiel: "machine", tendon: null },
-    { n: "Élévations latérales poulie", s: 3, r: "12-15", rest: 75, mode: "reps", c: "variante poulie",
+    { n: "Élévations latérales poulie", s: 3, r: "10-12", rest: 75, mode: "reps", c: "variante poulie · sans élan",
       groupe: "epaules", mouvement: "isolation", materiel: "poulie", tendon: null },
     { n: "Curl marteau (prise neutre)", s: 3, r: "10-12", rest: 75, mode: "reps", c: "prise neutre (coude)",
       groupe: "biceps", mouvement: "isolation", materiel: "halteres", tendon: "coude" },
-    { n: "Curl poignets supination", s: 3, r: "15-20", rest: 60, mode: "reps", c: "léger, avant-bras",
+    { n: "Curl poignets supination", s: 2, r: "10-12", rest: 60, mode: "reps", c: "léger, avant-bras · stop si douleur poignet",
       groupe: "avant-bras", mouvement: "isolation", materiel: "halteres", tendon: null },
-    { n: "Core — Crunch machine", s: 3, r: "12-15", rest: 60, mode: "reps", c: "finisher · contrôlé, 1-2 reps en réserve",
+    { n: "Core — Crunch machine", s: 3, r: "10-12", rest: 60, mode: "reps", c: "finisher · contrôlé, 1-2 reps en réserve",
       groupe: "core", mouvement: "isolation", materiel: "machine", tendon: null },
   ]},
   "Lower A": { kind: "muscu", knee: true, hsr: true, chargeTags: ["genou"], exos: [
@@ -72,7 +79,7 @@ const TEMPLATES = {
       groupe: "fessiers", mouvement: "hanche", materiel: "machine", tendon: null },
     { n: "Leg curl unilatéral", s: 3, r: "10-12", rest: 90, mode: "reps", c: "",
       groupe: "ischios", mouvement: "isolation", materiel: "machine", tendon: null, famille: "leg-curl-unilateral" },
-    { n: "Core — Crunch machine", s: 3, r: "12-15", rest: 60, mode: "reps", c: "finisher · contrôlé, 1-2 reps en réserve",
+    { n: "Core — Crunch machine", s: 3, r: "10-12", rest: 60, mode: "reps", c: "finisher · contrôlé, 1-2 reps en réserve",
       groupe: "core", mouvement: "isolation", materiel: "machine", tendon: null },
   ]},
   // Semaine avec match (01/09/2026) : Lower unique de la semaine, HSR lourd mais volume total
@@ -94,6 +101,33 @@ const TEMPLATES = {
       groupe: "fessiers", mouvement: "hanche", materiel: "machine", tendon: null },
     { n: "Core — Planche", s: 2, r: "45-60 s", rest: 60, mode: "temps", c: "finisher",
       groupe: "core", mouvement: "gainage", materiel: "aucun", tendon: null },
+  ]},
+  // Full Body (04/10/2026, demande de Yoann) : UNIQUEMENT le lundi qui suit un dimanche de
+  // match (détection côté app, `isPostMatchDay` → recommandeur `postMatch`). Base Lower C
+  // (choix de Yoann) + 1 pec + 1 dos + 1 épaule, ce qui ajoute une 3e exposition pecs/épaules
+  // ces semaines-là. Le bloc HSR genou (presse + leg extension, table HSR) est GARDÉ intact et
+  // en tête : si ce lundi remplace un Lower C (deux matchs consécutifs), c'est la seule séance
+  // lourde genou de la semaine. Mollets en superset avec la presse (habitude de Yoann, aucun
+  // temps perdu). RDL/hip thrust : chaîne postérieure déjà chargée par le match → 2-3 reps en
+  // réserve, jamais à l'échec. Mêmes noms d'exercices qu'Upper/Lower : historique, records et
+  // progression partagés. Pas de planche (séance déjà longue, ~65 min).
+  "Full Body": { kind: "muscu", knee: true, hsr: true, chargeTags: ["genou", "tirage"], exos: [
+    { n: "Presse à cuisses (HSR)", s: 3, r: "table HSR", rest: 180, mode: "reps", hsr: true, c: "tempo 6 s · amplitude 10-60° · superset mollets",
+      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "presse-cuisses" },
+    { n: "Mollets à la presse", s: 3, r: "10-12", rest: 90, mode: "reps", c: "en superset avec la presse",
+      groupe: "mollets", mouvement: "isolation", materiel: "machine", tendon: null, famille: "mollets-presse" },
+    { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 120, mode: "reps", hsr: true, c: "tempo 6 s",
+      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
+    { n: "Soulevé de terre roumain", s: 3, r: "8-10", rest: 150, mode: "reps", c: "lendemain de match : 2-3 reps en réserve, jamais à l'échec",
+      groupe: "ischios-fessiers", mouvement: "hanche", materiel: "barre", tendon: null },
+    { n: "Hip thrust", s: 3, r: "8-10", rest: 120, mode: "reps", c: "lendemain de match : 2-3 reps en réserve",
+      groupe: "fessiers", mouvement: "hanche", materiel: "machine", tendon: null },
+    { n: "Développé incliné haltères", s: 3, r: "8-10", rest: 150, mode: "reps", c: "pecs, priorité · 1-2 reps en réserve",
+      groupe: "pecs", mouvement: "poussee", materiel: "halteres", tendon: null, famille: "developpe-incline" },
+    { n: "Rowing barre ou machine", s: 3, r: "8-10", rest: 120, mode: "reps", c: "prise pronation/neutre",
+      groupe: "dos", mouvement: "tirage", materiel: "barre", tendon: "coude", famille: "rowing" },
+    { n: "Élévations latérales haltères", s: 3, r: "10-12", rest: 75, mode: "reps", c: "variante haltères · sans élan",
+      groupe: "epaules", mouvement: "isolation", materiel: "halteres", tendon: null },
   ]},
   // Échauffement (04/09/2026) : déménagé depuis ROUTINES.basket (routine "jouée" hors
   // trainingLog, onglet Douleurs) — devient un vrai carnet d'exercices, suivi pas à pas comme

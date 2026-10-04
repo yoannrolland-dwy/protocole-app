@@ -3985,6 +3985,55 @@ le souhaite ; coller dans « Coach IA · contexte permanent » son texte d'objec
 14 h (décision 11) ; le bilan 3 mois ne reçoit ni `paliers` ni `palier_semaine` (à ajouter si
 l'usage le demande).
 
+## Reps ≤ 12 sur Upper A/B, curls poignets réduits, Full Body le lundi post-match (04/10/2026, apps/perso v3.89.0)
+
+Demande de Yoann : « pas fan des séries au-delà de 12 reps », priorité pecs/épaules, douleur au
+poignet gauche (seulement sur les curls poignets), et un Full Body les lundis qui suivent un
+dimanche de match. Discuté avant de coder, avec les références : hypertrophie très proche entre
+~6 et ~30 reps tant que la série finit près de l'échec (Schoenfeld 2017/2021) ; ce qui compte =
+volume hebdo, proximité de l'échec (Robinson 2024), position étirée (Maeo 2023) ; le grip utile
+à l'escalade est l'isométrie des fléchisseurs des doigts, le curl poignet transfère peu.
+
+- **Seules les répétitions changent** (décision explicite de Yoann après explication — il a
+  refusé les 3 propositions d'exercices : triceps au-dessus de la tête, pec deck en Upper B, dos
+  4 → 3 séries). Développés **gardés en 8-10** (6-10 proposé, refusé). Isolation 12-15 → 10-12
+  (écarté poulie basse, élévations latérales haltères/poulie, rear delt), face pull 15 → 10-12,
+  crunch machine 12-15 → 10-12 **en Upper B ET Lower B** (même exercice, deux cibles différentes
+  auraient brouillé le préremplissage). Volume deltoïdes latéraux resté à 6 séries/semaine —
+  signalé à Yoann comme premier levier à revoir si les épaules ne progressent pas.
+- **Curls poignets 3×15-20 → 2×10-12, plus léger**, consigne « stop si douleur poignet ». Le
+  remplacement par du grip isométrique (farmer walk / dead hang) a été proposé et refusé ; à
+  ressortir si la douleur revient.
+- **`TEMPLATES["Full Body"]`** (`templates.js`, `knee`/`hsr`, `chargeTags: ["genou","tirage"]`) :
+  base Lower C choisie par Yoann — presse HSR + **mollets en superset** (son habitude), leg
+  extension HSR (gardée : si ce lundi remplace un Lower C, c'est la seule séance lourde genou
+  de la semaine), RDL et hip thrust **3×8-10 à 2-3 reps en réserve** (chaîne postérieure déjà
+  chargée par le match), puis incliné haltères, rowing, élévations latérales (3 séries chacun).
+  Mêmes noms d'exercices qu'Upper/Lower → historique/records/progression partagés.
+- **Recommandeur** (`recommender.js`) : nouveau paramètre optionnel `postMatch` qui prime sur
+  `matchWeek` — le bloc « BAS DU CORPS » suggère « Full Body » au lieu de Lower A/B/C (raison
+  dédiée ; genou rouge → « à éviter » avec « faire seulement le haut du corps »). « Full Body »
+  compte à la fois comme Upper ET Lower (`isUpper`/`isLower`/`upperToday`/`lowerToday`).
+- **App** : `isPostMatchDay` (match HIER dans `matchDates`) → `postMatch` passé au Dashboard et
+  au Coach IA ; `familiesForToday` renvoie `["Full Body"]` ce jour-là (bonus planning). **La
+  purge des dates passées garde désormais HIER** (sinon le lundi l'app aurait déjà effacé le
+  match de la veille) ; la carte Planning Basket repliée ne l'affiche pas. Texte du planning
+  idéal : « Lundi … — Full Body si match la veille ».
+- **`insights.js`** : « Full Body » ajouté à `NON_LOAD_TYPES` — séance conditionnelle, sinon la
+  carte Constats l'aurait déclarée « délaissée » les semaines sans match.
+- **`apps/public`** : changements de reps/curls/crunch portés par les gabarits partagés → visibles
+  par les bêta-testeurs au prochain déploiement `main` (même mécanisme que les précédents
+  changements de contenu Upper/Lower). « Full Body » absent de `FAMILY_TYPES` → invisible.
+- **Vérifié** : 31 assertions Node (`fb-test.mjs`) — aucune série > 12 reps en Upper A/B et
+  Lower B, exercices/séries Upper inchangés, Full Body (contenu, ordre, HSR, tag genou),
+  `postMatch` → Full Body + bonus, sans `postMatch` → Lower C comme avant, genou rouge → à
+  éviter, Full Body loggé → compte Upper et Lower. Prompt Coach IA identique au caractère près
+  (capture avant/après le même jour via `git stash` — une première comparaison contre une
+  capture du 02/10 différait uniquement par la date). Aperçu : match seedé hier → « Prochaine
+  séance : Full Body · 69 » avec bonus planning, tuile Full Body dans Séances, 8 exercices,
+  presse en « 3 × 15RM » (table HSR semaine 1), date d'avant-hier purgée / hier gardée mais pas
+  affichée. Aucune erreur console. Build `apps/perso` ET `apps/public` propres.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.

@@ -99,9 +99,15 @@ function applyPlanBonus(sugg, weeklyPlan) {
   });
 }
 
-export function recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme, extraSports, basketSchedule, weeklyPlan, energy, matchWeek }) {
+// `postMatch` (04/10/2026, optionnel, additif) : vrai le lundi qui suit un dimanche de match
+// (résolu par l'appelant depuis `basketSchedule.matchDates`). Prime sur `matchWeek` : le bloc
+// "BAS DU CORPS" suggère alors "Full Body" (base Lower C + 1 pec/dos/épaule) au lieu de
+// Lower A/B/C. Absent/faux → comportement identique à avant. "Full Body" compte à la fois
+// comme Upper ET comme Lower dans les décomptes et les "déjà fait aujourd'hui" — il contient
+// les deux.
+export function recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme, extraSports, basketSchedule, weeklyPlan, energy, matchWeek, postMatch }) {
   const t0 = today();
-  const isUpper = (t) => t.type === "Upper A" || t.type === "Upper B";
+  const isUpper = (t) => t.type === "Upper A" || t.type === "Upper B" || t.type === "Full Body";
   // "Lower C" (01/09/2026, semaine avec match) compte dans le volume/dernier-fait Lower
   // affiché. Jusqu'au 14/09/2026, elle restait hors de `variant("Lower A","Lower B")` —
   // jamais suggérée/évitée automatiquement. Revu ce jour-là (retour de Yoann : le
@@ -110,7 +116,7 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   // bascule désormais la suggestion vers Lower C plutôt que A/B. Le gate de sécurité genou
   // (dKnee, plus bas) reste correct dans tous les cas : il est déjà basé sur `chargeTags`,
   // pas sur ce littéral.
-  const isLower = (t) => t.type === "Lower A" || t.type === "Lower B" || t.type === "Lower C";
+  const isLower = (t) => t.type === "Lower A" || t.type === "Lower B" || t.type === "Lower C" || t.type === "Full Body";
   // `d >= 0` indispensable : sans lui, une entrée datée dans le futur (le sélecteur de
   // date le permet) donne un écart négatif, donc « <= n » est vrai et elle compte dans
   // la semaine écoulée. Même garde-fou que le helper global `withinDays`.
@@ -255,8 +261,8 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
 
   // ce qui est déjà fait aujourd'hui
   const todayTypes = training.filter((t) => t.date === t0).map((t) => t.type);
-  const upperToday = todayTypes.some((x) => x.startsWith("Upper"));
-  const lowerToday = todayTypes.some((x) => x.startsWith("Lower"));
+  const upperToday = todayTypes.some((x) => x.startsWith("Upper") || x === "Full Body");
+  const lowerToday = todayTypes.some((x) => x.startsWith("Lower") || x === "Full Body");
   const climbToday = todayTypes.includes("Escalade");
   const kneeToday = todayTypes.some((x) => chargeTagsOf(x)?.includes("genou"));
   // Sports du catalogue étendu réellement actifs pour cet utilisateur (Lot F) — absent/vide
@@ -313,14 +319,15 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   // ÉTROITEMENT via `lowerToday` (Lower A/B/C fait aujourd'hui, déjà calculé plus haut) —
   // volontairement PAS `kneeToday`/`dKnee` (Basket/Course/Foot inclus), qui réintroduirait
   // exactement la contrainte large que Yoann vient de faire retirer.
+  const loLabel = postMatch ? "Full Body" : matchWeek ? "Lower C" : "Lower A / B";
   if (kneeRed) {
-    push(avoid, matchWeek ? "Lower C" : "Lower A / B", 0, `Genou : ${kLast.baseline === false ? "pas revenu à la base sous 24 h" : `douleur ${painLast}/10`}. Attendre le retour à la base.`);
+    push(avoid, loLabel, 0, `Genou : ${kLast.baseline === false ? "pas revenu à la base sous 24 h" : `douleur ${painLast}/10`}. Attendre le retour à la base.${postMatch ? " Lendemain de match : faire seulement le haut du corps." : ""}`);
   } else if (lowerToday) {
-    push(avoid, matchWeek ? "Lower C" : "Lower A / B", 0, "Lower déjà fait aujourd'hui — deuxième dose déconseillée.");
+    push(avoid, loLabel, 0, "Lower déjà fait aujourd'hui — deuxième dose déconseillée.");
   } else {
-    const loV = matchWeek ? "Lower C" : variant("Lower A", "Lower B");
+    const loV = postMatch ? "Full Body" : matchWeek ? "Lower C" : variant("Lower A", "Lower B");
     let loScore = 20 + (2 - lower7) * 12 + cap(dLower) - (kneeAmber ? AMBER_PENALTY.genou["Lower A"] : 0);
-    let loReason = `Lower ${lower7}/2 cette semaine · dernier ${ago(dLower)}.`;
+    let loReason = `Lower ${lower7}/2 cette semaine · dernier ${ago(dLower)}.${postMatch ? " Lendemain de match : Full Body (HSR genou + chaîne postérieure à 2-3 reps en réserve + pecs/dos/épaules)." : ""}`;
     if (kneeUnknown) loReason += ` ${kneeNote} Charge prudente, tempo 6 s.`;
     else if (kneeAmber) loReason += ` Genou sensible (${painLast}/10${flagged7 ? `, ${flagged7} j hors base` : ""}) → charge prudente, tempo 6 s.`;
     loScore = fatigueScore(loScore);

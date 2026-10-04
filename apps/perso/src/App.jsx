@@ -47,7 +47,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.88.1";
+const APP_VERSION = "3.89.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -288,7 +288,7 @@ function PalierCard({ palier, targets, onApply }) {
   );
 }
 
-function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule, weeklyPlan, matchWeek, palier, onApplyPalier }) {
+function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule, weeklyPlan, matchWeek, postMatch, palier, onApplyPalier }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast && tgtW != null ? round(wLast.kg - tgtW) : null;
@@ -302,7 +302,7 @@ function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, tra
   const mToday = macros.find((m) => m.date === today());
   const kcalToday = mToday ? Math.round(kcalOfEntry(mToday)) : null;
 
-  const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee, sleep, targets, scheme, basketSchedule, weeklyPlan, energy, matchWeek }), [training, knee, sleep, targets, scheme, basketSchedule, weeklyPlan, energy, matchWeek]);
+  const { suggestions, avoid } = useMemo(() => recommendSessions({ training, knee, sleep, targets, scheme, basketSchedule, weeklyPlan, energy, matchWeek, postMatch }), [training, knee, sleep, targets, scheme, basketSchedule, weeklyPlan, energy, matchWeek, postMatch]);
 
   const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
   const waterToday = mToday?.water ?? 0;
@@ -2191,7 +2191,7 @@ function TdeeCard({ result, deficitReel, trend, windows, recomp }) {
 // recommandeur ("Prochaine séance").
 const WEEKLY_PLAN = {
   sansMatch: [
-    { jour: "Lundi", texte: "Lower A (HSR lourd)" },
+    { jour: "Lundi", texte: "Lower A (HSR lourd) — Full Body si match la veille" },
     { jour: "Mardi", texte: "Repos actif — 10k pas, mobilité douce ; iso genou et/ou escalade légère en option selon ressenti" },
     { jour: "Mercredi", texte: "Mobilité (matin) · Basket (soir)" },
     { jour: "Jeudi", texte: "Upper A" },
@@ -2200,7 +2200,7 @@ const WEEKLY_PLAN = {
     { jour: "Dimanche", texte: "Upper B" },
   ],
   avecMatch: [
-    { jour: "Lundi", texte: "Lower C (HSR lourd)" },
+    { jour: "Lundi", texte: "Lower C (HSR lourd) — Full Body si match la veille" },
     { jour: "Mardi", texte: "Repos actif — même logique que la semaine sans match" },
     { jour: "Mercredi", texte: "Mobilité (matin) · Basket (soir)" },
     { jour: "Jeudi", texte: "Upper A" },
@@ -2244,9 +2244,22 @@ function isMatchWeek(basketSchedule) {
  * famille à un type suggéré (bonus modéré, jamais un remplacement, voir recommender.js).
  */
 function familiesForToday(basketSchedule) {
+  // Lendemain de match (04/10/2026) : le planning du jour devient "Full Body", quelle que soit
+  // la variante de la semaine — prime sur Lower A/C du lundi.
+  if (isPostMatchDay(basketSchedule)) return ["Full Body"];
   const dow = new Date().getDay(); // 0=dimanche...6=samedi
   const variant = isMatchWeek(basketSchedule) ? "avecMatch" : "sansMatch";
   return WEEKLY_PLAN_FAMILIES[variant][dow] || [];
+}
+
+/**
+ * Vrai si un match a eu lieu HIER (04/10/2026) — en pratique le lundi qui suit un dimanche de
+ * match, jour du "Full Body" (demande de Yoann : uniquement ces lundis-là ; les dimanches sans
+ * match restent des jours de musculation normaux). Nécessite que la date d'hier survive à la
+ * purge des dates passées (voir l'effet de chargement d'`App` : on garde ≥ hier).
+ */
+function isPostMatchDay(basketSchedule) {
+  return !!basketSchedule?.matchDates?.includes(shiftDateKey(today(), -1));
 }
 
 /* ============================================================
@@ -2420,7 +2433,8 @@ function BasketScheduleCard({ basketSchedule, setBasketSchedule }) {
   // (voir l'effet de chargement d'`App`), décision de Yoann — inutile de garder une donnée
   // sans effet.
   const [showAll, setShowAll] = useState(false);
-  const shown = showAll ? matchDates : matchDates.slice(0, 3);
+  // Le match d'hier est gardé en mémoire pour le Full Body du lundi : jamais affiché replié.
+  const shown = showAll ? matchDates : matchDates.filter((d) => d >= today()).slice(0, 3);
   const hiddenCount = matchDates.length - shown.length;
 
   return (
@@ -2856,7 +2870,9 @@ export default function App({ silent = false } = {}) {
       // que si quelque chose a été retiré — même pattern que la migration Leg curl ci-dessus.
       const rawSchedule = await store.get("basketSchedule", { weekly: [], matchDates: [] });
       const allMatches = rawSchedule.matchDates || [];
-      const futureMatches = allMatches.filter((d) => d >= today());
+      // Garde aussi HIER (04/10/2026) : sans elle, le lundi l'app aurait déjà effacé le match
+      // de la veille et ne pourrait pas savoir que c'est un jour de Full Body (`isPostMatchDay`).
+      const futureMatches = allMatches.filter((d) => d >= shiftDateKey(today(), -1));
       const purgedSchedule = futureMatches.length === allMatches.length ? rawSchedule : { ...rawSchedule, matchDates: futureMatches };
       if (purgedSchedule !== rawSchedule) store.set("basketSchedule", purgedSchedule);
       setBasketScheduleState(purgedSchedule);
@@ -3137,7 +3153,7 @@ export default function App({ silent = false } = {}) {
         weight, sleep, training, knee, macros, notes, steps, targets, phase,
         foodLog: getSync("foodLog", []), foodOverrides: getSync("foodOverrides", {}),
         profile, journal, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule),
-        matchWeek: isMatchWeek(basketSchedule), targetHistory, palier: palierWeekly,
+        matchWeek: isMatchWeek(basketSchedule), postMatch: isPostMatchDay(basketSchedule), targetHistory, palier: palierWeekly,
         energy: computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps }),
       }, note),
     buildBriefing: () =>
@@ -3218,7 +3234,7 @@ export default function App({ silent = false } = {}) {
           <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, climbScheme, setClimbScheme, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule), matchWeek: isMatchWeek(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier }} openSettings={() => setShowSettings(true)} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule), matchWeek: isMatchWeek(basketSchedule), postMatch: isPostMatchDay(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier }} openSettings={() => setShowSettings(true)} />}
             {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
             {tab === "sleep" && <SleepTab {...{ sleep, rhr, steps, naps, save }} />}
             {tab === "steps" && <StepsTab {...{ steps, save }} />}
