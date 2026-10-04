@@ -821,7 +821,7 @@ chantier, chacun buildé/testé/commité, install native à la fin de chaque lot
 - `progressiveOverloadSuggestion` : une série « stable » avec un RIR qui augmente n'est pas un
   plateau (effort qui baisse = progression) ; `exoProgress` transmet le RIR au Coach IA.
 
-## T5 — Bonus
+## T5 — Bonus ✅ livré le 04/10/2026 (apps/perso v3.97.0, voir CLAUDE.md)
 - Haptique (`@capacitor/haptics`, natif seulement) au cochage d'une série — impulsion brève.
 - Champ « alcool (g) » optionnel dans `FreeEntry` (7 kcal/g, déjà le coefficient CIQUAL),
   stocké dans la ligne `foodLog`, remonté au Coach IA (`alcool_g` dans macros hier/aujourd'hui).

@@ -204,10 +204,13 @@ function Row({ food, onClick, pinned, onPin, onRemove, onEdit, onQuickAdd }) {
    la friction qui pousse à abandonner. Un nom vide se sauvegarde sous "Ajout rapide". */
 function FreeEntry({ onAdd, onBack, backLabel = "Saisie libre" }) {
   const [name, setName] = useState("");
-  const [m, setM] = useState({ prot: "", gluc: "", lip: "", fib: "" });
+  const [m, setM] = useState({ prot: "", gluc: "", lip: "", fib: "", alcool: "" });
   const num = (v) => { const n = parseFloat(String(v).replace(",", ".")); return Number.isFinite(n) ? n : 0; };
-  const macrosEntered = MACROS.some((k) => k !== "kcal" && m[k] !== "" && num(m[k]) > 0);
-  const kcalComputed = Math.round(num(m.prot) * 4 + num(m.gluc) * 4 + num(m.lip) * 9 + num(m.fib) * 2);
+  // Alcool (T5, 04/10/2026) : 7 kcal/g (même coefficient que la table CIQUAL), optionnel,
+  // stocké dans la ligne `foodLog` (per100.alcool) pour le Coach IA — jamais une macro cible.
+  const alcohol = num(m.alcool);
+  const macrosEntered = MACROS.some((k) => k !== "kcal" && m[k] !== "" && num(m[k]) > 0) || alcohol > 0;
+  const kcalComputed = Math.round(num(m.prot) * 4 + num(m.gluc) * 4 + num(m.lip) * 9 + num(m.fib) * 2 + alcohol * 7);
 
   // Calories toujours éditables, jamais figées sur le calcul 4/4/9+fibres (07/09/2026,
   // demande explicite de Yoann — cas de l'alcool : un Jamaican Mule ~190 kcal n'a que 16 g
@@ -238,7 +241,7 @@ function FreeEntry({ onAdd, onBack, backLabel = "Saisie libre" }) {
       </Body>
       <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom (optionnel — ex. Skyr vanille 150 g)" />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        {[["prot", "Protéines"], ["gluc", "Glucides"], ["lip", "Lipides"], ["fib", "Fibres"]].map(([k, l]) => (
+        {[["prot", "Protéines"], ["gluc", "Glucides"], ["lip", "Lipides"], ["fib", "Fibres"], ["alcool", "Alcool"]].map(([k, l]) => (
           <div key={k}>
             <Label style={{ marginBottom: 4 }}>{l} (g)</Label>
             <input type="text" inputMode="decimal" value={m[k]} placeholder="0"
@@ -253,8 +256,8 @@ function FreeEntry({ onAdd, onBack, backLabel = "Saisie libre" }) {
           onChange={(e) => { setKcalTouched(true); setKcal(e.target.value); }}
           style={{ ...inputStyle(false), textAlign: "center", fontSize: 16, fontWeight: 800, color: C.accent }} />
         <Body style={{ fontSize: 9.5, color: C.dim, marginTop: 4 }}>
-          Pré-rempli depuis les macros (4/4/9 + fibres) — modifiable, utile pour l'alcool ou
-          toute source de calories que les macros ne couvrent pas.
+          Pré-rempli depuis les macros (4/4/9 + fibres + alcool 7 kcal/g) — modifiable pour toute
+          source de calories que ces champs ne couvrent pas.
         </Body>
       </div>
       <Btn variant="primary" disabled={!ok} onClick={() => {
@@ -262,7 +265,7 @@ function FreeEntry({ onAdd, onBack, backLabel = "Saisie libre" }) {
           ref: newQuickRef(),
           name: name.trim() || "Ajout rapide",
           per100: macrosEntered
-            ? { kcal: Math.round(num(kcal)), prot: num(m.prot), gluc: num(m.gluc), lip: num(m.lip), fib: num(m.fib) }
+            ? { kcal: Math.round(num(kcal)), prot: num(m.prot), gluc: num(m.gluc), lip: num(m.lip), fib: num(m.fib), ...(alcohol > 0 ? { alcool: alcohol } : {}) }
             // Calories seules : les macros sont vraiment INCONNUES (null), pas nulles —
             // même principe que les fibres manquantes d'un produit Open Food Facts.
             : { kcal: Math.round(num(kcal)), prot: null, gluc: null, lip: null, fib: null },

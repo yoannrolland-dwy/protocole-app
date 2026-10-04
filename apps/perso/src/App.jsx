@@ -16,6 +16,7 @@ import { isBackupStale, daysSinceBackup, scheduleBackupReminder } from "./cloudB
 import { exoProgress, exerciseList, exerciseSessions, exerciseTrend, isTimeMode, setLabel,
          beats, recordToBeat, recordsBySession, painOutOfBase, progressiveOverloadSuggestion } from "@rawcare/core/training";
 import { weeklyVolumeByGroup, VOLUME_TARGET } from "@rawcare/core/volume";
+import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { SCHEMES, gradeIndex, ISSUES, climbSummary, climbLabel } from "@rawcare/core/climbing";
 import { realDeficit, MIN_WINDOW_DAYS as MIN_TDEE_DAYS, tdeeTrend, tdeeOverWindow } from "@rawcare/core/tdee";
 import { TEMPLATES, TYPES, DEFAULT_WEIGHTS, HSR_TABLE, hsrForWeek, hsrParse, parseSecs,
@@ -48,7 +49,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.96.0";
+const APP_VERSION = "3.97.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -1178,7 +1179,12 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
   const toggle = (ei, si) => {
     setExos((p) => p.map((e, i) => i !== ei ? e : { ...e, series: e.series.map((s, j) => j !== si ? s : { ...s, fait: !s.fait }) }));
     // coche = fin de série → relance le minuteur sur le dernier temps utilisé pour cet exercice (fin de série uniquement, pas décoche)
-    if (!exos[ei].series[si].fait) fireTimer(lastTimerByExo[ei] ?? exos[ei].rest);
+    if (!exos[ei].series[si].fait) {
+      fireTimer(lastTimerByExo[ei] ?? exos[ei].rest);
+      // Haptique (T5, 04/10/2026) : impulsion brève au cochage, natif seulement — jamais
+      // bloquant, une erreur du plugin est ignorée.
+      if (Capacitor.isNativePlatform()) Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+    }
   };
   const addSet = (ei, leg) => setExos((p) => p.map((e, i) => {
     if (i !== ei) return e;

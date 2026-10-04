@@ -17,7 +17,7 @@ import { climbSummary } from "../climbing.js";
 import { PHASES, phaseTarget, targetsForDate, kcalFromMacros, kcalOfEntry, isCutWindow, tdeeNow, weightTrend7, recompWindows } from "../targets.js";
 import { realDeficit } from "../tdee.js";
 import { isPalierEntry } from "../palier.js";
-import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor } from "../nutrition/foodStore.js";
+import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor, alcoholGramsFor } from "../nutrition/foodStore.js";
 
 // Amorçage du profil permanent : reprend mot pour mot les règles de coaching qui étaient
 // codées en dur dans le prompt jusqu'au 30/07/2026. Écrit une seule fois, à la première
@@ -186,6 +186,7 @@ export function buildCoachPrompt(data, note) {
   // --- temps réel : hier vs aujourd'hui, avec deltas explicites ---
   const findDay = (arr, d) => arr.find((e) => e.date === d);
   const y = shiftDateKey(today(), -1);
+  const alcYest = alcoholGramsFor(foodLog, y), alcToday = alcoholGramsFor(foodLog, today());
   const wToday = findDay(weight, today()), wYest = findDay(weight, y);
   const mToday = findDay(macros, today()), mYest = findDay(macros, y);
   const sToday = findDay(sleep, today()), sYest = findDay(sleep, y);
@@ -262,8 +263,10 @@ export function buildCoachPrompt(data, note) {
       delta: (wYest?.kg != null && wToday?.kg != null) ? round(wToday.kg - wYest.kg) : null },
     sommeil_nuit_derniere: sToday ? { heures: round(sToday.hours, 2), qualite: sToday.quality ?? null } : null,
     sommeil_avant_hier: sYest ? { heures: round(sYest.hours, 2), qualite: sYest.quality ?? null } : null,
-    macros_hier: mYest ? { proteines: mYest.protein, glucides: mYest.carbs, lipides: mYest.fat, fibres: mYest.fiber, eau_ml: mYest.water } : null,
-    macros_aujourdhui_en_cours: mToday ? { proteines: mToday.protein, glucides: mToday.carbs, lipides: mToday.fat, fibres: mToday.fiber, eau_ml: mToday.water, cible_eau_ml: waterTgtToday } : null,
+    // `alcool_g` (T5, 04/10/2026) : grammes d'alcool loggés via la saisie libre — ajouté
+    // seulement si > 0 (prompt identique à avant sinon). Jamais une cible.
+    macros_hier: mYest ? { proteines: mYest.protein, glucides: mYest.carbs, lipides: mYest.fat, fibres: mYest.fiber, eau_ml: mYest.water, ...(alcYest > 0 ? { alcool_g: alcYest } : {}) } : null,
+    macros_aujourdhui_en_cours: mToday ? { proteines: mToday.protein, glucides: mToday.carbs, lipides: mToday.fat, fibres: mToday.fiber, eau_ml: mToday.water, cible_eau_ml: waterTgtToday, ...(alcToday > 0 ? { alcool_g: alcToday } : {}) } : null,
     repas_hier: mealsFor(foodLog, y),
     repas_aujourdhui: mealsFor(foodLog, today()),
     pas_hier: sYest_steps?.count ?? null, pas_aujourdhui: sToday_steps?.count ?? null,

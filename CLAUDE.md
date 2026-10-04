@@ -4283,6 +4283,44 @@ rempli honnêtement — d'où un champ OPTIONNEL, jamais imposé, jamais présé
   fiche « 32 kg × 9 · RIR 2 », réouverture en modification → chip 2 présélectionnée. Aucune
   erreur console. Build `apps/perso` ET `apps/public` propres.
 
+## Chantier T — T5 : haptique au cochage + alcool en saisie libre (04/10/2026, apps/perso v3.97.0)
+
+Spec dans `ROADMAP.md`. Dernier lot du chantier T (T1 → T5 livrés le même jour).
+
+- **Haptique** (`@capacitor/haptics` 8.0.2, nouvelle dépendance `apps/perso`, enregistrée par
+  `npx cap sync android` — 7 plugins Capacitor désormais) : `Haptics.impact({ style: Light })`
+  dans `toggle()` de `MuscuLogger`, **au cochage seulement** (pas au décochage), **natif
+  seulement** (`Capacitor.isNativePlatform()`), erreur du plugin ignorée (`.catch`). Rien sur
+  la PWA/`apps/public`. **Non testable dans l'aperçu** — à sentir sur le téléphone après
+  install.
+- **Alcool (g) dans la saisie libre** (`FreeEntry`, `FoodSearch.jsx` des **deux apps** — même
+  composant, même modèle de ligne `foodLog` partagé par `packages/core`) : 5e champ sous les
+  macros, **7 kcal/g** ajoutés au pré-remplissage des calories (même coefficient que la table
+  CIQUAL, règlement UE 1169/2011). Un alcool seul suffit à activer « Ajouter ». Stocké dans la
+  ligne via `per100.alcool` (`makeEntry`, `foodStore.js`) **seulement si > 0** : les lignes
+  sans alcool gardent exactement les 5 clés d'avant. **Jamais une macro cible** : `amounts`/
+  `totals`/`deriveMacroLog` ne connaissent pas l'alcool, aucun compteur ni cible à l'écran.
+- **Coach IA** : nouvel helper `alcoholGramsFor(log, date)` (`foodStore.js`) ; `alcool_g`
+  ajouté à `macros_hier` / `macros_aujourdhui_en_cours` **seulement si > 0** — prompt identique
+  à avant sinon (capture datée T1 inchangée).
+- **Bug trouvé par l'aperçu, corrigé avant livraison** : raccourci `{ alcool }` alors que la
+  variable s'appelle `alcohol` → `ReferenceError` au clic sur « Ajouter » (le bouton semblait
+  inerte, aucune ligne écrite). Rappel utile : un test Node ne couvre pas le JSX ; c'est la
+  console de l'aperçu qui l'a montré.
+- **Tests** : `nutrition.test.mjs`, 3 tests (`makeEntry` avec/sans/zéro alcool, `alcoholGramsFor`
+  au prorata des quantités et par date, `totals`/`amounts` sans colonne alcool, `alcool_g`
+  conditionnel dans le prompt) — **71 tests** au total. Aperçu : 18 g → 126 kcal pré-remplies,
+  ligne persistée `per100 = {kcal 126, alcool 18, macros 0}`. Build `apps/perso` ET `apps/public`
+  propres, `cap sync` propre.
+
+### Chantier T — bilan
+
+T1 à T5 livrés le 04/10/2026 (v3.93.0 → v3.97.0), un commit par lot sur `dev`, 71 tests
+`node --test` et un hook pre-commit bloquant. **Install native à faire** (T1-T5 cumulés,
+dont le plugin haptique qui exige un vrai rebuild Gradle). À vérifier sur l'appareil : la
+sensation haptique au cochage, et à l'usage le RIR (« utile seulement si rempli
+honnêtement », doute explicite de Yoann).
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.

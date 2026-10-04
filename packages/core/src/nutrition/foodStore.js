@@ -77,9 +77,18 @@ export function makeEntry({ date, meal, food, q }) {
     per100: {
       kcal: food.per100.kcal, prot: food.per100.prot,
       gluc: food.per100.gluc, lip: food.per100.lip, fib: food.per100.fib,
+      // Alcool en g/100 g (T5, 04/10/2026) — optionnel, porté seulement par la saisie libre.
+      // Jamais une macro cible ni une colonne des totaux : sert au Coach IA (`alcool_g`).
+      ...(food.per100.alcool != null && food.per100.alcool > 0 ? { alcool: food.per100.alcool } : {}),
     },
     at: new Date().toISOString(),
   };
+}
+
+/** Grammes d'alcool loggés à une date (somme per100.alcool × q/100, 1 décimale), 0 si aucun. */
+export function alcoholGramsFor(log, date) {
+  const g = entriesFor(log || [], date).reduce((sum, e) => sum + ((e.per100?.alcool || 0) * (e.q || 0)) / 100, 0);
+  return Math.round(g * 10) / 10;
 }
 
 // --- Corrections de valeurs (V6, 03/08/2026) -------------------------------------
