@@ -73,7 +73,7 @@ function explain({ all, shown, avoid, slotReason, plan, closedReason }) {
 export const SLOTS = { MORNING_END: 12, MIDDAY_END: 14 };
 
 const isMuscuType = (type) => /^(Upper|Lower|Full Body)/.test(type);
-const isRestType = (type) => type.startsWith("Repos");
+const isRestType = (type) => type.startsWith("Récupération");
 const dowOf = (dateKey) => { const [y, m, d] = dateKey.split("-").map(Number); return new Date(y, m - 1, d).getDay(); };
 
 /** Basket prévu ce jour-là (jour hebdo fixe ou date de match) — même règle que le recommandeur. */
@@ -148,7 +148,12 @@ export function nextSessions({ now = new Date(), base, planFor }) {
     const notProposed = explain({ all: recoToday.suggestions, shown: trainable.length ? open : [], avoid: recoToday.avoid, slotReason, plan: planToday });
     today = trainable.length
       ? { date: todayKey, status: "open", suggestions: open, avoid: recoToday.avoid, note: null, notProposed }
-      : { date: todayKey, status: "closed", suggestions: [], avoid: [], note: ctx.sessionDone ? "Séance du jour faite : journée terminée — mobilité possible." : "Plus de créneau d'entraînement aujourd'hui — mobilité possible.", notProposed };
+      // `avoid` conservé même journée fermée (05/10/2026, bug vu sur les vraies données de
+      // Yoann) : un Full Body avec rowing coché fermait la journée (plus de créneau muscu) ET
+      // vidait « À éviter » — l'escalade, écartée pour le tirage du jour, disparaissait des deux
+      // listes (« Pourquoi pas les autres ? » masque les motifs « avoid », censés être affichés
+      // au-dessus). La raison d'une exclusion doit rester visible, journée ouverte ou non.
+      : { date: todayKey, status: "closed", suggestions: [], avoid: recoToday.avoid, note: ctx.sessionDone ? "Séance du jour faite : journée terminée — mobilité possible." : "Plus de créneau d'entraînement aujourd'hui — mobilité possible.", notProposed };
   }
 
   // ---- Demain ---- (décision 6 : prévision — sommeil et énergie de demain inconnus, donc

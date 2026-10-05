@@ -49,7 +49,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.97.0";
+const APP_VERSION = "3.98.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -354,6 +354,11 @@ function KneeQuickLog({ knee, saveKnee }) {
   );
 }
 
+// Couleur de la tendance de poids hebdo en Recomposition (05/10/2026) : |delta| ≤ 0,3 kg/sem
+// = objectif tenu (citron) ; au-delà = ambre, dans les deux sens ; jamais rouge.
+const RECOMP_TREND_MAX = 0.3;
+const recompTrendColor = (deltaWeek) => (Math.abs(deltaWeek) <= RECOMP_TREND_MAX ? C.accent : "#e8a33d");
+
 function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule, planFor, palier, onApplyPalier, saveKnee, onStart }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
@@ -404,7 +409,11 @@ function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, tra
     { label: "Poids", tab: "weight", val: wLast ? wLast.kg : "—", unit: "kg",
       note: tgtW != null ? `cible ${tgtW}` : `moy. 7 j ${wTrend?.avg7 ?? "—"}`, color: C.text,
       extra: wDelta != null ? { txt: `${wDelta > 0 ? "▲" : "▼"}${Math.abs(wDelta)}`, col: wDelta > 0 ? C.danger : C.accent }
-        : wTrend?.deltaWeek != null ? { txt: `${wTrend.deltaWeek > 0 ? "▲" : "▼"}${Math.abs(wTrend.deltaWeek)}/sem`, col: wTrend.deltaWeek > 0 ? C.danger : C.accent }
+        // Recomposition (05/10/2026) : ±0,3 kg/sem = attendu (citron), au-delà dans un sens ou
+        // l'autre = ambre (perte trop rapide → muscle à risque ; prise nette → gras/eau), jamais
+        // rouge — mêmes seuils que le moteur Palier (R3). La logique sèche (prise = rouge) ne
+        // s'applique qu'avec un poids cible.
+        : wTrend?.deltaWeek != null ? { txt: `${wTrend.deltaWeek > 0 ? "▲" : "▼"}${Math.abs(wTrend.deltaWeek)}/sem`, col: recompTrendColor(wTrend.deltaWeek) }
         : null },
     { label: "Pas", tab: "steps", val: stepsToday.toLocaleString("fr-FR"), unit: "",
       note: `/ ${STEPS_TARGET.toLocaleString("fr-FR")}`, color: C.text,
@@ -593,7 +602,7 @@ function WeightTab({ weight, targets, save, phase }) {
       <Card style={{ padding: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
           <Label style={{ fontSize: 10, letterSpacing: 1.5 }}>Actuel</Label>
-          <span style={{ fontSize: 11, color: C.accent, fontWeight: 700 }}>{tgtW != null ? `cible ${tgtW} kg` : trendLabel}</span>
+          <span style={{ fontSize: 11, color: tgtW != null ? C.accent : recompTrendColor(wTrend?.deltaWeek ?? 0), fontWeight: 700 }}>{tgtW != null ? `cible ${tgtW} kg` : trendLabel}</span>
         </div>
         <div style={{ margin: "6px 0 12px" }}><Big value={wLast ? wLast.kg : "—"} unit="kg" /></div>
         {data.length > 1 ? (
@@ -2373,7 +2382,7 @@ function TdeeCard({ result, deficitReel, trend, windows, recomp }) {
 const WEEKLY_PLAN = {
   sansMatch: [
     { jour: "Lundi", texte: "Lower A (HSR lourd) — Full Body si match la veille" },
-    { jour: "Mardi", texte: "Repos actif — 10k pas, mobilité douce ; iso genou et/ou escalade légère en option selon ressenti" },
+    { jour: "Mardi", texte: "Récupération active — 10k pas, mobilité douce ; iso genou et/ou escalade légère en option selon ressenti" },
     { jour: "Mercredi", texte: "Mobilité (matin) · Basket (soir)" },
     { jour: "Jeudi", texte: "Upper A" },
     { jour: "Vendredi", texte: "Mobilité (matin) · Basket (midi)" },
@@ -2382,7 +2391,7 @@ const WEEKLY_PLAN = {
   ],
   avecMatch: [
     { jour: "Lundi", texte: "Lower C (HSR lourd) — Full Body si match la veille" },
-    { jour: "Mardi", texte: "Repos actif — même logique que la semaine sans match" },
+    { jour: "Mardi", texte: "Récupération active — même logique que la semaine sans match" },
     { jour: "Mercredi", texte: "Mobilité (matin) · Basket (soir)" },
     { jour: "Jeudi", texte: "Upper A" },
     { jour: "Vendredi", texte: "Mobilité (matin) · Basket (midi)" },
@@ -2395,7 +2404,7 @@ const WEEKLY_PLAN = {
 // pour chaque jour de la semaine (index `Date#getDay()`, 0=dimanche...6=samedi), la ou les
 // "familles" de séance prévues. Une famille est un préfixe de type reconnu par
 // `recommendSessions` (packages/core/src/recommender.js) — "Upper" matche "Upper A"/"Upper
-// B", "Lower" matche "Lower A/B/C", "Repos" matche "Repos / mobilité". "Mobilité" ne matche
+// B", "Lower" matche "Lower A/B/C", "Repos" matche "Récupération active". "Mobilité" ne matche
 // aucun type suggéré automatiquement (c'est un choix manuel, jamais suggéré) : gardée ici
 // à titre documentaire, sans effet sur le score.
 const WEEKLY_PLAN_FAMILIES = {

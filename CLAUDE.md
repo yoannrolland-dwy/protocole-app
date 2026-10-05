@@ -4321,6 +4321,44 @@ dont le plugin haptique qui exige un vrai rebuild Gradle). À vérifier sur l'ap
 sensation haptique au cochage, et à l'usage le RIR (« utile seulement si rempli
 honnêtement », doute explicite de Yoann).
 
+## Retours post-chantier T : escalade invisible, « Récupération active », couleur poids en recomposition (05/10/2026, apps/perso v3.98.0)
+
+Trois retours de Yoann après l'install de v3.97.0, diagnostiqués sur ses **vraies données**
+(lues depuis le téléphone via `apps/perso/scripts/cdp.mjs`, rejouées en Node) avant tout code.
+
+- **Bug : l'escalade absente à la fois de « Prochaine séance », « À éviter » ET « Pourquoi pas
+  les autres ? »** (`packages/core/src/nextSession.js`). Cas réel : lundi, Full Body loggé avec
+  rowing coché → plus de créneau muscu → journée « fermée » ; dans cette branche `nextSessions`
+  renvoyait `avoid: []`, alors que l'escalade y était justement (« tirage / flexion du coude
+  déjà faits aujourd'hui »), et `WhyNot` masque les motifs `avoid` parce qu'ils sont censés
+  s'afficher au-dessus. Résultat : exclue partout, visible nulle part. **Fix** : la branche
+  fermée-par-les-créneaux conserve `recoToday.avoid` (la branche fermée-par-un-match reste à
+  `[]`, tout y est déjà expliqué par la note). Test nommé « régression 05/10 ».
+- **Barème escalade : objectif hebdo 1 séance** (`recommender.js`, décision de Yoann parmi
+  4 options) : `20 + (1 − min(climb7, 1)) × 12 + ancienneté` au lieu de `10 + ancienneté`
+  (plafond 17, structurellement 4e). Non faite cette semaine → 39 ; faite → 20 + ancienneté.
+  Reste derrière un Upper/Lower frais (51), passe devant un Lower déjà fait. Raison affichée
+  « Escalade 0/1 cette semaine · … ». Les exclusions (coude, tirage coché le jour même, déjà
+  faite) sont inchangées. Mesuré sur ses données : mardi → Récupération active 49 (planning),
+  Escalade 39, Lower C 33.
+- **« Repos / mobilité » → « Récupération active »** (libellé du type, `recommender.js`) :
+  « repos sonne faux ». `isRestType`/`matchesPlanFamily` testent désormais `startsWith(
+  "Récupération")` ; la clé de famille du planning idéal reste `"Repos"` en interne
+  (`WEEKLY_PLAN_FAMILIES`, pas une donnée stockée), textes du planning idéal mis à jour.
+  `apps/public` : aucune donnée stockée ne porte ce libellé, `familyOf` renvoie déjà `null`
+  pour ce type — rien à migrer.
+- **Couleur de la tendance de poids en Recomposition** (tuile Dashboard + badge onglet Poids,
+  `recompTrendColor` dans `App.jsx`) : la logique sèche (perte = citron, prise = rouge) ne
+  s'applique plus qu'avec un poids cible. En recomposition : **|delta| ≤ 0,3 kg/sem = citron**
+  (objectif tenu : stable ou lent), **au-delà = ambre dans les deux sens** (perte > 0,3 → muscle
+  à risque ; prise > 0,3 → gras/eau probable), **jamais rouge** — mêmes seuils que le moteur
+  Palier (R3). Expliqué à Yoann : à 100-300 kcal de déficit la balance doit être stable ou
+  descendre lentement, le muscle plus dense que le gras ne fait pas monter le poids à ce
+  déficit.
+- **Captures datées mises à jour** (`UPDATE_SNAPSHOTS=1`, premier usage réel du mécanisme T1) :
+  diff vérifié limité aux entrées escalade (score/raison) et au renommage. 73 tests verts.
+  Build `apps/perso` ET `apps/public` propres.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.

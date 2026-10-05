@@ -2,6 +2,7 @@
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import { nextSessions, slotOpen } from "../src/nextSession.js";
+import { recommendSessions } from "../src/recommender.js";
 import { SCHEMES } from "../src/climbing.js";
 import { fixClock, BS, planFor, at, session, exo, kneeOk, kneeRed } from "./_helpers.mjs";
 
@@ -30,7 +31,7 @@ test("dimanche 13h, match loggé → idem ; dimanche 9h avant match → Basket (
 test("lundi 10h, Full Body loggé → plus de muscu aujourd'hui ; demain mardi = Repos", () => {
   const r = run("2026-10-05", 10, { training: [MATCH, session("2026-10-05", "Full Body")] });
   assert.ok(!types(r.today).some((t) => /^(Upper|Lower|Full)/.test(t)), types(r.today));
-  assert.equal(top(r.tomorrow), "Repos / mobilité");
+  assert.equal(top(r.tomorrow), "Récupération active");
 });
 
 test("jeudi 10h, Upper avec rowing COCHÉ → pas d'escalade ; lundi Lower seul → escalade proposée le midi", () => {
@@ -128,4 +129,21 @@ test("demain : basket hors planning ni proposé ni « moins prioritaire » ; bas
   assert.match(why(x.tomorrow, "Basket").reason, /Pas au planning ce jour-là/);
   const y = run("2026-10-06", 21);
   assert.ok(types(y.tomorrow).includes("Basket"), types(y.tomorrow));
+});
+
+test("régression 05/10 : journée fermée par les créneaux → « À éviter » conservé (escalade après rowing coché)", () => {
+  const fb = [session("2026-10-05", "Full Body", [exo("Presse à cuisses (HSR)", true), exo("Rowing barre ou machine", true)])];
+  const r = run("2026-10-05", 13, { training: [session("2026-10-04", "Basket"), ...fb] });
+  assert.equal(r.today.status, "closed");
+  assert.ok(r.today.avoid.some((a) => a.type === "Escalade" && /flexion du coude/.test(a.reason)), JSON.stringify(r.today.avoid));
+});
+
+test("escalade : objectif hebdo 1 — 39 non faite (20 + 12 + 7), 25 une fois faite il y a 5 j, derrière un Upper frais", () => {
+  const r0 = recommendSessions({ ...base({ knee: kneeOk("2026-10-06") }), asOf: "2026-10-06", limit: Infinity });
+  const esc0 = r0.suggestions.find((s) => s.type === "Escalade");
+  assert.equal(esc0.score, 39);
+  assert.match(esc0.reason, /Escalade 0\/1 cette semaine/);
+  assert.ok(r0.suggestions.find((s) => s.type === "Upper A").score > esc0.score);
+  const r1 = recommendSessions({ ...base({ knee: kneeOk("2026-10-06"), training: [session("2026-10-01", "Escalade")] }), asOf: "2026-10-06", limit: Infinity });
+  assert.equal(r1.suggestions.find((s) => s.type === "Escalade").score, 25, "1/1 faite il y a 5 j : 20 + 0 × 12 + ancienneté 5");
 });

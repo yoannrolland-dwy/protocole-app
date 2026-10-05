@@ -13,8 +13,8 @@
       },
       {
         "type": "Escalade",
-        "score": 17,
-        "reason": "0× cette semaine · dernière jamais fait. Compte comme volume tirage : à placer un jour Lower ou off."
+        "score": 39,
+        "reason": "Escalade 0/1 cette semaine · dernière jamais fait. Compte comme volume tirage : à placer un jour Lower ou off."
       }
     ],
     "avoid": []
@@ -27,14 +27,14 @@
         "reason": "Upper 0/2 cette semaine · dernier jamais fait. Genou à ménager → c'est l'option sûre, jambes au repos."
       },
       {
-        "type": "Repos / mobilité",
+        "type": "Récupération active",
         "score": 45,
         "reason": "Décharge : mobilité douce + routine de rééduc autonome."
       },
       {
         "type": "Escalade",
-        "score": 17,
-        "reason": "0× cette semaine · dernière jamais fait. Compte comme volume tirage : à placer un jour Lower ou off."
+        "score": 39,
+        "reason": "Escalade 0/1 cette semaine · dernière jamais fait. Compte comme volume tirage : à placer un jour Lower ou off."
       }
     ],
     "avoid": [
@@ -64,8 +64,8 @@
       },
       {
         "type": "Escalade",
-        "score": 17,
-        "reason": "0× cette semaine · dernière jamais fait. Compte comme volume tirage : à placer un jour Lower ou off."
+        "score": 39,
+        "reason": "Escalade 0/1 cette semaine · dernière jamais fait. Compte comme volume tirage : à placer un jour Lower ou off."
       }
     ],
     "avoid": []
@@ -79,11 +79,11 @@
       },
       {
         "type": "Escalade",
-        "score": 23,
-        "reason": "0× cette semaine · dernière jamais fait. Compte comme volume tirage : à placer un jour Lower ou off. Lower déjà fait aujourd'hui : bon jour pour l'escalade (pas de conflit coude)."
+        "score": 45,
+        "reason": "Escalade 0/1 cette semaine · dernière jamais fait. Compte comme volume tirage : à placer un jour Lower ou off. Lower déjà fait aujourd'hui : bon jour pour l'escalade (pas de conflit coude)."
       },
       {
-        "type": "Repos / mobilité",
+        "type": "Récupération active",
         "score": 5,
         "reason": "1 j consécutifs d'entraînement."
       }
@@ -114,9 +114,9 @@
         "reason": "Upper 1/2 cette semaine · dernier hier."
       },
       {
-        "type": "Basket",
-        "score": 17,
-        "reason": "0× cette semaine · dernier jamais fait. Passer par l'échauffement guidé."
+        "type": "Escalade",
+        "score": 22,
+        "reason": "Escalade 1/1 cette semaine · dernière il y a 2 j. Compte comme volume tirage : à placer un jour Lower ou off."
       }
     ],
     "avoid": []
@@ -134,9 +134,9 @@
         "reason": "Lower 0/2 cette semaine · dernier jamais fait. Sommeil de qualité faible (5h, qualité 1/4) → séance allégée ou repos conseillé."
       },
       {
-        "type": "Repos / mobilité",
-        "score": 19,
-        "reason": "0 j consécutifs d'entraînement. 2 nuits courtes ou de mauvaise qualité sur les 3 derniers jours."
+        "type": "Escalade",
+        "score": 33,
+        "reason": "Escalade 0/1 cette semaine · dernière jamais fait. Compte comme volume tirage : à placer un jour Lower ou off. Sommeil de qualité faible (5h, qualité 1/4) → séance allégée ou repos conseillé."
       }
     ],
     "avoid": []
@@ -144,19 +144,19 @@
   "charge": {
     "suggestions": [
       {
+        "type": "Escalade",
+        "score": 22,
+        "reason": "Escalade 1/1 cette semaine · dernière il y a 2 j. Compte comme volume tirage : à placer un jour Lower ou off. Lower déjà fait aujourd'hui : bon jour pour l'escalade (pas de conflit coude). 7 séances sur les 3 derniers jours → fatigue à surveiller."
+      },
+      {
         "type": "Upper B",
         "score": 15,
         "reason": "Upper 2/2 cette semaine · dernier hier. 7 séances sur les 3 derniers jours → fatigue à surveiller."
       },
       {
-        "type": "Repos / mobilité",
+        "type": "Récupération active",
         "score": 13,
         "reason": "3 j consécutifs d'entraînement. 7 séances sur les 3 derniers jours → fatigue à surveiller."
-      },
-      {
-        "type": "Escalade",
-        "score": 12,
-        "reason": "1× cette semaine · dernière il y a 2 j. Compte comme volume tirage : à placer un jour Lower ou off. Lower déjà fait aujourd'hui : bon jour pour l'escalade (pas de conflit coude). 7 séances sur les 3 derniers jours → fatigue à surveiller."
       }
     ],
     "avoid": [
@@ -185,9 +185,9 @@
         "reason": "Lower 0/2 cette semaine · dernier jamais fait."
       },
       {
-        "type": "Basket",
-        "score": 17,
-        "reason": "0× cette semaine · dernier jamais fait. Passer par l'échauffement guidé."
+        "type": "Escalade",
+        "score": 39,
+        "reason": "Escalade 0/1 cette semaine · dernière jamais fait. Compte comme volume tirage : à placer un jour Lower ou off."
       }
     ],
     "avoid": []
@@ -205,9 +205,9 @@
         "reason": "Upper 0/2 cette semaine · dernier jamais fait."
       },
       {
-        "type": "Basket",
-        "score": 17,
-        "reason": "0× cette semaine · dernier jamais fait. Passer par l'échauffement guidé."
+        "type": "Escalade",
+        "score": 39,
+        "reason": "Escalade 0/1 cette semaine · dernière jamais fait. Compte comme volume tirage : à placer un jour Lower ou off."
       }
     ],
     "avoid": []
@@ -225,9 +225,9 @@
         "reason": "Upper 0/2 cette semaine · dernier jamais fait."
       },
       {
-        "type": "Basket",
-        "score": 17,
-        "reason": "0× cette semaine · dernier jamais fait. Passer par l'échauffement guidé."
+        "type": "Escalade",
+        "score": 39,
+        "reason": "Escalade 0/1 cette semaine · dernière jamais fait. Compte comme volume tirage : à placer un jour Lower ou off."
       }
     ],
     "avoid": []

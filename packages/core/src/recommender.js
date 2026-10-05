@@ -115,7 +115,7 @@ const SCHEDULED_SCORE = 999;
 // le dit — le planning redevient adaptable ces jours-là.
 const PLAN_LEAD = 10;
 function matchesPlanFamily(type, family) {
-  if (family === "Repos") return type.startsWith("Repos");
+  if (family === "Repos") return type.startsWith("Récupération");
   return type.startsWith(family);
 }
 function applyPlanBonus(sugg, weeklyPlan, fatigue) {
@@ -417,8 +417,11 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   } else if (pullToday.length) {
     push(avoid, "Escalade", 0, `Tirage / flexion du coude déjà faits aujourd'hui (${pullToday.join(", ")}) — l'escalade ajouterait une grosse dose de flexion du coude.`);
   } else {
-    let cScore = 10 + cap(dClimb) - (dClimb <= 1 ? climbPen : 0) + (lowerToday ? 6 : 0);
-    let cReason = `${climb7}× cette semaine · dernière ${ago(dClimb)}. Compte comme volume tirage : à placer un jour Lower ou off.`;
+    // Objectif hebdo 1 séance (05/10/2026, décision de Yoann) : même barème qu'Upper/Lower
+    // (20 + 12 par séance manquante + ancienneté) au lieu de l'ancien 10 + ancienneté qui
+    // plafonnait à 17 — l'escalade finissait structurellement 4e, jamais proposée.
+    let cScore = 20 + (1 - Math.min(climb7, 1)) * 12 + cap(dClimb) - (dClimb <= 1 ? climbPen : 0) + (lowerToday ? 6 : 0);
+    let cReason = `Escalade ${climb7}/1 cette semaine · dernière ${ago(dClimb)}. Compte comme volume tirage : à placer un jour Lower ou off.`;
     if (dClimb <= 1 && climbLast) cReason += ` ${climbWhy}`;
     if (lowerToday) cReason += " Lower déjà fait aujourd'hui : bon jour pour l'escalade (pas de conflit coude).";
     // Pénalité plus lourde que sur Upper : à volume égal, l'escalade est la sollicitation
@@ -549,7 +552,7 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   if (!kneeRed && loadHigh) { restScore += 8; restReason += ` ${load3} séances sur les 3 derniers jours → fatigue à surveiller.`; }
   if (!kneeRed && energyLow) { restScore += 8; restReason += ` Score d'énergie bas (${energy.total}/100).`; }
   if (!kneeRed && cutOn) { restScore += 4; restReason += " Fenêtre de sèche : le repos ne compte pas comme volume manqué."; }
-  push(sugg, "Repos / mobilité", restScore, restReason);
+  push(sugg, "Récupération active", restScore, restReason);
 
   // Bonus planning idéal — appliqué en dernier, après tous les signaux de sécurité et de
   // fatigue ci-dessus : un score déjà à 0 (bloqué ailleurs via `avoid`) ne repasse jamais
