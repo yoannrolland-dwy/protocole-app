@@ -10,11 +10,11 @@
 // absent vaut mieux qu'un constat faux.
 
 import { shiftDateKey, daysBetween } from "./dateUtils.js";
-import { recordsBySession, painOutOfBase } from "./training.js";
+import { recordsBySession, painOutOfBase, exerciseList, exerciseSessions, progressiveOverloadSuggestion } from "./training.js";
+import { weeklyVolumeByGroup } from "./volume.js";
 import { smoothedWeightSeries, trendAt } from "./tdee.js";
 import { kcalOfEntry, targetsForDate, kcalFromMacros } from "./targets.js";
 import { computeEnergyScore } from "./energy.js";
-import { TYPES } from "./session/templates.js";
 
 const round1 = (x) => Math.round(x * 10) / 10;
 
@@ -129,11 +129,12 @@ export function cutProjection(weightLog, targets, tdeeResult, todayDate) {
    Équilibre du volume d'entraînement par type
    ============================================================ */
 
-// "Mobilité" n'est pas une charge d'entraînement (même exclusion que `isLoadBearing` dans le
-// recommandeur, voir CLAUDE.md) — la signaler comme "délaissée" n'aurait pas de sens.
-// "Full Body" (04/10/2026) : séance CONDITIONNELLE (seulement le lundi qui suit un match) —
-// la déclarer "délaissée" les semaines sans match serait faux. Exclue au même titre.
-const NON_LOAD_TYPES = new Set(["Mobilité", "Full Body"]);
+// Types surveillés (05/10/2026, demande de Yoann) : les séances de musculation (Upper/Lower/
+// Full Body) suivent le planning idéal et le calendrier des matchs — qu'un Upper ou un Lower
+// passe plusieurs semaines sans être fait est NORMAL, pas un signal. Seuls comptent les types
+// hors planning muscu : l'escalade, le basket, et la récupération active (loggée sous le type
+// « Mobilité »). Avant cette date, tous les types sauf Mobilité/Full Body étaient candidats.
+const NEGLECT_WATCH_TYPES = ["Escalade", "Basket", "Mobilité"];
 const NEGLECT_THRESHOLD_DAYS = 14;
 
 /**
@@ -145,10 +146,10 @@ export function mostNeglectedType(training, todayDate) {
   if (!training?.length) return null;
   const lastByType = {};
   for (const t of training) {
-    if (NON_LOAD_TYPES.has(t.type)) continue;
+    if (!NEGLECT_WATCH_TYPES.includes(t.type)) continue;
     if (!lastByType[t.type] || t.date > lastByType[t.type]) lastByType[t.type] = t.date;
   }
-  const candidates = TYPES.filter((t) => !NON_LOAD_TYPES.has(t)).map((type) => {
+  const candidates = NEGLECT_WATCH_TYPES.map((type) => {
     const last = lastByType[type] || null;
     return { type, last, daysSince: last ? daysBetween(last, todayDate) : null };
   });
@@ -235,6 +236,43 @@ export function sleepEnergyCorrelation({ sleepLog, rhrLog, stepsLog }, todayDate
  * comme la carte Macros) : il dépend de `foodLog`/`overrides` lus fraîchement (getSync), une
  * lecture I/O que ce module ne fait pas — il reste pur, comme le reste de packages/core.
  */
+/* ============================================================
+   Plateaux en cours + volume prioritaire sous la zone (05/10/2026, demande de Yoann)
+   ============================================================ */
+
+/**
+ * Exercices actuellement en plateau (même détection que le carnet et la fiche Progression :
+ * `progressiveOverloadSuggestion`, RIR compris), avec la durée. `null` si aucun — ou si le
+ * genou est hors base aujourd'hui (même garde-fou que les records : ne jamais pousser une
+ * surcharge le jour où le tendon a flambé).
+ */
+export function activePlateaus(training, kneeLog, todayDate) {
+  if (!training?.length || painOutOfBase([kneeLog || []], todayDate)) return null;
+  const items = exerciseList(training)
+    .map((e) => ({ nom: e.nom, plateau: progressiveOverloadSuggestion(exerciseSessions(training, e.nom), e.nom) }))
+    .filter((x) => x.plateau)
+    .map((x) => ({ nom: x.nom, weeks: x.plateau.weeks, sessions: x.plateau.sessions }))
+    .sort((a, b) => b.weeks - a.weeks);
+  return items.length ? items : null;
+}
+
+// Jours où le constat « volume sous la zone » a un sens : la semaine est assez avancée pour
+// qu'un rattrapage soit encore possible (vendredi, samedi, dimanche — `getDay()` 5/6/0).
+const VOLUME_SHORTFALL_DAYS = new Set([5, 6, 0]);
+
+/**
+ * Groupes PRIORITAIRES (pecs, épaules — `PRIORITY_GROUPS` de volume.js) sous le plancher de
+ * leur zone cible sur les 7 derniers jours. Seulement en fin de semaine ; `null` sinon ou si
+ * tout est dans la zone. Jamais pour les autres groupes (compte neutre par décision T2).
+ */
+export function priorityVolumeShortfall(training, todayDate) {
+  const [y, m, d] = todayDate.split("-").map(Number);
+  if (!VOLUME_SHORTFALL_DAYS.has(new Date(y, m - 1, d).getDay())) return null;
+  const { groups } = weeklyVolumeByGroup(training, { asOf: todayDate });
+  const short = groups.filter((g) => g.priority && g.status === "sous").map((g) => ({ groupe: g.groupe, label: g.label, series: g.series }));
+  return short.length ? short : null;
+}
+
 export function computeFreeInsights({ training, weight, macros, sleep, rhr, steps, knee, targets, tdeeResult, kcalTargetToday, todayDate }) {
   return {
     streaks: computeStreaks(training, macros, todayDate),
@@ -242,6 +280,8 @@ export function computeFreeInsights({ training, weight, macros, sleep, rhr, step
     weightTdee: weightTdeeInsight(tdeeResult, kcalTargetToday),
     cutProjection: cutProjection(weight, targets, tdeeResult, todayDate),
     neglected: mostNeglectedType(training, todayDate),
+    plateaus: activePlateaus(training, knee, todayDate),
+    volumeShortfall: priorityVolumeShortfall(training, todayDate),
     cutAdherence: cutAdherence(macros, targets, todayDate),
     sleepEnergy: sleepEnergyCorrelation({ sleepLog: sleep, rhrLog: rhr, stepsLog: steps }, todayDate),
   };

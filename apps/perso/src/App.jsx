@@ -49,7 +49,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.98.1";
+const APP_VERSION = "3.99.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -734,7 +734,16 @@ function InsightsCard({ insights }) {
   }
   if (insights.neglected) {
     const n = insights.neglected;
-    rows.push({ label: "Type délaissé", value: n.type, note: n.daysSince == null ? "jamais loggé" : `pas fait depuis ${n.daysSince} j` });
+    rows.push({ label: "Type délaissé", value: n.type === "Mobilité" ? "Récupération active" : n.type, note: n.daysSince == null ? "jamais loggé" : `pas fait depuis ${n.daysSince} j` });
+  }
+  // Plateaux en cours + volume prioritaire sous la zone (05/10/2026) — voir insights.js.
+  if (insights.plateaus) {
+    const p = insights.plateaus;
+    rows.push({ label: "Plateaux en cours", value: `${p.length}`, note: p.map((x) => `${x.nom} (${x.weeks} sem.)`).join(" · ") });
+  }
+  if (insights.volumeShortfall) {
+    const v = insights.volumeShortfall;
+    rows.push({ label: "Volume sous la zone", value: v.map((g) => `${g.label} ${g.series}/${VOLUME_TARGET.min}`).join(" · "), note: "séries cochées sur 7 j · groupes prioritaires" });
   }
   if (insights.cutAdherence) {
     const a = insights.cutAdherence;

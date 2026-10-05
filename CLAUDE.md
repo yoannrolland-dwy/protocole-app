@@ -4366,6 +4366,28 @@ Trois retours de Yoann après l'install de v3.97.0, diagnostiqués sur ses **vra
   diff vérifié limité aux entrées escalade (score/raison) et au renommage. 73 tests verts.
   Build `apps/perso` ET `apps/public` propres.
 
+## Constats : « type délaissé » restreint + plateaux en cours + volume prioritaire (05/10/2026, apps/perso v3.99.0)
+
+- **« Type délaissé » ne surveille plus que Escalade, Basket et Mobilité** (`NEGLECT_WATCH_TYPES`,
+  `packages/core/src/insights.js`) : les séances de musculation suivent le planning idéal et le
+  calendrier des matchs, donc un Upper/Lower/Full Body qui passe des semaines sans être fait est
+  normal, pas un signal (demande explicite de Yoann). « Récupération active » n'est pas un type
+  loggé : c'est la séance **Mobilité** qui joue ce rôle, affichée « Récupération active » dans la
+  ligne du constat. Même fonction pour le Bilan 3 mois (`typeDelaisse`). Import `TYPES` devenu
+  inutile, retiré.
+- **Deux nouveaux constats** (choisis par Yoann parmi 4 propositions ; FC repos 7 j vs 30 j et
+  RIR moyen en baisse écartés pour l'instant) :
+  - **Plateaux en cours** (`activePlateaus`) : exercices dont `progressiveOverloadSuggestion`
+    (détection plateau + RIR, T4) est non nulle, avec la durée — « Développé incliné haltères
+    (3 sem.) ». Même garde-fou genou que les records (masqué si hors base).
+  - **Volume sous la zone** (`priorityVolumeShortfall`) : groupes prioritaires (pecs, épaules)
+    sous 10 séries sur 7 j, **vendredi/samedi/dimanche seulement** (assez tard pour que ce soit
+    un constat, assez tôt pour un rattrapage). Données T2, jamais pour les autres groupes.
+- `computeFreeInsights` renvoie `plateaus` et `volumeShortfall` ; deux lignes dans `InsightsCard`.
+- Tests : `insights.test.mjs` (5 tests) — **79 au total**. Aperçu : « Type délaissé : Basket »,
+  « Plateaux en cours : 1 · Développé incliné haltères (3 sem.) », constat volume absent un lundi.
+  Build `apps/perso` ET `apps/public` propres.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.
