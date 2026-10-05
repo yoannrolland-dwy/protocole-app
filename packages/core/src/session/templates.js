@@ -14,7 +14,14 @@ const TEMPLATES = {
   "Upper A": { kind: "muscu", chargeTags: ["tirage"], exos: [
     { n: "Développé incliné haltères", s: 4, r: "8-10", rest: 150, mode: "reps", c: "ouverture pecs, priorité · 1-2 reps en réserve",
       groupe: "pecs", mouvement: "poussee", materiel: "halteres", tendon: null, famille: "developpe-incline" },
-    { n: "Rowing barre ou machine", s: 4, r: "8-10", rest: 120, mode: "reps", c: "prise pronation/neutre (coude)",
+    // Spécialisation épaules / largeur du dos / haut des pecs (05/10/2026, analyse physique de
+    // Yoann — voir CLAUDE.md) : tirage vertical ajouté (largeur des dorsaux), rowing 4 → 3 et face
+    // pull 3 → 2 (haut du dos = point fort, on y retire du volume), élévations latérales 3 → 5
+    // (deltoïde LATÉRAL, levier n°1 de la carrure), planche 3 → 2 pour tenir ~1 h. Fourchettes
+    // ≤ 12 reps conservées (décision du 04/10). Mêmes noms d'exercices : historique intact.
+    { n: "Tirage vertical prise neutre", s: 3, r: "8-10", rest: 120, mode: "reps", c: "prise neutre (coude) · largeur des dorsaux",
+      groupe: "dos", mouvement: "tirage", materiel: "machine", tendon: "coude", famille: "tirage-vertical" },
+    { n: "Rowing barre ou machine", s: 3, r: "8-10", rest: 120, mode: "reps", c: "prise pronation/neutre (coude)",
       groupe: "dos", mouvement: "tirage", materiel: "barre", tendon: "coude", famille: "rowing" },
     // Reps plafonnées à 12 (04/10/2026, demande de Yoann) : l'hypertrophie est très proche entre
     // ~6 et ~30 reps tant que la série finit près de l'échec (Schoenfeld 2017/2021) — ce qui
@@ -22,18 +29,18 @@ const TEMPLATES = {
     // et nombre de séries volontairement INCHANGÉS (choix explicite de Yoann).
     { n: "Écarté poulie basse", s: 3, r: "10-12", rest: 90, mode: "reps", c: "ligne ascendante (haut des pecs) · bon étirement en bas",
       groupe: "pecs", mouvement: "isolation", materiel: "poulie", tendon: null },
-    { n: "Extension triceps poulie haute", s: 3, r: "10-12", rest: 90, mode: "reps", c: "",
+    { n: "Extension triceps poulie haute", s: 3, r: "10-12", rest: 75, mode: "reps", c: "",
       groupe: "triceps", mouvement: "isolation", materiel: "poulie", tendon: null },
-    { n: "Élévations latérales haltères", s: 3, r: "10-12", rest: 75, mode: "reps", c: "variante haltères · sans élan",
+    { n: "Élévations latérales haltères", s: 5, r: "10-12", rest: 60, mode: "reps", c: "priorité carrure · sans élan",
       groupe: "epaules", mouvement: "isolation", materiel: "halteres", tendon: null },
-    { n: "Face pull", s: 3, r: "10-12", rest: 60, mode: "reps", c: "arrière d'épaule",
+    { n: "Face pull", s: 2, r: "10-12", rest: 60, mode: "reps", c: "arrière d'épaule",
       groupe: "epaules", mouvement: "tirage", materiel: "poulie", tendon: null },
     // Curls poignets RÉDUITS 3×15-20 → 2×10-12 (04/10/2026) : douleur au poignet gauche sur ce
     // seul mouvement. Choix de Yoann de les garder réduits plutôt que de les remplacer par du
     // grip isométrique (dead hang / farmer walk, proposés) — à revoir si la douleur revient.
     { n: "Curl poignets pronation", s: 2, r: "10-12", rest: 60, mode: "reps", c: "léger, avant-bras · stop si douleur poignet",
       groupe: "avant-bras", mouvement: "isolation", materiel: "halteres", tendon: null },
-    { n: "Core — Planche", s: 3, r: "45-60 s", rest: 60, mode: "temps", c: "finisher · anti-extension · progresser par difficulté",
+    { n: "Core — Planche", s: 2, r: "45-60 s", rest: 60, mode: "temps", c: "finisher · anti-extension · progresser par difficulté",
       groupe: "core", mouvement: "gainage", materiel: "aucun", tendon: null },
   ]},
   "Upper B": { kind: "muscu", chargeTags: ["tirage"], exos: [
@@ -41,17 +48,23 @@ const TEMPLATES = {
       groupe: "pecs", mouvement: "poussee", materiel: "halteres", tendon: null, famille: "developpe-couche" },
     { n: "Tirage vertical prise neutre", s: 4, r: "8-10", rest: 120, mode: "reps", c: "prise neutre (coude)",
       groupe: "dos", mouvement: "tirage", materiel: "machine", tendon: "coude", famille: "tirage-vertical" },
-    { n: "Développé militaire haltères", s: 3, r: "8-10", rest: 120, mode: "reps", c: "",
+    // Spécialisation (05/10/2026, voir Upper A) : militaire 3 → 2 (l'avant d'épaule est déjà très
+    // sollicité par tous les développés), écarté poulie basse ajouté (haut des pecs), élévations
+    // latérales 5 séries, rear delt 3 → 2, crunch 3 → 2. Rééduc du coude (curl marteau) et curls
+    // poignets (2×10-12, poignet) inchangés.
+    { n: "Développé militaire haltères", s: 2, r: "8-10", rest: 120, mode: "reps", c: "",
       groupe: "epaules", mouvement: "poussee", materiel: "halteres", tendon: null, famille: "developpe-militaire" },
-    { n: "Rear delt machine (reverse pec deck)", s: 3, r: "10-12", rest: 75, mode: "reps", c: "arrière d'épaule",
-      groupe: "epaules", mouvement: "isolation", materiel: "machine", tendon: null },
-    { n: "Élévations latérales poulie", s: 3, r: "10-12", rest: 75, mode: "reps", c: "variante poulie · sans élan",
+    { n: "Écarté poulie basse", s: 2, r: "10-12", rest: 90, mode: "reps", c: "ligne ascendante (haut des pecs) · bon étirement en bas",
+      groupe: "pecs", mouvement: "isolation", materiel: "poulie", tendon: null },
+    { n: "Élévations latérales poulie", s: 5, r: "10-12", rest: 60, mode: "reps", c: "priorité carrure · sans élan",
       groupe: "epaules", mouvement: "isolation", materiel: "poulie", tendon: null },
+    { n: "Rear delt machine (reverse pec deck)", s: 2, r: "10-12", rest: 60, mode: "reps", c: "arrière d'épaule",
+      groupe: "epaules", mouvement: "isolation", materiel: "machine", tendon: null },
     { n: "Curl marteau (prise neutre)", s: 3, r: "10-12", rest: 75, mode: "reps", c: "prise neutre (coude)",
       groupe: "biceps", mouvement: "isolation", materiel: "halteres", tendon: "coude" },
     { n: "Curl poignets supination", s: 2, r: "10-12", rest: 60, mode: "reps", c: "léger, avant-bras · stop si douleur poignet",
       groupe: "avant-bras", mouvement: "isolation", materiel: "halteres", tendon: null },
-    { n: "Core — Crunch machine", s: 3, r: "10-12", rest: 60, mode: "reps", c: "finisher · contrôlé, 1-2 reps en réserve",
+    { n: "Core — Crunch machine", s: 2, r: "10-12", rest: 60, mode: "reps", c: "finisher · contrôlé, 1-2 reps en réserve",
       groupe: "core", mouvement: "isolation", materiel: "machine", tendon: null },
   ]},
   "Lower A": { kind: "muscu", knee: true, hsr: true, chargeTags: ["genou"], exos: [
@@ -124,9 +137,12 @@ const TEMPLATES = {
       groupe: "fessiers", mouvement: "hanche", materiel: "machine", tendon: null },
     { n: "Développé incliné haltères", s: 3, r: "8-10", rest: 150, mode: "reps", c: "pecs, priorité · 1-2 reps en réserve",
       groupe: "pecs", mouvement: "poussee", materiel: "halteres", tendon: null, famille: "developpe-incline" },
-    { n: "Rowing barre ou machine", s: 3, r: "8-10", rest: 120, mode: "reps", c: "prise pronation/neutre",
-      groupe: "dos", mouvement: "tirage", materiel: "barre", tendon: "coude", famille: "rowing" },
-    { n: "Élévations latérales haltères", s: 3, r: "10-12", rest: 75, mode: "reps", c: "variante haltères · sans élan",
+    // Spécialisation (05/10/2026) : tirage vertical à la place du rowing (largeur des dorsaux),
+    // élévations latérales 3 → 4. Bas du corps et HSR intacts. Pas de rééduc coude ici (reste en
+    // Upper A/B) pour tenir ~1 h — choix de Yoann.
+    { n: "Tirage vertical prise neutre", s: 3, r: "8-10", rest: 120, mode: "reps", c: "prise neutre (coude) · largeur des dorsaux",
+      groupe: "dos", mouvement: "tirage", materiel: "machine", tendon: "coude", famille: "tirage-vertical" },
+    { n: "Élévations latérales haltères", s: 4, r: "10-12", rest: 60, mode: "reps", c: "priorité carrure · sans élan",
       groupe: "epaules", mouvement: "isolation", materiel: "halteres", tendon: null },
   ]},
   // Échauffement (04/09/2026) : déménagé depuis ROUTINES.basket (routine "jouée" hors
@@ -190,7 +206,7 @@ export const DEFAULT_WEIGHTS = {
   "Développé incliné haltères": 32,
   "Développé couché haltères": 34,
   "Développé militaire haltères": 28,
-  "Écarté poulie basse": 12.5,
+  "Écarté poulie basse": 10,
   "Extension triceps poulie haute": 30,
   "Élévations latérales haltères": 16,
   "Élévations latérales poulie": 5,
@@ -200,7 +216,7 @@ export const DEFAULT_WEIGHTS = {
   "Curl poignets pronation": 6,
   "Curl poignets supination": 14,
   "Rowing barre ou machine": 55,
-  "Tirage vertical prise neutre": 80,
+  "Tirage vertical prise neutre": 85,
   "Presse à cuisses (HSR)": 200,
   "Presse à cuisses": 200,
   "Leg extension unilatérale": 25,

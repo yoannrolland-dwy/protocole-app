@@ -4441,6 +4441,38 @@ inutile à cette heure ; et ces trois-là manquaient de « Pourquoi pas les autr
   8 types expliqués. Tests mis à jour + 2 ajoutés — **82 tests**. Build `apps/perso` ET
   `apps/public` propres. `apps/public` (`Home.jsx`) n'utilise pas `nextSessions` — non concerné.
 
+## Spécialisation épaules / largeur du dos / haut des pecs — Upper A/B, Full Body, contexte coach (05/10/2026, apps/perso v3.101.0)
+
+Demande détaillée de Yoann (analyse physique du 05/10/2026 : photo + vidéo, évaluation visuelle
+seulement). Résumé et confirmation avant code, comme demandé ; trois contradictions avec ses
+décisions récentes signalées et tranchées : **fourchettes gardées ≤ 12 reps** (décision du
+04/10, son texte remettait 12-15/15), **curls poignets gardés à 2×10-12** (poignet, 04/10 — son
+texte disait 3×15-20 « inchangé » à tort), poids par défaut tirage 85 / écarté 10 posés par
+cohérence (sans effet pour lui : historique existant).
+
+- **`templates.js`** — Upper A (9 exos) : + Tirage vertical prise neutre 3×8-10, Rowing 4 → 3,
+  Élévations latérales haltères 3 → 5 (repos 60), Face pull 3 → 2, Planche 3 → 2, triceps repos
+  75. Upper B (9 exos) : Militaire 3 → 2, + Écarté poulie basse 2×10-12, Élévations poulie 3 → 5
+  (repos 60), Rear delt 3 → 2 (repos 60), Crunch 3 → 2. Full Body (haut du corps seulement) :
+  Tirage vertical à la place du Rowing, Élévations 3 → 4 (repos 60) ; **pas de curl marteau
+  ajouté** (option recommandée et choisie : rester ~1 h, la rééduc coude reste en Upper A/B).
+  **Mêmes noms d'exercices** : historique, records, plateaux, « dernière fois » continus. Bilan
+  hebdo Upper A+B : deltoïde latéral 6 → 10 séries, tirage vertical 4 → 7, haut des pecs 7 → 9,
+  haut du dos/arrière d'épaule 10 → 7, militaire 3 → 2. Durées estimées ~61/60/63 min.
+  Règle escalade inchangée (le tirage vertical coché bloque comme le rowing). Gabarits partagés
+  avec `apps/public` → visibles au prochain déploiement, comme à chaque changement de gabarit.
+- **Contexte permanent du Coach IA** (clé `coachProfile`, sur le téléphone — pas dans le code) :
+  section « ANALYSE PHYSIQUE DU 05/10/2026 » **ajoutée à la fin** du texte existant via
+  `apps/perso/scripts/cdp.mjs` (lecture → concaténation → écriture → reload → HOME → attente,
+  procédure de la mémoire `project-native-localstorage-write`), idempotente (marqueur). Contenu :
+  limites, points forts, priorités, programme et baisses de volume **volontaires** (à ne jamais
+  signaler comme un problème), raisonnement + références (Schoenfeld 2017, Murphy & Koehler
+  2022), contraintes, indicateurs de suivi, réévaluation 8-12 semaines avec photos toutes les
+  4 semaines. ~3 450 caractères au total. Yoann peut le relire/corriger dans Réglages.
+- Tests `templates.test.mjs` réécrits (contenu/ordre exacts des 9+9 exos, volumes, repos,
+  inchangés, poids par défaut, bilan hebdo par groupe) — **83 tests**. Build `apps/perso` ET
+  `apps/public` propres.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.
