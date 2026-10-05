@@ -4422,6 +4422,25 @@ clés internes (`reliability: "fiable"|"moyenne"|"faible"`, `reliabilityOf`, Pal
   `apps/public` propres. `apps/public` (sa propre carte TDEE) non touchée — à aligner si un
   bêta-testeur le remonte.
 
+## « À éviter » : rouge seulement si le créneau est encore ouvert (05/10/2026, apps/perso v3.100.0)
+
+Retour de Yoann, lundi 14 h après un Full Body le matin : « À éviter aujourd'hui » listait en
+rouge Full Body (déjà fait), Basket (pas ce jour-là) et Escalade (tirage ce matin) — vrai mais
+inutile à cette heure ; et ces trois-là manquaient de « Pourquoi pas les autres ? ».
+
+- **Règle unique, `packages/core/src/nextSession.js`** : **rouge = « tu pourrais encore le faire
+  maintenant, ne le fais pas »**. `avoid` (affiché en rouge, journée ouverte ou fermée) ne garde
+  que les types écartés par le recommandeur **dont le créneau est encore ouvert** (`slotOpen`).
+  Tout le reste est expliqué dans « Pourquoi pas les autres ? », où la **raison de créneau passe
+  en premier** (« Une séance est déjà faite aujourd'hui — pas de deuxième musculation. »,
+  « Créneau passé — escalade… », « Pas au planning aujourd'hui… ») et la raison de sécurité du
+  recommandeur est ajoutée en complément : « … De toute façon : Tirage / flexion du coude déjà
+  faits aujourd'hui (Rowing…) ». Nouveau cas : basket planifié et déjà fait → « Basket déjà fait
+  aujourd'hui » (au lieu d'un faux « pas au planning »).
+- Rejoué sur ses vraies données : lundi 13 h → rouge = [Escalade] seule ; 14 h → rouge vide, les
+  8 types expliqués. Tests mis à jour + 2 ajoutés — **82 tests**. Build `apps/perso` ET
+  `apps/public` propres. `apps/public` (`Home.jsx`) n'utilise pas `nextSessions` — non concerné.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.

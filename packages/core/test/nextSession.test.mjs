@@ -131,11 +131,30 @@ test("demain : basket hors planning ni proposé ni « moins prioritaire » ; bas
   assert.ok(types(y.tomorrow).includes("Basket"), types(y.tomorrow));
 });
 
-test("régression 05/10 : journée fermée par les créneaux → « À éviter » conservé (escalade après rowing coché)", () => {
+test("rouge = créneau encore ouvert seulement : lundi 13h après Full Body + rowing → seule l'escalade en « À éviter »", () => {
   const fb = [session("2026-10-05", "Full Body", [exo("Presse à cuisses (HSR)", true), exo("Rowing barre ou machine", true)])];
   const r = run("2026-10-05", 13, { training: [session("2026-10-04", "Basket"), ...fb] });
   assert.equal(r.today.status, "closed");
-  assert.ok(r.today.avoid.some((a) => a.type === "Escalade" && /flexion du coude/.test(a.reason)), JSON.stringify(r.today.avoid));
+  assert.deepEqual(r.today.avoid.map((a) => a.type), ["Escalade"]);
+  assert.match(r.today.avoid[0].reason, /flexion du coude/);
+  assert.match(why(r.today, "Full Body").reason, /^Une séance est déjà faite aujourd'hui.*De toute façon : Lower déjà fait/);
+  assert.equal(why(r.today, "Full Body").kind, "slot");
+  assert.match(why(r.today, "Basket").reason, /^Pas au planning aujourd'hui/);
+});
+
+test("lundi 14h après Full Body + rowing : plus rien en rouge, l'escalade explique créneau passé + tirage, 8 types expliqués", () => {
+  const fb = [session("2026-10-05", "Full Body", [exo("Rowing barre ou machine", true)])];
+  const r = run("2026-10-05", 14, { training: [session("2026-10-04", "Basket"), ...fb] });
+  assert.deepEqual(r.today.avoid, []);
+  const e = why(r.today, "Escalade");
+  assert.equal(e.kind, "slot");
+  assert.match(e.reason, /^Créneau passé — escalade.*De toute façon : Tirage \/ flexion du coude/);
+  assert.equal(r.today.notProposed.length, 8);
+});
+
+test("basket planifié et déjà fait → « Basket déjà fait aujourd'hui » plutôt que « pas au planning »", () => {
+  const r = run("2026-10-07", 22, { training: [session("2026-10-07", "Basket")] });
+  assert.match(why(r.today, "Basket").reason, /^Basket déjà fait aujourd'hui/);
 });
 
 test("escalade : objectif hebdo 1 — 39 non faite (20 + 12 + 7), 25 une fois faite il y a 5 j, derrière un Upper frais", () => {

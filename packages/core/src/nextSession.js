@@ -56,13 +56,15 @@ function explain({ all, shown, avoid, slotReason, plan, closedReason }) {
     if (shownSet.has(type)) continue;
     if (closedReason) { out.push({ type, kind: "closed", reason: closedReason }); continue; }
     const a = avoid.find((x) => covers(x.type, type));
+    const r = slotReason ? slotReason(type) : null;
+    // Créneau passé ou séance déjà faite (05/10/2026) : c'est la raison LISIBLE, même si le
+    // recommandeur écartait aussi ce type pour une raison de sécurité — celle-ci est ajoutée en
+    // complément. Un type n'est « à éviter » (rouge) que si son créneau est encore ouvert :
+    // rouge = « tu pourrais encore le faire maintenant, ne le fais pas ».
+    if (r) { out.push({ type, kind: "slot", reason: a ? `${r} De toute façon : ${a.reason}` : r }); continue; }
     if (a) { out.push({ type, kind: "avoid", reason: a.reason }); continue; }
     const sg = all.find((x) => x.type === type);
-    if (sg) {
-      const r = slotReason ? slotReason(type) : null;
-      out.push(r ? { type, kind: "slot", reason: r } : { type, kind: "priority", reason: `Moins prioritaire (score ${sg.score}).` });
-      continue;
-    }
+    if (sg) { out.push({ type, kind: "priority", reason: `Moins prioritaire (score ${sg.score}).` }); continue; }
     out.push({ type, kind: "variant", reason: variantReason(type, produced, plan) });
   }
   return out;
@@ -132,9 +134,12 @@ export function nextSessions({ now = new Date(), base, planFor }) {
   const slotReason = (type) => {
     if (slotOpen(type, ctx)) return null;
     if (isMuscuType(type)) return ctx.sessionDone ? "Une séance est déjà faite aujourd'hui — pas de deuxième musculation." : "Créneau passé — la musculation se fait le matin (avant 12h).";
-    if (type === "Basket") return "Pas au planning aujourd'hui — le basket n'est proposé que les jours prévus.";
+    if (type === "Basket") return doneToday.some((t) => t.type === "Basket") ? "Basket déjà fait aujourd'hui." : "Pas au planning aujourd'hui — le basket n'est proposé que les jours prévus.";
     return "Créneau passé — escalade le matin ou le midi (avant 14h).";
   };
+  // « À éviter » (rouge) ne garde que les types dont le créneau est encore ouvert : écarter ce
+  // qu'on ne peut de toute façon plus faire n'est que du bruit (retour de Yoann, 05/10/2026).
+  const avoidOpen = recoToday.avoid.filter((a) => EXPLAIN_TYPES.some((t) => covers(a.type, t) && slotOpen(t, ctx)));
   const planToday = plan(todayKey);
   let today;
   if (matchLogged(training, base.basketSchedule, todayKey)) {
@@ -147,13 +152,13 @@ export function nextSessions({ now = new Date(), base, planFor }) {
     const trainable = open.filter((s) => !isRestType(s.type));
     const notProposed = explain({ all: recoToday.suggestions, shown: trainable.length ? open : [], avoid: recoToday.avoid, slotReason, plan: planToday });
     today = trainable.length
-      ? { date: todayKey, status: "open", suggestions: open, avoid: recoToday.avoid, note: null, notProposed }
+      ? { date: todayKey, status: "open", suggestions: open, avoid: avoidOpen, note: null, notProposed }
       // `avoid` conservé même journée fermée (05/10/2026, bug vu sur les vraies données de
       // Yoann) : un Full Body avec rowing coché fermait la journée (plus de créneau muscu) ET
       // vidait « À éviter » — l'escalade, écartée pour le tirage du jour, disparaissait des deux
       // listes (« Pourquoi pas les autres ? » masque les motifs « avoid », censés être affichés
       // au-dessus). La raison d'une exclusion doit rester visible, journée ouverte ou non.
-      : { date: todayKey, status: "closed", suggestions: [], avoid: recoToday.avoid, note: ctx.sessionDone ? "Séance du jour faite : journée terminée — mobilité possible." : "Plus de créneau d'entraînement aujourd'hui — mobilité possible.", notProposed };
+      : { date: todayKey, status: "closed", suggestions: [], avoid: avoidOpen, note: ctx.sessionDone ? "Séance du jour faite : journée terminée — mobilité possible." : "Plus de créneau d'entraînement aujourd'hui — mobilité possible.", notProposed };
   }
 
   // ---- Demain ---- (décision 6 : prévision — sommeil et énergie de demain inconnus, donc
