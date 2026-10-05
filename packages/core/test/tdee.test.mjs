@@ -35,3 +35,15 @@ test("recompWindows : 14 et 21 j calculés sur 30 j synthétiques, lecture cohé
   assert.equal(rw.j14.meanIntake, 2560);
   assert.equal(rw.j21.meanIntake, 2560);
 });
+
+import { tdeeMargin, tdeeOverWindow } from "../src/tdee.js";
+test("marge kcal (bruit d'eau 0,5 kg) : ±138 sur 28 j, ±275 sur 14 j, ±550 sur 7 j ; portée par chaque résultat", () => {
+  assert.equal(tdeeMargin(28), 138);
+  assert.equal(tdeeMargin(14), 275);
+  assert.equal(tdeeMargin(7), 550);
+  const weight = Array.from({ length: 30 }, (_, i) => ({ date: d(i), kg: 94 + i * 0.04 }));
+  const kcal = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [d(i), 2500]));
+  const r = tdeeOverWindow({ weightLog: weight, kcalByDate: kcal, today: "2026-10-04", days: 14 });
+  assert.equal(r.status, "ok");
+  assert.equal(r.margin, 275);
+});

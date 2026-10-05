@@ -49,7 +49,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.99.0";
+const APP_VERSION = "3.99.1";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -751,7 +751,14 @@ function InsightsCard({ insights }) {
   }
   if (insights.sleepEnergy) {
     const s = insights.sleepEnergy;
-    rows.push({ label: "Sommeil vs énergie", value: `${s.goodAvg} vs ${s.poorAvg}`, note: `score moyen après bonne nuit vs mauvaise (n=${s.goodN}/${s.poorN})` });
+    // Reformulé le 05/10/2026 (demande de Yoann : titre parlant + phrase + lecture).
+    const gap = s.goodAvg - s.poorAvg;
+    const lecture = gap >= 15 ? "Grand écart : ton sommeil pilote ton énergie, c'est le levier à protéger."
+      : gap >= 8 ? "Écart modéré : une mauvaise nuit se paie, sans être dramatique."
+      : gap >= 0 ? "Petit écart : tu encaisses bien une nuit moyenne."
+      : "Écart inversé : d'autres facteurs dominent (charge de la veille, FC repos).";
+    rows.push({ label: "Effet du sommeil sur l'énergie", value: `${s.goodAvg} vs ${s.poorAvg}`,
+      note: `Après une excellente nuit, ton score d'énergie du matin est à ${s.goodAvg} en moyenne, contre ${s.poorAvg} après une mauvaise nuit (${s.goodN} et ${s.poorN} nuits comparées, 60 derniers jours). ${lecture}` });
   }
 
   if (!rows.length) return null;
@@ -2266,6 +2273,7 @@ function TdeeWindows({ windows }) {
           {w.status === "ok" ? (
             <span style={{ fontFamily: C.mono, fontSize: 12 }}>
               <span style={{ fontWeight: 800, color: C.text }}>{w.tdee}</span>
+              {w.margin != null && <span style={{ fontSize: 10, color: C.muted, marginLeft: 4 }}>± {w.margin}</span>}
               <span style={{ fontSize: 10, color: TDEE_RELIABILITY_COLOR[w.reliability], marginLeft: 6 }}>{TDEE_RELIABILITY_LABEL[w.reliability]}</span>
               <span style={{ fontSize: 10, color: C.dim, marginLeft: 6 }}>{loggedPct(w)}%</span>
             </span>
@@ -2347,6 +2355,7 @@ function TdeeCard({ result, deficitReel, trend, windows, recomp }) {
       </div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
         <span style={{ fontFamily: C.mono, fontSize: 24, fontWeight: 800, color: C.text }}>{result.tdee}</span>
+        {result.margin != null && <span style={{ fontFamily: C.mono, fontSize: 12, color: C.muted, fontWeight: 700 }}>± {result.margin}</span>}
         <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>kcal/j · sur {result.days} j</span>
       </div>
       <Body style={{ fontSize: 11, marginTop: 6 }}>

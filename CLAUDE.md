@@ -4388,6 +4388,27 @@ Trois retours de Yoann après l'install de v3.97.0, diagnostiqués sur ses **vra
   « Plateaux en cours : 1 · Développé incliné haltères (3 sem.) », constat volume absent un lundi.
   Build `apps/perso` ET `apps/public` propres.
 
+## Lisibilité : marge kcal du TDEE + constat sommeil/énergie reformulé (05/10/2026, apps/perso v3.99.1)
+
+- **Question de Yoann : « un pourcentage de fiabilité à la place de faible/moyenne/fiable ? »**
+  Réponse : non — le libellé est une grille de conditions (jours loggés, jours pesés, longueur
+  de fenêtre, veto perte d'eau), pas une mesure ; un % suggérerait une précision statistique
+  qu'on n'a pas (il faudrait connaître la vraie dépense). Retenu à la place, **sans
+  chambouler** : une **marge en kcal** à côté du chiffre — `margin` (`tdee.js`, `tdeeMargin(
+  days)` = 0,5 kg × 7700 / jours, additif sur chaque résultat `tdeeOnWindow`) : ±138 sur 28 j,
+  ±275 sur 14 j, ±550 sur 7 j. C'est la seule part de bruit (eau/glycogène) que la longueur de
+  fenêtre ne peut pas absorber — **pas un intervalle de confiance**, dit tel quel dans le code.
+  Le libellé de fiabilité reste le jugement de référence (couleurs, seuils, Palier inchangés).
+  Affiché « 2 640 ± 138 kcal/j » sur la carte principale et dans la comparaison des fenêtres.
+- **Constat « Sommeil vs énergie » → « Effet du sommeil sur l'énergie »** : la valeur
+  `85 vs 62` reste, la note devient une phrase complète (« Après une excellente nuit, ton score
+  d'énergie du matin est à 85 en moyenne, contre 62 après une mauvaise nuit (12 et 5 nuits
+  comparées, 60 derniers jours) ») suivie d'une **lecture** selon l'écart : ≥ 15 pts « ton
+  sommeil pilote ton énergie, levier à protéger » ; 8-14 « se paie, sans être dramatique » ;
+  0-7 « tu encaisses bien » ; négatif « d'autres facteurs dominent ». Calcul inchangé
+  (`sleepEnergyCorrelation`, qualité 4 vs ≤ 2, sieste exclue).
+- Test ajouté (`tdee.test.mjs`, marge) — **80 tests**. Build `apps/perso` ET `apps/public` propres.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.

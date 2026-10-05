@@ -211,8 +211,15 @@ function tdeeOnWindow(kcalByDate, weightLog, start, today) {
   const trendStart = trendAt(smoothed, start), trendEnd = trendAt(smoothed, today);
   if (mean == null || trendStart == null || trendEnd == null) return null;
   const deltaKg = round2(trendEnd - trendStart);
-  return { tdee: Math.round(mean - (deltaKg * KCAL_PER_KG) / days), meanIntake: Math.round(mean), deltaKg };
+  // `margin` (05/10/2026, lisibilité) : ordre de grandeur de l'erreur en kcal/j dû à la seule
+  // variation d'eau/glycogène — une variation de WATER_NOISE_KG sur la fenêtre déplace le
+  // résultat de WATER_NOISE_KG × 7700 / jours (≈ ±140 sur 28 j, ±275 sur 14 j, ±550 sur 7 j).
+  // Ce n'est PAS un intervalle de confiance : juste la part de bruit que la longueur de la
+  // fenêtre ne peut pas absorber. La fiabilité (libellé) reste le jugement de référence.
+  return { tdee: Math.round(mean - (deltaKg * KCAL_PER_KG) / days), meanIntake: Math.round(mean), deltaKg, margin: tdeeMargin(days) };
 }
+export const WATER_NOISE_KG = 0.5;
+export const tdeeMargin = (days) => Math.round((WATER_NOISE_KG * KCAL_PER_KG) / days);
 
 /**
  * TDEE sur une fenêtre de longueur FIXE (24/09/2026, comparaison 7/14/21/28 j dans l'onglet
