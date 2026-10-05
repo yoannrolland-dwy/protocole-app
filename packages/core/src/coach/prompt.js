@@ -13,6 +13,9 @@ import { recommendSessions } from "../recommender.js";
 import { buildZones, DEFAULT_ZONES } from "../pain.js";
 import { exoProgress } from "../training.js";
 import { volumeForCoach, PRIORITY_GROUPS, VOLUME_TARGET } from "../volume.js";
+// Libellé de confiance du TDEE pour le modèle (05/10/2026) : « élevée/moyenne/faible » au lieu
+// de « fiable/moyenne/faible » — même mot que l'écran, clés internes inchangées.
+const CONFIANCE = { fiable: "élevée", moyenne: "moyenne", faible: "faible" };
 import { climbSummary } from "../climbing.js";
 import { PHASES, phaseTarget, targetsForDate, kcalFromMacros, kcalOfEntry, isCutWindow, tdeeNow, weightTrend7, recompWindows } from "../targets.js";
 import { realDeficit } from "../tdee.js";
@@ -129,7 +132,7 @@ export function buildCoachPrompt(data, note) {
   // hors recomposition : le prompt des autres phases reste identique au caractère près.
   const recompSummary = PHASES[phase].noTarget ? (() => {
     const rw = recompWindows({ foodLog, overrides: foodOverrides, macros, weight, targets });
-    const f = (r) => r.status === "ok" ? { deficit_reel: r.reading.deficit, zone: r.reading.zone, lecture: r.reading.label, fiabilite: r.reliability } : { statut: r.reason };
+    const f = (r) => r.status === "ok" ? { deficit_reel: r.reading.deficit, zone: r.reading.zone, lecture: r.reading.label, confiance: CONFIANCE[r.reliability] ?? r.reliability } : { statut: r.reason };
     return { j14: f(rw.j14), j21: f(rw.j21) };
   })() : null;
   // Historique des paliers de cibles (R2, clé `targetHistory`) : seul moyen pour le coach de
@@ -315,7 +318,7 @@ export function buildCoachPrompt(data, note) {
     // que le coach l'estime à la louche à partir du poids et des apports. `null` tant
     // qu'il n'y a pas assez de recul — jamais un chiffre non fiable.
     depense_estimee: tdeeResult.status === "ok" ? {
-      kcal_j: tdeeResult.tdee, fiabilite: tdeeResult.reliability, fenetre_jours: tdeeResult.days,
+      kcal_j: tdeeResult.tdee, confiance: CONFIANCE[tdeeResult.reliability] ?? tdeeResult.reliability, fenetre_jours: tdeeResult.days,
       deficit_reel_vs_cible: realDeficit(Math.round(kcalFromMacros(atToday.protein, atToday.carbs, atToday.fat, atToday.fiber)), tdeeResult.tdee),
       chevauche_perte_eau: tdeeResult.overlapsWater,
       ...(recompSummary ? { recomposition: recompSummary } : {}),
@@ -415,7 +418,7 @@ ${notesTxt ? `\nNOTES DE CONTEXTE écrites par ${authorLabel} (14 j, ex. alcool,
 ${(journal || "").trim() ? `CARNET DE BORD — état que TU as écrit à la fin de ta dernière analyse. C'est ta mémoire : appuie-toi dessus pour enchaîner (a-t-il appliqué ce que tu avais demandé ? où en est la progression ?) au lieu de repartir de zéro.\n${journal.trim()}\n` : "CARNET DE BORD : vide, c'est ta première analyse. Tu le créeras en fin de réponse.\n"}
 Structure ta réponse en deux temps :
 1. **Aujourd'hui / les prochaines 24h** : à partir du bloc TEMPS RÉEL, dis-lui concrètement quoi faire (ou éviter) MAINTENANT — ${["séance", "nutrition", "hydratation", "récupération", painMentionShort ? `douleurs (${painMentionShort})` : null].filter(Boolean).join(", ")} — en te basant sur ce qui s'est passé hier et sur les notes de contexte. \`repas_hier\`/\`repas_aujourdhui\` donnent le détail réel des aliments par repas (pas seulement les totaux macros) : commente la COMPOSITION si elle appelle un conseil concret (répartition protéique entre repas, repas trop pauvre/trop riche en fibres, timing autour de l'entraînement) — pas une simple relecture de la liste. Le champ \`recommandeur\` (dans RÉSUMÉ 14 JOURS) donne déjà un verdict calculé sur la séance du jour (score + motif, alternatives, à éviter) : appuie-toi dessus au lieu d'en recalculer un autre de ton côté — commente-le, nuance-le ou signale un désaccord argumenté si tu vois un facteur qu'il ignore, mais ne propose pas une séance différente sans le dire explicitement.${nextSession ? " Si `recommandeur.journee` indique une journée terminée, ne propose AUCUNE séance pour aujourd'hui (au mieux de la mobilité) : parle de `recommandeur.demain`, la séance prévue demain (prévision, à confirmer avec le genou et la nuit)." : ""}
-2. **Tendance de fond (14 jours)** : ce qui se dessine sur la durée et ce qu'il faut ajuster pour la semaine à venir, EN CORRÉLANT explicitement poids, kcal, macros, fibres et eau à partir du dataset JOUR PAR JOUR (ex. un pic de poids coïncide-t-il avec un pic de glucides/sodium la veille plutôt qu'un vrai surplus calorique ? un manque de fibres ou d'eau coïncide-t-il avec une stagnation ?). Le champ \`depense_estimee\` (dans RÉSUMÉ 14 JOURS) donne déjà la dépense énergétique réelle calculée par le JS (tendance de poids lissée vs apports réels) avec sa fiabilité et sa fenêtre : utilise CE chiffre pour le déficit plutôt que d'en estimer un toi-même à la louche à partir du poids et des apports bruts. S'il chevauche la perte hydrique du début de sèche (\`chevauche_perte_eau\`) ou si la fiabilité est "faible", dis-le explicitement et nuance en conséquence — ne présente jamais ce chiffre comme définitif dans ce cas. S'il vaut "pas assez de données", n'invente pas de dépense chiffrée.${recompInstr}${palierInstr}
+2. **Tendance de fond (14 jours)** : ce qui se dessine sur la durée et ce qu'il faut ajuster pour la semaine à venir, EN CORRÉLANT explicitement poids, kcal, macros, fibres et eau à partir du dataset JOUR PAR JOUR (ex. un pic de poids coïncide-t-il avec un pic de glucides/sodium la veille plutôt qu'un vrai surplus calorique ? un manque de fibres ou d'eau coïncide-t-il avec une stagnation ?). Le champ \`depense_estimee\` (dans RÉSUMÉ 14 JOURS) donne déjà la dépense énergétique réelle calculée par le JS (tendance de poids lissée vs apports réels) avec son niveau de confiance et sa fenêtre : utilise CE chiffre pour le déficit plutôt que d'en estimer un toi-même à la louche à partir du poids et des apports bruts. S'il chevauche la perte hydrique du début de sèche (\`chevauche_perte_eau\`) ou si la confiance est "faible", dis-le explicitement et nuance en conséquence — ne présente jamais ce chiffre comme définitif dans ce cas. S'il vaut "pas assez de données", n'invente pas de dépense chiffrée.${recompInstr}${palierInstr}
 Traite explicitement CHAQUE domaine : ${["poids (bruit quotidien vs moyenne glissante)", "macros (protéines jour le jour, reste en moyenne 7j)", "eau (jours de basket +1L)", "sommeil (impact récup)", "pas quotidiens (corrélation activité/résultat)", `séances (équilibre Upper/Lower, progressive overload exercice par exercice, gestion de charge sur l'escalade${volumeHebdo ? `, volume hebdo par groupe — \`volume_hebdo_series\` : séries cochées sur 7 j, zone cible ${VOLUME_TARGET.min}-${VOLUME_TARGET.max} séries/semaine pour ${PRIORITY_GROUPS.join("/")} (prioritaires), les autres à titre indicatif` : ""})`, painDomainClause].filter(Boolean).join(", ")}.
 Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reciter les données brutes (cite seulement les chiffres qui appuient un conseil) : va droit aux conseils, en bullet points courts. Limite stricte : 500 mots maximum au total — écourte les détails plutôt que de laisser une section inachevée, et termine toujours par une phrase de conclusion complète. Ce n'est pas un avis médical.
 
@@ -468,7 +471,7 @@ export function buildBilanPrompt({ facts, phase, targets, profile, identity, not
     records: facts.records ? { count: facts.records.count, seances: facts.records.sessions } : null,
     depense_reelle: facts.deficitReel ? {
       kcal_j: facts.deficitReel.tdee, deficit_vs_cible: facts.deficitReel.deficit,
-      delta_kg: facts.deficitReel.deltaKg, jours: facts.deficitReel.days, fiabilite: facts.deficitReel.reliability,
+      delta_kg: facts.deficitReel.deltaKg, jours: facts.deficitReel.days, confiance: CONFIANCE[facts.deficitReel.reliability] ?? facts.deficitReel.reliability,
     } : null,
     projection_fin_seche: facts.projectionFinSeche ? {
       poids_kg: facts.projectionFinSeche.projectedKg, date_fin: facts.projectionFinSeche.endDate,

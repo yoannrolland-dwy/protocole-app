@@ -49,7 +49,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.99.1";
+const APP_VERSION = "3.99.2";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -725,7 +725,7 @@ function InsightsCard({ insights }) {
     const w = insights.weightTdee;
     rows.push({
       label: "Déficit réel", value: `${w.deficit > 0 ? "+" : ""}${w.deficit} kcal/j`,
-      note: `${w.deltaKg > 0 ? "+" : ""}${w.deltaKg} kg sur ${w.days} j · fiabilité ${w.reliability}`,
+      note: `${w.deltaKg > 0 ? "+" : ""}${w.deltaKg} kg sur ${w.days} j · confiance ${TDEE_RELIABILITY_LABEL[w.reliability] ?? w.reliability}`,
     });
   }
   if (insights.cutProjection) {
@@ -2244,7 +2244,9 @@ function PainTab({ knee, save, hsrWeek }) {
 // ambre = à nuancer, danger = à prendre avec de grosses pincettes). "Faible" n'utilise pas
 // le rouge : ce n'est pas une alerte, juste une estimation à ne pas trop croire.
 const TDEE_RELIABILITY_COLOR = { fiable: C.accent, moyenne: "#e8a33d", faible: C.muted };
-const TDEE_RELIABILITY_LABEL = { fiable: "fiable", moyenne: "moyenne", faible: "faible" };
+// Libellés affichés (05/10/2026) : « confiance élevée / moyenne / faible » — la répétition
+// « fiabilité fiable » gênait à la lecture. Clés internes (`reliability`) inchangées.
+const TDEE_RELIABILITY_LABEL = { fiable: "élevée", moyenne: "moyenne", faible: "faible" };
 
 /**
  * Carte "Dépense estimée" (V7). Jamais un chiffre non fiable : tant qu'il n'y a pas assez
@@ -2350,7 +2352,7 @@ function TdeeCard({ result, deficitReel, trend, windows, recomp }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
         <Label>Dépense estimée</Label>
         <span style={{ fontSize: 10, fontFamily: C.mono, fontWeight: 800, color: col, textTransform: "uppercase" }}>
-          fiabilité {TDEE_RELIABILITY_LABEL[result.reliability]}
+          confiance {TDEE_RELIABILITY_LABEL[result.reliability]}
         </span>
       </div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>

@@ -4409,6 +4409,19 @@ Trois retours de Yoann après l'install de v3.97.0, diagnostiqués sur ses **vra
   (`sleepEnergyCorrelation`, qualité 4 vs ≤ 2, sieste exclue).
 - Test ajouté (`tdee.test.mjs`, marge) — **80 tests**. Build `apps/perso` ET `apps/public` propres.
 
+## « Fiabilité fiable » → « confiance élevée / moyenne / faible » (05/10/2026, apps/perso v3.99.2)
+
+Retour de Yoann : la répétition « fiabilité fiable » gêne à la lecture. Choix parmi 3
+propositions : **« confiance élevée / moyenne / faible »**. Mots seulement — seuils, couleurs et
+clés internes (`reliability: "fiable"|"moyenne"|"faible"`, `reliabilityOf`, Palier) inchangés.
+- `apps/perso` : `TDEE_RELIABILITY_LABEL` mappe `fiable → "élevée"` ; « fiabilité » → « confiance »
+  sur la carte TDEE, la comparaison des fenêtres et le constat « Déficit réel ».
+- `coach/prompt.js` : clé JSON `fiabilite` → `confiance` (valeurs mappées via `CONFIANCE`) dans
+  `depense_estimee`, `depense_estimee.recomposition` et le bilan ; consigne reformulée. Captures
+  datées actées, diff vérifié limité à ce renommage. 80 tests, builds `apps/perso` ET
+  `apps/public` propres. `apps/public` (sa propre carte TDEE) non touchée — à aligner si un
+  bêta-testeur le remonte.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.
