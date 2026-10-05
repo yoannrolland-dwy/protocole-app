@@ -49,7 +49,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.98.0";
+const APP_VERSION = "3.98.1";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -549,6 +549,14 @@ function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, tra
             <div style={{ fontFamily: C.mono, fontSize: 9.5, color: C.dim }}>{next.tomorrow.suggestions[0]?.score}</div>
           </div>
           {next.tomorrow.suggestions[0] && <div style={{ fontSize: 10.5, color: C.dim, lineHeight: 1.4 }}>{next.tomorrow.suggestions[0].reason}</div>}
+          {/* Alternatives de demain (05/10/2026) : `nextSessions` en calcule 3 et « Pourquoi pas
+              les autres ? » les considère affichées — sans cette ligne, la 2e et la 3e (ex.
+              l'escalade) n'apparaissaient nulle part. */}
+          {next.tomorrow.suggestions.length > 1 && (
+            <div style={{ fontSize: 10.5, color: C.text2, lineHeight: 1.5, marginTop: 4 }}>
+              Alternatives : {next.tomorrow.suggestions.slice(1).map((s) => `${s.type} (${s.score})`).join(" · ")}
+            </div>
+          )}
           {next.tomorrow.avoid.length > 0 && (
             <div style={{ fontSize: 10.5, color: C.dangerText, lineHeight: 1.4, marginTop: 4 }}>
               À éviter : {next.tomorrow.avoid.map((a) => a.type).join(", ")}

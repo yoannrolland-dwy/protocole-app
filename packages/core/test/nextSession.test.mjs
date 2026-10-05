@@ -147,3 +147,11 @@ test("escalade : objectif hebdo 1 — 39 non faite (20 + 12 + 7), 25 une fois fa
   const r1 = recommendSessions({ ...base({ knee: kneeOk("2026-10-06"), training: [session("2026-10-01", "Escalade")] }), asOf: "2026-10-06", limit: Infinity });
   assert.equal(r1.suggestions.find((s) => s.type === "Escalade").score, 25, "1/1 faite il y a 5 j : 20 + 0 × 12 + ancienneté 5");
 });
+
+test("demain : 3 propositions calculées (dont l'escalade), libellé du planning « Récupération active »", () => {
+  const fb = [session("2026-10-05", "Full Body", [exo("Rowing barre ou machine", true)])];
+  const r = run("2026-10-05", 13, { training: [session("2026-10-04", "Basket"), ...fb] });
+  assert.equal(r.tomorrow.suggestions.length, 3);
+  assert.ok(types(r.tomorrow).includes("Escalade"), types(r.tomorrow));
+  assert.match(r.tomorrow.suggestions[0].reason, /Planning idéal du jour : Récupération active/);
+});

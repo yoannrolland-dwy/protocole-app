@@ -4321,7 +4321,7 @@ dont le plugin haptique qui exige un vrai rebuild Gradle). À vérifier sur l'ap
 sensation haptique au cochage, et à l'usage le RIR (« utile seulement si rempli
 honnêtement », doute explicite de Yoann).
 
-## Retours post-chantier T : escalade invisible, « Récupération active », couleur poids en recomposition (05/10/2026, apps/perso v3.98.0)
+## Retours post-chantier T : escalade invisible, « Récupération active », couleur poids en recomposition (05/10/2026, apps/perso v3.98.0 → v3.98.1)
 
 Trois retours de Yoann après l'install de v3.97.0, diagnostiqués sur ses **vraies données**
 (lues depuis le téléphone via `apps/perso/scripts/cdp.mjs`, rejouées en Node) avant tout code.
@@ -4355,6 +4355,13 @@ Trois retours de Yoann après l'install de v3.97.0, diagnostiqués sur ses **vra
   Palier (R3). Expliqué à Yoann : à 100-300 kcal de déficit la balance doit être stable ou
   descendre lentement, le muscle plus dense que le gras ne fait pas monter le poids à ce
   déficit.
+- **Second bug, trouvé sur la capture d'écran de Yoann après l'install (v3.98.1)** : le bloc
+  « Demain » n'affichait que la **première** proposition alors que `nextSessions` en calcule 3
+  et que « Pourquoi pas les autres ? » les considère toutes affichées — l'escalade (2e, score 39)
+  n'apparaissait donc nulle part pour demain non plus. Fix UI : ligne « Alternatives : Escalade
+  (39) · Lower C (33) » sous la raison. Au passage, « Planning idéal du jour : Repos » affiche
+  désormais « Récupération active » (`applyPlanBonus`, libellé seul — la clé de famille reste
+  `"Repos"`). Test ajouté (3 propositions pour demain, libellé). 74 tests.
 - **Captures datées mises à jour** (`UPDATE_SNAPSHOTS=1`, premier usage réel du mécanisme T1) :
   diff vérifié limité aux entrées escalade (score/raison) et au renommage. 73 tests verts.
   Build `apps/perso` ET `apps/public` propres.

@@ -125,7 +125,8 @@ function applyPlanBonus(sugg, weeklyPlan, fatigue) {
   const others = sugg.filter((s) => !planned.includes(s) && s.score < SCHEDULED_SCORE);
   const maxOther = others.length ? Math.max(...others.map((s) => s.score)) : 0;
   planned.forEach((s) => {
-    const family = weeklyPlan.find((f) => matchesPlanFamily(s.type, f));
+    const fam = weeklyPlan.find((f) => matchesPlanFamily(s.type, f));
+    const family = fam === "Repos" ? "Récupération active" : fam; // libellé affiché (05/10/2026)
     if (s.score >= SCHEDULED_SCORE) return; // basket planifié : déjà en tête, rien à ajouter
     if (fatigue) {
       s.score += PLAN_BONUS;
