@@ -49,7 +49,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.101.0";
+const APP_VERSION = "3.102.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -734,7 +734,7 @@ function InsightsCard({ insights }) {
   }
   if (insights.neglected) {
     const n = insights.neglected;
-    rows.push({ label: "Type délaissé", value: n.type === "Mobilité" ? "Récupération active" : n.type, note: n.daysSince == null ? "jamais loggé" : `pas fait depuis ${n.daysSince} j` });
+    rows.push({ label: "Type délaissé", value: n.type, note: n.daysSince == null ? "jamais loggé" : `pas fait depuis ${n.daysSince} j` });
   }
   // Plateaux en cours + volume prioritaire sous la zone (05/10/2026) — voir insights.js.
   if (insights.plateaus) {
@@ -2410,7 +2410,7 @@ function TdeeCard({ result, deficitReel, trend, windows, recomp }) {
 const WEEKLY_PLAN = {
   sansMatch: [
     { jour: "Lundi", texte: "Lower A (HSR lourd) — Full Body si match la veille" },
-    { jour: "Mardi", texte: "Récupération active — 10k pas, mobilité douce ; iso genou et/ou escalade légère en option selon ressenti" },
+    { jour: "Mardi", texte: "Mobilité (salle, ~20 min) + 30 min de marche ; escalade légère en option selon ressenti" },
     { jour: "Mercredi", texte: "Mobilité (matin) · Basket (soir)" },
     { jour: "Jeudi", texte: "Upper A" },
     { jour: "Vendredi", texte: "Mobilité (matin) · Basket (midi)" },
@@ -2419,7 +2419,7 @@ const WEEKLY_PLAN = {
   ],
   avecMatch: [
     { jour: "Lundi", texte: "Lower C (HSR lourd) — Full Body si match la veille" },
-    { jour: "Mardi", texte: "Récupération active — même logique que la semaine sans match" },
+    { jour: "Mardi", texte: "Mobilité + marche — même logique que la semaine sans match" },
     { jour: "Mercredi", texte: "Mobilité (matin) · Basket (soir)" },
     { jour: "Jeudi", texte: "Upper A" },
     { jour: "Vendredi", texte: "Mobilité (matin) · Basket (midi)" },
@@ -2432,7 +2432,7 @@ const WEEKLY_PLAN = {
 // pour chaque jour de la semaine (index `Date#getDay()`, 0=dimanche...6=samedi), la ou les
 // "familles" de séance prévues. Une famille est un préfixe de type reconnu par
 // `recommendSessions` (packages/core/src/recommender.js) — "Upper" matche "Upper A"/"Upper
-// B", "Lower" matche "Lower A/B/C", "Repos" matche "Récupération active". "Mobilité" ne matche
+// B", "Lower" matche "Lower A/B/C", "Repos" matche "Mobilité" (la récup = la séance Mobilité). "Mobilité" matche aussi
 // aucun type suggéré automatiquement (c'est un choix manuel, jamais suggéré) : gardée ici
 // à titre documentaire, sans effet sur le score.
 const WEEKLY_PLAN_FAMILIES = {

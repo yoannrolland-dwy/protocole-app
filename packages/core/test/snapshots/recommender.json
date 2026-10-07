@@ -27,7 +27,7 @@
         "reason": "Upper 0/2 cette semaine · dernier jamais fait. Genou à ménager → c'est l'option sûre, jambes au repos."
       },
       {
-        "type": "Récupération active",
+        "type": "Mobilité",
         "score": 45,
         "reason": "Décharge : mobilité douce + routine de rééduc autonome."
       },
@@ -83,7 +83,7 @@
         "reason": "Escalade 0/1 cette semaine · dernière jamais fait. Compte comme volume tirage : à placer un jour Lower ou off. Lower déjà fait aujourd'hui : bon jour pour l'escalade (pas de conflit coude)."
       },
       {
-        "type": "Récupération active",
+        "type": "Mobilité",
         "score": 5,
         "reason": "1 j consécutifs d'entraînement."
       }
@@ -154,7 +154,7 @@
         "reason": "Upper 2/2 cette semaine · dernier hier. 7 séances sur les 3 derniers jours → fatigue à surveiller."
       },
       {
-        "type": "Récupération active",
+        "type": "Mobilité",
         "score": 13,
         "reason": "3 j consécutifs d'entraînement. 7 séances sur les 3 derniers jours → fatigue à surveiller."
       }

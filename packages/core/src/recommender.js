@@ -115,7 +115,7 @@ const SCHEDULED_SCORE = 999;
 // le dit — le planning redevient adaptable ces jours-là.
 const PLAN_LEAD = 10;
 function matchesPlanFamily(type, family) {
-  if (family === "Repos") return type.startsWith("Récupération");
+  if (family === "Repos") return type === "Mobilité"; // la récup = la séance Mobilité (07/10/2026)
   return type.startsWith(family);
 }
 function applyPlanBonus(sugg, weeklyPlan, fatigue) {
@@ -126,7 +126,7 @@ function applyPlanBonus(sugg, weeklyPlan, fatigue) {
   const maxOther = others.length ? Math.max(...others.map((s) => s.score)) : 0;
   planned.forEach((s) => {
     const fam = weeklyPlan.find((f) => matchesPlanFamily(s.type, f));
-    const family = fam === "Repos" ? "Récupération active" : fam; // libellé affiché (05/10/2026)
+    const family = fam === "Repos" ? "Mobilité" : fam; // libellé affiché (07/10/2026 : la récup = Mobilité)
     if (s.score >= SCHEDULED_SCORE) return; // basket planifié : déjà en tête, rien à ajouter
     if (fatigue) {
       s.score += PLAN_BONUS;
@@ -553,7 +553,9 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   if (!kneeRed && loadHigh) { restScore += 8; restReason += ` ${load3} séances sur les 3 derniers jours → fatigue à surveiller.`; }
   if (!kneeRed && energyLow) { restScore += 8; restReason += ` Score d'énergie bas (${energy.total}/100).`; }
   if (!kneeRed && cutOn) { restScore += 4; restReason += " Fenêtre de sèche : le repos ne compte pas comme volume manqué."; }
-  push(sugg, "Récupération active", restScore, restReason);
+  // « Mobilité » (07/10/2026, ex-« Récupération active », ex-« Repos / mobilité ») : c'est un vrai
+  // gabarit, donc démarrable depuis le Dashboard — pour Yoann récupération active = séance Mobilité.
+  push(sugg, "Mobilité", restScore, restReason);
 
   // Bonus planning idéal — appliqué en dernier, après tous les signaux de sécurité et de
   // fatigue ci-dessus : un score déjà à 0 (bloqué ailleurs via `avoid`) ne repasse jamais

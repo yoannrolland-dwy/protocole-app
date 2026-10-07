@@ -11,17 +11,17 @@ test("Upper A/B et Lower B : plus aucune série au-delà de 12 reps (hors temps/
       if (e.mode === "reps" && e.r !== "table HSR") assert.ok(maxRep(e.r) <= 12, `${t} · ${e.n} ${e.r}`);
 });
 
-test("Upper A/B après la spécialisation du 05/10/2026 : 9 exercices chacun, volumes et repos attendus", () => {
+test("Upper A/B après la spécialisation du 05/10 et le déménagement du core (07/10) : 8 exercices chacun", () => {
   const A = Object.fromEntries(TEMPLATES["Upper A"].exos.map((e) => [e.n, e]));
   const B = Object.fromEntries(TEMPLATES["Upper B"].exos.map((e) => [e.n, e]));
-  assert.equal(TEMPLATES["Upper A"].exos.length, 9);
-  assert.equal(TEMPLATES["Upper B"].exos.length, 9);
+  assert.equal(TEMPLATES["Upper A"].exos.length, 8);
+  assert.equal(TEMPLATES["Upper B"].exos.length, 8);
   assert.equal(TEMPLATES["Upper A"].exos.map((e) => e.n).join("|"),
-    "Développé incliné haltères|Tirage vertical prise neutre|Rowing barre ou machine|Écarté poulie basse|Extension triceps poulie haute|Élévations latérales haltères|Face pull|Curl poignets pronation|Core — Planche");
+    "Développé incliné haltères|Tirage vertical prise neutre|Rowing barre ou machine|Écarté poulie basse|Extension triceps poulie haute|Élévations latérales haltères|Face pull|Curl poignets pronation");
   assert.equal(TEMPLATES["Upper B"].exos.map((e) => e.n).join("|"),
-    "Développé couché haltères|Tirage vertical prise neutre|Développé militaire haltères|Écarté poulie basse|Élévations latérales poulie|Rear delt machine (reverse pec deck)|Curl marteau (prise neutre)|Curl poignets supination|Core — Crunch machine");
-  assert.deepEqual([A["Tirage vertical prise neutre"].s, A["Rowing barre ou machine"].s, A["Élévations latérales haltères"].s, A["Élévations latérales haltères"].rest, A["Face pull"].s, A["Core — Planche"].s, A["Extension triceps poulie haute"].rest], [3, 3, 5, 60, 2, 2, 75]);
-  assert.deepEqual([B["Développé militaire haltères"].s, B["Écarté poulie basse"].s, B["Élévations latérales poulie"].s, B["Élévations latérales poulie"].rest, B["Rear delt machine (reverse pec deck)"].s, B["Core — Crunch machine"].s], [2, 2, 5, 60, 2, 2]);
+    "Développé couché haltères|Tirage vertical prise neutre|Développé militaire haltères|Écarté poulie basse|Élévations latérales poulie|Rear delt machine (reverse pec deck)|Curl marteau (prise neutre)|Curl poignets supination");
+  assert.deepEqual([A["Tirage vertical prise neutre"].s, A["Rowing barre ou machine"].s, A["Élévations latérales haltères"].s, A["Élévations latérales haltères"].rest, A["Face pull"].s, A["Extension triceps poulie haute"].rest], [3, 3, 5, 60, 2, 75]);
+  assert.deepEqual([B["Développé militaire haltères"].s, B["Écarté poulie basse"].s, B["Élévations latérales poulie"].s, B["Élévations latérales poulie"].rest, B["Rear delt machine (reverse pec deck)"].s], [2, 2, 5, 60, 2]);
   // inchangés : développés, rééduc coude, curls poignets (poignet)
   assert.deepEqual([A["Développé incliné haltères"].s, A["Développé incliné haltères"].r, B["Tirage vertical prise neutre"].s, B["Curl marteau (prise neutre)"].s, A["Curl poignets pronation"].s, A["Curl poignets pronation"].r, B["Curl poignets supination"].s], [4, "8-10", 4, 3, 2, "10-12", 2]);
   assert.equal(DEFAULT_WEIGHTS["Tirage vertical prise neutre"], 85);
@@ -46,9 +46,18 @@ test("Full Body : existe, HSR, tag genou, contenu et ordre figés", () => {
   assert.equal(FB.exos.find((e) => e.n === "Élévations latérales haltères").s, 4);
 });
 
-test("Mobilité : aucune charge (chargeTags vide, pas de flag genou/escalade), tout optionnel", () => {
+test("Mobilité (07/10/2026) : aucune charge, core déménagé ici, iso genou + planche + crunch non optionnels", () => {
   const M = TEMPLATES["Mobilité"];
   assert.deepEqual(M.chargeTags, []);
   assert.ok(!M.knee && !M.climb);
-  assert.ok(M.exos.every((e) => e.opt));
+  assert.equal(M.exos.map((e) => e.n).join("|"),
+    "Iso leg extension unilatérale @60° (genou)|Hanche 90/90 avec transitions|Cheville : genou au mur|Rotation externe épaule poulie basse|Core — Planche|Core — Crunch machine|Iso flexion coude prise marteau + supination");
+  assert.deepEqual(M.exos.filter((e) => !e.opt).map((e) => e.n), ["Iso leg extension unilatérale @60° (genou)", "Core — Planche", "Core — Crunch machine"]);
+  assert.equal(M.exos.find((e) => e.n.startsWith("Iso leg")).s, 3);
+  assert.equal(M.exos.find((e) => e.n === "Rotation externe épaule poulie basse").groupe, "coiffe", "jamais compté dans le volume prioritaire épaules");
+});
+
+test("core retiré des gabarits de muscu : plus aucune planche ni crunch hors Mobilité", () => {
+  for (const t of ["Upper A", "Upper B", "Lower A", "Lower B", "Lower C", "Full Body"])
+    assert.ok(!TEMPLATES[t].exos.some((e) => e.n.startsWith("Core — ")), `${t} contient encore du core`);
 });

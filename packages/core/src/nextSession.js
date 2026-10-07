@@ -75,7 +75,7 @@ function explain({ all, shown, avoid, slotReason, plan, closedReason }) {
 export const SLOTS = { MORNING_END: 12, MIDDAY_END: 14 };
 
 const isMuscuType = (type) => /^(Upper|Lower|Full Body)/.test(type);
-const isRestType = (type) => type.startsWith("Récupération");
+const isRestType = (type) => type === "Mobilité";
 const dowOf = (dateKey) => { const [y, m, d] = dateKey.split("-").map(Number); return new Date(y, m - 1, d).getDay(); };
 
 /** Basket prévu ce jour-là (jour hebdo fixe ou date de match) — même règle que le recommandeur. */

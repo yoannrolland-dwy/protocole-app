@@ -4473,6 +4473,43 @@ cohérence (sans effet pour lui : historique existant).
   inchangés, poids par défaut, bilan hebdo par groupe) — **83 tests**. Build `apps/perso` ET
   `apps/public` propres.
 
+## Mobilité refondue : exercices explicites, core déménagé, « Récupération active » → « Mobilité » (07/10/2026, apps/perso v3.102.0)
+
+Demande de Yoann : la récupération active ET la séance Mobilité sont la même chose pour lui (il ne
+voulait juste plus lire « repos ») ; la séance du matin (mardi/mercredi/vendredi, à la SALLE,
+avant 30 min de marche) doit coller à son planning, avec des exercices qui lui « parlent » et en
+synergie basket / escalade / muscu, et rester courte. Proposition détaillée, questions
+(terminologie, lieu, exercices à retirer, sort du core), réponses, puis « GO ».
+
+- **Un seul mot : « Mobilité »** (option recommandée et retenue, zéro migration — l'alternative
+  « tout renommer Récupération active » aurait migré le type stocké dans `trainingLog`). Le
+  recommandeur propose désormais le type `"Mobilité"` (`recommender.js`, ex-« Récupération
+  active »), `isRestType`/`matchesPlanFamily("Repos")` testent `=== "Mobilité"`. **Effet
+  gratuit** : comme c'est un vrai gabarit, le bouton « Démarrer Mobilité » apparaît sur le
+  Dashboard quand c'est la proposition du jour. Les jours « Mobilité + Basket » du planning
+  (mercredi/vendredi) donnent aussi le bonus de planning à Mobilité (derrière le Basket à 999).
+  Constats : la ligne « Type délaissé » affiche « Mobilité » tel quel.
+- **Gabarit Mobilité réécrit** (`templates.js`, ~20 min) : Iso leg extension unilatérale @60°
+  (genou) **3**×45 s (était 5, non optionnel — antalgie avant le basket du soir) · Hanche 90/90
+  avec transitions 2×45 s/côté · **Cheville : genou au mur** 2×10/côté (mesurable, distance
+  orteils-mur ; question de Yoann sur le tendon : charge très faible, exercice de rééduc des
+  tendinopathies rotulienne/quadricipitale, à faire après l'iso ; variante à genoux proposée et
+  refusée) · Rotation externe épaule poulie basse 2×12/côté (groupe **`coiffe`**, nouveau libellé
+  `GROUP_LABELS`, pour ne jamais gonfler le volume prioritaire épaules) · **Core — Planche**
+  2×45-60 s · **Core — Crunch machine** 2×10-12 (non optionnels, mêmes noms → historique
+  continu) · Iso flexion coude 2×30 s (optionnel, prévention). Retirés : « Étirement chaîne
+  postérieure » (la marche couvre), « Gainage doux », « Mobilité hanche/chevilles/épaules » (remplacés
+  par des libellés précis — nouveaux noms, donc nouvel historique pour ces trois-là).
+- **Tout le core déménage** : planche retirée d'Upper A, Lower A, Lower C ; crunch machine retiré
+  d'Upper B, Lower B (Full Body n'en avait pas). Gain 4-6 min par séance de muscu, abdos 3×/semaine.
+  Le `volume.js` compte toujours le crunch dans `core` (planche = temps, exclue).
+- Planning idéal (`WEEKLY_PLAN`) : mardi « Mobilité (salle, ~20 min) + 30 min de marche ».
+- Tests mis à jour (Upper A/B à 8 exos, contenu exact de Mobilité, « plus aucun core hors
+  Mobilité », libellés) — **84 tests**. Captures datées actées (diff limité au renommage). Rejoué
+  sur ses données : demain → Mobilité en tête (planning), Escalade, Lower C. Build `apps/perso`
+  ET `apps/public` propres. `apps/public` : « Mobilité » reste hors `FAMILY_TYPES`, invisible ;
+  Upper A/B sans core visibles au prochain déploiement, comme à chaque changement de gabarit.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.

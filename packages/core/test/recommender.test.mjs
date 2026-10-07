@@ -18,7 +18,7 @@ test("régression 14/09 : Lower C + Escalade loggés aujourd'hui → ni l'un ni 
   assert.ok(!types(r).includes("Escalade"), `Escalade encore suggérée : ${types(r)}`);
   assert.ok(r.avoid.some((a) => /^Lower/.test(a.type) && /déjà fait/.test(a.reason)), "Lower dans « à éviter » avec le motif");
   assert.ok(r.avoid.some((a) => a.type === "Escalade" && /déjà fait/.test(a.reason)), "Escalade dans « à éviter » avec le motif");
-  assert.ok(types(r).some((t) => /Récupération/.test(t)), "Récupération active reste proposée");
+  assert.ok(types(r).includes("Mobilité"), "Mobilité (récupération) reste proposée");
 });
 
 test("régression 14/09 (non-régression du 13/09) : un Basket loggé aujourd'hui ne bloque PAS Lower", () => {

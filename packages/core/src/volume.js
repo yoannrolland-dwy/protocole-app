@@ -22,10 +22,10 @@ export const EXCLUDED_GROUPS = new Set(["cardio", "mobilite"]);
 export const GROUP_LABELS = {
   pecs: "Pectoraux", epaules: "Épaules", dos: "Dos", biceps: "Biceps", triceps: "Triceps",
   "avant-bras": "Avant-bras", quadriceps: "Quadriceps", ischios: "Ischios",
-  "ischios-fessiers": "Ischios / fessiers", fessiers: "Fessiers", mollets: "Mollets", core: "Core",
+  "ischios-fessiers": "Ischios / fessiers", fessiers: "Fessiers", mollets: "Mollets", core: "Core", coiffe: "Coiffe des rotateurs",
 };
 // Ordre d'affichage : prioritaires d'abord, puis haut du corps, puis bas, puis core.
-const ORDER = ["pecs", "epaules", "dos", "biceps", "triceps", "avant-bras", "quadriceps", "ischios", "ischios-fessiers", "fessiers", "mollets", "core"];
+const ORDER = ["pecs", "epaules", "dos", "biceps", "triceps", "avant-bras", "quadriceps", "ischios", "ischios-fessiers", "fessiers", "mollets", "core", "coiffe"];
 
 /** Groupe musculaire d'une entrée d'exercice du journal, ou `null` si inconnu/exclu. */
 export function groupOf(entry) {

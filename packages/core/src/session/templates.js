@@ -40,8 +40,6 @@ const TEMPLATES = {
     // grip isométrique (dead hang / farmer walk, proposés) — à revoir si la douleur revient.
     { n: "Curl poignets pronation", s: 2, r: "10-12", rest: 60, mode: "reps", c: "léger, avant-bras · stop si douleur poignet",
       groupe: "avant-bras", mouvement: "isolation", materiel: "halteres", tendon: null },
-    { n: "Core — Planche", s: 2, r: "45-60 s", rest: 60, mode: "temps", c: "finisher · anti-extension · progresser par difficulté",
-      groupe: "core", mouvement: "gainage", materiel: "aucun", tendon: null },
   ]},
   "Upper B": { kind: "muscu", chargeTags: ["tirage"], exos: [
     { n: "Développé couché haltères", s: 4, r: "8-10", rest: 150, mode: "reps", c: "ouverture pecs, priorité",
@@ -64,8 +62,6 @@ const TEMPLATES = {
       groupe: "biceps", mouvement: "isolation", materiel: "halteres", tendon: "coude" },
     { n: "Curl poignets supination", s: 2, r: "10-12", rest: 60, mode: "reps", c: "léger, avant-bras · stop si douleur poignet",
       groupe: "avant-bras", mouvement: "isolation", materiel: "halteres", tendon: null },
-    { n: "Core — Crunch machine", s: 2, r: "10-12", rest: 60, mode: "reps", c: "finisher · contrôlé, 1-2 reps en réserve",
-      groupe: "core", mouvement: "isolation", materiel: "machine", tendon: null },
   ]},
   "Lower A": { kind: "muscu", knee: true, hsr: true, chargeTags: ["genou"], exos: [
     { n: "Iso leg extension @60° (si genou raide)", s: 5, r: "45 s", rest: 120, mode: "temps", opt: true, c: "primer antalgique · effort ~70 %",
@@ -78,8 +74,6 @@ const TEMPLATES = {
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
     { n: "Soulevé de terre roumain", s: 3, r: "8-10", rest: 150, mode: "reps", c: "genou peu sollicité",
       groupe: "ischios-fessiers", mouvement: "hanche", materiel: "barre", tendon: null },
-    { n: "Core — Planche", s: 3, r: "45-60 s", rest: 60, mode: "temps", c: "finisher · pas de crunch le jour du RDL",
-      groupe: "core", mouvement: "gainage", materiel: "aucun", tendon: null },
   ]},
   "Lower B": { kind: "muscu", knee: true, chargeTags: ["genou"], exos: [
     { n: "Presse à cuisses", s: 4, r: "8-10", rest: 180, mode: "reps", c: "contrôlé, reps + hautes",
@@ -92,8 +86,6 @@ const TEMPLATES = {
       groupe: "fessiers", mouvement: "hanche", materiel: "machine", tendon: null },
     { n: "Leg curl unilatéral", s: 3, r: "10-12", rest: 90, mode: "reps", c: "",
       groupe: "ischios", mouvement: "isolation", materiel: "machine", tendon: null, famille: "leg-curl-unilateral" },
-    { n: "Core — Crunch machine", s: 3, r: "10-12", rest: 60, mode: "reps", c: "finisher · contrôlé, 1-2 reps en réserve",
-      groupe: "core", mouvement: "isolation", materiel: "machine", tendon: null },
   ]},
   // Semaine avec match (01/09/2026) : Lower unique de la semaine, HSR lourd mais volume total
   // réduit par rapport à Lower A (mollets 3 séries au lieu de 4, planche 2 au lieu de 3) —
@@ -112,8 +104,6 @@ const TEMPLATES = {
       groupe: "ischios-fessiers", mouvement: "hanche", materiel: "barre", tendon: null },
     { n: "Hip thrust", s: 3, r: "8-10", rest: 120, mode: "reps", c: "genou-safe",
       groupe: "fessiers", mouvement: "hanche", materiel: "machine", tendon: null },
-    { n: "Core — Planche", s: 2, r: "45-60 s", rest: 60, mode: "temps", c: "finisher",
-      groupe: "core", mouvement: "gainage", materiel: "aucun", tendon: null },
   ]},
   // Full Body (04/10/2026, demande de Yoann) : UNIQUEMENT le lundi qui suit un dimanche de
   // match (détection côté app, `isPostMatchDay` → recommandeur `postMatch`). Base Lower C
@@ -179,23 +169,34 @@ const TEMPLATES = {
   // et AUCUN flag knee/climb DÉLIBÉRÉMENT : de la récup/mobilité ne doit jamais compter comme
   // une exposition genou/coude (gate, pénalité ambre) ni comme une charge d'entraînement —
   // voir aussi l'exclusion de "Mobilité" dans load3/streak (recommender.js).
+  // Mobilité (refonte 07/10/2026, décisions de Yoann) : séance du matin mardi/mercredi/vendredi à
+  // la SALLE, ~20 min avant 30 min de marche. Exercices nommés précisément, chacun justifié par
+  // sa synergie basket / escalade / muscu (les anciens libellés vagues « Mobilité hanche »,
+  // « chevilles », « étirement chaîne postérieure », « gainage doux » ne lui parlaient pas).
+  // TOUT LE CORE a déménagé ici (planche et crunch machine retirés des 5 gabarits de muscu qui
+  // en avaient — gain de 4-6 min par séance, abdos 3×/semaine, mêmes noms → historique continu).
+  // Le recommandeur propose « Mobilité » comme type de récupération (ex-« Récupération
+  // active ») : chargeTags vide, jamais une charge, jamais gaté.
   "Mobilité": { kind: "muscu", chargeTags: [], exos: [
-    { n: "Iso leg extension unilatérale @60° (genou)", s: 5, r: "45 s", rest: 120, mode: "temps", opt: true,
-      c: "primer antalgique · effort ~70 %, doser par genou",
-      groupe: "quadriceps", mouvement: "genou", materiel: "aucun", tendon: "genou" },
-    { n: "Iso flexion coude prise marteau + supination", s: 4, r: "45 s", rest: 60, mode: "temps", opt: true,
-      c: "prise neutre, supination résistée en fin de tenue",
-      groupe: "biceps", mouvement: "isolation", materiel: "aucun", tendon: "coude" },
-    { n: "Mobilité hanche (fentes + rotations)", s: 1, r: "3 min", rest: 0, mode: "temps", opt: true, c: "",
+    { n: "Iso leg extension unilatérale @60° (genou)", s: 3, r: "45 s", rest: 60, mode: "temps",
+      c: "rééduc tendon quadricipital · effort ~70 %, sous le seuil de douleur · antalgie avant le basket du soir",
+      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou" },
+    { n: "Hanche 90/90 avec transitions", s: 2, r: "45 s", rest: 20, mode: "temps", opt: true,
+      c: "par côté · rotation interne/externe de hanche : défense basse et changements de direction (basket), talon-fesse et haut de pied (escalade)",
       groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
-    { n: "Mobilité chevilles", s: 1, r: "2 min", rest: 0, mode: "temps", opt: true, c: "",
+    { n: "Cheville : genou au mur", s: 2, r: "10", rest: 20, mode: "reps", opt: true,
+      c: "par côté · talon au sol, genou vers le mur, lent, sans rebond · mesure : distance orteils-mur (viser > 10 cm) · amorti des réceptions (basket), adhérence talon bas (escalade)",
       groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
-    { n: "Étirement chaîne postérieure (ischios/mollets)", s: 2, r: "30-45 s", rest: 30, mode: "temps", opt: true, c: "",
-      groupe: "mobilite", mouvement: "isolation", materiel: "aucun", tendon: null },
-    { n: "Mobilité épaules (coiffe des rotateurs)", s: 2, r: "30-45 s", rest: 30, mode: "temps", opt: true, c: "",
-      groupe: "epaules", mouvement: "mobilite", materiel: "aucun", tendon: null },
-    { n: "Gainage doux (planche genoux ou côté)", s: 2, r: "30 s", rest: 30, mode: "temps", opt: true, c: "",
+    { n: "Rotation externe épaule poulie basse", s: 2, r: "12", rest: 45, mode: "reps", opt: true,
+      c: "par côté, léger · coiffe des rotateurs : contrepoids aux 10 séries d'élévations hebdo et aux tirages bras en l'air (escalade)",
+      groupe: "coiffe", mouvement: "isolation", materiel: "poulie", tendon: null },
+    { n: "Core — Planche", s: 2, r: "45-60 s", rest: 60, mode: "temps", c: "anti-extension · progresser par difficulté, pas par durée",
       groupe: "core", mouvement: "gainage", materiel: "aucun", tendon: null },
+    { n: "Core — Crunch machine", s: 2, r: "10-12", rest: 60, mode: "reps", c: "contrôlé, 1-2 reps en réserve",
+      groupe: "core", mouvement: "isolation", materiel: "machine", tendon: null },
+    { n: "Iso flexion coude prise marteau + supination", s: 2, r: "30 s", rest: 45, mode: "temps", opt: true,
+      c: "prévention coude (sans douleur depuis septembre) · à cocher selon l'escalade de la semaine",
+      groupe: "biceps", mouvement: "isolation", materiel: "aucun", tendon: "coude" },
   ]},
 };
 export { TEMPLATES };

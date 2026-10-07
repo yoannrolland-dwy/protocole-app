@@ -31,7 +31,7 @@ test("dimanche 13h, match loggé → idem ; dimanche 9h avant match → Basket (
 test("lundi 10h, Full Body loggé → plus de muscu aujourd'hui ; demain mardi = Repos", () => {
   const r = run("2026-10-05", 10, { training: [MATCH, session("2026-10-05", "Full Body")] });
   assert.ok(!types(r.today).some((t) => /^(Upper|Lower|Full)/.test(t)), types(r.today));
-  assert.equal(top(r.tomorrow), "Récupération active");
+  assert.equal(top(r.tomorrow), "Mobilité");
 });
 
 test("jeudi 10h, Upper avec rowing COCHÉ → pas d'escalade ; lundi Lower seul → escalade proposée le midi", () => {
@@ -167,10 +167,10 @@ test("escalade : objectif hebdo 1 — 39 non faite (20 + 12 + 7), 25 une fois fa
   assert.equal(r1.suggestions.find((s) => s.type === "Escalade").score, 25, "1/1 faite il y a 5 j : 20 + 0 × 12 + ancienneté 5");
 });
 
-test("demain : 3 propositions calculées (dont l'escalade), libellé du planning « Récupération active »", () => {
+test("demain : 3 propositions calculées (dont l'escalade), libellé du planning « Mobilité »", () => {
   const fb = [session("2026-10-05", "Full Body", [exo("Rowing barre ou machine", true)])];
   const r = run("2026-10-05", 13, { training: [session("2026-10-04", "Basket"), ...fb] });
   assert.equal(r.tomorrow.suggestions.length, 3);
   assert.ok(types(r.tomorrow).includes("Escalade"), types(r.tomorrow));
-  assert.match(r.tomorrow.suggestions[0].reason, /Planning idéal du jour : Récupération active/);
+  assert.match(r.tomorrow.suggestions[0].reason, /Planning idéal du jour : Mobilité/);
 });
