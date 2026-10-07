@@ -205,6 +205,11 @@ function Row({ food, onClick, pinned, onPin, onRemove, onEdit, onQuickAdd }) {
 function FreeEntry({ onAdd, onBack, backLabel = "Saisie libre" }) {
   const [name, setName] = useState("");
   const [m, setM] = useState({ prot: "", gluc: "", lip: "", fib: "", alcool: "" });
+  // Ajouter / Retirer (07/10/2026, demande de Yoann) : « Retirer » enregistre une ligne de
+  // CORRECTION aux valeurs négatives — pour affiner une estimation faite en début de journée sans
+  // tout ressaisir. Même formulaire, même pipeline ; seul le signe change à l'enregistrement.
+  const [remove, setRemove] = useState(false);
+  const sign = remove ? -1 : 1;
   const num = (v) => { const n = parseFloat(String(v).replace(",", ".")); return Number.isFinite(n) ? n : 0; };
   // Alcool (T5, 04/10/2026) : 7 kcal/g (même coefficient que la table CIQUAL), optionnel,
   // stocké dans la ligne `foodLog` (per100.alcool) pour le Coach IA — jamais une macro cible.
@@ -236,8 +241,21 @@ function FreeEntry({ onAdd, onBack, backLabel = "Saisie libre" }) {
         </button>
         <Label style={{ fontSize: 11 }}>{backLabel}</Label>
       </div>
+      <div style={{ display: "flex", gap: 6 }}>
+        {[[false, "Ajouter"], [true, "Retirer"]].map(([v, l]) => {
+          const on = remove === v;
+          return (
+            <button key={l} onClick={() => setRemove(v)} style={{
+              flex: 1, padding: "7px 0", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5,
+              background: on ? C.accent : C.card, color: on ? "#000" : C.muted, border: `1.5px solid ${on ? C.accent : C.border}`, fontFamily: "inherit",
+            }}>{l}</button>
+          );
+        })}
+      </div>
       <Body style={{ fontSize: 10.5, color: C.dim }}>
-        Macros de la portion réellement mangée, pas pour 100 g.
+        {remove
+          ? "Correction : ce que tu saisis sera RETIRÉ des totaux du repas (estimation trop haute faite plus tôt)."
+          : "Macros de la portion réellement mangée, pas pour 100 g."}
       </Body>
       <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom (optionnel — ex. Skyr vanille 150 g)" />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -263,15 +281,16 @@ function FreeEntry({ onAdd, onBack, backLabel = "Saisie libre" }) {
       <Btn variant="primary" disabled={!ok} onClick={() => {
         onAdd({
           ref: newQuickRef(),
-          name: name.trim() || "Ajout rapide",
+          name: name.trim() || (remove ? `Correction (−${Math.round(num(kcal))} kcal)` : "Ajout rapide"),
+          ...(remove ? { correction: true } : {}),
           per100: macrosEntered
-            ? { kcal: Math.round(num(kcal)), prot: num(m.prot), gluc: num(m.gluc), lip: num(m.lip), fib: num(m.fib), ...(alcohol > 0 ? { alcool: alcohol } : {}) }
+            ? { kcal: sign * Math.round(num(kcal)), prot: sign * num(m.prot), gluc: sign * num(m.gluc), lip: sign * num(m.lip), fib: sign * num(m.fib), ...(alcohol > 0 ? { alcool: sign * alcohol } : {}) }
             // Calories seules : les macros sont vraiment INCONNUES (null), pas nulles —
             // même principe que les fibres manquantes d'un produit Open Food Facts.
-            : { kcal: Math.round(num(kcal)), prot: null, gluc: null, lip: null, fib: null },
+            : { kcal: sign * Math.round(num(kcal)), prot: null, gluc: null, lip: null, fib: null },
         }, 100);
         onBack();
-      }}>Ajouter</Btn>
+      }}>{remove ? "Retirer" : "Ajouter"}</Btn>
     </div>
   );
 }

@@ -79,11 +79,18 @@ export function makeEntry({ date, meal, food, q }) {
       gluc: food.per100.gluc, lip: food.per100.lip, fib: food.per100.fib,
       // Alcool en g/100 g (T5, 04/10/2026) — optionnel, porté seulement par la saisie libre.
       // Jamais une macro cible ni une colonne des totaux : sert au Coach IA (`alcool_g`).
-      ...(food.per100.alcool != null && food.per100.alcool > 0 ? { alcool: food.per100.alcool } : {}),
+      ...(food.per100.alcool != null && food.per100.alcool != 0 ? { alcool: food.per100.alcool } : {}),
     },
+    // Correction (07/10/2026) : ligne NÉGATIVE saisie depuis « Macro rapide » pour retirer ce qui a
+    // été surestimé plus tôt dans la journée. Les totaux additionnent, donc elle se soustrait
+    // naturellement ; le marqueur sert à l'exclure des « aliments habituels ».
+    ...(food.correction ? { correction: true } : {}),
     at: new Date().toISOString(),
   };
 }
+
+/** Ligne de correction (valeurs négatives, voir `makeEntry`). */
+export const isCorrection = (e) => !!e?.correction;
 
 /** Grammes d'alcool loggés à une date (somme per100.alcool × q/100, 1 décimale), 0 si aucun. */
 export function alcoholGramsFor(log, date) {
@@ -317,6 +324,7 @@ const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400
 export function usageStats(log, { meal, date = todayKey() } = {}) {
   const stats = new Map();
   for (const e of log) {
+    if (isCorrection(e)) continue; // une correction n'est pas un aliment qu'on remange
     const age = daysBetween(e.date, date);
     if (age < 0 || age > WINDOW_DAYS) continue;
     let s = stats.get(e.ref);

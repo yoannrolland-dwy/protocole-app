@@ -4529,6 +4529,25 @@ Retour de Yoann le jour même, après avoir loggé sa Mobilité le matin : la ca
   15 h → créneau passé ; lundi 14 h sans « mobilité possible » ; demain mardi/mercredi) —
   **89 tests**. Build `apps/perso` ET `apps/public` propres.
 
+## Macro rapide : « Retirer » (ligne de correction négative) (07/10/2026, apps/perso+public v3.103.0)
+
+Demande de Yoann : il estime parfois ses repas en début de journée, puis affine à la baisse —
+plutôt que tout ressaisir, pouvoir **soustraire** depuis « Macro rapide ».
+- **`FreeEntry`** (`FoodSearch.jsx`, les deux apps — même composant) : bascule « Ajouter /
+  Retirer » en tête du formulaire. En mode Retirer, même formulaire (macros, alcool, calories
+  pré-remplies), mais à l'enregistrement **toutes les valeurs sont négatives** (`sign = −1`), le
+  nom par défaut devient « Correction (−N kcal) » (lisible dans le journal ET dans
+  `repas_aujourdhui` du Coach IA) et la ligne porte `correction: true`.
+- **`foodStore.js`** : `makeEntry` propage `correction` (clé absente sinon — lignes existantes
+  identiques) et accepte un `alcool` négatif ; `isCorrection(e)` ; `usageStats` **ignore les
+  corrections** (jamais dans « Vos aliments habituels » ni les favoris). Rien d'autre à changer :
+  `totals`/`amounts`/`deriveMacroLog`/TDEE additionnent, une ligne négative se soustrait
+  naturellement.
+- Test ajouté (`nutrition.test.mjs` : soustraction des totaux, marqueur, exclusion des habituels) —
+  **90 tests**. Aperçu : Retirer 10 P / 20 G → ligne « Correction (−40 kcal) », déjeuner et jour à
+  −40 kcal, `macroLog` dérivé à −40/−10/−20, aucune erreur console. Build `apps/perso` ET
+  `apps/public` propres. `apps/public` non testé en direct (port en miroir, même composant).
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.

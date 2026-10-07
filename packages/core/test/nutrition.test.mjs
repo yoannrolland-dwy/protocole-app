@@ -1,7 +1,7 @@
 // Alcool dans la saisie libre (T5, 04/10/2026) : makeEntry / alcoholGramsFor / prompt alcool_g.
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import { makeEntry, alcoholGramsFor, amounts, totals } from "../src/nutrition/foodStore.js";
+import { makeEntry, alcoholGramsFor, amounts, totals, usageStats, isCorrection } from "../src/nutrition/foodStore.js";
 import { buildCoachPrompt } from "../src/coach/prompt.js";
 import { DEFAULT_TARGETS } from "../src/targets.js";
 import { SCHEMES } from "../src/climbing.js";
@@ -42,4 +42,15 @@ test("Coach IA : alcool_g dans macros_hier / macros_aujourdhui_en_cours seulemen
   assert.doesNotMatch(u, /"macros_aujourdhui_en_cours":\{[^}]*alcool_g/);
   const u0 = buildCoachPrompt({ ...base, macros, foodLog: [] }, "").user;
   assert.ok(!u0.includes("alcool_g"));
+});
+
+test("correction (Retirer) : ligne négative soustraite des totaux, marquée, exclue des aliments habituels", () => {
+  const plus = makeEntry({ date: T0, meal: "dejeuner", food: { ref: "quick:a", name: "Estimation", per100: { kcal: 600, prot: 40, gluc: 60, lip: 20, fib: 5 } }, q: 100 });
+  const moins = makeEntry({ date: T0, meal: "dejeuner", food: { ref: "quick:b", name: "Correction (−150 kcal)", correction: true, per100: { kcal: -150, prot: -10, gluc: -15, lip: -5, fib: 0 } }, q: 100 });
+  assert.ok(isCorrection(moins) && !isCorrection(plus));
+  const tot = totals([plus, moins]);
+  assert.deepEqual([tot.kcal, tot.prot, tot.gluc, tot.lip], [450, 30, 45, 15]);
+  assert.equal(amounts(moins).kcal, -150);
+  const stats = usageStats([plus, moins], { date: T0 });
+  assert.ok(stats.has("quick:a") && !stats.has("quick:b"), "la correction ne remonte jamais dans les habituels");
 });
