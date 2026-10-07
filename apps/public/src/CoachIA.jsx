@@ -24,7 +24,7 @@ import { C, Card, Label, Body, Btn, Field, inputStyle } from "./ui.jsx";
 // - Disclaimer visible en permanence sous le bouton Analyser, pas seulement à l'état idle.
 export default function CoachIA({ data, update, error: loadError }) {
   const apiKey = data?.apiKey || "";
-  const model = data?.model || "claude-sonnet-5";
+  const model = data?.model || "claude-sonnet-5-5";
 
   const [state, setState] = useState("idle");
   const [text, setText] = useState("");
@@ -80,7 +80,7 @@ export default function CoachIA({ data, update, error: loadError }) {
     setState("loading"); setErr(""); setProgress(""); setMeta(null);
     try {
       const { system, user } = buildCoachPrompt(bag(), note);
-      const askedModel = model || "claude-sonnet-5";
+      const askedModel = model || "claude-sonnet-5-5";
       const { data: resData, usedModel } = await callClaude({
         apiKey, model: askedModel, system, user,
         effort: "medium", maxTokens: 6000, onRetry: setProgress,

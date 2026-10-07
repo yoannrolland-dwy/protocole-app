@@ -49,7 +49,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.103.0";
+const APP_VERSION = "3.103.1";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -124,7 +124,7 @@ function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
     setState("loading"); setErr(""); setProgress(""); setMeta(null); setKind(which);
     try {
       const { system, user } = which === "bilan" ? coach.buildBilan() : coach.buildPrompt(note);
-      const askedModel = coach.model || "claude-sonnet-5";
+      const askedModel = coach.model || "claude-sonnet-5-5";
       const { data, usedModel } = await callClaude({
         apiKey: coach.apiKey,
         model: askedModel,
@@ -2948,8 +2948,8 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
         <Label style={{ marginBottom: 8 }}>Coach IA · clé API Anthropic</Label>
         <TextInput type="password" value={k} onChange={(e) => setK(e.target.value)} placeholder="sk-ant-..." style={{ marginBottom: 10 }} />
         <Label style={{ marginBottom: 6 }}>Modèle</Label>
-        <TextInput value={m} onChange={(e) => setM(e.target.value)} placeholder="claude-sonnet-5" style={{ marginBottom: 12 }} />
-        <Btn variant="primary" onClick={() => { setApiKey(k.trim()); setModel(m.trim() || "claude-sonnet-5"); setMsg("Réglages enregistrés."); }} style={{ width: "100%" }}>
+        <TextInput value={m} onChange={(e) => setM(e.target.value)} placeholder="claude-sonnet-5-5" style={{ marginBottom: 12 }} />
+        <Btn variant="primary" onClick={() => { setApiKey(k.trim()); setModel(m.trim() || "claude-sonnet-5-5"); setMsg("Réglages enregistrés."); }} style={{ width: "100%" }}>
           Enregistrer
         </Btn>
         <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
@@ -3056,7 +3056,7 @@ export default function App({ silent = false } = {}) {
   const [palierWeekly, setPalierWeekly] = useState(null);
   const [palierTick, setPalierTick] = useState(0);
   const [apiKey, setApiKeyState] = useState("");
-  const [model, setModelState] = useState("claude-sonnet-5");
+  const [model, setModelState] = useState("claude-sonnet-5-5");
   const [coachProfile, setCoachProfileState] = useState("");
   const [coachJournal, setCoachJournalState] = useState("");
   const [lastAutoBackup, setLastAutoBackup] = useState(null);
@@ -3111,7 +3111,7 @@ export default function App({ silent = false } = {}) {
       if (purgedSchedule !== rawSchedule) store.set("basketSchedule", purgedSchedule);
       setBasketScheduleState(purgedSchedule);
       setApiKeyState(await store.get("apiKey", ""));
-      setModelState(await store.get("model", "claude-sonnet-5"));
+      setModelState(await store.get("model", "claude-sonnet-5-5"));
       // Profil : amorcé une seule fois avec les règles auparavant codées en dur, pour que
       // rien ne soit perdu au passage. `null` = jamais initialisé ; une chaîne vide est un
       // choix délibéré de l'utilisateur et n'est donc jamais réamorcée.

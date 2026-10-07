@@ -9,6 +9,9 @@ import { today } from "../dateUtils.js";
 // d'où la date en dur plutôt qu'un simple prix — sinon l'app sous-estimerait le coût à
 // partir du 01/09/2026 sans que rien ne le signale.
 export const PRICING = {
+  // Sonnet 5.5 (07/10/2026) : successeur de Sonnet 5 au même tarif (2 $ / 10 $ par MTok), effort
+  // supporté (défaut "high" côté API ; l'app envoie "medium", voir CLAUDE.md).
+  "claude-sonnet-5-5": { in: 2, out: 10 },
   "claude-sonnet-5": { in: 3, out: 15, intro: { in: 2, out: 10 }, introUntil: "2026-08-31" },
   "claude-haiku-4-5": { in: 1, out: 5 },
   "claude-opus-5": { in: 5, out: 25 },
@@ -29,7 +32,7 @@ export const costCents = (model, usage) => {
 // Haiku 4.5 REJETTE output_config.effort (paramètre réservé aux modèles récents) : on ne
 // l'envoie donc que pour les modèles qui le supportent, sinon la bascule de secours
 // échouerait avec une erreur 400 au pire moment.
-export const SUPPORTS_EFFORT = new Set(["claude-sonnet-5", "claude-opus-5"]);
+export const SUPPORTS_EFFORT = new Set(["claude-sonnet-5-5", "claude-sonnet-5", "claude-opus-5-5", "claude-opus-5"]);
 export const FALLBACK_MODEL = "claude-haiku-4-5";
 
 const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));

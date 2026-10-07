@@ -4548,6 +4548,23 @@ plutôt que tout ressaisir, pouvoir **soustraire** depuis « Macro rapide ».
   −40 kcal, `macroLog` dérivé à −40/−10/−20, aucune erreur console. Build `apps/perso` ET
   `apps/public` propres. `apps/public` non testé en direct (port en miroir, même composant).
 
+## Coach IA : passage à Claude Sonnet 5.5 (07/10/2026, apps/perso v3.103.1)
+
+Demande de Yoann (« le modèle est resté bloqué sur Sonnet 5 »). Identifiant et tarif vérifiés via
+la référence API : `claude-sonnet-5-5`, **2 $ / 10 $ par MTok** (même prix que Sonnet 5), 1M de
+contexte, `output_config.effort` supporté.
+- `coach/claudeApi.js` : `PRICING["claude-sonnet-5-5"]` ajouté (le coût affiché après chaque
+  analyse reste exact) ; `SUPPORTS_EFFORT` étendu à Sonnet 5.5 et Opus 5.5. L'app n'envoie aucun
+  paramètre `thinking` (seulement `effort: "medium"`) — compatible : sur Sonnet 5.5, `thinking:
+  {type: "disabled"}` serait refusé (400), ce que l'app ne fait pas.
+- Défaut du champ modèle → `claude-sonnet-5-5` (`apps/perso`, et `apps/public` pour les nouveaux
+  comptes — un compte existant garde la valeur stockée).
+- **Réglage sur le téléphone** (`protocole:model`) basculé via `cdp.mjs` → relu après
+  redémarrage à froid. Reprise automatique (3 essais puis Haiku 4.5) inchangée.
+- Test `claudeApi.test.mjs` — **91 tests**. Build `apps/perso` ET `apps/public` propres.
+- À surveiller à l'usage : Sonnet 5.5 peut répondre `stop_reason: "refusal"` (classifieurs) —
+  jamais vu sur ce type de contenu (coaching sportif), l'app l'afficherait comme une réponse vide.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.

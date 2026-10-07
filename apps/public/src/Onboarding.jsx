@@ -48,7 +48,7 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
   const [phase, setPhase] = useState(data?.phase || "seche");
   const [climbScheme, setClimbScheme] = useState(data?.climbScheme || "gym");
   const [apiKey, setApiKey] = useState(data?.apiKey || "");
-  const [model, setModel] = useState(data?.model || "claude-sonnet-5");
+  const [model, setModel] = useState(data?.model || "claude-sonnet-5-5");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [backupMsg, setBackupMsg] = useState("");
@@ -266,7 +266,7 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
         <TextInput value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-ant-…" />
         <div style={{ marginTop: 10 }}>
           <Field label="Modèle">
-            <TextInput value={model} onChange={(e) => setModel(e.target.value)} placeholder="claude-sonnet-5" />
+            <TextInput value={model} onChange={(e) => setModel(e.target.value)} placeholder="claude-sonnet-5-5" />
           </Field>
         </div>
       </Card>
