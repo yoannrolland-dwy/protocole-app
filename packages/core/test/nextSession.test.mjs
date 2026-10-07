@@ -67,7 +67,8 @@ test("genou rouge → Lower / Full Body écartés aujourd'hui ET demain", () => 
   assert.ok(!types(r.today).some((t) => /^Lower/.test(t)), types(r.today));
 });
 
-test("slotOpen : muscu avant 12h, escalade jusqu'à 14h (2e séance ok), basket seulement planifié", () => {
+test("slotOpen : muscu avant 12h, escalade jusqu'à 14h (2e séance ok), basket seulement planifié, mobilité le matin et une fois", () => {
+  assert.ok(slotOpen("Mobilité", { hour: 9, mobiliteDone: false }) && !slotOpen("Mobilité", { hour: 12, mobiliteDone: false }) && !slotOpen("Mobilité", { hour: 9, mobiliteDone: true }));
   assert.ok(!slotOpen("Upper A", { hour: 12, sessionDone: false }) && slotOpen("Upper A", { hour: 11, sessionDone: false }));
   assert.ok(slotOpen("Escalade", { hour: 13, sessionDone: true }) && !slotOpen("Escalade", { hour: 14 }));
   assert.ok(!slotOpen("Basket", { hour: 13, basketPlanned: false }) && slotOpen("Basket", { hour: 21, basketPlanned: true }));
@@ -149,7 +150,7 @@ test("lundi 14h après Full Body + rowing : plus rien en rouge, l'escalade expli
   const e = why(r.today, "Escalade");
   assert.equal(e.kind, "slot");
   assert.match(e.reason, /^Créneau passé — escalade.*De toute façon : Tirage \/ flexion du coude/);
-  assert.equal(r.today.notProposed.length, 8);
+  assert.equal(r.today.notProposed.length, 9, "les 8 types + Mobilité (déjà faite ou créneau passé)");
 });
 
 test("basket planifié et déjà fait → « Basket déjà fait aujourd'hui » plutôt que « pas au planning »", () => {
@@ -173,4 +174,37 @@ test("demain : 3 propositions calculées (dont l'escalade), libellé du planning
   assert.equal(r.tomorrow.suggestions.length, 3);
   assert.ok(types(r.tomorrow).includes("Escalade"), types(r.tomorrow));
   assert.match(r.tomorrow.suggestions[0].reason, /Planning idéal du jour : Mobilité/);
+});
+
+test("mercredi 9h (Mobilité + Basket au planning) : Mobilité en premier, Basket ensuite", () => {
+  const r = run("2026-10-07", 9);
+  assert.equal(top(r.today), "Mobilité");
+  assert.equal(r.today.suggestions[1]?.type, "Basket");
+});
+
+test("mercredi 9h, Mobilité déjà loggée → plus proposée, expliquée « déjà faite » ; Basket en tête", () => {
+  const r = run("2026-10-07", 9, { training: [session("2026-10-07", "Mobilité")] });
+  assert.ok(!types(r.today).includes("Mobilité"));
+  assert.match(why(r.today, "Mobilité").reason, /^Mobilité déjà faite aujourd'hui/);
+  assert.equal(top(r.today), "Basket");
+});
+
+test("mercredi 15h, rien loggé → Mobilité hors créneau (matin), Basket du soir reste proposé", () => {
+  const r = run("2026-10-07", 15);
+  assert.ok(!types(r.today).includes("Mobilité"));
+  assert.match(why(r.today, "Mobilité").reason, /^Créneau passé — la mobilité se fait le matin/);
+  assert.equal(top(r.today), "Basket");
+});
+
+test("lundi 14h après Full Body : journée terminée SANS « mobilité possible » (créneau du matin passé)", () => {
+  const r = run("2026-10-05", 14, { training: [session("2026-10-04", "Basket"), session("2026-10-05", "Full Body")] });
+  assert.equal(r.today.status, "closed");
+  assert.doesNotMatch(r.today.note, /mobilité possible/);
+});
+
+test("demain mardi (famille Repos) : Mobilité en tête ; demain mercredi : Mobilité devant le Basket planifié", () => {
+  assert.equal(top(run("2026-10-05", 21, { training: [session("2026-10-04", "Basket")] }).tomorrow), "Mobilité");
+  const r = run("2026-10-06", 21);
+  assert.equal(top(r.tomorrow), "Mobilité");
+  assert.equal(r.tomorrow.suggestions[1]?.type, "Basket");
 });

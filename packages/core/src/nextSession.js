@@ -15,7 +15,9 @@ import { TEMPLATES } from "./session/templates.js";
 // « Pourquoi pas les autres ? » (04/10/2026, demande de Yoann) : chaque type de séance NON
 // proposé reçoit une phrase explicative, aujourd'hui comme demain — plus jamais une séance qui
 // disparaît sans raison. Mobilité exclue (jamais une contrainte, toujours possible).
-const EXPLAIN_TYPES = Object.keys(TEMPLATES).filter((t) => t !== "Mobilité");
+// Mobilité incluse depuis le 07/10/2026 : elle a désormais un créneau (matin) et un état « déjà
+// faite », donc une raison à donner quand elle n'est pas proposée.
+const EXPLAIN_TYPES = Object.keys(TEMPLATES);
 
 /** Un libellé d'`avoid` couvre-t-il ce type ? "Upper A / B" couvre Upper A et Upper B. */
 function covers(label, type) {
@@ -96,8 +98,10 @@ export const matchLogged = (training, basketSchedule, dateKey) =>
  *     n'est pas loggé ; jamais proposé hors planning.
  *   - autres sports (catalogue public) : comme l'escalade.
  */
-export function slotOpen(type, { hour, sessionDone, basketPlanned }) {
-  if (isRestType(type)) return true;
+export function slotOpen(type, { hour, sessionDone, basketPlanned, mobiliteDone }) {
+  // Mobilité (07/10/2026, retour de Yoann) : le matin seulement, et une seule fois par jour —
+  // elle n'est plus « toujours possible ».
+  if (isRestType(type)) return hour < SLOTS.MORNING_END && !mobiliteDone;
   if (isMuscuType(type)) return hour < SLOTS.MORNING_END && !sessionDone;
   if (type === "Basket") return basketPlanned; // décision 1 : basket seulement s'il est au planning
   return hour < SLOTS.MIDDAY_END;
@@ -130,9 +134,19 @@ export function nextSessions({ now = new Date(), base, planFor }) {
     hour,
     sessionDone: doneToday.length > 0,
     basketPlanned: isBasketPlanned(base.basketSchedule, todayKey) && !doneToday.some((t) => t.type === "Basket"),
+    mobiliteDone: training.some((t) => t.date === todayKey && t.type === "Mobilité"),
+  };
+  // Jours « Mobilité » du planning (mardi via la famille Repos, mercredi/vendredi) : elle passe en
+  // PREMIÈRE position tant qu'elle est faisable, même devant un basket planifié le soir — c'est la
+  // séance du matin, le basket vient après (07/10/2026).
+  const mobilitePlanned = (families) => (families || []).some((f) => f === "Repos" || f === "Mobilité");
+  const mobiliteFirst = (list, planned) => {
+    const i = planned ? list.findIndex((x) => isRestType(x.type)) : -1;
+    return i > 0 ? [list[i], ...list.slice(0, i), ...list.slice(i + 1)] : list;
   };
   const slotReason = (type) => {
     if (slotOpen(type, ctx)) return null;
+    if (isRestType(type)) return ctx.mobiliteDone ? "Mobilité déjà faite aujourd'hui." : "Créneau passé — la mobilité se fait le matin (avant 12h).";
     if (isMuscuType(type)) return ctx.sessionDone ? "Une séance est déjà faite aujourd'hui — pas de deuxième musculation." : "Créneau passé — la musculation se fait le matin (avant 12h).";
     if (type === "Basket") return doneToday.some((t) => t.type === "Basket") ? "Basket déjà fait aujourd'hui." : "Pas au planning aujourd'hui — le basket n'est proposé que les jours prévus.";
     return "Créneau passé — escalade le matin ou le midi (avant 14h).";
@@ -148,7 +162,7 @@ export function nextSessions({ now = new Date(), base, planFor }) {
     today = { date: todayKey, status: "closed", suggestions: [], avoid: [], note: "Match joué aujourd'hui : journée terminée — mobilité possible.",
       notProposed: explain({ all: [], shown: [], avoid: [], plan: planToday, closedReason }) };
   } else {
-    const open = recoToday.suggestions.filter((s) => slotOpen(s.type, ctx)).slice(0, 3);
+    const open = mobiliteFirst(recoToday.suggestions.filter((s) => slotOpen(s.type, ctx)), mobilitePlanned(planToday.weeklyPlan)).slice(0, 3);
     const trainable = open.filter((s) => !isRestType(s.type));
     const notProposed = explain({ all: recoToday.suggestions, shown: trainable.length ? open : [], avoid: recoToday.avoid, slotReason, plan: planToday });
     today = trainable.length
@@ -158,7 +172,7 @@ export function nextSessions({ now = new Date(), base, planFor }) {
       // vidait « À éviter » — l'escalade, écartée pour le tirage du jour, disparaissait des deux
       // listes (« Pourquoi pas les autres ? » masque les motifs « avoid », censés être affichés
       // au-dessus). La raison d'une exclusion doit rester visible, journée ouverte ou non.
-      : { date: todayKey, status: "closed", suggestions: [], avoid: avoidOpen, note: ctx.sessionDone ? "Séance du jour faite : journée terminée — mobilité possible." : "Plus de créneau d'entraînement aujourd'hui — mobilité possible.", notProposed };
+      : { date: todayKey, status: "closed", suggestions: [], avoid: avoidOpen, note: `${ctx.sessionDone ? "Séance du jour faite : journée terminée" : "Plus de créneau d'entraînement aujourd'hui"}${slotOpen("Mobilité", ctx) ? " — mobilité possible." : "."}`, notProposed };
   }
 
   // ---- Demain ---- (décision 6 : prévision — sommeil et énergie de demain inconnus, donc
@@ -169,7 +183,7 @@ export function nextSessions({ now = new Date(), base, planFor }) {
   // ni suggéré demain, ni expliqué par un simple « moins prioritaire ».
   const basketPlannedTomorrow = isBasketPlanned(base.basketSchedule, tomorrowKey);
   const tomorrowSlot = (type) => (type === "Basket" && !basketPlannedTomorrow ? "Pas au planning ce jour-là — le basket n'est proposé que les jours prévus." : null);
-  const shownTomorrow = recoTomorrow.suggestions.filter((x) => !tomorrowSlot(x.type)).slice(0, 3);
+  const shownTomorrow = mobiliteFirst(recoTomorrow.suggestions.filter((x) => !tomorrowSlot(x.type)), mobilitePlanned(planTomorrow.weeklyPlan)).slice(0, 3);
   const tomorrow = {
     date: tomorrowKey, suggestions: shownTomorrow, avoid: recoTomorrow.avoid,
     caveat: "Prévision — sous réserve de ton genou et de ta nuit.",

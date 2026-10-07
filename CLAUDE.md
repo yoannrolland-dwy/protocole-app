@@ -4510,6 +4510,25 @@ synergie basket / escalade / muscu, et rester courte. Proposition détaillée, q
   ET `apps/public` propres. `apps/public` : « Mobilité » reste hors `FAMILY_TYPES`, invisible ;
   Upper A/B sans core visibles au prochain déploiement, comme à chaque changement de gabarit.
 
+### Mobilité : créneau du matin, une fois par jour, en tête les jours planifiés (07/10/2026, v3.102.1)
+
+Retour de Yoann le jour même, après avoir loggé sa Mobilité le matin : la carte proposait encore
+« Basket et Mobilité ». Cause : Mobilité était traitée comme « toujours possible » (`slotOpen`
+→ `true`), jamais « déjà faite » ni « hors créneau ». Règle demandée et implémentée
+(`nextSession.js`) :
+- **Créneau matin** (`hour < 12`) **et une seule fois par jour** (`ctx.mobiliteDone`) — après
+  12 h ou une fois loggée, elle n'est plus proposée, et « Pourquoi pas les autres ? » l'explique
+  (« Mobilité déjà faite aujourd'hui. » / « Créneau passé — la mobilité se fait le matin »).
+  `EXPLAIN_TYPES` inclut donc Mobilité (9 types expliqués). La note de journée fermée ne dit
+  « mobilité possible » que si son créneau est encore ouvert.
+- **Première position les jours où elle est au planning** (mardi via la famille `Repos`,
+  mercredi/vendredi via `Mobilité`), aujourd'hui comme demain, **devant un Basket planifié à
+  999** : c'est la séance du matin, le basket vient le soir/midi. Réordonnancement d'affichage
+  seulement (`mobiliteFirst`), scores inchangés.
+- 5 tests ajoutés (mercredi 9 h : Mobilité puis Basket ; loggée → expliquée, Basket en tête ;
+  15 h → créneau passé ; lundi 14 h sans « mobilité possible » ; demain mardi/mercredi) —
+  **89 tests**. Build `apps/perso` ET `apps/public` propres.
+
 ## Comment je veux qu'on travaille
 
 - Explique en une phrase ce qui change et pourquoi avant de coder.
