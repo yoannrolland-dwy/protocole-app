@@ -4564,6 +4564,16 @@ contexte, `output_config.effort` supporté.
 - Test `claudeApi.test.mjs` — **91 tests**. Build `apps/perso` ET `apps/public` propres.
 - À surveiller à l'usage : Sonnet 5.5 peut répondre `stop_reason: "refusal"` (classifieurs) —
   jamais vu sur ce type de contenu (coaching sportif), l'app l'afficherait comme une réponse vide.
+- **Coût mesuré après bascule : 4,6 ¢ par analyse** (contre ~3,1 ¢ sur Sonnet 5). Diagnostic sur le
+  prompt réel reconstruit depuis le téléphone : entrée ≈ 6 200 tokens (~1,25 ¢ — le contexte
+  permanent enrichi ne pèse que +0,2 ¢), donc sortie ≈ 3 350 tokens (~3,35 ¢) contre ~1 800 avant.
+  La réponse visible est plafonnée à 500 mots : l'écart est de la **réflexion interne** (facturée en
+  sortie) — les niveaux d'effort de Sonnet 5.5 sont recalibrés, `medium` y réfléchit plus. Trois
+  options proposées (effort `low` pour Sonnet 5.5 — recommandée, réversible ; laisser ; revenir à
+  Sonnet 5). **Décision de Yoann : laisser tel quel, à réévaluer à l'usage.** Si le surcoût ne se
+  justifie pas, l'effort par modèle (`low` pour `claude-sonnet-5-5`) est le premier levier.
+
+
 
 ## Comment je veux qu'on travaille
 
