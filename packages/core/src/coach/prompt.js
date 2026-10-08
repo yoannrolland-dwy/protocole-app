@@ -295,7 +295,7 @@ export function buildCoachPrompt(data, note) {
       // que la pesée est faite avant ou après 7 h. POUR INFORMATION (demande de Yoann) —
       // aucune pesée n'est exclue ni corrigée. Clé absente tant que les deux groupes n'ont
       // pas 3 pesées horodatées : prompt identique à avant dans ce cas.
-      ...(weighTime.ready ? { heure_pesee: { avant_7h: { n: weighTime.early.n, ecart_moyen_vs_tendance_kg: weighTime.early.meanDelta }, apres_7h: { n: weighTime.late.n, ecart_moyen_vs_tendance_kg: weighTime.late.meanDelta }, difference_kg: weighTime.diff } } : {}) },
+      ...(weighTime.ready ? { heure_pesee: { avant_7h: { n: weighTime.early.n, ecart_relatif_kg: weighTime.early.meanDelta }, apres_7h: { n: weighTime.late.n, ecart_relatif_kg: weighTime.late.meanDelta }, difference_kg: weighTime.diff } } : {}) },
     macros_moy_7j: { proteines: avgKey(m7, "protein"), glucides: avgKey(m7, "carbs"), lipides: avgKey(m7, "fat"), fibres: avgKey(m7, "fiber"), eau_ml: avgKey(m7, "water") },
     cibles: { proteines: atToday.protein, glucides: atToday.carbs, lipides: atToday.fat, fibres: atToday.fiber, eau_ml: targets.water },
     // Sommeil et genou : ces agrégats remplacent les tableaux bruts 14 j qui étaient
@@ -408,7 +408,7 @@ ${profile.trim()}` : "";
 ${JSON.stringify(realtime)}
 
 RÉSUMÉ 14 JOURS (moyennes fiables, tendance de fond) :
-${JSON.stringify(summary)}${weighTime.ready ? "\n`poids.heure_pesee` : écart moyen entre chaque pesée et la tendance lissée, selon l'heure (avant/après 7 h). Pour information seulement — commente-le en une phrase (effet de l'heure, lien avec les nuits courtes), sans exclure ni recalculer aucune pesée : la tendance et le TDEE restent la référence." : ""}
+${JSON.stringify(summary)}${weighTime.ready ? "\n`poids.heure_pesee` : écart moyen de chaque pesée à la tendance lissée, centré sur l'ensemble des pesées, selon l'heure (avant/après 7 h) — positif = plus lourd que les autres pesées. Pour information seulement — commente-le en une phrase (effet de l'heure, lien avec les nuits courtes), sans exclure ni recalculer aucune pesée : la tendance et le TDEE restent la référence." : ""}
 
 JOUR PAR JOUR — pour corréler apports et variations de poids (rétention d'eau via sodium/glucides vs vraie perte de masse grasse). Clés : d=date, p=poids, kc=kcal, P/G/L=protéines/glucides/lipides, F=fibres, eau=ml, pas, cible_kc=cible kcal du jour. Un champ absent = pas de donnée ce jour-là :
 ${JSON.stringify(merged)}

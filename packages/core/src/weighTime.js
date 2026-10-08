@@ -4,8 +4,10 @@
 // digestion moins avancée. L'effet sur le TDEE est noyé dans la marge affichée (±138 kcal
 // sur 28 j), mais il voulait le voir chiffré. On compare chaque pesée à la tendance EMA
 // (jamais au poids brut, pour neutraliser la perte réelle) et on moyenne l'écart par groupe
-// d'heure. `time` est "HH:MM" local, posé par la synchro Health Connect ; une pesée manuelle
-// n'en a pas et n'entre dans aucun groupe.
+// d'heure — CENTRÉ sur la moyenne de toutes les pesées horodatées : sur une perte continue,
+// l'EMA traîne au-dessus du poids réel (mesuré sur ses données : −1,2 kg sur les deux groupes),
+// et seul l'écart ENTRE les groupes répond à la question. `time` est "HH:MM" local, posé par
+// la synchro Health Connect ; une pesée manuelle n'en a pas et n'entre dans aucun groupe.
 import { smoothedWeightSeries } from "./tdee.js";
 
 export const EARLY_CUTOFF_HOUR = 7; // avant 7 h = « aux aurores »
@@ -17,8 +19,9 @@ const hourOf = (time) => {
 };
 
 /**
- * `{ early: { n, meanDelta, meanHour }, late: {...}, diff, ready }` — delta = pesée − EMA du
- * jour, en kg (positif = plus lourd que la tendance). `ready` = les deux groupes ont au moins
+ * `{ early: { n, meanDelta, meanHour }, late: {...}, diff, ready }` — delta = (pesée − EMA du
+ * jour) − moyenne de ce delta sur toutes les pesées horodatées, en kg (positif = plus lourd
+ * que les autres pesées, à tendance égale). `ready` = les deux groupes ont au moins
  * WEIGH_TIME_MIN_SAMPLES pesées. `diff` = early.meanDelta − late.meanDelta (null si pas prêt).
  */
 export function weighTimeAnalysis(weightLog, { cutoffHour = EARLY_CUTOFF_HOUR, days = 90, asOf } = {}) {
@@ -34,9 +37,11 @@ export function weighTimeAnalysis(weightLog, { cutoffHour = EARLY_CUTOFF_HOUR, d
     if (t == null) continue;
     (h < cutoffHour ? early : late).push({ delta: w.kg - t, hour: h });
   }
+  const all = [...early, ...late];
+  const center = all.length ? all.reduce((a, x) => a + x.delta, 0) / all.length : 0;
   const grp = (arr) => ({
     n: arr.length,
-    meanDelta: arr.length ? round2(arr.reduce((a, x) => a + x.delta, 0) / arr.length) : null,
+    meanDelta: arr.length ? round2(arr.reduce((a, x) => a + x.delta, 0) / arr.length - center) : null,
     meanHour: arr.length ? round2(arr.reduce((a, x) => a + x.hour, 0) / arr.length) : null,
   });
   const e = grp(early), l = grp(late);

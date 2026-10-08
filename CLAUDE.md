@@ -4587,7 +4587,9 @@ Trois retours de Yoann, discutés avant code (challenge/questions, puis « GO »
   gagne un champ **`time`** (additif, absent sur une pesée manuelle) ; **le poids est lu sur 90 j**
   (au lieu de 14) mais seules les dates de la fenêtre normale écrasent le kg — au-delà, seule
   l'heure est ajoutée aux pesées déjà présentes. `packages/core/src/weighTime.js`
-  (`weighTimeAnalysis`) : écart moyen pesée − tendance EMA avant/après 7 h, `ready` dès 3 et 3.
+  (`weighTimeAnalysis`) : écart pesée − tendance EMA, **centré sur la moyenne de toutes les
+  pesées** (sur une perte continue l'EMA traîne au-dessus du poids : −1,2 kg sur ses deux
+  groupes, seul l'écart entre groupes compte), avant/après 7 h, `ready` dès 3 et 3.
   Carte « Heure de pesée » dans l'onglet Poids (+ heure dans l'historique), et
   `summary.poids.heure_pesee` dans le prompt du Coach IA avec une consigne « pour information,
   ne pas exclure ni recalculer » — clé absente tant que pas prêt (prompt identique sinon).
@@ -4622,7 +4624,11 @@ Trois retours de Yoann, discutés avant code (challenge/questions, puis « GO »
   +0,19 / −0,13 → +0,32 kg à l'aube), Séances (« charge 420 (normale) · gêne coudes 5/10 »,
   formulaire gêne), Dashboard (raison Upper A avec charge et gêne). Build `apps/perso` ET
   `apps/public` propres. Non testé en réel : l'heure remontée par Health Connect (à vérifier dans
-  l'historique Poids après la première synchro).
+  l'historique Poids après la première synchro) → **vérifié sur le téléphone après l'install** :
+  62 pesées horodatées sur 69 (rattrapage 90 j OK). **Résultat sur ses vraies données : aucun
+  effet mesurable** — 37 pesées avant 7 h (moy. 6h00) et 25 après (moy. 8h16), différence
+  −0,01 kg ; même avec un seuil à 6h30, −0,02 kg. Son impression (« plus lourd à l'aube ») ne se
+  retrouve pas en moyenne sur 90 jours.
 
 
 

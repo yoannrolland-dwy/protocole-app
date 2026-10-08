@@ -676,8 +676,8 @@ function WeighTimeCard({ weight }) {
       </div>
       <Body style={{ fontSize: 10.5, color: C.dim, marginTop: 8 }}>
         {r.ready
-          ? `Écart moyen à la tendance lissée, 90 derniers jours. Les pesées à l'aube sortent ${r.diff > 0 ? "+" : ""}${r.diff.toFixed(2)} kg par rapport aux autres. Pour information : aucune pesée n'est exclue du calcul.`
-          : "Écart moyen à la tendance lissée. Lecture possible dès 3 pesées horodatées de chaque côté."}
+          ? `Écart de chaque pesée à la tendance lissée, centré sur l'ensemble des pesées (90 derniers jours). Les pesées à l'aube sortent ${r.diff > 0 ? "+" : ""}${r.diff.toFixed(2)} kg par rapport aux autres. Pour information : aucune pesée n'est exclue du calcul.`
+          : "Écart de chaque pesée à la tendance lissée, centré sur l'ensemble des pesées. Lecture possible dès 3 pesées horodatées de chaque côté."}
       </Body>
     </Card>
   );
