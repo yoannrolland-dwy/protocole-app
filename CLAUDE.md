@@ -4612,9 +4612,11 @@ Trois retours de Yoann, discutés avant code (challenge/questions, puis « GO »
   par Yoann. Même pénalité du lendemain sur Upper/Escalade (4/8/14), forfait 8 sans RPE. Bilan 3
   mois (`climbLoadPainCorrelation`) et prompt (`charge`/`niveau`) passés dessus. « Dernières
   séances » affiche « charge 420 (normale) ».
-- **Gêne articulaire pendant une escalade** (`gene: { zone, pain }`, optionnel, jamais
-  présélectionné) : chips Aucune / Doigts / Poignets / Coudes + 0-10 (`GeneField`, perso
-  seulement). Gêne ≥ 4 à la dernière escalade → le lendemain Escalade −12, Upper −8, raison
+- **Gêne articulaire pendant une escalade** (`gene: { [zone]: pain }`, plusieurs zones
+  cumulables — retour de Yoann le jour même, la première version n'en acceptait qu'une ; l'ancienne
+  forme `{ zone, pain }` reste lue —, optionnel, jamais présélectionné) : une ligne 0-10 par zone
+  doigts / poignets / coudes (`GeneField`, perso seulement), 0 = retirée. La gêne la plus forte
+  pilote la pénalité : ≥ 4 à la dernière escalade → le lendemain Escalade −12, Upper −8, raison
   affichée ; `gene` dans les séances sans séries du prompt + consigne « si elle revient d'une
   séance à l'autre, dis-le ». Distinct du journal de douleur quotidien (Silbernagel juge le
   lendemain) : si ça revient, rouvrir une vraie zone. **Congestion écartée** (subjective, rien

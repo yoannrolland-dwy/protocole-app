@@ -50,7 +50,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.104.0";
+const APP_VERSION = "3.104.1";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -1733,23 +1733,37 @@ function ProgressScreen({ training, knee, onBack }) {
    l'app de sa salle, et le nombre de blocs était un mauvais proxy de charge — voir
    packages/core/src/sessionLoad.js). Zone + intensité 0-10, optionnel, jamais présélectionné.
    ============================================================ */
+// Forme stockée : `{ [zone]: pain }` — plusieurs zones à la fois (retour de Yoann le jour même :
+// « je pourrais avoir les 3 en même temps »). Une zone non touchée n'est pas écrite ; 0 = retirée.
 function GeneField({ gene, setGene }) {
-  const zone = gene?.zone ?? null, pain = gene?.pain ?? null;
-  const setZone = (z) => setGene(z ? { zone: z, pain: pain ?? null } : null);
+  const map = gene?.zone ? { [gene.zone]: gene.pain } : (gene || {});
+  const setPain = (zone, n) => {
+    const next = { ...map };
+    if (n == null || n === 0) delete next[zone]; else next[zone] = n;
+    setGene(Object.keys(next).length ? next : null);
+  };
   return (
     <div style={{ marginTop: 10 }}>
       <Label style={{ marginBottom: 6 }}>Gêne pendant la séance</Label>
-      <Pills options={[{ key: "aucune", label: "Aucune" }, ...GENE_ZONES]} value={zone ?? "aucune"} onChange={(k) => setZone(k === "aucune" ? null : k)} />
-      {zone && (
-        <div style={{ display: "flex", gap: 4, marginTop: 8, flexWrap: "wrap" }}>
-          {Array.from({ length: 11 }, (_, i) => i).map((n) => (
-            <button key={n} onClick={() => setGene({ zone, pain: n })}
-              style={{ width: 28, height: 28, borderRadius: 6, border: `1.5px solid ${pain === n ? C.accent : C.border}`, background: pain === n ? C.accent : C.card, color: pain === n ? "#000" : C.text2, fontFamily: C.mono, fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0 }}>
-              {n}
-            </button>
-          ))}
-        </div>
-      )}
+      {GENE_ZONES.map((z) => {
+        const pain = map[z.key] ?? null;
+        return (
+          <div key={z.key} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+            <span style={{ width: 62, fontSize: 10, color: pain ? C.accent : C.muted, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>{z.label}</span>
+            <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+              {Array.from({ length: 11 }, (_, i) => i).map((n) => {
+                const on = n === 0 ? pain == null : pain === n;
+                return (
+                  <button key={n} onClick={() => setPain(z.key, n)}
+                    style={{ width: 24, height: 24, borderRadius: 5, border: `1.5px solid ${on ? C.accent : C.border}`, background: on ? C.accent : C.card, color: on ? "#000" : C.text2, fontFamily: C.mono, fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>
+                    {n}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
       <Body style={{ fontSize: 10, color: C.dim, marginTop: 6 }}>
         À partir de 4/10, l'escalade et le tirage lourd sont pénalisés le lendemain. Si ça revient plusieurs séances de suite, rouvre une zone de douleur.
       </Body>
@@ -1848,7 +1862,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType, onStar
     const rec = { id: editing?.id ?? `${date}-${type}-${Date.now()}`, date, type, start: startTime, duration: round(duration), rpe,
       // Gêne (08/10/2026) omise quand rien n'est noté : une séance sans gêne reste exactement
       // la même entrée qu'avant. Les anciens `blocs` d'une séance rééditée ne sont pas repris.
-      ...(type === "Escalade" && gene?.zone && gene.pain != null ? { gene } : {}) };
+      ...(type === "Escalade" && gene && Object.keys(gene).length ? { gene } : {}) };
     store.set("trainingDraft", null);
     save.training((editing ? training.map((x) => (x === editing ? rec : x)) : [...training, rec]).sort(byDate));
     setOpen(null); setEditing(null);

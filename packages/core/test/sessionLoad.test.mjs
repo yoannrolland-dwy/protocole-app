@@ -1,7 +1,7 @@
 // Charge-séance RPE × durée + gêne articulaire (08/10/2026) — remplace le suivi des blocs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sessionLoad, loadLabel, sessionGene, geneLabel, LOAD_LIGHT, LOAD_HEAVY } from "../src/sessionLoad.js";
+import { sessionLoad, loadLabel, sessionGene, sessionGenes, geneLabel, LOAD_LIGHT, LOAD_HEAVY } from "../src/sessionLoad.js";
 import { recommendSessions } from "../src/recommender.js";
 import { buildCoachPrompt } from "../src/coach/prompt.js";
 import { DEFAULT_TARGETS } from "../src/targets.js";
@@ -28,6 +28,11 @@ test("sessionGene : null sans zone ou sous 1, libellé", () => {
   assert.equal(sessionGene({ gene: { zone: "coudes", pain: 0 } }), null);
   assert.deepEqual(sessionGene({ gene: { zone: "coudes", pain: 5 } }), { zone: "coudes", pain: 5 });
   assert.equal(geneLabel({ gene: { zone: "poignets", pain: 3 } }), "gêne poignets 3/10");
+  // Forme multi-zones : la pire pilote, le libellé les liste toutes dans l'ordre doigts/poignets/coudes.
+  assert.deepEqual(sessionGenes({ gene: { coudes: 3, doigts: 5 } }), [{ zone: "doigts", pain: 5 }, { zone: "coudes", pain: 3 }]);
+  assert.deepEqual(sessionGene({ gene: { coudes: 3, doigts: 5 } }), { zone: "doigts", pain: 5 });
+  assert.equal(geneLabel({ gene: { coudes: 3, doigts: 5 } }), "gêne doigts 5/10 · coudes 3/10");
+  assert.equal(sessionGenes({ gene: { coudes: 0 } }), null);
 });
 
 const base = (o = {}) => ({ training: [], knee: kneeOk(), sleep: [], targets: DEFAULT_TARGETS, ...o });
@@ -63,6 +68,8 @@ test("prompt : charge/niveau et gêne dans les séances sans séries, légende g
   assert.ok(!a.includes('"gene" = gêne'));
   const b = buildCoachPrompt({ ...empty, training: [{ date: d(1), type: "Escalade", duration: 60, rpe: 7, gene: { zone: "doigts", pain: 4 } }] }, "").user;
   assert.ok(b.includes('"gene":"doigts 4/10"') && b.includes('"gene" = gêne'));
+  const c = buildCoachPrompt({ ...empty, training: [{ date: d(1), type: "Escalade", duration: 60, rpe: 7, gene: { doigts: 4, coudes: 2 } }] }, "").user;
+  assert.ok(c.includes('"gene":"doigts 4/10, coudes 2/10"'));
   assert.ok(!a.includes("blocs") && !a.includes("cotation"));
 });
 

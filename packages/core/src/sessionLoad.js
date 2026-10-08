@@ -39,7 +39,8 @@ export function loadLabel(session) {
 /* ============================================================
    Gêne articulaire ressentie PENDANT une séance (08/10/2026)
    ============================================================
-   Champ optionnel `gene: { zone, pain }` sur une séance Escalade — distinct du journal de
+   Champ optionnel `gene: { [zone]: pain }` (plusieurs zones possibles, 08/10/2026 — la forme
+   initiale `{ zone, pain }` à une seule zone reste lue) sur une séance Escalade — distinct du journal de
    douleur quotidien (kneeLog / Silbernagel, qui juge le LENDEMAIN) : ici c'est ce que la
    séance elle-même a provoqué. Une gêne ≥ GENE_THRESHOLD à la dernière escalade pénalise le
    lendemain l'escalade et le tirage lourd (recommender.js). Si une gêne revient plusieurs
@@ -52,17 +53,28 @@ export const GENE_ZONES = [
 ];
 export const GENE_THRESHOLD = 4;
 
-/** `{ zone, pain }` si une gêne ≥ 1 est notée sur la séance, sinon `null`. */
-export function sessionGene(session) {
+/**
+ * Liste `[{ zone, pain }]` des gênes ≥ 1 notées sur la séance (ordre de GENE_ZONES), ou `null`
+ * si aucune. Accepte la forme multi `{ doigts: 5, coudes: 3 }` et l'ancienne `{ zone, pain }`.
+ */
+export function sessionGenes(session) {
   const g = session?.gene;
-  if (!g || !g.zone || !(Number(g.pain) >= 1)) return null;
-  return { zone: g.zone, pain: Number(g.pain) };
+  if (!g) return null;
+  const map = g.zone ? { [g.zone]: g.pain } : g;
+  const list = GENE_ZONES.map((z) => ({ zone: z.key, pain: Number(map[z.key]) })).filter((x) => x.pain >= 1);
+  return list.length ? list : null;
+}
+
+/** La gêne la plus forte (`{ zone, pain }`) ou `null` — c'est elle qui pilote la pénalité. */
+export function sessionGene(session) {
+  const list = sessionGenes(session);
+  return list ? list.reduce((a, b) => (b.pain > a.pain ? b : a)) : null;
 }
 
 export const geneZoneLabel = (key) => GENE_ZONES.find((z) => z.key === key)?.label?.toLowerCase() || key;
 
-/** « gêne coudes 5/10 » ou "". */
+/** « gêne coudes 5/10 · doigts 3/10 » ou "". */
 export function geneLabel(session) {
-  const g = sessionGene(session);
-  return g ? `gêne ${geneZoneLabel(g.zone)} ${g.pain}/10` : "";
+  const list = sessionGenes(session);
+  return list ? `gêne ${list.map((g) => `${geneZoneLabel(g.zone)} ${g.pain}/10`).join(" · ")}` : "";
 }

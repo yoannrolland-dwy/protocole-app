@@ -16,7 +16,7 @@ import { volumeForCoach, PRIORITY_GROUPS, VOLUME_TARGET } from "../volume.js";
 // Libellé de confiance du TDEE pour le modèle (05/10/2026) : « élevée/moyenne/faible » au lieu
 // de « fiable/moyenne/faible » — même mot que l'écran, clés internes inchangées.
 const CONFIANCE = { fiable: "élevée", moyenne: "moyenne", faible: "faible" };
-import { sessionLoad, sessionGene, geneZoneLabel } from "../sessionLoad.js";
+import { sessionLoad, sessionGenes, geneZoneLabel } from "../sessionLoad.js";
 import { weighTimeAnalysis } from "../weighTime.js";
 import { PHASES, phaseTarget, targetsForDate, kcalFromMacros, kcalOfEntry, isCutWindow, tdeeNow, weightTrend7, recompWindows } from "../targets.js";
 import { realDeficit } from "../tdee.js";
@@ -184,9 +184,9 @@ export function buildCoachPrompt(data, note) {
   // = gêne articulaire notée pendant une escalade, seulement quand elles existent.
   const autresSeances = last14(training).filter((s) => !s.exercices)
     .map((s) => {
-      const l = sessionLoad(s), g = sessionGene(s);
+      const l = sessionLoad(s), g = sessionGenes(s);
       return { d: s.date.slice(5), t: s.type, ...(s.duration != null ? { min: s.duration } : {}), ...(s.rpe != null ? { rpe: s.rpe } : {}),
-        ...(l ? { charge: l.load, niveau: l.level } : {}), ...(g ? { gene: `${geneZoneLabel(g.zone)} ${g.pain}/10` } : {}) };
+        ...(l ? { charge: l.load, niveau: l.level } : {}), ...(g ? { gene: g.map((x) => `${geneZoneLabel(x.zone)} ${x.pain}/10`).join(", ") } : {}) };
     });
   const anyGene = autresSeances.some((s) => s.gene);
 
@@ -415,7 +415,7 @@ ${JSON.stringify(merged)}
 
 PROGRESSION PAR EXERCICE (14 j) — déjà calculée, ne refais pas l'arithmétique. "series_max" = meilleure série de chaque séance au format "MM-JJ poidsXreps" (ou "MM-JJ Ns" pour les exercices en gainage, mesurés en secondes) ; "tendance" compare le volume (charge × reps, ou les secondes en gainage) de la dernière séance à la précédente${exoProgressData.some((x) => x.rir) ? ' ; "rir" = reps en réserve déclarées par séance (même ordre, 3 = 3 ou plus, null = non renseigné) — une série identique avec plus de RIR est une progression (effort moindre), pas une stagnation' : ""} :
 ${JSON.stringify(exoProgressData)}
-${autresSeances.length ? `Séances sans séries (basket/escalade) : ${JSON.stringify(autresSeances)}\n"charge" = RPE × minutes (charge-séance de Foster ; légère ≤ 300, grosse ≥ 540 — c'est le proxy de charge de tirage sur le coude pour l'escalade).${anyGene ? ' "gene" = gêne articulaire ressentie PENDANT la séance (zone + intensité /10), distincte du journal de douleur quotidien : si elle revient d\'une séance à l\'autre, dis-le explicitement.' : ""}` : ""}${paliersBlock}
+${autresSeances.length ? `Séances sans séries (basket/escalade) : ${JSON.stringify(autresSeances)}\n"charge" = RPE × minutes (charge-séance de Foster ; légère ≤ 300, grosse ≥ 540 — c'est le proxy de charge de tirage sur le coude pour l'escalade).${anyGene ? ' "gene" = gêne(s) articulaire(s) ressentie(s) PENDANT la séance (zone + intensité /10, plusieurs zones possibles), distincte du journal de douleur quotidien : si elle revient d\'une séance à l\'autre, dis-le explicitement.' : ""}` : ""}${paliersBlock}
 ${notesTxt ? `\nNOTES DE CONTEXTE écrites par ${authorLabel} (14 j, ex. alcool, insomnie, petite blessure) — à prendre en compte activement dans l'analyse :\n${notesTxt}\n` : ""}
 ${(journal || "").trim() ? `CARNET DE BORD — état que TU as écrit à la fin de ta dernière analyse. C'est ta mémoire : appuie-toi dessus pour enchaîner (a-t-il appliqué ce que tu avais demandé ? où en est la progression ?) au lieu de repartir de zéro.\n${journal.trim()}\n` : "CARNET DE BORD : vide, c'est ta première analyse. Tu le créeras en fin de réponse.\n"}
 Structure ta réponse en deux temps :
