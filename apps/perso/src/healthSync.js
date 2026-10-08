@@ -75,6 +75,7 @@ export async function syncHealthConnect() {
   const stepsByDate = {};
   const sleepByDate = {};
   const weightByDate = {};
+  const weightTimeByDate = {}; // "HH:MM" local de la pesée (08/10/2026), seulement si connue
   const rhrByDate = {};
   const napsByDate = {};
 
@@ -110,10 +111,17 @@ export async function syncHealthConnect() {
     }
 
     if (canWeight) {
-      const { days } = await HealthNutrition.readWeight({
-        startDate: start.toISOString(), endDate: end.toISOString(),
+      // Poids lu sur 90 jours (08/10/2026) au lieu de SYNC_DAYS, pour l'heure de pesée
+      // (weighTime.js) : une entrée par jour, coût négligeable. Côté App.jsx, seules les dates
+      // de la fenêtre de synchro normale écrasent le kg ; au-delà, seule l'heure est ajoutée
+      // aux pesées déjà présentes (jamais un kg réécrit hors fenêtre).
+      const startW = new Date(localMidnight); startW.setDate(startW.getDate() - 89);
+      const { days, times } = await HealthNutrition.readWeight({
+        startDate: startW.toISOString(), endDate: end.toISOString(),
       });
-      Object.entries(days || {}).forEach(([date, kg]) => { weightByDate[date] = kg; });
+      const minKey = toKey(start);
+      Object.entries(days || {}).forEach(([date, kg]) => { if (date >= minKey) weightByDate[date] = kg; });
+      Object.entries(times || {}).forEach(([date, t]) => { weightTimeByDate[date] = t; });
     }
 
     if (canRhr) {
@@ -126,5 +134,5 @@ export async function syncHealthConnect() {
     return { status: "error", message: String(e) };
   }
 
-  return { status: "ok", stepsByDate, sleepByDate, weightByDate, rhrByDate, napsByDate };
+  return { status: "ok", stepsByDate, sleepByDate, weightByDate, weightTimeByDate, rhrByDate, napsByDate };
 }

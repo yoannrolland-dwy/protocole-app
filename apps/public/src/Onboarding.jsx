@@ -46,7 +46,6 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
   // Réglages au moment de sa création — même raisonnement que la carte "Cibles macro de
   // base" juste en dessous, qui vit ici pour la même raison.
   const [phase, setPhase] = useState(data?.phase || "seche");
-  const [climbScheme, setClimbScheme] = useState(data?.climbScheme || "gym");
   const [apiKey, setApiKey] = useState(data?.apiKey || "");
   const [model, setModel] = useState(data?.model || "claude-sonnet-5-5");
   const [saving, setSaving] = useState(false);
@@ -123,7 +122,7 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
   const finish = async () => {
     setSaving(true); setSaveError("");
     try {
-      await update({ activeSports, painZones, targets, phase, climbScheme, apiKey, model, onboarded: true });
+      await update({ activeSports, painZones, targets, phase, apiKey, model, onboarded: true });
       onClose?.();
     } catch (e) {
       setSaveError(String(e.message || e));
@@ -248,14 +247,6 @@ export default function Onboarding({ data, update, onClose, mode = "onboarding" 
           </Field>
         </div>
       </Card>
-
-      {activeSports.includes("escalade") && (
-        <Card>
-          <Label style={{ marginBottom: 8 }}>Système de cotation escalade</Label>
-          <Pills options={[{ key: "gym", label: "Couleur de salle" }, { key: "fontainebleau", label: "Fontainebleau" }]}
-            value={climbScheme} onChange={setClimbScheme} />
-        </Card>
-      )}
 
       <Card>
         <Label style={{ marginBottom: 8 }}>Clé API Anthropic — optionnel</Label>

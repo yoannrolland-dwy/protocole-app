@@ -3,12 +3,11 @@
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import { recommendSessions, heavyPullDoneOn } from "../src/recommender.js";
-import { SCHEMES } from "../src/climbing.js";
 import { fixClock, T0, d, session, exo, kneeOk, kneeRed, snapshot } from "./_helpers.mjs";
 
 before(() => fixClock());
 const T = { cut: { enabled: false } };
-const base = (o = {}) => ({ training: [], knee: kneeOk(), sleep: [], targets: T, scheme: SCHEMES.gym, ...o });
+const base = (o = {}) => ({ training: [], knee: kneeOk(), sleep: [], targets: T, ...o });
 const types = (r) => r.suggestions.map((s) => s.type);
 
 // ---------- Régression du 14/09/2026 (v3.80.5) : « déjà fait aujourd'hui » perdu au retrait du gate 48h
@@ -113,7 +112,7 @@ test("capture datée : sorties de recommendSessions sur 11 scénarios (snapshots
     genouRouge: { knee: kneeRed() },
     genouAmbre: { knee: [{ date: d(1), pain: 4, baseline: true }] },
     lowerAujourdhui: { training: [session(T0, "Lower C")] },
-    upperHierEscalade: { training: [session(d(1), "Upper A"), { date: d(2), type: "Escalade", blocs: Array(20).fill({ cotation: "rouge-2", issue: "essais" }) }] },
+    upperHierEscalade: { training: [session(d(1), "Upper A"), { date: d(2), type: "Escalade", duration: 75, rpe: 8 }] },
     sommeilCourt: { sleep: [{ date: T0, hours: 5, quality: 1 }, { date: d(1), hours: 5, quality: 2 }] },
     charge: { training: [0, 0, 1, 1, 2, 2, 2].map((n, i) => session(d(n), ["Upper A", "Lower A", "Basket", "Upper B", "Escalade", "Lower B", "Basket"][i])) },
     planUpper: { weeklyPlan: ["Upper"] },

@@ -4574,6 +4574,57 @@ contexte, `output_config.effort` supporté.
   justifie pas, l'effort par modèle (`low` pour `claude-sonnet-5-5`) est le premier levier.
 
 
+## Heure de pesée, épaules 3+2, fin du suivi des blocs d'escalade, gêne articulaire (08/10/2026, apps/perso v3.104.0)
+
+Trois retours de Yoann, discutés avant code (challenge/questions, puis « GO »).
+
+- **Heure de pesée — observation seulement, aucune pesée exclue** (décision explicite). Il a
+  remarqué qu'une pesée à ~5h30 (nuits courtes) sort plus haute qu'à 8h : physiologiquement
+  juste (eau perdue par respiration/miction, digestion), mais l'effet sur le TDEE est noyé dans
+  la marge affichée (1-3 pesées/sem à +0,3 kg ≈ 10-35 kcal/j sur 28 j vs ±138). Une correction
+  par formule a été déconseillée (calibrage impossible, la nuit courte change aussi la rétention).
+  Livré : `HealthNutritionPlugin.readWeight` renvoie aussi `times` (HH:mm local) ; `weightLog`
+  gagne un champ **`time`** (additif, absent sur une pesée manuelle) ; **le poids est lu sur 90 j**
+  (au lieu de 14) mais seules les dates de la fenêtre normale écrasent le kg — au-delà, seule
+  l'heure est ajoutée aux pesées déjà présentes. `packages/core/src/weighTime.js`
+  (`weighTimeAnalysis`) : écart moyen pesée − tendance EMA avant/après 7 h, `ready` dès 3 et 3.
+  Carte « Heure de pesée » dans l'onglet Poids (+ heure dans l'historique), et
+  `summary.poids.heure_pesee` dans le prompt du Coach IA avec une consigne « pour information,
+  ne pas exclure ni recalculer » — clé absente tant que pas prêt (prompt identique sinon).
+- **Élévations latérales 5 séries → 3 + 2 sur deux profils** (haltères = tension en haut, poulie =
+  tension bras le long du corps, position étirée — Maeo 2023). Upper A : haltères 3 + poulie 2 ;
+  Upper B : poulie 3 + haltères 2 (répartition choisie par Yoann). Mêmes noms des deux côtés,
+  historique continu. Consigne « poulie à hauteur de main, câble derrière le corps » (se pencher
+  n'est pas nécessaire — question de Yoann, réponse : ça n'ajoute que quelques degrés). **Iso leg
+  extension 5 × 45 s gardé** (protocole antalgique de Rio 2015, pas de l'hypertrophie). Upper A/B
+  à 9 exercices.
+- **Suivi des blocs d'escalade retiré partout, perso ET public** (décision de Yoann : les pistes
+  changent, il les note dans l'app de sa salle, ça n'apporte rien). `climbing.js` supprimé,
+  `BlocsField` supprimé des deux apps, réglage « Système de cotation » retiré (Réglages perso,
+  Onboarding public), `climbSummary`/`cotationInstr` retirés du prompt. `climbScheme` reste dans
+  `DATA_KEYS` (plus lu, même cas qu'`elbowLog`) ; les `blocs` des anciennes séances restent dans
+  `trainingLog`, plus lus par personne. `SCHEMES`/`scheme` disparaissent des signatures
+  (`recommendSessions`, `buildCoachPrompt`, `computeBilanFacts`, `nextSessions.base`).
+- **Charge-séance = RPE × durée** (`packages/core/src/sessionLoad.js`, Foster 2001) remplace le
+  nombre de blocs : légère ≤ 300, grosse ≥ 540 (60 min × RPE 7 = 420 normale), seuils validés
+  par Yoann. Même pénalité du lendemain sur Upper/Escalade (4/8/14), forfait 8 sans RPE. Bilan 3
+  mois (`climbLoadPainCorrelation`) et prompt (`charge`/`niveau`) passés dessus. « Dernières
+  séances » affiche « charge 420 (normale) ».
+- **Gêne articulaire pendant une escalade** (`gene: { zone, pain }`, optionnel, jamais
+  présélectionné) : chips Aucune / Doigts / Poignets / Coudes + 0-10 (`GeneField`, perso
+  seulement). Gêne ≥ 4 à la dernière escalade → le lendemain Escalade −12, Upper −8, raison
+  affichée ; `gene` dans les séances sans séries du prompt + consigne « si elle revient d'une
+  séance à l'autre, dis-le ». Distinct du journal de douleur quotidien (Silbernagel juge le
+  lendemain) : si ça revient, rouvrir une vraie zone. **Congestion écartée** (subjective, rien
+  dans l'app ne saurait quoi en faire). Brouillon de séance porte `gene` à la place de `blocs`.
+- Tests : `sessionLoad.test.mjs` (7 tests : seuils, gêne, pénalités, prompt, heure de pesée) +
+  templates/recommender ajustés — **98 tests**. Aperçu : Poids (heure dans l'historique, carte
+  +0,19 / −0,13 → +0,32 kg à l'aube), Séances (« charge 420 (normale) · gêne coudes 5/10 »,
+  formulaire gêne), Dashboard (raison Upper A avec charge et gêne). Build `apps/perso` ET
+  `apps/public` propres. Non testé en réel : l'heure remontée par Health Connect (à vérifier dans
+  l'historique Poids après la première synchro).
+
+
 
 ## Comment je veux qu'on travaille
 

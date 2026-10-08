@@ -3,11 +3,10 @@ import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import { nextSessions, slotOpen } from "../src/nextSession.js";
 import { recommendSessions } from "../src/recommender.js";
-import { SCHEMES } from "../src/climbing.js";
 import { fixClock, BS, planFor, at, session, exo, kneeOk, kneeRed } from "./_helpers.mjs";
 
 before(() => fixClock());
-const base = (o = {}) => ({ training: [], knee: kneeOk(), sleep: [], targets: { cut: { enabled: false } }, scheme: SCHEMES.gym, basketSchedule: BS, ...o });
+const base = (o = {}) => ({ training: [], knee: kneeOk(), sleep: [], targets: { cut: { enabled: false } }, basketSchedule: BS, ...o });
 const run = (k, h, o = {}) => nextSessions({ now: at(k, h), base: base({ knee: kneeOk(k), ...o }), planFor });
 const top = (x) => x.suggestions[0]?.type;
 const types = (x) => x.suggestions.map((s) => s.type);

@@ -4,7 +4,6 @@ import assert from "node:assert/strict";
 import { makeEntry, alcoholGramsFor, amounts, totals, usageStats, isCorrection } from "../src/nutrition/foodStore.js";
 import { buildCoachPrompt } from "../src/coach/prompt.js";
 import { DEFAULT_TARGETS } from "../src/targets.js";
-import { SCHEMES } from "../src/climbing.js";
 import { fixClock, T0, d } from "./_helpers.mjs";
 
 before(() => fixClock());
@@ -34,7 +33,7 @@ test("alcoholGramsFor : somme par date au prorata de la quantité ; 0 sans alcoo
 });
 
 test("Coach IA : alcool_g dans macros_hier / macros_aujourdhui_en_cours seulement si > 0", () => {
-  const base = { weight: [], sleep: [], training: [], knee: [], notes: [], steps: [], targets: DEFAULT_TARGETS, foodOverrides: {}, profile: "", journal: "", scheme: SCHEMES.gym, basketSchedule: { weekly: [], matchDates: [] }, weeklyPlan: [], energy: null, matchWeek: false, phase: "seche" };
+  const base = { weight: [], sleep: [], training: [], knee: [], notes: [], steps: [], targets: DEFAULT_TARGETS, foodOverrides: {}, profile: "", journal: "", basketSchedule: { weekly: [], matchDates: [] }, weeklyPlan: [], energy: null, matchWeek: false, phase: "seche" };
   const macros = [{ date: d(1), protein: 200, carbs: 250, fat: 80, fiber: 30, water: 2000 }, { date: T0, protein: 100, carbs: 120, fat: 40, fiber: 15, water: 1000 }];
   const foodLog = [makeEntry({ date: d(1), meal: "extra", food: food({ kcal: 190, prot: 0, gluc: 16, lip: 0, fib: 0, alcool: 18 }), q: 100 })];
   const u = buildCoachPrompt({ ...base, macros, foodLog }, "").user;

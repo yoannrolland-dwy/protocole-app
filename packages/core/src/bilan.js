@@ -13,7 +13,7 @@ import {
   recentRecordsRecap, weightTdeeInsight, cutProjection, mostNeglectedType,
   cutAdherence, sleepEnergyCorrelation,
 } from "./insights.js";
-import { climbLoad } from "./climbing.js";
+import { sessionLoad } from "./sessionLoad.js";
 import { weeklyWeekdayKcalTrend } from "./targets.js";
 
 export const BILAN_WINDOW_DAYS = 90;
@@ -26,15 +26,15 @@ const CLIMB_PAIN_MIN_SAMPLES = 2;
 
 /**
  * Douleur genou moyenne les 2 jours suivant une séance d'escalade, groupée par charge de
- * tirage (`climbLoad` — "grosse" vs "légère/normale"). `null` tant que les deux groupes n'ont
+ * tirage (`sessionLoad`, RPE × durée depuis le 08/10/2026 — "grosse" vs "légère/normale"). `null` tant que les deux groupes n'ont
  * pas au moins `CLIMB_PAIN_MIN_SAMPLES` séances chacun (échantillon trop faible sinon).
  */
-export function climbLoadPainCorrelation(training, kneeLog, scheme, todayDate, windowDays = BILAN_WINDOW_DAYS) {
+export function climbLoadPainCorrelation(training, kneeLog, todayDate, windowDays = BILAN_WINDOW_DAYS) {
   const windowStart = shiftDateKey(todayDate, -(windowDays - 1));
   const heavy = [], other = [];
   for (const s of training || []) {
     if (s.type !== "Escalade" || s.date < windowStart || s.date > todayDate) continue;
-    const load = climbLoad(s, scheme);
+    const load = sessionLoad(s);
     if (!load) continue;
     const pains = [1, 2]
       .map((n) => (kneeLog || []).find((k) => k.date === shiftDateKey(s.date, n)))
@@ -96,7 +96,7 @@ export function fiberWeightStagnationCorrelation(weightLog, macros, todayDate, w
  * (`tdeeNow(...)`, comme la carte Macros et le point 1) — ce module reste pur, aucune lecture
  * I/O (`foodLog`/`overrides` frais nécessaires à `tdeeNow`).
  */
-export function computeBilanFacts({ training, weight, macros, sleep, rhr, steps, knee, targets, scheme, tdeeResult, kcalTargetToday, todayDate, windowDays = BILAN_WINDOW_DAYS }) {
+export function computeBilanFacts({ training, weight, macros, sleep, rhr, steps, knee, targets, tdeeResult, kcalTargetToday, todayDate, windowDays = BILAN_WINDOW_DAYS }) {
   return {
     fenetreJours: windowDays,
     records: recentRecordsRecap(training, knee, todayDate, windowDays),
@@ -105,7 +105,7 @@ export function computeBilanFacts({ training, weight, macros, sleep, rhr, steps,
     typeDelaisse: mostNeglectedType(training, todayDate),
     regulariteSeche: cutAdherence(macros, targets, todayDate),
     sommeilVsEnergie: sleepEnergyCorrelation({ sleepLog: sleep, rhrLog: rhr, stepsLog: steps }, todayDate, windowDays),
-    escaladeVsDouleurGenou: climbLoadPainCorrelation(training, knee, scheme, todayDate, windowDays),
+    escaladeVsDouleurGenou: climbLoadPainCorrelation(training, knee, todayDate, windowDays),
     fibresVsStagnationPoids: fiberWeightStagnationCorrelation(weight, macros, todayDate, windowDays),
     kcalSemaineLunVen: weeklyWeekdayKcalTrend(macros, { weeks: Math.ceil(windowDays / 7), endDate: todayDate }),
   };

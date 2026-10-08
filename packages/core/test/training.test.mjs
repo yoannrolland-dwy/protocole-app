@@ -4,7 +4,6 @@ import assert from "node:assert/strict";
 import { exerciseSessions, exoProgress, progressiveOverloadSuggestion } from "../src/training.js";
 import { buildCoachPrompt } from "../src/coach/prompt.js";
 import { DEFAULT_TARGETS } from "../src/targets.js";
-import { SCHEMES } from "../src/climbing.js";
 import { fixClock, d } from "./_helpers.mjs";
 
 before(() => fixClock());
@@ -47,7 +46,7 @@ test("exoProgress : clé rir seulement si au moins une séance en a, dans l'ordr
 });
 
 test("Coach IA : légende RIR dans le prompt seulement quand une séance en porte", () => {
-  const empty = { weight: [], sleep: [], knee: [], macros: [], notes: [], steps: [], targets: DEFAULT_TARGETS, foodLog: [], foodOverrides: {}, profile: "", journal: "", scheme: SCHEMES.gym, basketSchedule: { weekly: [], matchDates: [] }, weeklyPlan: [], energy: null, matchWeek: false, phase: "seche" };
+  const empty = { weight: [], sleep: [], knee: [], macros: [], notes: [], steps: [], targets: DEFAULT_TARGETS, foodLog: [], foodOverrides: {}, profile: "", journal: "", basketSchedule: { weekly: [], matchDates: [] }, weeklyPlan: [], energy: null, matchWeek: false, phase: "seche" };
   const u1 = buildCoachPrompt({ ...empty, training: [sess(1, 30, 8, 2)] }, "").user;
   assert.match(u1, /"rir" = reps en réserve/);
   assert.match(u1, /"rir":\[2\]/);

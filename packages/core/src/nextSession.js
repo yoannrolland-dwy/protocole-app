@@ -110,7 +110,7 @@ export function slotOpen(type, { hour, sessionDone, basketPlanned, mobiliteDone 
 /**
  * @param now        Date (injectable pour les tests et l'aperçu)
  * @param base       les entrées habituelles de `recommendSessions` (training, knee, sleep,
- *                   targets, scheme, basketSchedule, energy, zones…) — SANS weeklyPlan/
+ *                   targets, basketSchedule, energy, zones…) — SANS weeklyPlan/
  *                   matchWeek/postMatch/asOf, que ce module calcule par date.
  * @param planFor    (dateKey) => { weeklyPlan, matchWeek, postMatch } — fourni par l'app.
  * @returns { today: { date, status: "open"|"closed", suggestions, avoid, note, notProposed },

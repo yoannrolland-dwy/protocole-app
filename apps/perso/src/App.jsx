@@ -17,7 +17,8 @@ import { exoProgress, exerciseList, exerciseSessions, exerciseTrend, isTimeMode,
          beats, recordToBeat, recordsBySession, painOutOfBase, progressiveOverloadSuggestion } from "@rawcare/core/training";
 import { weeklyVolumeByGroup, VOLUME_TARGET } from "@rawcare/core/volume";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
-import { SCHEMES, gradeIndex, ISSUES, climbSummary, climbLabel } from "@rawcare/core/climbing";
+import { GENE_ZONES, loadLabel, geneLabel } from "@rawcare/core/sessionLoad";
+import { weighTimeAnalysis } from "@rawcare/core/weighTime";
 import { realDeficit, MIN_WINDOW_DAYS as MIN_TDEE_DAYS, tdeeTrend, tdeeOverWindow } from "@rawcare/core/tdee";
 import { TEMPLATES, TYPES, DEFAULT_WEIGHTS, HSR_TABLE, hsrForWeek, hsrParse, parseSecs,
          PERI, BASKET_PROTOCOLS } from "@rawcare/core/session/templates";
@@ -49,7 +50,7 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.103.1";
+const APP_VERSION = "3.104.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -359,7 +360,7 @@ function KneeQuickLog({ knee, saveKnee }) {
 const RECOMP_TREND_MAX = 0.3;
 const recompTrendColor = (deltaWeek) => (Math.abs(deltaWeek) <= RECOMP_TREND_MAX ? C.accent : "#e8a33d");
 
-function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, scheme, basketSchedule, planFor, palier, onApplyPalier, saveKnee, onStart }) {
+function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, openSettings, basketSchedule, planFor, palier, onApplyPalier, saveKnee, onStart }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast && tgtW != null ? round(wLast.kg - tgtW) : null;
@@ -381,9 +382,9 @@ function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, tra
   useEffect(() => { const id = setInterval(() => setClock(Date.now()), 5 * 60 * 1000); return () => clearInterval(id); }, []);
   const next = useMemo(() => nextSessions({
     now: new Date(clock),
-    base: { training, knee, sleep, targets, scheme, basketSchedule, energy },
+    base: { training, knee, sleep, targets, basketSchedule, energy },
     planFor,
-  }), [training, knee, sleep, targets, scheme, basketSchedule, energy, clock]);
+  }), [training, knee, sleep, targets, basketSchedule, energy, clock]);
   const { suggestions, avoid } = next.today;
 
   const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
@@ -650,12 +651,35 @@ function WeightTab({ weight, targets, save, phase }) {
         <Label style={{ padding: "10px 0 6px", letterSpacing: 1.5 }}>Historique</Label>
         {weight.length ? lastN(weight, 10).reverse().map((w) => (
           <div key={w.date} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderTop: `1px solid ${C.divider}`, fontFamily: C.mono, fontSize: 13 }}>
-            <span style={{ color: C.text2 }}>{fmt(w.date)}</span>
+            <span style={{ color: C.text2 }}>{fmt(w.date)}{w.time ? <span style={{ color: C.dim, fontSize: 11 }}> · {w.time}</span> : null}</span>
             <span style={{ color: C.text, fontWeight: 700 }}>{w.kg}</span>
           </div>
         )) : <Empty>Aucune donnée.</Empty>}
       </Card>
+      <WeighTimeCard weight={weight} />
     </div>
+  );
+}
+
+// Heure de pesée (08/10/2026) — observation seulement, aucune pesée exclue (décision de
+// Yoann). Écart moyen à la tendance EMA selon que la pesée est avant ou après 7 h.
+function WeighTimeCard({ weight }) {
+  const r = useMemo(() => weighTimeAnalysis(weight), [weight]);
+  if (!r.early.n && !r.late.n) return null;
+  const sg = (x) => (x == null ? "—" : `${x > 0 ? "+" : ""}${x.toFixed(2)} kg`);
+  return (
+    <Card>
+      <Label style={{ marginBottom: 6 }}>Heure de pesée</Label>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontFamily: C.mono, fontSize: 12 }}>
+        <div><div style={{ color: C.muted, fontSize: 10 }}>AVANT {r.cutoffHour} H · {r.early.n} pesée{r.early.n > 1 ? "s" : ""}</div><div style={{ color: C.text, fontWeight: 700 }}>{sg(r.early.meanDelta)}</div></div>
+        <div><div style={{ color: C.muted, fontSize: 10 }}>APRÈS {r.cutoffHour} H · {r.late.n} pesée{r.late.n > 1 ? "s" : ""}</div><div style={{ color: C.text, fontWeight: 700 }}>{sg(r.late.meanDelta)}</div></div>
+      </div>
+      <Body style={{ fontSize: 10.5, color: C.dim, marginTop: 8 }}>
+        {r.ready
+          ? `Écart moyen à la tendance lissée, 90 derniers jours. Les pesées à l'aube sortent ${r.diff > 0 ? "+" : ""}${r.diff.toFixed(2)} kg par rapport aux autres. Pour information : aucune pesée n'est exclue du calcul.`
+          : "Écart moyen à la tendance lissée. Lecture possible dès 3 pesées horodatées de chaque côté."}
+      </Body>
+    </Card>
   );
 }
 
@@ -1704,135 +1728,34 @@ function ProgressScreen({ training, knee, onBack }) {
 }
 
 /* ============================================================
-   SAISIE DES BLOCS D'ESCALADE (V5)
-   Doit rester rapide au doigt EN SALLE : une grille de cotations à taper, jamais un champ
-   texte libre, et un moyen d'ajouter plusieurs blocs de même cotation d'un coup.
+   GÊNE ARTICULAIRE PENDANT UNE ESCALADE (08/10/2026)
+   Remplace la saisie des blocs (V5, retirée : les pistes changent, Yoann les note déjà dans
+   l'app de sa salle, et le nombre de blocs était un mauvais proxy de charge — voir
+   packages/core/src/sessionLoad.js). Zone + intensité 0-10, optionnel, jamais présélectionné.
    ============================================================ */
-function BlocsField({ blocs, setBlocs, scheme }) {
-  // Issue « armée » : on choisit une fois, puis on tape les cotations. Défaut « après
-  // essais », le cas le plus fréquent — flash et échec sont les exceptions.
-  const [issue, setIssue] = useState("essais");
-
-  const add = (cotation, n = 1) => setBlocs([...blocs, ...Array.from({ length: n }, () => ({ cotation, issue }))]);
-  // Retire UN bloc de ce couple (cotation, issue) — le dernier ajouté.
-  const rm = (cotation, iss) => {
-    const i = blocs.map((b) => b.cotation === cotation && b.issue === iss).lastIndexOf(true);
-    if (i >= 0) setBlocs(blocs.filter((_, j) => j !== i));
-  };
-
-  // Récapitulatif groupé par (cotation, issue), trié par difficulté croissante : c'est la
-  // lecture utile en fin de séance, pas la liste chronologique des 20 blocs.
-  const groupes = [];
-  blocs.forEach((b) => {
-    const g = groupes.find((x) => x.cotation === b.cotation && x.issue === b.issue);
-    if (g) g.n += 1; else groupes.push({ cotation: b.cotation, issue: b.issue, n: 1 });
-  });
-  groupes.sort((a, b) => gradeIndex(scheme, a.cotation) - gradeIndex(scheme, b.cotation)
-    || ISSUES.findIndex((x) => x.key === a.issue) - ISSUES.findIndex((x) => x.key === b.issue));
-
-  const s = climbSummary(blocs, scheme);
-  // Compte par cotation, toutes issues confondues : affiché dans la grille pour savoir où
-  // on en est sans lire le récapitulatif.
-  const parCotation = {};
-  blocs.forEach((b) => { parCotation[b.cotation] = (parCotation[b.cotation] || 0) + 1; });
-
-  // Deux modes de saisie selon le schéma actif (RawCare Phase 1, 06/08/2026) : "gym" reste
-  // une grille couleur × niveau (la lecture du mur) ; un schéma sans colors/levels (ex.
-  // Fontainebleau) devient une liste plate de puces, une par cotation.
-  const isGrid = !!(scheme.colors && scheme.levels);
-
+function GeneField({ gene, setGene }) {
+  const zone = gene?.zone ?? null, pain = gene?.pain ?? null;
+  const setZone = (z) => setGene(z ? { zone: z, pain: pain ?? null } : null);
   return (
-    <div style={{ marginTop: 12 }}>
-      <Label style={{ marginBottom: 6 }}>Blocs · issue à enregistrer</Label>
-      <Pills options={ISSUES.map((i) => ({ key: i.key, label: i.label }))} value={issue} onChange={setIssue} small />
-
-      <Label style={{ margin: "10px 0 6px" }}>Taper un niveau pour l'ajouter</Label>
-      {isGrid ? (
-        /* Une ligne par couleur de piste, du plus facile au plus dur — la lecture du mur.
-           La pastille de couleur est la seule entorse admise au « accent citron uniquement » :
-           ici la couleur EST la donnée, pas une décoration. */
-        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-          {scheme.colors.map((col) => (
-            <div key={col.key} style={{ display: "grid", gridTemplateColumns: `62px repeat(${scheme.levels.length}, 1fr)`, gap: 5, alignItems: "center" }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
-                <span style={{ width: 10, height: 10, borderRadius: 3, background: col.hex, flexShrink: 0,
-                  border: col.key === "noir" ? `1px solid ${C.border}` : "none" }} />
-                <span style={{ fontSize: 9.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.3, fontWeight: 700 }}>{col.label}</span>
-              </span>
-              {scheme.levels.map((lv) => {
-                const g = scheme.makeGrade(col.key, lv);
-                const n = parCotation[g] || 0;
-                return (
-                  <button key={lv} onClick={() => add(g)} style={{
-                    padding: "8px 2px", borderRadius: 6, cursor: "pointer", fontFamily: C.mono,
-                    fontSize: 12, fontWeight: 800,
-                    background: n ? C.accentRow : C.card, color: n ? C.accent : C.muted,
-                    border: `1.5px solid ${n ? C.accent : C.border}`,
-                  }}>
-                    {lv}{n > 0 && <span style={{ fontSize: 9, marginLeft: 1 }}>×{n}</span>}
-                  </button>
-                );
-              })}
-            </div>
+    <div style={{ marginTop: 10 }}>
+      <Label style={{ marginBottom: 6 }}>Gêne pendant la séance</Label>
+      <Pills options={[{ key: "aucune", label: "Aucune" }, ...GENE_ZONES]} value={zone ?? "aucune"} onChange={(k) => setZone(k === "aucune" ? null : k)} />
+      {zone && (
+        <div style={{ display: "flex", gap: 4, marginTop: 8, flexWrap: "wrap" }}>
+          {Array.from({ length: 11 }, (_, i) => i).map((n) => (
+            <button key={n} onClick={() => setGene({ zone, pain: n })}
+              style={{ width: 28, height: 28, borderRadius: 6, border: `1.5px solid ${pain === n ? C.accent : C.border}`, background: pain === n ? C.accent : C.card, color: pain === n ? "#000" : C.text2, fontFamily: C.mono, fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0 }}>
+              {n}
+            </button>
           ))}
         </div>
-      ) : (
-        /* Schéma sans grille (ex. Fontainebleau) : une puce par cotation, ordre croissant. */
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {scheme.grades.map((g) => {
-            const n = parCotation[g] || 0;
-            return (
-              <button key={g} onClick={() => add(g)} style={{
-                padding: "8px 10px", borderRadius: 6, cursor: "pointer", fontFamily: C.mono,
-                fontSize: 12, fontWeight: 800,
-                background: n ? C.accentRow : C.card, color: n ? C.accent : C.muted,
-                border: `1.5px solid ${n ? C.accent : C.border}`,
-              }}>
-                {g}{n > 0 && <span style={{ fontSize: 9, marginLeft: 2 }}>×{n}</span>}
-              </button>
-            );
-          })}
-        </div>
       )}
-
-      {groupes.length > 0 && (
-        <div style={{ marginTop: 10 }}>
-          {groupes.map((g) => (
-            <div key={`${g.cotation}-${g.issue}`} style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "6px 0", borderTop: `1px solid ${C.divider}`,
-            }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: C.mono, fontSize: 12, color: C.text, fontWeight: 700 }}>
-                {isGrid && <span style={{ width: 9, height: 9, borderRadius: 3, background: scheme.gradeColor(g.cotation) || C.dim,
-                  border: g.cotation.startsWith("noir") ? `1px solid ${C.border}` : "none" }} />}
-                {scheme.gradeLabel(g.cotation)}
-                <span style={{ color: g.issue === "echec" ? C.danger : C.muted, fontWeight: 400, marginLeft: 2, fontFamily: "inherit" }}>
-                  {ISSUES.find((i) => i.key === g.issue)?.label}
-                </span>
-              </span>
-              {/* −/+ collés : ajuster une quantité d'un pouce, sans repasser par la grille */}
-              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <button onClick={() => rm(g.cotation, g.issue)} style={blocStep}>−</button>
-                <span style={{ fontFamily: C.mono, fontSize: 13, fontWeight: 800, color: C.accent, minWidth: 16, textAlign: "center" }}>{g.n}</span>
-                <button onClick={() => setBlocs([...blocs, { cotation: g.cotation, issue: g.issue }])} style={blocStep}>+</button>
-              </span>
-            </div>
-          ))}
-          <div style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono, marginTop: 8 }}>
-            {s.n} bloc{s.n > 1 ? "s" : ""}
-            {s.max ? ` · max ${scheme.gradeLabel(s.max)} · médiane ${scheme.gradeLabel(s.mediane)}` : " · aucun réussi"}
-            {` · ${s.flash} flash / ${s.essais} essais / ${s.echec} échec${s.echec > 1 ? "s" : ""}`}
-          </div>
-        </div>
-      )}
+      <Body style={{ fontSize: 10, color: C.dim, marginTop: 6 }}>
+        À partir de 4/10, l'escalade et le tirage lourd sont pénalisés le lendemain. Si ça revient plusieurs séances de suite, rouvre une zone de douleur.
+      </Body>
     </div>
   );
 }
-const blocStep = {
-  width: 28, height: 28, borderRadius: 6, background: C.card, color: C.accent,
-  border: `1.5px solid ${C.border}`, cursor: "pointer", fontSize: 15, fontWeight: 800,
-  fontFamily: "inherit", lineHeight: 1,
-};
 
 
 // Carte « Volume · 7 jours » (onglet Séances, chantier T2). Lecture seule, dérivée de
@@ -1871,7 +1794,7 @@ function VolumeCard({ training }) {
   );
 }
 
-function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme, startType, onStartConsumed }) {
+function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType, onStartConsumed }) {
   // Brouillon auto-sauvegardé (localStorage, hors DATA_KEYS — voir Règles absolues #1) :
   // restaure au montage la séance laissée en cours (TrainTab démonte tout son état à
   // chaque changement d'onglet, ce qui effaçait la séance avant ce correctif). Lu une
@@ -1884,7 +1807,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme, startType
   const [startTime, setStartTime] = useState(() => draft0?.start ?? new Date().toTimeString().slice(0, 5));
   const [duration, setDuration] = useState(() => draft0?.duration ?? 60);
   const [rpe, setRpe] = useState(() => draft0?.rpe ?? 7);
-  const [blocs, setBlocs] = useState(() => draft0?.blocs ?? []);
+  const [gene, setGene] = useState(() => draft0?.gene ?? null);
   // Séance déjà enregistrée en cours de modification (référence exacte de l'objet
   // dans `training`) — null quand on démarre une nouvelle séance à blanc.
   const [editing, setEditing] = useState(() => {
@@ -1906,7 +1829,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme, startType
     setStartTime(new Date().toTimeString().slice(0, 5));
     setDuration(60);
     setRpe(7);
-    setBlocs([]);
+    setGene(null);
     setOpen(sel ? null : type);
   };
 
@@ -1917,15 +1840,15 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme, startType
     setStartTime(t.start ?? new Date().toTimeString().slice(0, 5));
     setDuration(t.duration ?? 60);
     setRpe(t.rpe ?? 7);
-    setBlocs(t.blocs ?? []);
+    setGene(t.gene ?? null);
     setOpen(t.type);
   };
 
   const logSession = (type) => {
     const rec = { id: editing?.id ?? `${date}-${type}-${Date.now()}`, date, type, start: startTime, duration: round(duration), rpe,
-      // Champ omis quand il n'y a rien à dire : une séance sans blocs saisis reste
-      // exactement la même entrée qu'avant V5 (et le recommandeur le voit).
-      ...(type === "Escalade" && blocs.length ? { blocs } : {}) };
+      // Gêne (08/10/2026) omise quand rien n'est noté : une séance sans gêne reste exactement
+      // la même entrée qu'avant. Les anciens `blocs` d'une séance rééditée ne sont pas repris.
+      ...(type === "Escalade" && gene?.zone && gene.pain != null ? { gene } : {}) };
     store.set("trainingDraft", null);
     save.training((editing ? training.map((x) => (x === editing ? rec : x)) : [...training, rec]).sort(byDate));
     setOpen(null); setEditing(null);
@@ -1935,13 +1858,13 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme, startType
     setOpen(null); setEditing(null);
   };
 
-  // Brouillon Escalade (blocs saisis via BlocsField) — même protection que le carnet muscu,
+  // Brouillon Escalade (durée/RPE/gêne) — même protection que le carnet muscu,
   // gérée ici puisque Escalade reste rendue directement par TrainTab (kind "sport", pas de
   // MuscuLogger). Ignoré tant qu'un autre type est ouvert.
   useEffect(() => {
     if (open !== "Escalade") return;
-    store.set("trainingDraft", { type: "Escalade", date, editingId: editing?.id ?? null, start: startTime, duration, rpe, blocs });
-  }, [open, date, editing, startTime, duration, rpe, blocs]);
+    store.set("trainingDraft", { type: "Escalade", date, editingId: editing?.id ?? null, start: startTime, duration, rpe, gene });
+  }, [open, date, editing, startTime, duration, rpe, gene]);
 
   const vol = {};
   training.filter((t) => daysBetween(t.date, today()) <= 14).forEach((t) => { vol[t.type] = (vol[t.type] || 0) + 1; });
@@ -2001,7 +1924,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme, startType
             <Field label="Durée (min)"><Stepper value={duration} set={setDuration} step={5} min={0} int /></Field>
           </div>
           <Field label="RPE"><Stepper value={rpe} set={setRpe} step={1} min={1} max={10} int /></Field>
-          {open === "Escalade" && <BlocsField blocs={blocs} setBlocs={setBlocs} scheme={scheme} />}
+          {open === "Escalade" && <GeneField gene={gene} setGene={setGene} />}
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <Btn variant="primary" onClick={() => logSession(open)} style={{ flex: 1 }}>
               <CheckCircle2 size={14} style={{ display: "inline", marginRight: 4 }} />{editing ? "Enregistrer les modifications" : "Enregistrer"}
@@ -2066,7 +1989,8 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, scheme, startType
                   t.exercices?.length ? `${t.exercices.length} exos · ${t.exercices.reduce((a, e) => a + (e.series?.length || 0), 0)} séries` : null,
                   t.duration != null ? `${t.duration}′` : null,
                   t.rpe != null ? `RPE ${t.rpe}` : null,
-                  climbLabel(t.blocs, scheme) || null,
+                  t.exercices ? null : loadLabel(t) || null,
+                  geneLabel(t) || null,
                 ].filter(Boolean).join(" · ")}
               </span>
               <button onClick={(ev) => { ev.stopPropagation(); save.training(training.filter((x) => x !== t)); }}
@@ -2729,7 +2653,7 @@ function BasketScheduleCard({ basketSchedule, setBasketSchedule }) {
    ============================================================ */
 function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync, onHealthSync,
                          coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, saveTargets, buildBriefing,
-                         lastAutoBackup, lastCloudBackup, onCloudBackupDone, climbScheme, setClimbScheme, phase, setPhase,
+                         lastAutoBackup, lastCloudBackup, onCloudBackupDone, phase, setPhase,
                          basketSchedule, setBasketSchedule }) {
   const [k, setK] = useState(apiKey);
   const [m, setM] = useState(model);
@@ -2913,17 +2837,6 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync
         )}
       </Card>
 
-      <Card>
-        <Label style={{ marginBottom: 8 }}>Système de cotation escalade</Label>
-        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
-          "Couleur de salle" reste la valeur par défaut. Changer de système n'efface rien :
-          les blocs déjà enregistrés dans l'ancien système restent comptés dans le volume de
-          la séance, juste hors échelle pour le classement par niveau.
-        </Body>
-        <Pills options={[{ key: "gym", label: "Couleur de salle" }, { key: "fontainebleau", label: "Fontainebleau" }]}
-          value={climbScheme} onChange={setClimbScheme} />
-      </Card>
-
       {Capacitor.isNativePlatform() && (
         <Card>
           <Label style={{ marginBottom: 8 }}>Health Connect · pas, sommeil & macros</Label>
@@ -3041,7 +2954,6 @@ export default function App({ silent = false } = {}) {
   const [targets, setTargets] = useState(DEFAULT_TARGETS);
   const [phase, setPhaseState] = useState("seche");
   const [hsrWeek, setHsrWeekState] = useState(1);
-  const [climbScheme, setClimbSchemeState] = useState("gym");
   // Planning Basket fixe (01/09/2026) : `weekly` = jours de semaine récurrents (entraînement
   // hebdo, 0=dimanche...6=samedi comme Date#getDay()), `matchDates` = dates ponctuelles
   // (calendrier de matchs, irrégulier — pas un simple jour de semaine). Défaut vide : aucun
@@ -3096,7 +3008,6 @@ export default function App({ silent = false } = {}) {
       setHsrWeekState(await store.get("hsrWeek", 1));
       setTargetHistory(await store.get("targetHistory", []));
       setPalierWeekly(await store.get("palierWeekly", null));
-      setClimbSchemeState(await store.get("climbScheme", "gym"));
       // Purge des dates de match passées (30/09/2026, décision explicite de Yoann) : une date
       // passée n'a plus aucun effet (le recommandeur ne regarde que le dimanche à venir) et
       // n'a pas à encombrer la liste des Réglages. Strictement antérieure à aujourd'hui : un
@@ -3164,10 +3075,21 @@ export default function App({ silent = false } = {}) {
     }
     // Nutrition/eau : plus lues depuis Health Connect (bascule M6, 02/08/2026) — foodLog
     // est l'unique écrivain de macroLog désormais, voir la dérivation dans NutritionTab.jsx.
-    if (Object.keys(result.weightByDate || {}).length) {
+    if (Object.keys(result.weightByDate || {}).length || Object.keys(result.weightTimeByDate || {}).length) {
       setWeight((prev) => {
         let next = prev;
-        Object.entries(result.weightByDate).forEach(([date, kg]) => { next = upsert(next, { date, kg, source: "healthconnect" }); });
+        // `time` (08/10/2026, heure de pesée) : "HH:MM" local, posé seulement quand Health Connect
+        // la fournit — une pesée manuelle n'en a pas. Observation seulement (weighTime.js).
+        Object.entries(result.weightByDate || {}).forEach(([date, kg]) => {
+          const time = result.weightTimeByDate?.[date];
+          next = upsert(next, { date, kg, source: "healthconnect", ...(time ? { time } : {}) });
+        });
+        // Rattrapage de l'heure seule (90 j) sur les pesées déjà présentes hors fenêtre de synchro.
+        Object.entries(result.weightTimeByDate || {}).forEach(([date, time]) => {
+          if (result.weightByDate?.[date] != null) return;
+          const cur = next.find((w) => w.date === date);
+          if (cur && !cur.time) next = upsert(next, { ...cur, time });
+        });
         store.set("weightLog", next);
         return next;
       });
@@ -3357,12 +3279,7 @@ export default function App({ silent = false } = {}) {
   };
   const setPhase = (v) => { setPhaseState(v); store.set("phase", v); };
   const setHsrWeek = (v) => { setHsrWeekState(v); store.set("hsrWeek", v); };
-  const setClimbScheme = (v) => { setClimbSchemeState(v); store.set("climbScheme", v); };
   const setBasketSchedule = (v) => { setBasketScheduleState(v); store.set("basketSchedule", v); };
-  // Objet schéma dérivé, recalculé seulement quand le réglage change — passé partout où
-  // packages/core/src/climbing.js est consommé (BlocsField, historique, recommandeur, Coach
-  // IA). Repli sur "gym" si une valeur invalide traînait dans le stockage.
-  const scheme = SCHEMES[climbScheme] || SCHEMES.gym;
   const setApiKey = (v) => { setApiKeyState(v); store.set("apiKey", v); };
   const setModel = (v) => { setModelState(v); store.set("model", v); };
   const setCoachProfile = (v) => { setCoachProfileState(v); store.set("coachProfile", v); };
@@ -3386,10 +3303,10 @@ export default function App({ silent = false } = {}) {
       buildCoachPrompt({
         weight, sleep, training, knee, macros, notes, steps, targets, phase,
         foodLog: getSync("foodLog", []), foodOverrides: getSync("foodOverrides", {}),
-        profile, journal, scheme, basketSchedule, weeklyPlan: familiesForToday(basketSchedule),
+        profile, journal, basketSchedule, weeklyPlan: familiesForToday(basketSchedule),
         matchWeek: isMatchWeek(basketSchedule), postMatch: isPostMatchDay(basketSchedule), targetHistory, palier: palierWeekly,
         // Recommandeur temporel (S2) : même verdict Aujourd'hui/Demain que la carte du Dashboard.
-        nextSession: nextSessions({ now: new Date(), base: { training, knee, sleep, targets, scheme, basketSchedule,
+        nextSession: nextSessions({ now: new Date(), base: { training, knee, sleep, targets, basketSchedule,
           energy: computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps }) }, planFor: planForDate(basketSchedule) }),
         energy: computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps }),
       }, note),
@@ -3397,7 +3314,7 @@ export default function App({ silent = false } = {}) {
       buildCoachBriefing({
         weight, sleep, training, knee, macros, notes, steps, targets, phase,
         foodLog: getSync("foodLog", []), foodOverrides: getSync("foodOverrides", {}),
-        profile: coachProfile, journal: coachJournal, scheme,
+        profile: coachProfile, journal: coachJournal,
       }),
     // Bilan long terme (point 4 du chantier IA, 07/09/2026) : mêmes données que l'analyse
     // quotidienne, mais résumées sur 90 jours par `computeBilanFacts` (packages/core/src/
@@ -3408,7 +3325,7 @@ export default function App({ silent = false } = {}) {
       const tdeeResult = tdeeNow({ foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}), macros, weight, targets });
       const atToday = targetsForDate(today(), targets);
       const kcalTargetToday = Math.round(kcalFromMacros(atToday.protein, atToday.carbs, atToday.fat, atToday.fiber));
-      const facts = computeBilanFacts({ training, weight, macros, sleep, rhr, steps, knee, targets, scheme, tdeeResult, kcalTargetToday, todayDate: today() });
+      const facts = computeBilanFacts({ training, weight, macros, sleep, rhr, steps, knee, targets, tdeeResult, kcalTargetToday, todayDate: today() });
       return buildBilanPrompt({ facts, phase, targets, profile: coachProfile, notes });
     },
     apiKey, model,
@@ -3468,14 +3385,14 @@ export default function App({ silent = false } = {}) {
       {/* Contenu */}
       <main ref={mainRef} style={{ flex: 1, overflowY: "auto", padding: "14px 16px 24px" }}>
         {loading ? <Empty>Chargement…</Empty> : showSettings ? (
-          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, climbScheme, setClimbScheme, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
+          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, scheme, basketSchedule, planFor: planForDate(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier, saveKnee: save.knee, onStart: startSession }} openSettings={() => setShowSettings(true)} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, basketSchedule, planFor: planForDate(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier, saveKnee: save.knee, onStart: startSession }} openSettings={() => setShowSettings(true)} />}
             {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
             {tab === "sleep" && <SleepTab {...{ sleep, rhr, steps, naps, save }} />}
             {tab === "steps" && <StepsTab {...{ steps, save }} />}
-            {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, scheme, startType }} onStartConsumed={() => setStartType(null)} />}
+            {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, startType }} onStartConsumed={() => setStartType(null)} />}
             {tab === "pain" && <PainTab {...{ knee, save, hsrWeek }} />}
             {tab === "perf" && <PerformanceTab {...{ macros, targets, training, weight, phase }} />}
             {tab === "macro" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} apiKey={apiKey} model={model} />}

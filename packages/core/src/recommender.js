@@ -27,7 +27,7 @@ import { today, byDate, daysBetween, fmtHM, shiftDateKey } from "./dateUtils.js"
 import { buildZones, DEFAULT_ZONES, mergeZoneStates } from "./pain.js";
 import { TEMPLATES } from "./session/templates.js";
 import { SPORTS_CATALOG } from "./session/catalog.js";
-import { climbLoad } from "./climbing.js";
+import { sessionLoad, sessionGene, geneZoneLabel, GENE_THRESHOLD } from "./sessionLoad.js";
 import { isCutWindow } from "./targets.js";
 import { exerciseSessions, exerciseTrend } from "./training.js";
 import { metaFor } from "./session/exoMeta.js";
@@ -151,7 +151,7 @@ function applyPlanBonus(sugg, weeklyPlan, fatigue) {
 // c'est la seule lecture de la date du jour dans ce module (audit du 04/10/2026).
 // `limit` (chantier S, optionnel, défaut 3) : nombre de suggestions renvoyées — `nextSession.js`
 // demande toute la liste pour filtrer par créneau AVANT de couper à 3.
-export function recommendSessions({ training, knee, elbow, zones, sleep, targets, scheme, extraSports, basketSchedule, weeklyPlan, energy, matchWeek, postMatch, asOf, limit = 3 }) {
+export function recommendSessions({ training, knee, elbow, zones, sleep, targets, extraSports, basketSchedule, weeklyPlan, energy, matchWeek, postMatch, asOf, limit = 3 }) {
   const t0 = asOf ?? today();
   const isUpper = (t) => t.type === "Upper A" || t.type === "Upper B" || t.type === "Full Body";
   // "Lower C" (01/09/2026, semaine avec match) compte dans le volume/dernier-fait Lower
@@ -218,19 +218,26 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   // reste seul nécessaire, pour le bloc BASKET (score 999 le jour de l'entraînement prévu).
   const basketToday = isScheduledBasket(basketSchedule, t0);
 
-  // Charge de la dernière séance d'escalade (V5) : jusqu'ici la pénalité « escalade
-  // récente » était FORFAITAIRE — une heure tranquille et une grosse session de blocs
-  // comptaient pareil. `climbLoad` renvoie `null` si la séance n'a pas de blocs saisis
-  // (tout l'historique d'avant V5), et le comportement forfaitaire d'origine s'applique
-  // alors tel quel : pas de charge supposée à partir d'une donnée absente.
+  // Charge de la dernière séance d'escalade : jusqu'au 03/08/2026 la pénalité « escalade
+  // récente » était FORFAITAIRE ; de V5 au 08/10/2026 elle était modulée par le NOMBRE DE
+  // BLOCS ; depuis le 08/10/2026 par la charge-séance RPE × durée (sessionLoad.js, Foster
+  // 2001). `sessionLoad` renvoie `null` sans durée ET RPE, et le forfait d'origine
+  // s'applique alors tel quel : pas de charge supposée à partir d'une donnée absente.
   const lastClimb = training.filter((t) => t.type === "Escalade").slice(-1)[0];
-  const climbLast = dClimb <= 1 ? climbLoad(lastClimb, scheme) : null;
+  const climbLast = dClimb <= 1 ? sessionLoad(lastClimb) : null;
   // Pénalité modulée : une session légère pèse moins qu'un forfait, une grosse pèse plus.
   const CLIMB_PEN = { legere: 4, normale: 8, grosse: 14 };
   const climbPen = climbLast ? CLIMB_PEN[climbLast.level] : 8;
   const climbWhy = climbLast
-    ? `Escalade ${dClimb === 0 ? "aujourd'hui" : "hier"} : ${climbLast.n} blocs${climbLast.max ? ` (max ${scheme.gradeLabel(climbLast.max)})` : ""} — ${climbLast.level === "grosse" ? "grosse session, tirage lourd sur le coude" : climbLast.level === "legere" ? "session légère, impact limité sur le coude" : "charge de tirage normale"}.`
+    ? `Escalade ${dClimb === 0 ? "aujourd'hui" : "hier"} : charge ${climbLast.load} (${climbLast.duration} min × RPE ${climbLast.rpe}) — ${climbLast.level === "grosse" ? "grosse session, tirage lourd sur le coude" : climbLast.level === "legere" ? "session légère, impact limité sur le coude" : "charge de tirage normale"}.`
     : "Escalade récente : allège le tirage (coude).";
+  // Gêne articulaire notée PENDANT la dernière escalade (08/10/2026, sessionLoad.js) : à
+  // partir de GENE_THRESHOLD/10, le lendemain pénalise l'escalade (plus fort) et le tirage
+  // lourd — même logique qu'une zone ambre, mais sur un seul jour et sans journal quotidien.
+  const climbGene = dClimb <= 1 ? sessionGene(lastClimb) : null;
+  const geneHot = !!(climbGene && climbGene.pain >= GENE_THRESHOLD);
+  const GENE_PEN = { upper: 8, climb: 12 };
+  const geneWhy = geneHot ? `Gêne ${geneZoneLabel(climbGene.zone)} ${climbGene.pain}/10 à la dernière escalade → à ménager.` : "";
 
   // Zones de douleur, génériques par tag de charge (RawCare Phase 1) — `buildZones`
   // (packages/core/src/pain.js) sait désormais gérer N zones arbitraires ; `apps/perso`
@@ -343,6 +350,7 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
     if (kneeRed) { upScore += 18; upReason += " Genou à ménager → c'est l'option sûre, jambes au repos."; }
     if (elbowAmber) { upScore -= AMBER_PENALTY.tirage["Upper A"]; upReason += ` ${elbowWhy} → charge de tirage prudente, prises neutres/pronation.`; }
     if (dClimb <= 1) { upScore -= climbPen; upReason += ` ${climbWhy}`; }
+    if (geneHot) { upScore -= GENE_PEN.upper; upReason += ` ${geneWhy}`; }
     if (dUpper === 0) { upScore -= 32; upReason = `Haut du corps déjà fait aujourd'hui (${upper7}/2 cette semaine) — à reprendre après récupération.`; }
     upScore = fatigueScore(upScore);
     const upFat = fatigueReason(); if (upFat) upReason += ` ${upFat}`;
@@ -424,6 +432,7 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
     let cScore = 20 + (1 - Math.min(climb7, 1)) * 12 + cap(dClimb) - (dClimb <= 1 ? climbPen : 0) + (lowerToday ? 6 : 0);
     let cReason = `Escalade ${climb7}/1 cette semaine · dernière ${ago(dClimb)}. Compte comme volume tirage : à placer un jour Lower ou off.`;
     if (dClimb <= 1 && climbLast) cReason += ` ${climbWhy}`;
+    if (geneHot) { cScore -= GENE_PEN.climb; cReason += ` ${geneWhy}`; }
     if (lowerToday) cReason += " Lower déjà fait aujourd'hui : bon jour pour l'escalade (pas de conflit coude).";
     // Pénalité plus lourde que sur Upper : à volume égal, l'escalade est la sollicitation
     // la plus intense du tendon distal du biceps (prises fermées, à-coups, blocages).

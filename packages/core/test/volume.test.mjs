@@ -4,7 +4,6 @@ import assert from "node:assert/strict";
 import { weeklyVolumeByGroup, volumeForCoach, groupOf, zoneStatus, PRIORITY_GROUPS, VOLUME_TARGET } from "../src/volume.js";
 import { buildCoachPrompt } from "../src/coach/prompt.js";
 import { DEFAULT_TARGETS } from "../src/targets.js";
-import { SCHEMES } from "../src/climbing.js";
 import { fixClock, T0, d, summaryOf } from "./_helpers.mjs";
 
 before(() => fixClock());
@@ -72,7 +71,7 @@ test("zoneStatus : 9 sous, 10 et 20 dans, 21 au-dessus", () => {
 });
 
 test("Coach IA : volume_hebdo_series dans le résumé + consigne quand il y a des séries ; rien sinon", () => {
-  const empty = { weight: [], sleep: [], training: [], knee: [], macros: [], notes: [], steps: [], targets: DEFAULT_TARGETS, foodLog: [], foodOverrides: {}, profile: "", journal: "", scheme: SCHEMES.gym, basketSchedule: { weekly: [], matchDates: [] }, weeklyPlan: [], energy: null, matchWeek: false };
+  const empty = { weight: [], sleep: [], training: [], knee: [], macros: [], notes: [], steps: [], targets: DEFAULT_TARGETS, foodLog: [], foodOverrides: {}, profile: "", journal: "", basketSchedule: { weekly: [], matchDates: [] }, weeklyPlan: [], energy: null, matchWeek: false };
   const training = [{ date: d(1), type: "Upper A", exercices: [ex("Développé incliné haltères", 3), ex("Rowing barre ou machine", 4)] }];
   const u = buildCoachPrompt({ ...empty, training, phase: "seche" }, "").user;
   const s = summaryOf(u);

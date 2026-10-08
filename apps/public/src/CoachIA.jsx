@@ -3,7 +3,6 @@ import { ChevronDown, ChevronRight, Sparkles } from "lucide-react";
 import { callClaude, costCents } from "@rawcare/core/coach/claudeApi";
 import { buildCoachPrompt, buildCoachBriefing, splitCarnet } from "@rawcare/core/coach/prompt";
 import { buildZones } from "@rawcare/core/pain";
-import { SCHEMES } from "@rawcare/core/climbing";
 import { mergeTargets } from "./defaultTargets.js";
 import { today, byDate } from "@rawcare/core/dateUtils";
 import { C, Card, Label, Body, Btn, Field, inputStyle } from "./ui.jsx";
@@ -66,7 +65,6 @@ export default function CoachIA({ data, update, error: loadError }) {
       targets: mergeTargets(data?.targets), phase: data?.phase || "seche",
       foodLog: data?.foodLog || [], foodOverrides: data?.foodOverrides || {},
       profile: data?.coachProfile || "", journal: data?.coachJournal || "",
-      scheme: SCHEMES[data?.climbScheme] || SCHEMES.gym,
       zones, painLogs: data?.painLogs || {}, identity,
     };
   };

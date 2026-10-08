@@ -4,14 +4,13 @@ import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import { buildCoachPrompt, buildBilanPrompt } from "../src/coach/prompt.js";
 import { DEFAULT_TARGETS, PHASES } from "../src/targets.js";
-import { SCHEMES } from "../src/climbing.js";
 import { nextSessions } from "../src/nextSession.js";
 import { recommendTargets } from "../src/palier.js";
 import { recompZone } from "../src/tdee.js";
 import { fixClock, T0, d, session, summaryOf, snapshot } from "./_helpers.mjs";
 
 before(() => fixClock());
-const empty = { weight: [], sleep: [], training: [], knee: [], macros: [], notes: [], steps: [], targets: DEFAULT_TARGETS, foodLog: [], foodOverrides: {}, profile: "", journal: "", scheme: SCHEMES.gym, basketSchedule: { weekly: [], matchDates: [] }, weeklyPlan: [], energy: null, matchWeek: false };
+const empty = { weight: [], sleep: [], training: [], knee: [], macros: [], notes: [], steps: [], targets: DEFAULT_TARGETS, foodLog: [], foodOverrides: {}, profile: "", journal: "", basketSchedule: { weekly: [], matchDates: [] }, weeklyPlan: [], energy: null, matchWeek: false };
 
 // Jeu de données réaliste (r1-baseline) : 28 j de poids, 14 j de sommeil/macros/pas, 1 séance.
 const rich = () => ({
@@ -101,7 +100,7 @@ test("nextSession fourni : recommandeur.journee « terminée », demain Full Bod
   const bs = { weekly: [3, 5], matchDates: ["2026-10-04"] };
   const planFor = (k) => ({ weeklyPlan: k === "2026-10-05" ? ["Full Body"] : ["Basket"], matchWeek: k === "2026-10-04", postMatch: k === "2026-10-05" });
   const training = [session("2026-10-04", "Basket")];
-  const ns = nextSessions({ now: new Date(2026, 9, 4, 21, 10), base: { training, knee: [{ date: "2026-10-04", pain: 2, baseline: true }], sleep: [], targets: DEFAULT_TARGETS, scheme: SCHEMES.gym, basketSchedule: bs }, planFor });
+  const ns = nextSessions({ now: new Date(2026, 9, 4, 21, 10), base: { training, knee: [{ date: "2026-10-04", pain: 2, baseline: true }], sleep: [], targets: DEFAULT_TARGETS, basketSchedule: bs }, planFor });
   const u = buildCoachPrompt({ ...empty, training, basketSchedule: bs, phase: "recomposition", nextSession: ns }, "").user;
   const s = summaryOf(u);
   assert.match(s.recommandeur.journee, /^terminée/);

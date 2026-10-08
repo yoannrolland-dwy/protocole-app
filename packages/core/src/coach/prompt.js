@@ -16,7 +16,8 @@ import { volumeForCoach, PRIORITY_GROUPS, VOLUME_TARGET } from "../volume.js";
 // Libellé de confiance du TDEE pour le modèle (05/10/2026) : « élevée/moyenne/faible » au lieu
 // de « fiable/moyenne/faible » — même mot que l'écran, clés internes inchangées.
 const CONFIANCE = { fiable: "élevée", moyenne: "moyenne", faible: "faible" };
-import { climbSummary } from "../climbing.js";
+import { sessionLoad, sessionGene, geneZoneLabel } from "../sessionLoad.js";
+import { weighTimeAnalysis } from "../weighTime.js";
 import { PHASES, phaseTarget, targetsForDate, kcalFromMacros, kcalOfEntry, isCutWindow, tdeeNow, weightTrend7, recompWindows } from "../targets.js";
 import { realDeficit } from "../tdee.js";
 import { isPalierEntry } from "../palier.js";
@@ -107,7 +108,7 @@ export const mealsFor = (log, date) => {
  */
 export function buildCoachPrompt(data, note) {
   const { weight, sleep, training, knee, macros, notes, steps, targets, phase,
-    foodLog, foodOverrides, profile, journal, scheme, zones, painLogs, identity, basketSchedule, weeklyPlan, energy, matchWeek, postMatch, targetHistory, palier, nextSession } = data;
+    foodLog, foodOverrides, profile, journal, zones, painLogs, identity, basketSchedule, weeklyPlan, energy, matchWeek, postMatch, targetHistory, palier, nextSession } = data;
 
   // Dépense adaptative (V7) : mêmes données, même calcul que la carte de l'onglet
   // Macros (`tdeeNow`) — jamais deux chiffres différents pour la même réalité.
@@ -152,7 +153,7 @@ export function buildCoachPrompt(data, note) {
   // `zones` passé tel quel (undefined pour apps/perso, reconstruit en interne par
   // recommendSessions exactement comme avant — voir recommender.js) : jamais deux verdicts
   // différents entre cette fonction et la carte "Prochaine séance" côté apps/public.
-  const reco = recommendSessions({ training, knee, zones, sleep, targets, scheme, basketSchedule, weeklyPlan, energy, matchWeek, postMatch });
+  const reco = recommendSessions({ training, knee, zones, sleep, targets, basketSchedule, weeklyPlan, energy, matchWeek, postMatch });
 
   // Phrase "Deux tendinopathies en rééduc : ..." du system prompt, construite en itérant
   // sur les zones (RawCare Phase 1, 06/08/2026) plutôt qu'écrite en dur pour exactement
@@ -178,13 +179,16 @@ export function buildCoachPrompt(data, note) {
   // exactement les mêmes fonctions, sur tout l'historique au lieu de 14 jours.
   const exoProgressData = exoProgress(last14(training));
 
-  // Séances non-muscu : durée et RPE suffisent, il n'y a pas de séries à analyser.
-  // Sauf l'escalade depuis V5 : on remonte le RÉSUMÉ des blocs (nombre, cotation max et
-  // médiane, réussite), jamais la liste brute — sur une séance de 20 blocs elle
-  // coûterait des tokens pour un signal que le JS calcule exactement.
+  // Séances non-muscu : durée et RPE suffisent, il n'y a pas de séries à analyser. Depuis le
+  // 08/10/2026 (fin du suivi des blocs), `charge` = RPE × durée (sessionLoad.js) et `gene`
+  // = gêne articulaire notée pendant une escalade, seulement quand elles existent.
   const autresSeances = last14(training).filter((s) => !s.exercices)
-    .map((s) => ({ d: s.date.slice(5), t: s.type, ...(s.duration != null ? { min: s.duration } : {}), ...(s.rpe != null ? { rpe: s.rpe } : {}),
-      ...(climbSummary(s.blocs, scheme) ? { blocs: climbSummary(s.blocs, scheme) } : {}) }));
+    .map((s) => {
+      const l = sessionLoad(s), g = sessionGene(s);
+      return { d: s.date.slice(5), t: s.type, ...(s.duration != null ? { min: s.duration } : {}), ...(s.rpe != null ? { rpe: s.rpe } : {}),
+        ...(l ? { charge: l.load, niveau: l.level } : {}), ...(g ? { gene: `${geneZoneLabel(g.zone)} ${g.pain}/10` } : {}) };
+    });
+  const anyGene = autresSeances.some((s) => s.gene);
 
   // --- temps réel : hier vs aujourd'hui, avec deltas explicites ---
   const findDay = (arr, d) => arr.find((e) => e.date === d);
@@ -278,6 +282,7 @@ export function buildCoachPrompt(data, note) {
     ...painRealtime,
   };
 
+  const weighTime = weighTimeAnalysis(weight);
   const volumeRaw = volumeForCoach(training);
   const volumeHebdo = Object.values(volumeRaw).some((n) => n > 0) ? volumeRaw : null;
   const summary = {
@@ -285,7 +290,12 @@ export function buildCoachPrompt(data, note) {
     poids: { dernier: lastN(weight, 1)[0]?.kg ?? null, moy_7j: w7, moy_7j_precedents: w14, tendance_kg_sur_semaine: (w7 != null && w14 != null) ? round(w7 - w14) : null,
       // 3e semaine seulement en Recomposition (règle "perte > 0,3 kg/sem sur 2 semaines") —
       // ajoutée aux autres phases, elle changerait leur prompt, vérifié identique par hash.
-      ...(PHASES[phase].noTarget ? { moy_7j_il_y_a_2_sem: wt.avg7prev2, tendance_kg_sem_precedente: wt.deltaWeekPrev } : {}) },
+      ...(PHASES[phase].noTarget ? { moy_7j_il_y_a_2_sem: wt.avg7prev2, tendance_kg_sem_precedente: wt.deltaWeekPrev } : {}),
+      // Heure de pesée (08/10/2026, weighTime.js) : écart moyen pesée − tendance EMA selon
+      // que la pesée est faite avant ou après 7 h. POUR INFORMATION (demande de Yoann) —
+      // aucune pesée n'est exclue ni corrigée. Clé absente tant que les deux groupes n'ont
+      // pas 3 pesées horodatées : prompt identique à avant dans ce cas.
+      ...(weighTime.ready ? { heure_pesee: { avant_7h: { n: weighTime.early.n, ecart_moyen_vs_tendance_kg: weighTime.early.meanDelta }, apres_7h: { n: weighTime.late.n, ecart_moyen_vs_tendance_kg: weighTime.late.meanDelta }, difference_kg: weighTime.diff } } : {}) },
     macros_moy_7j: { proteines: avgKey(m7, "protein"), glucides: avgKey(m7, "carbs"), lipides: avgKey(m7, "fat"), fibres: avgKey(m7, "fiber"), eau_ml: avgKey(m7, "water") },
     cibles: { proteines: atToday.protein, glucides: atToday.carbs, lipides: atToday.fat, fibres: atToday.fiber, eau_ml: targets.water },
     // Sommeil et genou : ces agrégats remplacent les tableaux bruts 14 j qui étaient
@@ -393,27 +403,19 @@ ${profile.trim()}` : "";
   const who = identity ?? "de Yoann, 43 ans, athlète (muscu/basket/escalade)";
   const system = `Tu es le coach personnel tout-en-un ${who} : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. ${phaseClause} ${tendinopathiesClause}Protéines hautes prioritaires. Escalade = volume tirage, jamais empilée le jour d'un Upper ; ne pas cumuler les expositions genou.${tempBlock}${profileBlock}`;
 
-  // Le paragraphe sur l'échelle de cotation dépend du schéma actif (RawCare Phase 1,
-  // 06/08/2026) : "gym" est propre à la salle de l'utilisateur, donc l'explication complète
-  // (ordre des couleurs, mise en garde anti-Fontainebleau) reste nécessaire. Un schéma
-  // standard comme Fontainebleau est une notation déjà connue du modèle, aucune mise en
-  // garde à faire.
-  const cotationInstr = scheme.id === "gym"
-    ? `Les cotations sont celles de SA SALLE, au format "couleur-niveau", ordonnées ainsi : jaune < vert < bleu < rouge < noir < violet, et 1 à 5 dans chaque couleur (5 = le plus dur). Ne pas les convertir en Fontainebleau.`
-    : `Les cotations sont en échelle ${scheme.label} standard.`;
 
   const user = `TEMPS RÉEL — hier vs aujourd'hui (regarde d'abord ça, c'est le plus actionnable). "heure_analyse" est l'heure EXACTE de cette analyse : les champs "_aujourdhui"/"_en_cours" (pas, macros, eau) ne couvrent que depuis ce matin jusqu'à cette heure-là, jamais la journée entière — ne les juge JAMAIS insuffisants par rapport à une cible de journée complète (3000 pas ou 600 kcal à 8h du matin, c'est juste tôt, pas un problème). Pour macros/eau spécifiquement, base-toi sur "repas_aujourdhui" (par nom de repas) plutôt que sur le total brut : avant midi seul le petit-déjeuner est normalement pris, entre midi et 15h le déjeuner s'ajoute, entre 15h et 18h le goûter, entre 19h et 22h le dîner — "Pré-training", "Post-training" et "Extra" sont des repas flexibles, jamais un repère horaire (les deux premiers sont liés à une séance, pas à l'heure de la journée). Un repas plus tardif déjà rempli n'est pas suspect : ${authorLabel} planifie parfois ses repas à l'avance dans la journée.
 ${JSON.stringify(realtime)}
 
 RÉSUMÉ 14 JOURS (moyennes fiables, tendance de fond) :
-${JSON.stringify(summary)}
+${JSON.stringify(summary)}${weighTime.ready ? "\n`poids.heure_pesee` : écart moyen entre chaque pesée et la tendance lissée, selon l'heure (avant/après 7 h). Pour information seulement — commente-le en une phrase (effet de l'heure, lien avec les nuits courtes), sans exclure ni recalculer aucune pesée : la tendance et le TDEE restent la référence." : ""}
 
 JOUR PAR JOUR — pour corréler apports et variations de poids (rétention d'eau via sodium/glucides vs vraie perte de masse grasse). Clés : d=date, p=poids, kc=kcal, P/G/L=protéines/glucides/lipides, F=fibres, eau=ml, pas, cible_kc=cible kcal du jour. Un champ absent = pas de donnée ce jour-là :
 ${JSON.stringify(merged)}
 
 PROGRESSION PAR EXERCICE (14 j) — déjà calculée, ne refais pas l'arithmétique. "series_max" = meilleure série de chaque séance au format "MM-JJ poidsXreps" (ou "MM-JJ Ns" pour les exercices en gainage, mesurés en secondes) ; "tendance" compare le volume (charge × reps, ou les secondes en gainage) de la dernière séance à la précédente${exoProgressData.some((x) => x.rir) ? ' ; "rir" = reps en réserve déclarées par séance (même ordre, 3 = 3 ou plus, null = non renseigné) — une série identique avec plus de RIR est une progression (effort moindre), pas une stagnation' : ""} :
 ${JSON.stringify(exoProgressData)}
-${autresSeances.length ? `Séances sans séries (basket/escalade) : ${JSON.stringify(autresSeances)}\nPour l'escalade (bloc en salle), "blocs" résume la séance : n=nombre de blocs (le proxy de charge sur le tendon du coude), max/mediane=cotations réussies, max_tente=le plus dur essayé, puis la répartition flash/essais/echec. ${cotationInstr}` : ""}${paliersBlock}
+${autresSeances.length ? `Séances sans séries (basket/escalade) : ${JSON.stringify(autresSeances)}\n"charge" = RPE × minutes (charge-séance de Foster ; légère ≤ 300, grosse ≥ 540 — c'est le proxy de charge de tirage sur le coude pour l'escalade).${anyGene ? ' "gene" = gêne articulaire ressentie PENDANT la séance (zone + intensité /10), distincte du journal de douleur quotidien : si elle revient d\'une séance à l\'autre, dis-le explicitement.' : ""}` : ""}${paliersBlock}
 ${notesTxt ? `\nNOTES DE CONTEXTE écrites par ${authorLabel} (14 j, ex. alcool, insomnie, petite blessure) — à prendre en compte activement dans l'analyse :\n${notesTxt}\n` : ""}
 ${(journal || "").trim() ? `CARNET DE BORD — état que TU as écrit à la fin de ta dernière analyse. C'est ta mémoire : appuie-toi dessus pour enchaîner (a-t-il appliqué ce que tu avais demandé ? où en est la progression ?) au lieu de repartir de zéro.\n${journal.trim()}\n` : "CARNET DE BORD : vide, c'est ta première analyse. Tu le créeras en fin de réponse.\n"}
 Structure ta réponse en deux temps :

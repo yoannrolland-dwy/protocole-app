@@ -330,12 +330,17 @@ class HealthNutritionPlugin : Plugin() {
                     .values.map { grp -> grp.maxByOrNull { it.metadata.lastModifiedTime }!! }
 
                 val out = JSObject()
+                // Heure locale de la pesée (08/10/2026) — observation seulement côté JS
+                // (weighTime.js), jamais une exclusion.
+                val times = JSObject()
+                val hm = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
                 records.groupBy { dayOf(it.time) }.forEach { (day, recs) ->
                     // Plusieurs pesées le même jour : on garde la plus récente dans la journée.
                     val latest = recs.maxByOrNull { it.time }!!
                     out.put(day, Math.round(latest.weight.inKilograms * 100) / 100.0)
+                    times.put(day, latest.time.atZone(java.time.ZoneId.systemDefault()).format(hm))
                 }
-                call.resolve(JSObject().put("days", out))
+                call.resolve(JSObject().put("days", out).put("times", times))
             } catch (e: Exception) {
                 call.reject("Lecture poids impossible : ${e.message}")
             }

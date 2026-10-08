@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { AlertTriangle } from "lucide-react";
 import { recommendSessions } from "@rawcare/core/recommender";
 import { buildZones } from "@rawcare/core/pain";
-import { SCHEMES } from "@rawcare/core/climbing";
 import { kcalFromMacros, kcalOfEntry } from "@rawcare/core/targets";
 import { mergeTargets, phaseTarget, targetsForDate } from "./defaultTargets.js";
 import { today, fmt, fmtHM, lastN, round } from "@rawcare/core/dateUtils";
@@ -31,7 +30,6 @@ export default function Home({ session, data, update, error: loadError, setTab }
   const sleep = data?.sleepLog || [];
   const targets = mergeTargets(data?.targets);
   const activeSports = data?.activeSports || [];
-  const scheme = SCHEMES[data?.climbScheme] || SCHEMES.gym;
   const phase = data?.phase || "seche";
   const painZones = data?.painZones || [];
   const painLogs = data?.painLogs || {};
@@ -90,13 +88,13 @@ export default function Home({ session, data, update, error: loadError, setTab }
     // pour un compte n'ayant coché ni Course à pied, ni Vélo, ni Foot, donc aucun des trois
     // blocs de score dédiés ne s'exécute (voir recommender.js).
     const extraSports = activeSports.flatMap((f) => FAMILY_TYPES[f] || []).filter((t) => CATALOG_SPORT_TYPES.includes(t));
-    const r = recommendSessions({ training, zones, sleep, targets, scheme, extraSports });
+    const r = recommendSessions({ training, zones, sleep, targets, extraSports });
     // Ne jamais suggérer/écarter un sport non activé — familyOf renvoie null pour "Repos /
     // mobilité" (toujours gardé) et gère les types combinés d'`avoid` ("Upper A / B").
     const keep = (x) => { const f = familyOf(x.type); return !f || activeSports.includes(f); };
     return { suggestions: r.suggestions.filter(keep), avoid: r.avoid.filter(keep) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [training, sleep, targets, scheme, activeSports, data?.painZones, data?.painLogs]);
+  }, [training, sleep, targets, activeSports, data?.painZones, data?.painLogs]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

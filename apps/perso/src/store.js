@@ -58,9 +58,9 @@ export const store = {
 // de douleur réel du genou, pour un gain purement esthétique. L'UI et le recommandeur
 // sont écrits génériquement (PAIN_ZONES / zoneState dans App.jsx) pour qu'une 3e zone ne
 // coûte qu'une ligne — l'élégance de la clé unique sans son risque.
-// `climbScheme` (RawCare Phase 1, 06/08/2026) : système de cotation escalade actif
-// ("gym" | "fontainebleau"), voir packages/core/src/climbing.js. Chaîne simple, "gym" par
-// défaut si absente (comportement de toujours, aucune migration nécessaire).
+// `climbScheme` (RawCare Phase 1, 06/08/2026 → retiré le 08/10/2026 avec le suivi des blocs
+// d'escalade) : plus aucun code ne le lit ni ne l'écrit, la clé reste listée ici uniquement
+// pour ne pas casser un export/import existant (même cas qu'`elbowLog`).
 export const DATA_KEYS = [
   // "elbowLog" reste ici uniquement pour ne pas perdre l'historique déjà exporté (le coude a
   // été retiré le 05/09/2026, plus aucun code ne le lit ni ne l'écrit — voir CLAUDE.md).

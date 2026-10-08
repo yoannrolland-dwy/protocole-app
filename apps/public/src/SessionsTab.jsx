@@ -3,12 +3,10 @@ import { ChevronRight, CheckCircle2, Trash2 } from "lucide-react";
 import { TEMPLATES, TYPES, hsrForWeek } from "@rawcare/core/session/templates";
 import { SPORTS_CATALOG } from "@rawcare/core/session/catalog";
 import { exerciseList, recordsBySession, painOutOfBase } from "@rawcare/core/training";
-import { SCHEMES, climbLabel } from "@rawcare/core/climbing";
 import { today, fmt, round, byDate, daysBetween, lastN } from "@rawcare/core/dateUtils";
 import { C, Card, Label, Body, Btn, Field, DateField, Stepper, ScreenHeader, Empty } from "./ui.jsx";
 import { FAMILY_TYPES } from "./onboarding.js";
 import MuscuLogger from "./MuscuLogger.jsx";
-import BlocsField from "./BlocsField.jsx";
 import ProgressScreen from "./ProgressScreen.jsx";
 
 // Écran Séances (carnet complet) — RawCare Phase 2, Phase B. Toute la logique métier vient
@@ -16,8 +14,7 @@ import ProgressScreen from "./ProgressScreen.jsx";
 // fichier est de l'UI React consommant des fonctions pures, aucune nouvelle logique métier.
 //
 // Depuis le chantier onboarding (06/08/2026) : le sélecteur de type de séance est filtré aux
-// familles actives de l'utilisateur (`data.activeSports`, voir onboarding.js), `climbScheme`
-// est lu depuis `data.climbScheme` (plus figé sur "gym"), et `painOutOfBase` lit
+// familles actives de l'utilisateur (`data.activeSports`, voir onboarding.js), et `painOutOfBase` lit
 // `data.painLogs` (N zones dynamiques) au lieu des `kneeLog`/`elbowLog` fixes d'apps/perso.
 //
 // Lot F (06/08/2026) : `SPORTS_CATALOG` (Course à pied/Vélo/Foot) s'ajoute à `TEMPLATES` pour
@@ -33,7 +30,6 @@ export default function SessionsTab({ data, update, error: loadError }) {
   const painLogList = Object.values(painLogs);
   const activeSports = data?.activeSports || [];
   const activeTypes = activeSports.flatMap((fam) => FAMILY_TYPES[fam] || []);
-  const scheme = SCHEMES[data?.climbScheme] || SCHEMES.gym;
   const allTypes = useMemo(() => [...TYPES, ...Object.keys(SPORTS_CATALOG)], []);
 
   const [open, setOpen] = useState(null);
@@ -42,7 +38,6 @@ export default function SessionsTab({ data, update, error: loadError }) {
   const [startTime, setStartTime] = useState(() => new Date().toTimeString().slice(0, 5));
   const [duration, setDuration] = useState(60);
   const [rpe, setRpe] = useState(7);
-  const [blocs, setBlocs] = useState([]);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -68,7 +63,6 @@ export default function SessionsTab({ data, update, error: loadError }) {
     setStartTime(t.start ?? new Date().toTimeString().slice(0, 5));
     setDuration(t.duration ?? 60);
     setRpe(t.rpe ?? 7);
-    setBlocs(t.blocs ?? []);
     setOpen(t.type);
   };
 
@@ -87,7 +81,7 @@ export default function SessionsTab({ data, update, error: loadError }) {
 
   const logSession = (type) => {
     const rec = { id: editing?.id ?? `${date}-${type}-${Date.now()}`, date, type, start: startTime, duration: round(duration), rpe,
-      ...(type === "Escalade" && blocs.length ? { blocs } : {}) };
+    };
     persist(editing ? training.map((x) => (x === editing ? rec : x)) : [...training, rec]);
   };
   const saveMuscu = (rec) => {
@@ -159,7 +153,6 @@ export default function SessionsTab({ data, update, error: loadError }) {
             <Field label="Durée (min)"><Stepper value={duration} set={setDuration} step={5} min={0} int /></Field>
           </div>
           <Field label="RPE"><Stepper value={rpe} set={setRpe} step={1} min={1} max={10} int /></Field>
-          {open === "Escalade" && <BlocsField blocs={blocs} setBlocs={setBlocs} scheme={scheme} />}
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <Btn variant="primary" onClick={() => logSession(open)} disabled={saving} style={{ flex: 1 }}>
               <CheckCircle2 size={14} style={{ display: "inline", marginRight: 4 }} />{editing ? "Enregistrer les modifications" : "Enregistrer"}
@@ -210,7 +203,7 @@ export default function SessionsTab({ data, update, error: loadError }) {
               <span style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono }}>
                 {t.exercices
                   ? `${t.exercices.length} exos · ${t.exercices.reduce((a, e) => a + (e.series?.length || 0), 0)} séries`
-                  : `${t.duration != null ? t.duration + "′" : ""}${t.rpe != null ? ` · RPE ${t.rpe}` : ""}${climbLabel(t.blocs, scheme) ? ` · ${climbLabel(t.blocs, scheme)}` : ""}`}
+                  : `${t.duration != null ? t.duration + "′" : ""}${t.rpe != null ? ` · RPE ${t.rpe}` : ""}`}
               </span>
               <button onClick={(ev) => { ev.stopPropagation(); deleteSession(t); }}
                 style={{ background: "none", border: "none", cursor: "pointer", color: C.dim, padding: 0 }}>
