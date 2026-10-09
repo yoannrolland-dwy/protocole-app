@@ -4633,6 +4633,53 @@ Trois retours de Yoann, discutés avant code (challenge/questions, puis « GO »
   retrouve pas en moyenne sur 90 jours.
 
 
+## Protéines hebdo sur le graphique, mollets en superset, fiche match remaniée (09/10/2026, apps/perso v3.105.0)
+
+Quatre demandes de Yoann, résumé et confirmation avant code. **Point « contexte pour la conversation
+claude.ai et son projet » abandonné pour l'instant** (« ce n'est pas assez clair, on verra plus
+tard ») : rien de fait. Constat à garder pour la reprise : « Copier le contexte » envoie un état
+complet (phase, cibles, paliers, carnet, 14 j) mais jamais ce qui a changé ni le programme de
+séances, et l'app ne peut pas écrire dans un projet claude.ai (texte à coller à la main). Idée
+discutée : bloc « Changements depuis le dernier export » + bouton « Copier la fiche projet ».
+**Le contexte permanent du téléphone (`coachProfile`) dit encore « élévations latérales 5 séries
+par séance Upper » alors que c'est 3 + 2 depuis le 08/10 : à corriger (via `cdp.mjs`, comme le
+05/10) si Yoann le demande.**
+
+- **Courbe de protéines au-dessus du graphique hebdo** (onglet TDEE/Performance, carte « Moyenne
+  kcal ») : `ComposedChart` à trois éléments, barres kcal (axe gauche), ligne de cible kcal
+  pointillée, **courbe ambre des protéines g/j (axe droit)** (`PROT_LINE`, ambre déjà utilisé
+  ailleurs). `weeklyProteinTrend` (`targets.js`) : mêmes semaines lundi-dimanche que
+  `weeklyKcalTrend`, **jours terminés seulement** (aujourd'hui exclu, journée incomplète — même
+  raison que le correctif TDEE du 13/09), jour sans protéines ignoré, jamais compté à 0. La carte
+  kcal garde sa règle (aujourd'hui inclus) : décision du 13/09, non rouverte. Cible protéines
+  affichée à côté de la cible kcal.
+- **Mollets en superset avec la presse** : `supersetAvec` sur « Mollets à la presse » (Lower A,
+  B, C, Full Body) et `exoSeriesCount(template, ex, hsrWeek)` (`templates.js`) : un exercice HSR
+  suit la table, un exercice en superset fait **autant de séries que son partenaire**. Semaine HSR
+  9 (réelle) : 4 partout. Pendant les semaines HSR 1 à 3, presse et mollets passent à 3, y compris
+  Lower A (4 avant) : conséquence assumée par Yoann (option B choisie, « autant de séries »).
+  Lower B : presse fixe à 4, donc mollets 4. Les séances loguées montraient déjà 4 mollets en
+  Lower C et Full Body : il ajoutait la série à la main. Perso seulement : `apps/public` a sa
+  propre copie de `MuscuLogger` qui ignore le champ, donc rien ne change côté public.
+- **Fiche « Match dimanche 10h30 »** (`BASKET_PROTOCOLS.match10h`, protocole validé, modifié sur
+  demande explicite) : caféine retirée du réveil et déplacée à 9h20 (ISSN, environ 60 min avant
+  l'effort) ; petit-déj pain blanc 100 g + miel 25 g + whey 30 g (≈34 g P / 77 g G / 2 g L / ~450
+  kcal, objectif ~1 g/kg de glucides avec les bonbons) ; échauffement 9h45 en 5 étapes + règle
+  genou > 3/10 + eau ; ajustement « gros repas la veille » à ~50-55 g de glucides (pain 70 g + miel
+  15 g). **Mobilité de 8-10 min à la maison supprimée** (« l'échauffement fait le taff »), et la
+  ligne d'ajustement « Lever à 8h … décaler la mobilité à la salle (9h15) » supprimée avec elle,
+  devenue sans objet. Aucun total de journée n'était affiché : seuls les totaux par bloc existent,
+  ceux de la récupération et du déjeuner sont inchangés. Remarques données à Yoann, sans action :
+  200 mg de caféine font environ 2,1 mg/kg à 94 kg (fourchette ISSN 3-6 mg/kg), dose non touchée ;
+  son petit-déj recalculé donnerait ≈ 465 kcal, ses chiffres ont été gardés. La fiche est partagée
+  avec `apps/public` (même `BASKET_PROTOCOLS`) : elle changera aussi chez les bêta-testeurs au
+  prochain déploiement, comme avant.
+- Tests : `match-mollets-proteines.test.mjs` (3 tests : fiche, séries des mollets par semaine HSR,
+  moyenne de protéines) — **101 tests**. Aperçu : graphique à courbe ambre et axe droit, fiche match
+  conforme, Full Body « Mollets 4 × 10-12 » en semaine HSR 9, aucune erreur console. Build
+  `apps/perso` ET `apps/public` propres.
+
+
 
 ## Comment je veux qu'on travaille
 

@@ -76,7 +76,7 @@ const TEMPLATES = {
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "iso-leg-extension" },
     { n: "Presse à cuisses (HSR)", s: 3, r: "table HSR", rest: 180, mode: "reps", hsr: true, c: "tempo 6 s · amplitude 10-60°",
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "presse-cuisses" },
-    { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "enchaîné",
+    { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "en superset avec la presse", supersetAvec: "Presse à cuisses (HSR)",
       groupe: "mollets", mouvement: "isolation", materiel: "machine", tendon: null, famille: "mollets-presse" },
     { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 120, mode: "reps", hsr: true, c: "tempo 6 s",
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
@@ -86,7 +86,7 @@ const TEMPLATES = {
   "Lower B": { kind: "muscu", knee: true, chargeTags: ["genou"], exos: [
     { n: "Presse à cuisses", s: 4, r: "8-10", rest: 180, mode: "reps", c: "contrôlé, reps + hautes",
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "presse-cuisses" },
-    { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "enchaîné",
+    { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "en superset avec la presse", supersetAvec: "Presse à cuisses",
       groupe: "mollets", mouvement: "isolation", materiel: "machine", tendon: null, famille: "mollets-presse" },
     { n: "Leg extension unilatérale", s: 3, r: "8-10", rest: 120, mode: "reps", c: "tempo 6 s",
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
@@ -106,7 +106,7 @@ const TEMPLATES = {
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "presse-cuisses" },
     { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 120, mode: "reps", hsr: true, c: "tempo 6 s",
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
-    { n: "Mollets à la presse", s: 3, r: "10-12", rest: 90, mode: "reps", c: "enchaîné",
+    { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "en superset avec la presse", supersetAvec: "Presse à cuisses (HSR)",
       groupe: "mollets", mouvement: "isolation", materiel: "machine", tendon: null, famille: "mollets-presse" },
     { n: "Soulevé de terre roumain", s: 3, r: "8-10", rest: 150, mode: "reps", c: "genou peu sollicité",
       groupe: "ischios-fessiers", mouvement: "hanche", materiel: "barre", tendon: null },
@@ -125,7 +125,7 @@ const TEMPLATES = {
   "Full Body": { kind: "muscu", knee: true, hsr: true, chargeTags: ["genou", "tirage"], exos: [
     { n: "Presse à cuisses (HSR)", s: 3, r: "table HSR", rest: 180, mode: "reps", hsr: true, c: "tempo 6 s · amplitude 10-60° · superset mollets",
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "presse-cuisses" },
-    { n: "Mollets à la presse", s: 3, r: "10-12", rest: 90, mode: "reps", c: "en superset avec la presse",
+    { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "en superset avec la presse", supersetAvec: "Presse à cuisses (HSR)",
       groupe: "mollets", mouvement: "isolation", materiel: "machine", tendon: null, famille: "mollets-presse" },
     { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 120, mode: "reps", hsr: true, c: "tempo 6 s",
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
@@ -245,6 +245,21 @@ export const HSR_TABLE = [
   { wk: "9-12", from: 9, to: 12, scheme: "4 × 6RM" },
 ];
 export const hsrForWeek = (w) => HSR_TABLE.find((r) => w >= r.from && w <= r.to) || HSR_TABLE[0];
+/**
+ * Nombre de séries d'un exercice d'un gabarit pour une semaine HSR donnée (09/10/2026). Un
+ * exercice HSR suit la table ; un exercice `supersetAvec` (mollets) fait **autant de séries que
+ * son partenaire de superset** — ta règle : en superset chaque série de presse est suivie d'une
+ * série de mollets. Repli sur `ex.s` si le partenaire est introuvable.
+ */
+export const exoSeriesCount = (template, ex, hsrWeek) => {
+  const hsrSeries = hsrParse(hsrForWeek(hsrWeek).scheme).series;
+  if (ex.hsr) return hsrSeries;
+  if (ex.supersetAvec) {
+    const partner = (template?.exos || []).find((e) => e.n === ex.supersetAvec);
+    if (partner) return partner.hsr ? hsrSeries : partner.s;
+  }
+  return ex.s;
+};
 export const hsrParse = (scheme) => {
   const m = scheme.match(/(\d+)\s*×\s*(\d+)/);
   return m ? { series: +m[1], reps: +m[2] } : { series: 3, reps: 10 };
@@ -345,25 +360,29 @@ export const BASKET_PROTOCOLS = {
     blocks: [
       { h: "Au réveil (7h ou 8h selon la nuit)", items: [
         "500 ml d'eau immédiatement.",
-        "Caféine : 1 cachet 200 mg.",
       ]},
       { h: "10-15 min après le réveil", items: [
-        "Petit-déj pré-match : pain blanc 70 g (≈2-3 tranches) + miel 15 g + whey 30 g → 31 g P / 53 g G / 2 g L / ~355 kcal.",
+        "Petit-déj pré-match : pain blanc 100 g + miel 25 g + whey 30 g → ≈34 g P / 77 g G / 2 g L / ~450 kcal.",
       ]},
       { h: "20-40 min après le petit-déj", items: [
         "Marche 15-20 min, allure tranquille — active circulation et digestion.",
       ]},
       { h: "Ensuite", items: [
         "Douche chaude 5-8 min (jamais froide avant un match — réduit la performance neuromusculaire).",
-        "Mobilité 8-10 min : cercles épaules/hanches, fentes alternées, squats poids du corps, sauts légers sur place.",
       ]},
       { h: "Jusqu'au départ (9h)", items: [
         "Hydratation continue : 400-500 ml d'eau par petites gorgées.",
       ]},
       { h: "9h20-9h25 (pré-match)", items: [
-        "Bonbons 30 g → 24 g G / ~110 kcal. + eau 250 ml.",
+        "Bonbons 30 g → 24 g G / ~110 kcal + eau 250 ml + caféine 1 cachet 200 mg.",
       ]},
       { h: "9h45 — Échauffement", items: [
+        "1. Cardio léger 5 min.",
+        "2. Mobilité dynamique 5 min (fentes marchées, balancements de jambe, hanches, chevilles).",
+        "3. Isométrie genou : 3-5 × 30-45 s (chaise ou iso quad à ~60°).",
+        "4. Montée progressive : squats poids du corps 2×10, puis sauts/réceptions douces 2×5.",
+        "5. Spécifique basket : accélérations/décélérations, changements de direction, shoots en mouvement.",
+        "Règle : douleur genou > 3/10 à n'importe quelle étape → réduire, ne pas forcer.",
         "Gorgées d'eau régulières.",
       ]},
       { h: "Pendant le match (10h30-12h)", items: [
@@ -388,8 +407,7 @@ export const BASKET_PROTOCOLS = {
       { h: "⚠ Ajustements selon le contexte de la veille", items: [
         "Réveil spontané plus tôt → se lever tout de suite, ne pas lutter au lit.",
         "Transit fragile / selles liquides (stress pré-match) → petit-déj sans fibres, sans lipides, sans laitage lourd ; réduire ou sauter la caféine si ventre sensible.",
-        "Gros repas/soirée la veille → déjà chargé en glycogène, réduire glucides du petit-déj à 35-40 g au lieu de 50-60 g.",
-        "Lever à 8h au lieu de 7h → décaler la mobilité à la salle (9h15) plutôt qu'à la maison, timing trop serré sinon.",
+        "Gros repas/soirée la veille → déjà chargé en glycogène, réduire les glucides du petit-déj à ~50-55 g (pain blanc 70 g + miel 15 g) au lieu de ~77 g.",
       ]},
     ],
   },

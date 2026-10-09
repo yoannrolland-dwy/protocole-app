@@ -144,6 +144,36 @@ export function weeklyKcalTrend(macros, opts = {}) {
 }
 
 /**
+ * Moyenne de protéines (g/j) par semaine lundi-dimanche, mêmes semaines que `weeklyKcalTrend`
+ * (09/10/2026, courbe superposée au graphique de l'onglet Performance). **Les jours TERMINÉS
+ * seulement** : aujourd'hui est exclu (journée incomplète, tirerait la moyenne vers le bas, même
+ * raison que le correctif TDEE du 13/09/2026). Un jour sans protéines connues est ignoré, jamais
+ * compté à 0. `[{ weekStart, avgProtein, days }]`, `avgProtein` null sans aucun jour.
+ */
+export function weeklyProteinTrend(macros, { weeks = 8, endDate } = {}) {
+  const end = endDate || today();
+  const [ey, em, ed] = end.split("-").map(Number);
+  const endObj = new Date(ey, em - 1, ed);
+  const thisMonday = new Date(endObj);
+  thisMonday.setDate(endObj.getDate() - ((endObj.getDay() + 6) % 7));
+  const key = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const byDate = new Map((macros || []).filter((m) => m.protein != null && m.date !== end).map((m) => [m.date, m.protein]));
+  const out = [];
+  for (let w = weeks - 1; w >= 0; w--) {
+    const monday = new Date(thisMonday);
+    monday.setDate(thisMonday.getDate() - w * 7);
+    let sum = 0, days = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday); d.setDate(monday.getDate() + i);
+      const k = key(d);
+      if (byDate.has(k)) { sum += byDate.get(k); days++; }
+    }
+    out.push({ weekStart: key(monday), avgProtein: days ? Math.round(sum / days) : null, days });
+  }
+  return out;
+}
+
+/**
  * Dépense énergétique adaptative (V7) — calculée "maintenant", factorisée pour que l'écran
  * Macros et le Coach IA appellent EXACTEMENT le même calcul (jamais deux chiffres
  * différents pour la même réalité). `foodLog`/`overrides` doivent être lus fraîchement par

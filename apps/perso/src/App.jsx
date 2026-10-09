@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
-  ResponsiveContainer, LineChart, Line, BarChart, Bar,
+  ResponsiveContainer, LineChart, Line, BarChart, Bar, ComposedChart,
   XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Cell,
 } from "recharts";
 import {
@@ -21,14 +21,14 @@ import { GENE_ZONES, loadLabel, geneLabel } from "@rawcare/core/sessionLoad";
 import { weighTimeAnalysis } from "@rawcare/core/weighTime";
 import { realDeficit, MIN_WINDOW_DAYS as MIN_TDEE_DAYS, tdeeTrend, tdeeOverWindow } from "@rawcare/core/tdee";
 import { TEMPLATES, TYPES, DEFAULT_WEIGHTS, HSR_TABLE, hsrForWeek, hsrParse, parseSecs,
-         PERI, BASKET_PROTOCOLS } from "@rawcare/core/session/templates";
+         PERI, BASKET_PROTOCOLS, exoSeriesCount } from "@rawcare/core/session/templates";
 import { refSet, lastPerf, perfHistory, lastExerciseSets, medianTarget } from "@rawcare/core/session/perf";
 import { EXERCISE_LIBRARY } from "@rawcare/core/session/exercises";
 import { computeEnergyScore, computeSleepScore, scoreLabel } from "@rawcare/core/energy";
 import { computeFreeInsights } from "@rawcare/core/insights";
 import { computeBilanFacts } from "@rawcare/core/bilan";
 import { PHASES, phaseTarget as phaseTargetCore, DEFAULT_TARGETS, targetsForDate,
-         kcalFromMacros, kcalOfEntry, tdeeNow, weeklyKcalTrend, buildKcalByDate, weightTrend7, recompWindows } from "@rawcare/core/targets";
+         kcalFromMacros, kcalOfEntry, tdeeNow, weeklyKcalTrend, weeklyProteinTrend, buildKcalByDate, weightTrend7, recompWindows } from "@rawcare/core/targets";
 import { recommendTargets, palierWeekOf, loggedRateLastDays } from "@rawcare/core/palier";
 import { nextSessions } from "@rawcare/core/nextSession";
 import { buildCoachPrompt, buildCoachBriefing, buildBilanPrompt, splitCarnet, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
@@ -50,7 +50,10 @@ import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from "./claudeApi.js";
 
-const APP_VERSION = "3.104.1";
+// Courbe des protéines du graphique hebdo (09/10/2026) : ambre déjà utilisé ailleurs dans l'app
+// (fiabilité TDEE, volume sous la zone), distinct des barres kcal en citron.
+const PROT_LINE = "#e8a33d";
+const APP_VERSION = "3.105.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -1067,7 +1070,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
   const hp = hsrParse(hsrForWeek(hsrWeek).scheme);
 
   const buildExos = () => template.exos.map((ex) => {
-    const nSeries = ex.hsr ? hp.series : ex.s;
+    const nSeries = exoSeriesCount(template, ex, hsrWeek);
     const last = lastPerf(training, ex.n);
     const lastSets = lastExerciseSets(training, ex.n);
     const target = ex.hsr ? `${hp.reps}` : ex.r;
@@ -1088,7 +1091,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
       const savedLast = wasSubstituted ? lastPerf(training, savedEx.nom) : last;
       const savedDef = wasSubstituted ? DEFAULT_WEIGHTS[savedEx.nom] : def;
       return { nom: savedEx.nom, mode: savedEx.mode ?? ex.mode, perLeg: !!savedEx.perLeg, opt: !!ex.opt, rest: ex.rest,
-        target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${ex.s} × ${ex.r}`,
+        target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${exoSeriesCount(template, ex, hsrWeek)} × ${ex.r}`,
         consigne: lib ? lib.c : ex.c, def: savedDef, last: savedLast,
         groupe: lib ? lib.groupe : ex.groupe, mouvement: lib ? lib.mouvement : ex.mouvement,
         materiel: lib ? lib.materiel : ex.materiel, tendon: lib ? lib.tendon : ex.tendon,
@@ -1113,7 +1116,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
       ? [...Array(nSeries)].map((_, k) => mk("G", k)).concat([...Array(nSeries)].map((_, k) => mk("D", k)))
       : [...Array(nSeries)].map((_, k) => mk(null, k));
     return { nom: ex.n, mode: ex.mode, perLeg: !!ex.perLeg, opt: !!ex.opt, rest: ex.rest,
-      target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${ex.s} × ${ex.r}`, consigne: ex.c, def, last,
+      target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${exoSeriesCount(template, ex, hsrWeek)} × ${ex.r}`, consigne: ex.c, def, last,
       groupe: ex.groupe, mouvement: ex.mouvement, materiel: ex.materiel, tendon: ex.tendon, famille: ex.famille, rir: null, series };
   });
 
@@ -2465,7 +2468,8 @@ function PerformanceTab({ macros, targets, training, weight, phase }) {
   // les cheat meals de Yoann ne suivent pas un jour fixe, exclure le week-end n'avait donc pas
   // de sens pour lui). Une vraie moyenne glissante absorbe un écart ponctuel quel que soit le
   // jour où il tombe, sans avoir à deviner lequel exclure.
-  const weeklyTrend = weeklyKcalTrend(macros, { weeks: 8 }).map((w) => ({ ...w, label: fmt(w.weekStart) }));
+  const protByWeek = new Map(weeklyProteinTrend(macros, { weeks: 8 }).map((w) => [w.weekStart, w.avgProtein]));
+  const weeklyTrend = weeklyKcalTrend(macros, { weeks: 8 }).map((w) => ({ ...w, label: fmt(w.weekStart), avgProtein: protByWeek.get(w.weekStart) ?? null }));
   const weeksWithData = weeklyTrend.filter((w) => w.days > 0);
 
   return (
@@ -2476,29 +2480,31 @@ function PerformanceTab({ macros, targets, training, weight, phase }) {
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
           <Label>Moyenne kcal · semaine (lun-dim)</Label>
-          <span style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono }}>cible ~{kcalTargetToday} kcal</span>
+          <span style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono }}>cible ~{kcalTargetToday} kcal · <span style={{ color: PROT_LINE }}>{atToday.protein} g prot.</span></span>
         </div>
         {weeksWithData.length ? (
           <div style={{ height: 130 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyTrend} margin={{ top: 4, right: 4, left: -22, bottom: 0 }}>
+              <ComposedChart data={weeklyTrend} margin={{ top: 4, right: -14, left: -22, bottom: 0 }}>
                 <CartesianGrid stroke={C.divider} vertical={false} />
                 <XAxis dataKey="label" tick={chartAxis} interval="preserveEnd" />
-                <YAxis tick={chartAxis} />
+                <YAxis yAxisId="kcal" tick={chartAxis} />
+                <YAxis yAxisId="prot" orientation="right" tick={{ ...chartAxis, fill: PROT_LINE }} domain={["dataMin - 15", "dataMax + 15"]} />
                 <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle}
-                  formatter={(v) => (v == null ? ["—", "kcal"] : [v, "kcal"])} />
-                <ReferenceLine y={kcalTargetToday} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
-                <Bar dataKey="avgKcal" radius={[3, 3, 0, 0]}>
+                  formatter={(v, name) => (v == null ? ["—", name === "avgProtein" ? "g/j prot." : "kcal"] : [v, name === "avgProtein" ? "g/j prot." : "kcal"])} />
+                <ReferenceLine yAxisId="kcal" y={kcalTargetToday} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
+                <Bar yAxisId="kcal" dataKey="avgKcal" radius={[3, 3, 0, 0]}>
                   {weeklyTrend.map((d, i) => (
                     <Cell key={i} fill={d.avgKcal == null ? "transparent" : Math.abs(d.avgKcal - kcalTargetToday) <= kcalTargetToday * 0.1 ? C.accent : C.border} />
                   ))}
                 </Bar>
-              </BarChart>
+                <Line yAxisId="prot" type="monotone" dataKey="avgProtein" stroke={PROT_LINE} strokeWidth={2} dot={{ r: 3, fill: PROT_LINE, strokeWidth: 0 }} connectNulls />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         ) : <Empty>Aucune donnée.</Empty>}
         <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
-          Semaine du lundi, moyenne glissante sur les 7 jours réellement loggés.
+          Barres : kcal, moyenne des jours réellement loggés (axe gauche). Courbe : protéines g/j, jours terminés seulement (axe droit).
         </Body>
       </Card>
 
