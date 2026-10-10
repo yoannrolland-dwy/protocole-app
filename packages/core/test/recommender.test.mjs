@@ -124,3 +124,12 @@ test("capture datée : sorties de recommendSessions sur 11 scénarios (snapshots
   for (const [k, v] of Object.entries(sc)) out[k] = recommendSessions({ ...base({ knee: k === "vide" ? [] : kneeOk() }), ...v });
   snapshot("recommender", out);
 });
+
+test("basket planifié : « jour du match » un dimanche de match, « jour de l'entraînement » un jour fixe (10/10)", () => {
+  const match = recommendSessions(base({ basketSchedule: { weekly: [3], matchDates: [T0] } })).suggestions.find((s) => s.type === "Basket");
+  assert.ok(match.reason.startsWith("C'est le jour du match"), match.reason);
+  assert.equal(match.score, 999);
+  const dow = new Date(2026, 9, 4).getDay();
+  const fixed = recommendSessions(base({ basketSchedule: { weekly: [dow], matchDates: [] } })).suggestions.find((s) => s.type === "Basket");
+  assert.ok(fixed.reason.startsWith("C'est le jour de l'entraînement"), fixed.reason);
+});

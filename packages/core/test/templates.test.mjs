@@ -17,7 +17,7 @@ test("Upper A/B après la spécialisation du 05/10 et le déménagement du core 
   assert.equal(TEMPLATES["Upper A"].exos.length, 9);
   assert.equal(TEMPLATES["Upper B"].exos.length, 9);
   assert.equal(TEMPLATES["Upper A"].exos.map((e) => e.n).join("|"),
-    "Développé incliné haltères|Tirage vertical prise neutre|Rowing barre ou machine|Écarté poulie basse|Extension triceps poulie haute|Élévations latérales haltères|Élévations latérales poulie|Face pull|Curl poignets pronation");
+    "Développé incliné haltères|Tirage vertical prise neutre|Rowing barre ou machine|Écarté poulie basse|Élévations latérales haltères|Élévations latérales poulie|Extension triceps poulie haute|Face pull|Curl poignets pronation");
   assert.equal(TEMPLATES["Upper B"].exos.map((e) => e.n).join("|"),
     "Développé couché haltères|Tirage vertical prise neutre|Développé militaire haltères|Écarté poulie basse|Élévations latérales poulie|Élévations latérales haltères|Rear delt machine (reverse pec deck)|Curl marteau (prise neutre)|Curl poignets supination");
   assert.deepEqual([A["Tirage vertical prise neutre"].s, A["Rowing barre ou machine"].s, A["Élévations latérales haltères"].s, A["Élévations latérales poulie"].s, A["Élévations latérales haltères"].rest, A["Face pull"].s, A["Extension triceps poulie haute"].rest], [3, 3, 3, 2, 60, 2, 75]);
@@ -42,7 +42,7 @@ test("Full Body : existe, HSR, tag genou, contenu et ordre figés", () => {
   assert.ok(TYPES.includes("Full Body"));
   assert.ok(FB.hsr && FB.chargeTags.includes("genou"));
   assert.equal(FB.exos.map((e) => e.n).join("|"),
-    "Presse à cuisses (HSR)|Mollets à la presse|Leg extension unilatérale|Soulevé de terre roumain|Hip thrust|Développé incliné haltères|Tirage vertical prise neutre|Élévations latérales haltères");
+    "Presse à cuisses (HSR)|Mollets à la presse|Soulevé de terre roumain|Hip thrust|Développé incliné haltères|Tirage vertical prise neutre|Leg extension unilatérale|Élévations latérales haltères");
   assert.equal(FB.exos.find((e) => e.n === "Élévations latérales haltères").s, 4);
 });
 
@@ -60,4 +60,22 @@ test("Mobilité (07/10/2026) : aucune charge, core déménagé ici, iso genou + 
 test("core retiré des gabarits de muscu : plus aucune planche ni crunch hors Mobilité", () => {
   for (const t of ["Upper A", "Upper B", "Lower A", "Lower B", "Lower C", "Full Body"])
     assert.ok(!TEMPLATES[t].exos.some((e) => e.n.startsWith("Core — ")), `${t} contient encore du core`);
+});
+
+test("ordre des exercices (10/10/2026) : composés lourds d'abord, isolations ensuite, mollets collés à la presse, leg extension après le soulevé de terre", () => {
+  const order = (t) => TEMPLATES[t].exos.map((e) => e.n);
+  assert.deepEqual(order("Lower A"), ["Iso leg extension @60° (si genou raide)", "Presse à cuisses (HSR)", "Mollets à la presse", "Soulevé de terre roumain", "Leg extension unilatérale"]);
+  assert.deepEqual(order("Lower B"), ["Presse à cuisses", "Mollets à la presse", "Hip thrust", "Leg extension unilatérale", "Leg curl unilatéral"]);
+  assert.deepEqual(order("Lower C"), ["Iso leg extension @60° (si genou raide)", "Presse à cuisses (HSR)", "Mollets à la presse", "Soulevé de terre roumain", "Hip thrust", "Leg extension unilatérale"]);
+  for (const t of ["Lower A", "Lower B", "Lower C", "Full Body"]) {
+    const o = order(t), i = o.findIndex((n) => n.startsWith("Presse"));
+    assert.equal(o[i + 1], "Mollets à la presse", `${t} : mollets juste après la presse (superset)`);
+    const le = o.indexOf("Leg extension unilatérale");
+    for (const hinge of ["Soulevé de terre roumain", "Hip thrust"]) if (o.includes(hinge)) assert.ok(o.indexOf(hinge) < le, `${t} : ${hinge} avant leg extension`);
+  }
+  // L'iso genou (échauffement antalgique) reste en tout premier quand elle existe.
+  for (const t of ["Lower A", "Lower C"]) assert.ok(order(t)[0].startsWith("Iso leg extension"));
+  // Upper A : élévations (épaules prioritaires) avant le triceps.
+  const a = order("Upper A");
+  assert.ok(a.indexOf("Élévations latérales poulie") < a.indexOf("Extension triceps poulie haute"));
 });

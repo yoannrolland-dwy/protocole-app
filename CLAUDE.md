@@ -4680,6 +4680,33 @@ par séance Upper » alors que c'est 3 + 2 depuis le 08/10 : à corriger (via `c
   `apps/perso` ET `apps/public` propres.
 
 
+## Ordre des exercices du plus consommateur au plus léger, « jour du match » (10/10/2026, apps/perso v3.106.0)
+
+Deux demandes de Yoann, résumé et confirmation avant code (« GO, leg extension après le soulevé de
+terre »).
+
+- **Ordre des exercices** (`templates.js`) : règle = gros composés d'abord, puis composés
+  secondaires, puis isolations des muscles prioritaires, puis petites isolations, avant-bras en
+  dernier. Mêmes noms d'exercices : historique, records et plateaux inchangés. Upper A : triceps
+  passe **après** les élévations latérales (épaules prioritaires). Upper B : déjà dans l'ordre.
+  Lower A : iso genou, presse HSR, mollets, soulevé de terre roumain, leg extension HSR. Lower B :
+  presse, mollets, hip thrust, leg extension, leg curl. Lower C : iso genou, presse, mollets,
+  soulevé de terre roumain, hip thrust, leg extension. Full Body : presse, mollets, soulevé de
+  terre, hip thrust, incliné, tirage vertical, leg extension, élévations. Contraintes respectées :
+  **mollets toujours collés à la presse** (superset), **iso genou en tout premier** (échauffement
+  antalgique), **leg extension HSR après le soulevé de terre / hip thrust** — choix de Yoann, en
+  connaissance de la contrepartie : le travail du tendon se fait un peu plus fatigué. Mobilité,
+  Basket et Escalade non touchés. Un brouillon de séance déjà commencé garde l'ancien ordre.
+  `apps/public` partage les gabarits : nouvel ordre visible au prochain déploiement.
+- **Basket planifié un dimanche de match** (`recommender.js`) : le texte disait « C'est le jour de
+  l'entraînement » même un jour de match. Désormais « C'est le jour du match » quand la date est
+  dans `basketSchedule.matchDates`, « jour de l'entraînement » pour les jours fixes. Score 999 et
+  première place inchangés.
+- Tests : ordre des 5 séances et contraintes (mollets après la presse, leg extension après les
+  composés de hanche, iso en premier, triceps après élévations), message de match vs entraînement —
+  **103 tests**. Build `apps/perso` ET `apps/public` propres.
+
+
 
 ## Comment je veux qu'on travaille
 

@@ -29,8 +29,6 @@ const TEMPLATES = {
     // et nombre de séries volontairement INCHANGÉS (choix explicite de Yoann).
     { n: "Écarté poulie basse", s: 3, r: "10-12", rest: 90, mode: "reps", c: "ligne ascendante (haut des pecs) · bon étirement en bas",
       groupe: "pecs", mouvement: "isolation", materiel: "poulie", tendon: null },
-    { n: "Extension triceps poulie haute", s: 3, r: "10-12", rest: 75, mode: "reps", c: "",
-      groupe: "triceps", mouvement: "isolation", materiel: "poulie", tendon: null },
     // 08/10/2026 : 5 séries d'un même mouvement → 3 + 2 sur deux profils de résistance
     // (haltères = tension en haut, poulie = tension bras le long du corps, position étirée).
     // Même volume hebdo (10 séries), moins de dégradation sur les dernières séries. Upper B
@@ -39,6 +37,8 @@ const TEMPLATES = {
       groupe: "epaules", mouvement: "isolation", materiel: "halteres", tendon: null },
     { n: "Élévations latérales poulie", s: 2, r: "10-12", rest: 60, mode: "reps", c: "poulie à hauteur de main, câble derrière le corps",
       groupe: "epaules", mouvement: "isolation", materiel: "poulie", tendon: null },
+    { n: "Extension triceps poulie haute", s: 3, r: "10-12", rest: 75, mode: "reps", c: "",
+      groupe: "triceps", mouvement: "isolation", materiel: "poulie", tendon: null },
     { n: "Face pull", s: 2, r: "10-12", rest: 60, mode: "reps", c: "arrière d'épaule",
       groupe: "epaules", mouvement: "tirage", materiel: "poulie", tendon: null },
     // Curls poignets RÉDUITS 3×15-20 → 2×10-12 (04/10/2026) : douleur au poignet gauche sur ce
@@ -78,20 +78,20 @@ const TEMPLATES = {
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "presse-cuisses" },
     { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "en superset avec la presse", supersetAvec: "Presse à cuisses (HSR)",
       groupe: "mollets", mouvement: "isolation", materiel: "machine", tendon: null, famille: "mollets-presse" },
-    { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 120, mode: "reps", hsr: true, c: "tempo 6 s",
-      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
     { n: "Soulevé de terre roumain", s: 3, r: "8-10", rest: 150, mode: "reps", c: "genou peu sollicité",
       groupe: "ischios-fessiers", mouvement: "hanche", materiel: "barre", tendon: null },
+    { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 120, mode: "reps", hsr: true, c: "tempo 6 s",
+      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
   ]},
   "Lower B": { kind: "muscu", knee: true, chargeTags: ["genou"], exos: [
     { n: "Presse à cuisses", s: 4, r: "8-10", rest: 180, mode: "reps", c: "contrôlé, reps + hautes",
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "presse-cuisses" },
     { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "en superset avec la presse", supersetAvec: "Presse à cuisses",
       groupe: "mollets", mouvement: "isolation", materiel: "machine", tendon: null, famille: "mollets-presse" },
-    { n: "Leg extension unilatérale", s: 3, r: "8-10", rest: 120, mode: "reps", c: "tempo 6 s",
-      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
     { n: "Hip thrust", s: 3, r: "8-10", rest: 120, mode: "reps", c: "genou-safe",
       groupe: "fessiers", mouvement: "hanche", materiel: "machine", tendon: null },
+    { n: "Leg extension unilatérale", s: 3, r: "8-10", rest: 120, mode: "reps", c: "tempo 6 s",
+      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
     { n: "Leg curl unilatéral", s: 3, r: "10-12", rest: 90, mode: "reps", c: "",
       groupe: "ischios", mouvement: "isolation", materiel: "machine", tendon: null, famille: "leg-curl-unilateral" },
   ]},
@@ -104,14 +104,14 @@ const TEMPLATES = {
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "iso-leg-extension" },
     { n: "Presse à cuisses (HSR)", s: 3, r: "table HSR", rest: 180, mode: "reps", hsr: true, c: "tempo 6 s · amplitude 10-60°",
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "presse-cuisses" },
-    { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 120, mode: "reps", hsr: true, c: "tempo 6 s",
-      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
     { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "en superset avec la presse", supersetAvec: "Presse à cuisses (HSR)",
       groupe: "mollets", mouvement: "isolation", materiel: "machine", tendon: null, famille: "mollets-presse" },
     { n: "Soulevé de terre roumain", s: 3, r: "8-10", rest: 150, mode: "reps", c: "genou peu sollicité",
       groupe: "ischios-fessiers", mouvement: "hanche", materiel: "barre", tendon: null },
     { n: "Hip thrust", s: 3, r: "8-10", rest: 120, mode: "reps", c: "genou-safe",
       groupe: "fessiers", mouvement: "hanche", materiel: "machine", tendon: null },
+    { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 120, mode: "reps", hsr: true, c: "tempo 6 s",
+      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
   ]},
   // Full Body (04/10/2026, demande de Yoann) : UNIQUEMENT le lundi qui suit un dimanche de
   // match (détection côté app, `isPostMatchDay` → recommandeur `postMatch`). Base Lower C
@@ -127,8 +127,6 @@ const TEMPLATES = {
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "presse-cuisses" },
     { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "en superset avec la presse", supersetAvec: "Presse à cuisses (HSR)",
       groupe: "mollets", mouvement: "isolation", materiel: "machine", tendon: null, famille: "mollets-presse" },
-    { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 120, mode: "reps", hsr: true, c: "tempo 6 s",
-      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
     { n: "Soulevé de terre roumain", s: 3, r: "8-10", rest: 150, mode: "reps", c: "lendemain de match : 2-3 reps en réserve, jamais à l'échec",
       groupe: "ischios-fessiers", mouvement: "hanche", materiel: "barre", tendon: null },
     { n: "Hip thrust", s: 3, r: "8-10", rest: 120, mode: "reps", c: "lendemain de match : 2-3 reps en réserve",
@@ -140,6 +138,8 @@ const TEMPLATES = {
     // Upper A/B) pour tenir ~1 h — choix de Yoann.
     { n: "Tirage vertical prise neutre", s: 3, r: "8-10", rest: 120, mode: "reps", c: "prise neutre (coude) · largeur des dorsaux",
       groupe: "dos", mouvement: "tirage", materiel: "machine", tendon: "coude", famille: "tirage-vertical" },
+    { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 120, mode: "reps", hsr: true, c: "tempo 6 s",
+      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
     { n: "Élévations latérales haltères", s: 4, r: "10-12", rest: 60, mode: "reps", c: "priorité carrure · sans élan",
       groupe: "epaules", mouvement: "isolation", materiel: "halteres", tendon: null },
   ]},

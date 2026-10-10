@@ -402,7 +402,9 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
     // Planning fixe (01/09/2026) : entraînement/match déjà prévu aujourd'hui — plus une
     // suggestion parmi d'autres à évaluer, une certitude. Score au-dessus de tout calcul
     // possible pour garantir la première place, texte dédié plutôt que le score habituel.
-    push(sugg, "Basket", SCHEDULED_SCORE, "C'est le jour de l'entraînement — Basket prévu aujourd'hui. Passer par l'échauffement guidé.");
+    // 10/10/2026 : un jour de MATCH (date de `matchDates`) n'est pas un jour d'entraînement.
+    const isMatchDay = !!basketSchedule?.matchDates?.includes(t0);
+    push(sugg, "Basket", SCHEDULED_SCORE, `${isMatchDay ? "C'est le jour du match" : "C'est le jour de l'entraînement"} — Basket prévu aujourd'hui. Passer par l'échauffement guidé.`);
   } else {
     let bScore = 10 + cap(dBasket) - (kneeAmber ? AMBER_PENALTY.genou["Basket"] : 0) - (dKnee <= 1 ? 6 : 0);
     let bReason = `${basket7}× cette semaine · dernier ${ago(dBasket)}. Passer par l'échauffement guidé.`;
