@@ -17,9 +17,9 @@ test("Upper A/B après la spécialisation du 05/10 et le déménagement du core 
   assert.equal(TEMPLATES["Upper A"].exos.length, 9);
   assert.equal(TEMPLATES["Upper B"].exos.length, 9);
   assert.equal(TEMPLATES["Upper A"].exos.map((e) => e.n).join("|"),
-    "Développé incliné haltères|Tirage vertical prise neutre|Rowing barre ou machine|Écarté poulie basse|Élévations latérales haltères|Élévations latérales poulie|Extension triceps poulie haute|Face pull|Curl poignets pronation");
+    "Développé incliné haltères|Tirage vertical prise neutre|Rowing barre ou machine|Écarté poulie basse|Élévations latérales poulie|Extension triceps poulie haute|Face pull|Élévations latérales haltères|Curl poignets pronation");
   assert.equal(TEMPLATES["Upper B"].exos.map((e) => e.n).join("|"),
-    "Développé couché haltères|Tirage vertical prise neutre|Développé militaire haltères|Écarté poulie basse|Élévations latérales poulie|Élévations latérales haltères|Rear delt machine (reverse pec deck)|Curl marteau (prise neutre)|Curl poignets supination");
+    "Développé couché haltères|Développé militaire haltères|Tirage vertical prise neutre|Écarté poulie basse|Élévations latérales poulie|Rear delt machine (reverse pec deck)|Élévations latérales haltères|Curl marteau (prise neutre)|Curl poignets supination");
   assert.deepEqual([A["Tirage vertical prise neutre"].s, A["Rowing barre ou machine"].s, A["Élévations latérales haltères"].s, A["Élévations latérales poulie"].s, A["Élévations latérales haltères"].rest, A["Face pull"].s, A["Extension triceps poulie haute"].rest], [3, 3, 3, 2, 60, 2, 75]);
   assert.deepEqual([B["Développé militaire haltères"].s, B["Écarté poulie basse"].s, B["Élévations latérales poulie"].s, B["Élévations latérales haltères"].s, B["Élévations latérales poulie"].rest, B["Rear delt machine (reverse pec deck)"].s], [2, 2, 3, 2, 60, 2]);
   // inchangés : développés, rééduc coude, curls poignets (poignet)

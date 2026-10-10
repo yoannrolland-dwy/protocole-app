@@ -4707,6 +4707,24 @@ terre »).
   **103 tests**. Build `apps/perso` ET `apps/public` propres.
 
 
+### Upper A/B regroupés par zone de matériel (10/10/2026, apps/perso v3.107.0)
+
+Retour de Yoann : Upper B lui paraissait « le plus bizarre » (j'avais écrit « déjà dans l'ordre »
+trop vite, en ne regardant que la règle plus lourd → plus léger) et il voulait éviter les
+allers-retours entre poulies et haltères. **Règle ajoutée : les gros composés restent en tête,
+puis un bloc poulie, puis un bloc haltères.** Upper A : incliné (haltères), tirage vertical,
+rowing, écarté poulie, élévations poulie (2 séries), triceps poulie, face pull, **élévations
+haltères (3 séries)**, curl poignets. Upper B : couché, militaire (les deux développés se suivent),
+tirage vertical, écarté poulie, élévations poulie (3 séries), rear delt machine, élévations
+haltères (2 séries), curl marteau, curl poignets. **Contrepartie assumée par Yoann (« GO avec le
+compromis ») : en Upper A, les 3 séries principales d'élévations latérales (muscle prioritaire)
+passent en 8e position, donc faites fatigué.** Alternative proposée et non retenue : inverser les
+rôles en A (poulie 3 + haltères 2, comme B), qui aurait supprimé l'alternance des deux profils
+voulue par Yoann entre A et B. Le tag `materiel` du face pull reste « halteres » dans les gabarits
+alors que Yoann le fait sans doute à la poulie : non confirmé, non modifié (il n'a pas d'effet sur
+l'ordre). Tests d'ordre exact mis à jour — **103 tests**. Build `apps/perso` ET `apps/public` propres.
+
+
 
 ## Comment je veux qu'on travaille
 

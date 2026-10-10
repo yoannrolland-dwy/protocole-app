@@ -29,18 +29,18 @@ const TEMPLATES = {
     // et nombre de séries volontairement INCHANGÉS (choix explicite de Yoann).
     { n: "Écarté poulie basse", s: 3, r: "10-12", rest: 90, mode: "reps", c: "ligne ascendante (haut des pecs) · bon étirement en bas",
       groupe: "pecs", mouvement: "isolation", materiel: "poulie", tendon: null },
-    // 08/10/2026 : 5 séries d'un même mouvement → 3 + 2 sur deux profils de résistance
-    // (haltères = tension en haut, poulie = tension bras le long du corps, position étirée).
-    // Même volume hebdo (10 séries), moins de dégradation sur les dernières séries. Upper B
-    // fait l'inverse (3 poulie + 2 haltères). Mêmes noms des deux côtés → historique continu.
-    { n: "Élévations latérales haltères", s: 3, r: "10-12", rest: 60, mode: "reps", c: "priorité carrure · sans élan",
-      groupe: "epaules", mouvement: "isolation", materiel: "halteres", tendon: null },
     { n: "Élévations latérales poulie", s: 2, r: "10-12", rest: 60, mode: "reps", c: "poulie à hauteur de main, câble derrière le corps",
       groupe: "epaules", mouvement: "isolation", materiel: "poulie", tendon: null },
     { n: "Extension triceps poulie haute", s: 3, r: "10-12", rest: 75, mode: "reps", c: "",
       groupe: "triceps", mouvement: "isolation", materiel: "poulie", tendon: null },
     { n: "Face pull", s: 2, r: "10-12", rest: 60, mode: "reps", c: "arrière d'épaule",
       groupe: "epaules", mouvement: "tirage", materiel: "poulie", tendon: null },
+    // 08/10/2026 : 5 séries d'un même mouvement → 3 + 2 sur deux profils de résistance
+    // (haltères = tension en haut, poulie = tension bras le long du corps, position étirée).
+    // Même volume hebdo (10 séries), moins de dégradation sur les dernières séries. Upper B
+    // fait l'inverse (3 poulie + 2 haltères). Mêmes noms des deux côtés → historique continu.
+    { n: "Élévations latérales haltères", s: 3, r: "10-12", rest: 60, mode: "reps", c: "priorité carrure · sans élan",
+      groupe: "epaules", mouvement: "isolation", materiel: "halteres", tendon: null },
     // Curls poignets RÉDUITS 3×15-20 → 2×10-12 (04/10/2026) : douleur au poignet gauche sur ce
     // seul mouvement. Choix de Yoann de les garder réduits plutôt que de les remplacer par du
     // grip isométrique (dead hang / farmer walk, proposés) — à revoir si la douleur revient.
@@ -50,22 +50,22 @@ const TEMPLATES = {
   "Upper B": { kind: "muscu", chargeTags: ["tirage"], exos: [
     { n: "Développé couché haltères", s: 4, r: "8-10", rest: 150, mode: "reps", c: "ouverture pecs, priorité",
       groupe: "pecs", mouvement: "poussee", materiel: "halteres", tendon: null, famille: "developpe-couche" },
-    { n: "Tirage vertical prise neutre", s: 4, r: "8-10", rest: 120, mode: "reps", c: "prise neutre (coude)",
-      groupe: "dos", mouvement: "tirage", materiel: "machine", tendon: "coude", famille: "tirage-vertical" },
     // Spécialisation (05/10/2026, voir Upper A) : militaire 3 → 2 (l'avant d'épaule est déjà très
     // sollicité par tous les développés), écarté poulie basse ajouté (haut des pecs), élévations
     // latérales 5 séries, rear delt 3 → 2, crunch 3 → 2. Rééduc du coude (curl marteau) et curls
     // poignets (2×10-12, poignet) inchangés.
     { n: "Développé militaire haltères", s: 2, r: "8-10", rest: 120, mode: "reps", c: "",
       groupe: "epaules", mouvement: "poussee", materiel: "halteres", tendon: null, famille: "developpe-militaire" },
+    { n: "Tirage vertical prise neutre", s: 4, r: "8-10", rest: 120, mode: "reps", c: "prise neutre (coude)",
+      groupe: "dos", mouvement: "tirage", materiel: "machine", tendon: "coude", famille: "tirage-vertical" },
     { n: "Écarté poulie basse", s: 2, r: "10-12", rest: 90, mode: "reps", c: "ligne ascendante (haut des pecs) · bon étirement en bas",
       groupe: "pecs", mouvement: "isolation", materiel: "poulie", tendon: null },
     { n: "Élévations latérales poulie", s: 3, r: "10-12", rest: 60, mode: "reps", c: "priorité carrure · poulie à hauteur de main, câble derrière le corps",
       groupe: "epaules", mouvement: "isolation", materiel: "poulie", tendon: null },
-    { n: "Élévations latérales haltères", s: 2, r: "10-12", rest: 60, mode: "reps", c: "sans élan",
-      groupe: "epaules", mouvement: "isolation", materiel: "halteres", tendon: null },
     { n: "Rear delt machine (reverse pec deck)", s: 2, r: "10-12", rest: 60, mode: "reps", c: "arrière d'épaule",
       groupe: "epaules", mouvement: "isolation", materiel: "machine", tendon: null },
+    { n: "Élévations latérales haltères", s: 2, r: "10-12", rest: 60, mode: "reps", c: "sans élan",
+      groupe: "epaules", mouvement: "isolation", materiel: "halteres", tendon: null },
     { n: "Curl marteau (prise neutre)", s: 3, r: "10-12", rest: 75, mode: "reps", c: "prise neutre (coude)",
       groupe: "biceps", mouvement: "isolation", materiel: "halteres", tendon: "coude" },
     { n: "Curl poignets supination", s: 2, r: "10-12", rest: 60, mode: "reps", c: "léger, avant-bras · stop si douleur poignet",
