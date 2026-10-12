@@ -131,6 +131,9 @@ const TEMPLATES = {
       groupe: "ischios-fessiers", mouvement: "hanche", materiel: "barre", tendon: null },
     { n: "Hip thrust", s: 3, r: "8-10", rest: 120, mode: "reps", c: "lendemain de match : 2-3 reps en réserve",
       groupe: "fessiers", mouvement: "hanche", materiel: "machine", tendon: null },
+    // Leg extension en dernier exercice de jambes (10/10/2026), avant de passer au haut du corps.
+    { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 120, mode: "reps", hsr: true, c: "tempo 6 s",
+      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
     { n: "Développé incliné haltères", s: 3, r: "8-10", rest: 150, mode: "reps", c: "pecs, priorité · 1-2 reps en réserve",
       groupe: "pecs", mouvement: "poussee", materiel: "halteres", tendon: null, famille: "developpe-incline" },
     // Spécialisation (05/10/2026) : tirage vertical à la place du rowing (largeur des dorsaux),
@@ -138,8 +141,6 @@ const TEMPLATES = {
     // Upper A/B) pour tenir ~1 h — choix de Yoann.
     { n: "Tirage vertical prise neutre", s: 3, r: "8-10", rest: 120, mode: "reps", c: "prise neutre (coude) · largeur des dorsaux",
       groupe: "dos", mouvement: "tirage", materiel: "machine", tendon: "coude", famille: "tirage-vertical" },
-    { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 120, mode: "reps", hsr: true, c: "tempo 6 s",
-      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
     { n: "Élévations latérales haltères", s: 4, r: "10-12", rest: 60, mode: "reps", c: "priorité carrure · sans élan",
       groupe: "epaules", mouvement: "isolation", materiel: "halteres", tendon: null },
   ]},

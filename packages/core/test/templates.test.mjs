@@ -42,7 +42,7 @@ test("Full Body : existe, HSR, tag genou, contenu et ordre figés", () => {
   assert.ok(TYPES.includes("Full Body"));
   assert.ok(FB.hsr && FB.chargeTags.includes("genou"));
   assert.equal(FB.exos.map((e) => e.n).join("|"),
-    "Presse à cuisses (HSR)|Mollets à la presse|Soulevé de terre roumain|Hip thrust|Développé incliné haltères|Tirage vertical prise neutre|Leg extension unilatérale|Élévations latérales haltères");
+    "Presse à cuisses (HSR)|Mollets à la presse|Soulevé de terre roumain|Hip thrust|Leg extension unilatérale|Développé incliné haltères|Tirage vertical prise neutre|Élévations latérales haltères");
   assert.equal(FB.exos.find((e) => e.n === "Élévations latérales haltères").s, 4);
 });
 
