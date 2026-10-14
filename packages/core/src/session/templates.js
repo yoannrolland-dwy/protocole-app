@@ -199,13 +199,14 @@ const TEMPLATES = {
     { n: "Rotation externe épaule poulie basse", s: 2, r: "12", rest: 45, mode: "reps", opt: true,
       c: "par côté, léger · coiffe des rotateurs : contrepoids aux 10 séries d'élévations hebdo et aux tirages bras en l'air (escalade)",
       groupe: "coiffe", mouvement: "isolation", materiel: "poulie", tendon: null },
-    { n: "Core — Planche", s: 2, r: "45-60 s", rest: 60, mode: "temps", c: "anti-extension · progresser par difficulté, pas par durée",
-      groupe: "core", mouvement: "gainage", materiel: "aucun", tendon: null },
-    { n: "Core — Crunch machine", s: 2, r: "10-12", rest: 60, mode: "reps", c: "contrôlé, 1-2 reps en réserve",
-      groupe: "core", mouvement: "isolation", materiel: "machine", tendon: null },
+    // Ordre (14/10/2026, demande de Yoann) : iso coude avant les abdos, planche en dernier.
     { n: "Iso flexion coude prise marteau + supination", s: 2, r: "30 s", rest: 45, mode: "temps", opt: true,
       c: "prévention coude (sans douleur depuis septembre) · à cocher selon l'escalade de la semaine",
       groupe: "biceps", mouvement: "isolation", materiel: "aucun", tendon: "coude" },
+    { n: "Core — Crunch machine", s: 2, r: "10-12", rest: 60, mode: "reps", c: "contrôlé, 1-2 reps en réserve",
+      groupe: "core", mouvement: "isolation", materiel: "machine", tendon: null },
+    { n: "Core — Planche", s: 2, r: "45-60 s", rest: 60, mode: "temps", c: "anti-extension · progresser par difficulté, pas par durée",
+      groupe: "core", mouvement: "gainage", materiel: "aucun", tendon: null },
   ]},
 };
 export { TEMPLATES };

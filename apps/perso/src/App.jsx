@@ -53,7 +53,7 @@ import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from 
 // Courbe des protéines du graphique hebdo (09/10/2026) : ambre déjà utilisé ailleurs dans l'app
 // (fiabilité TDEE, volume sous la zone), distinct des barres kcal en citron.
 const PROT_LINE = "#e8a33d";
-const APP_VERSION = "3.107.1";
+const APP_VERSION = "3.107.2";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.

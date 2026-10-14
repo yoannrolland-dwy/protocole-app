@@ -51,8 +51,8 @@ test("Mobilité (07/10/2026) : aucune charge, core déménagé ici, iso genou + 
   assert.deepEqual(M.chargeTags, []);
   assert.ok(!M.knee && !M.climb);
   assert.equal(M.exos.map((e) => e.n).join("|"),
-    "Iso leg extension unilatérale @60° (genou)|Hanche 90/90 avec transitions|Cheville : genou au mur|Rotation externe épaule poulie basse|Core — Planche|Core — Crunch machine|Iso flexion coude prise marteau + supination");
-  assert.deepEqual(M.exos.filter((e) => !e.opt).map((e) => e.n), ["Iso leg extension unilatérale @60° (genou)", "Core — Planche", "Core — Crunch machine"]);
+    "Iso leg extension unilatérale @60° (genou)|Hanche 90/90 avec transitions|Cheville : genou au mur|Rotation externe épaule poulie basse|Iso flexion coude prise marteau + supination|Core — Crunch machine|Core — Planche");
+  assert.deepEqual(M.exos.filter((e) => !e.opt).map((e) => e.n), ["Iso leg extension unilatérale @60° (genou)", "Core — Crunch machine", "Core — Planche"]);
   assert.equal(M.exos.find((e) => e.n.startsWith("Iso leg")).s, 3);
   assert.equal(M.exos.find((e) => e.n === "Rotation externe épaule poulie basse").groupe, "coiffe", "jamais compté dans le volume prioritaire épaules");
 });
