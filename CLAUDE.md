@@ -4737,3 +4737,19 @@ l'ordre). Tests d'ordre exact mis à jour — **103 tests**. Build `apps/perso` 
   (l'app elle-même est consultée sur téléphone), mais dans Claude Code la
   priorité reste la clarté du diff/des changements.
 - Toujours en français.
+
+## Mobilité réordonnée, retour à l'exercice d'origine, Full Body (12-17/10/2026, apps/perso v3.107.1 → v3.107.3)
+
+- **Full Body** (v3.107.1) : la leg extension passe juste après le hip thrust (dernier exercice de
+  jambes), avant l'incliné — plus aucun exercice de jambe au milieu du haut du corps. Vérifié par
+  script sur tous les gabarits (Basket excepté : son échauffement alterne haut/bas volontairement).
+- **Mobilité** (v3.107.2) : ordre final iso leg extension, hanche 90/90, cheville genou au mur,
+  rotation externe épaule, iso flexion coude, crunch machine, **planche en dernier**.
+- **Retour à l'exercice d'origine après « Remplacer cet exercice »** (v3.107.3) : l'exercice du
+  gabarit n'étant pas toujours dans `EXERCISE_LIBRARY`, il n'était pas proposé comme candidat.
+  Désormais, dès qu'un exercice porte `origine`, la liste affiche en tête « <nom> · exercice
+  d'origine » (pris dans `template.exos`) ; `substitute()` remet `origine` à `undefined` quand on
+  revient au nom d'origine. Séries remises à zéro et historique/poids par défaut de l'exercice
+  d'origine, comme pour toute substitution. Testé dans l'aperçu (Lower B : presse → poulie →
+  retour). Entrée `protocole-dev-5175` ajoutée à `.claude/launch.json` (le port 5173 est souvent
+  pris par un autre projet).

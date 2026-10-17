@@ -53,7 +53,7 @@ import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from 
 // Courbe des protéines du graphique hebdo (09/10/2026) : ambre déjà utilisé ailleurs dans l'app
 // (fiabilité TDEE, volume sous la zone), distinct des barres kcal en citron.
 const PROT_LINE = "#e8a33d";
-const APP_VERSION = "3.107.2";
+const APP_VERSION = "3.107.3";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -1282,9 +1282,12 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
       // `origine` garde le nom du gabarit d'ORIGINE (pas le précédent remplacement) à
       // travers plusieurs substitutions successives — c'est lui qui permet de
       // retrouver le bon exercice à la réouverture de la séance (voir buildExos).
+      // Retour à l'exercice d'origine (17/10/2026) : `lib` est alors l'exercice du gabarit
+      // lui-même, et `origine` redevient absent (plus de substitution).
+      const origin = e.origine ?? e.nom;
       return { ...e, rir: null, nom: lib.n, consigne: lib.c, groupe: lib.groupe, mouvement: lib.mouvement,
         materiel: lib.materiel, tendon: lib.tendon, famille: lib.famille, def, last, series,
-        origine: e.origine ?? e.nom };
+        origine: lib.n === origin ? undefined : origin };
     }));
     setSubOpen(null);
   };
@@ -1449,15 +1452,19 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
                     exercices mécaniquement différents. Invisible si aucun candidat. */}
                 {(() => {
                   const candidates = e.famille
-                    ? EXERCISE_LIBRARY.filter((l) => l.famille === e.famille && l.n !== e.nom)
+                    ? EXERCISE_LIBRARY.filter((l) => l.famille === e.famille && l.n !== e.nom && l.n !== e.origine)
                     : [];
+                  // Retour à l'exercice d'origine : l'exercice du gabarit n'est pas forcément
+                  // dans la bibliothèque, on le prend donc directement dans le gabarit.
+                  const original = e.origine ? template.exos.find((x) => x.n === e.origine) : null;
+                  if (original) candidates.unshift({ ...original, isOriginal: true });
                   if (!candidates.length) return null;
                   return subOpen === ei ? (
                     <div style={{ marginTop: 8, background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: 10 }}>
                       <Label style={{ marginBottom: 6 }}>Remplacer par</Label>
                       {candidates.map((c) => (
                         <div key={c.n} onClick={() => substitute(ei, c)} style={{ padding: "7px 2px", borderBottom: `1px solid ${C.divider}`, cursor: "pointer" }}>
-                          <div style={{ fontSize: 12, color: C.text, fontWeight: 600 }}>{c.n}</div>
+                          <div style={{ fontSize: 12, color: C.text, fontWeight: 600 }}>{c.n}{c.isOriginal && <span style={{ color: C.accent }}> · exercice d'origine</span>}</div>
                           {c.c && <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{c.c}</div>}
                         </div>
                       ))}
