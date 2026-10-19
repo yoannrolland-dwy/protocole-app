@@ -53,7 +53,7 @@ import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from 
 // Courbe des protéines du graphique hebdo (09/10/2026) : ambre déjà utilisé ailleurs dans l'app
 // (fiabilité TDEE, volume sous la zone), distinct des barres kcal en citron.
 const PROT_LINE = "#e8a33d";
-const APP_VERSION = "3.107.3";
+const APP_VERSION = "3.108.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -766,7 +766,7 @@ function InsightsCard({ insights }) {
   // Plateaux en cours + volume prioritaire sous la zone (05/10/2026) — voir insights.js.
   if (insights.plateaus) {
     const p = insights.plateaus;
-    rows.push({ label: "Plateaux en cours", value: `${p.length}`, note: p.map((x) => `${x.nom} (${x.weeks} sem.)`).join(" · ") });
+    rows.push({ label: "Plateaux en cours", value: `${p.length}`, note: p.map((x) => `${x.nom} (${x.sessions} séances)`).join(" · ") });
   }
   if (insights.volumeShortfall) {
     const v = insights.volumeShortfall;
@@ -1440,7 +1440,7 @@ function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, 
                 )}
                 {!painRed && plateauByExo[e.nom] && (
                   <Body style={{ fontSize: 10.5, color: "#e8a33d", marginTop: 6, fontFamily: C.mono }}>
-                    ⏸ plateau depuis {plateauByExo[e.nom].weeks} semaine{plateauByExo[e.nom].weeks > 1 ? "s" : ""}
+                    ⏸ plateau depuis {plateauByExo[e.nom].sessions} séances
                   </Body>
                 )}
 
@@ -1651,14 +1651,14 @@ function ExerciseDetail({ training, knee, nom, onBack }) {
           <Label style={{ marginBottom: 5 }}>Plateau détecté</Label>
           {overload.kind === "reps" ? (
             <Body>
-              {overload.sessions} séances stables d'affilée (depuis {overload.weeks} semaine{overload.weeks > 1 ? "s" : ""}) sur{" "}
+              {overload.sessions} séances stables d'affilée sur{" "}
               {overload.poids} kg × {overload.from}. Vise{" "}
               <strong style={{ color: C.text }}>{overload.target} reps</strong> à {overload.poids} kg la prochaine fois
               (fourchette {overload.range.min}-{overload.range.max}).
             </Body>
           ) : (
             <Body>
-              {overload.sessions} séances stables d'affilée (depuis {overload.weeks} semaine{overload.weeks > 1 ? "s" : ""}) en haut
+              {overload.sessions} séances stables d'affilée en haut
               de la fourchette ({overload.range.min}-{overload.range.max} reps) à {overload.from} kg. Passe à la charge
               supérieure disponible et repars en bas de la fourchette.
             </Body>

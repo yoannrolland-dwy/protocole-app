@@ -10,6 +10,17 @@ const T = { cut: { enabled: false } };
 const base = (o = {}) => ({ training: [], knee: kneeOk(), sleep: [], targets: T, ...o });
 const types = (r) => r.suggestions.map((s) => s.type);
 
+// ---------- 19/10/2026 : une journée de Mobilité seule = jour de repos (pas de streak d'entraînement)
+test("Mobilité seule = repos : 12 jours de Mobilité ne créent aucun « j sans coupure » ; 12 jours de muscu, si", () => {
+  const mob = [...Array(12)].map((_, i) => session(d(i + 1), "Mobilité"));
+  const restOf = (r) => r.suggestions.find((s) => s.type === "Mobilité")?.reason || "";
+  const r = recommendSessions(base({ training: mob, limit: 20 }));
+  assert.ok(!/sans coupure/.test(restOf(r)), `streak compté à tort : ${restOf(r)}`);
+  assert.ok(/^0 j consécutifs/.test(restOf(r)), `streak attendu à 0 : ${restOf(r)}`);
+  const lift = [...Array(12)].map((_, i) => session(d(i + 1), "Upper A"));
+  assert.ok(/12 j sans coupure/.test(restOf(recommendSessions(base({ training: lift, limit: 20 })))), "12 jours de muscu comptés (contrôle du test)");
+});
+
 // ---------- Régression du 14/09/2026 (v3.80.5) : « déjà fait aujourd'hui » perdu au retrait du gate 48h
 test("régression 14/09 : Lower C + Escalade loggés aujourd'hui → ni l'un ni l'autre re-suggéré, Repos seul", () => {
   const r = recommendSessions(base({ training: [session(T0, "Lower C"), session(T0, "Escalade")] }));

@@ -25,7 +25,22 @@ test("mobilité (récupération active) est bien surveillée ; sous 14 j rien à
   assert.equal(mostNeglectedType([session(d(5), "Escalade"), session(d(6), "Basket"), session(d(7), "Mobilité")], T0), null);
 });
 
-import { activePlateaus, priorityVolumeShortfall } from "../src/insights.js";
+import { activePlateaus, priorityVolumeShortfall, computeStreaks } from "../src/insights.js";
+
+test("plateau : un exercice sauté pendant des semaines ne fait pas avancer le compteur (séances consécutives de CET exercice)", () => {
+  const plateau = [60, 40, 20, 0].map(stableSess); // 4 séances espacées de 20 j
+  const r = activePlateaus(plateau, [], T0);
+  assert.equal(r[0].sessions, 4);
+});
+
+test("streak d'entraînement (19/10/2026) : une journée de Mobilité seule est un jour de repos, elle ne prolonge pas le streak", () => {
+  const s = computeStreaks([session(d(1), "Upper A"), session(d(2), "Lower A"), session(T0, "Mobilité")], [], T0);
+  assert.equal(s.training, 2, "Upper hier + Lower avant-hier ; la Mobilité d'aujourd'hui ne compte pas");
+  const onlyMob = computeStreaks([session(T0, "Mobilité"), session(d(1), "Mobilité")], [], T0);
+  assert.equal(onlyMob.training, 0);
+  const both = computeStreaks([session(T0, "Mobilité"), session(T0, "Upper A")], [], T0);
+  assert.equal(both.training, 1, "Mobilité + vraie séance le même jour = jour d'entraînement");
+});
 import { kneeRed } from "./_helpers.mjs";
 const NOM = "Développé incliné haltères";
 const stableSess = (daysAgo) => ({ date: d(daysAgo), type: "Upper A", exercices: [{ nom: NOM, mode: "reps", series: [{ poids: 30, val: 8, fait: true }] }] });
@@ -36,6 +51,7 @@ test("plateaux en cours : listés avec leur durée ; null sans plateau ; masqué
   assert.equal(r.length, 1);
   assert.equal(r[0].nom, NOM);
   assert.equal(r[0].weeks, 4);
+  assert.equal(r[0].sessions, 6, "durée affichée en séances consécutives (19/10/2026), pas en semaines");
   assert.equal(activePlateaus([stableSess(5), { date: T0, type: "Upper A", exercices: [{ nom: NOM, mode: "reps", series: [{ poids: 32, val: 8, fait: true }] }] }], [], T0), null, "progression → pas de plateau");
   assert.equal(activePlateaus(plateau, kneeRed(), T0), null, "genou hors base → rien");
 });

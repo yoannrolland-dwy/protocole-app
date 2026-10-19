@@ -39,11 +39,11 @@ function countStreak(dateSet, todayDate) {
   return n;
 }
 
-/** Deux streaks distincts : jours d'affilée entraînés (tout type confondu, Mobilité compris
- * — ici c'est une célébration de régularité, pas un signal de charge/fatigue comme dans le
- * recommandeur) et jours d'affilée avec des macros loggées. */
+/** Deux streaks distincts : jours d'affilée entraînés et jours d'affilée avec des macros
+ * loggées. Une journée avec UNIQUEMENT de la Mobilité est un jour de repos (19/10/2026,
+ * demande de Yoann — même règle que le recommandeur) : elle ne prolonge pas le streak. */
 export function computeStreaks(training, macros, todayDate) {
-  const trainedDates = new Set((training || []).map((t) => t.date));
+  const trainedDates = new Set((training || []).filter((t) => t.type !== "Mobilité").map((t) => t.date));
   const loggedDates = new Set(
     (macros || []).filter((m) => m.protein != null || m.carbs != null || m.fat != null).map((m) => m.date)
   );
@@ -252,7 +252,7 @@ export function activePlateaus(training, kneeLog, todayDate) {
     .map((e) => ({ nom: e.nom, plateau: progressiveOverloadSuggestion(exerciseSessions(training, e.nom), e.nom) }))
     .filter((x) => x.plateau)
     .map((x) => ({ nom: x.nom, weeks: x.plateau.weeks, sessions: x.plateau.sessions }))
-    .sort((a, b) => b.weeks - a.weeks);
+    .sort((a, b) => b.sessions - a.sessions);
   return items.length ? items : null;
 }
 

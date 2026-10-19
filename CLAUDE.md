@@ -4753,3 +4753,22 @@ l'ordre). Tests d'ordre exact mis à jour — **103 tests**. Build `apps/perso` 
   d'origine, comme pour toute substitution. Testé dans l'aperçu (Lower B : presse → poulie →
   retour). Entrée `protocole-dev-5175` ajoutée à `.claude/launch.json` (le port 5173 est souvent
   pris par un autre projet).
+
+## Plateaux en séances, Mobilité seule = repos (19/10/2026, apps/perso v3.108.0)
+
+- **Plateaux affichés en nombre de séances consécutives** (pas en semaines) : « ⏸ plateau depuis
+  6 séances » (carnet), « 6 séances stables d'affilée » (fiche exercice), « Développé incliné
+  haltères (6 séances) » (constat). Raison de Yoann : si un exercice est sauté pour une raison
+  quelconque, le compteur ne doit pas continuer à grimper. La détection comptait DÉJÀ des séances
+  consécutives de l'exercice (jamais des jours) ; seul l'affichage changeait. `weeks`/`since`
+  restent dans le retour de `progressiveOverloadSuggestion` mais plus affichés. Le constat trie
+  désormais par nombre de séances.
+- **Une journée avec uniquement de la Mobilité est un jour de repos** : le recommandeur la
+  traitait déjà ainsi (`isLoadBearing`, depuis le 04/09/2026 : exclue de la charge 3 j, du streak
+  « j sans coupure » et des signaux de baisse de perf) — verrouillé par un test. Ce qui la
+  comptait encore comme entraînement : le constat « Streak entraînement » (`computeStreaks`,
+  `insights.js`), corrigé. Mobilité + une vraie séance le même jour = jour d'entraînement.
+  Le Coach IA reçoit `seances_7j`/`seances_14j` par type, donc « Mobilité » y apparaît comme son
+  propre type, jamais mélangée aux séances de charge (non modifié).
+- Tests : 106 (plateau en séances malgré des séances espacées de 20 j, streak sans Mobilité seule,
+  recommandeur sans streak sur 12 jours de Mobilité). Build `apps/perso` ET `apps/public` propres.
