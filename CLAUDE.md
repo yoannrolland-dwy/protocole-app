@@ -197,10 +197,13 @@ monospace), corrigée pour la lisibilité mesurée à l'audit U1.
 
 ## Fonctionnalités en place (ne pas régresser sans le signaler)
 
-- **8 onglets** : Tableau de bord, Poids, Énergie (ex-Sommeil, 05/09/2026 — sommeil +
-  score d'énergie), Pas, Séances, Douleurs (genou seul depuis le 05/09/2026, coude
-  retiré), Performance (ex-Macros), Macro (ex-Repas, module Nutrition interne — voir la
-  section dédiée plus bas)
+- **5 onglets depuis le 25/10/2026 (chantier U, U3 étape 1)** : Aujourd'hui (ex-Tableau
+  de bord), Séance, Nutrition (ex-Macro, module Nutrition interne), **Corps** (sous-onglets
+  Poids · Énergie · Pas · Genou — les 4 anciens onglets), Analyse (ex-TDEE/Performance).
+  Clés internes inchangées (`dash`, `train`, `macro`, `corps`, `perf` ; sous-onglets
+  `weight`, `sleep`, `steps`, `pain`) : `goTo` dans App.jsx traduit les anciennes clés
+  encore appelées par les écrans. Avant : 8 onglets (Tableau de bord, Poids, Énergie, Pas,
+  Séances, Douleurs, Performance, Macro)
 - **Carnet de musculation série par série** (`MuscuLogger`) : grille
   kg × reps (ou secondes pour les exos en mode "temps"), mémoire de la
   dernière perf **par série** (pas juste par exercice — si la 3e série était
@@ -3490,6 +3493,34 @@ Première étape de la refonte IHM (spec et décisions dans `ROADMAP.md`, « Cha
 - **Maquettes** dans `docs/refonte-ihm/` (U1-arborescence.html, U2-directions.html). Piège
   retenu : une page d'artifact dessinée par script peut s'afficher vide sur le téléphone de
   Yoann → écrire le HTML en dur.
+
+## Chantier U — U3 étape 1 : barre d'onglets + en-tête (25/10/2026, v3.111.0)
+
+- **`components/TabBar.jsx`** : 5 onglets de l'arborescence A, chacun 72 px de large sur le
+  téléphone de Yoann (360 px de large) et 62 px de haut, libellé 12 px, icône 22 px,
+  `aria-current`, classe `p-tap`. Icônes : Sun, Dumbbell, Flame (gardée : Yoann n'aimait pas
+  couverts/pomme), PersonStanding, TrendingUp. Mesuré sur le téléphone : « Aujourd'hui »
+  occupe 65 px sur 72.
+- **`components/AppHeader.jsx`** : nom de l'écran (« Réglages » quand ils sont ouverts) +
+  date, pastille de phase, engrenage en bouton de 48 px avec nom accessible (« Ouvrir / Fermer
+  les réglages ») qui devient une croix quand les Réglages sont ouverts. Le logo texte
+  « Protocole » disparaît, comme sur la maquette A choisie.
+- **`screens/CorpsTab.jsx`** : sous-onglets Poids · Énergie · Pas · Genou (48 px, citron
+  plein sur le sous-onglet actif). Les 4 écrans s'affichent tels quels, ils seront refaits à
+  l'étape 5. Le sous-onglet ouvert est retenu pendant la session (état React, rien de
+  sauvegardé). Les tuiles du tableau de bord (Poids, Pas, Sommeil, Score d'énergie) arrivent
+  sur le bon sous-onglet via `goTo`.
+- **Zoom réautorisé** : `maximum-scale=1` retiré d'`index.html`. Sur l'app native, la
+  WebView Capacitor n'active pas le pincement par défaut, donc rien ne change au toucher ;
+  sur navigateur, le zoom redevient possible.
+- **Lighthouse accessibilité : 64 → 94.** Les échecs restants sont les tuiles du tableau de
+  bord (gris v1 à 3,5:1 et 2,1:1), traitées à l'étape 4.
+- **Non fait, prévu à l'étape 3 (carnet)** : la barre « Séance en cours » visible hors du
+  carnet. Elle a besoin que le minuteur vive au-dessus du carnet (aujourd'hui il s'arrête à
+  l'écran quand on quitte l'onglet Séance ; seule la notification continue).
+- Testé dans l'aperçu (375 px) : tuiles → bon sous-onglet, sous-onglet retenu, chaque
+  onglet, Réglages ouverts/fermés, aucune erreur console ; 116 tests ; installé et vérifié sur
+  le téléphone.
 
 ## Minuteur de repos calé sur l'heure réelle (25/10/2026, apps/perso v3.109.3)
 

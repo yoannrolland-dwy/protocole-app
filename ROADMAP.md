@@ -29,7 +29,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | U0 | Refonte IHM — socle : découper `App.jsx` par écran, zéro changement visible, captures « avant » | moyen | ✅ 25/10/2026 (v3.109.2) |
 | U1 | Refonte IHM — cadrage : audit chiffré + moments d'usage + arborescence maquettée | petit | ✅ 25/10/2026 (option A) |
 | U2 | Refonte IHM — directions visuelles en maquettes, choix, design system v2 (variables CSS) | gros | ✅ 25/10/2026 (v3.110.0, direction A) |
-| U3 | Refonte IHM — écran par écran (un commit + une install par écran) | gros | ⬜ |
+| U3 | Refonte IHM — écran par écran (un commit + une install par écran) | gros | 🟡 1/8 (barre + en-tête, v3.111.0) |
 | U4 | Refonte IHM — audit final avant/après + mise à jour CLAUDE.md | petit | ⬜ |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il
@@ -972,4 +972,11 @@ Posé sans changement visible : `apps/perso/src/design/tokens.js` (jetons, sourc
 chaque écran migre dans son propre commit en U3. Description complète dans CLAUDE.md,
 section design system. **Reste pour U3 (étape 1, barre d'onglets + en-tête)** : retirer
 `maximum-scale=1` d'`index.html` (zoom bloqué, échec Lighthouse).
+
+### U3 — avancement
+1. ✅ Barre d'onglets + en-tête (25/10/2026, v3.111.0) — 5 onglets, Corps à sous-onglets,
+   zoom réautorisé, Lighthouse accessibilité 64 → 94. La barre « Séance en cours » est
+   reportée à l'étape 3 (le minuteur doit d'abord vivre au-dessus du carnet).
+2. ⬜ Macro (saisie) · 3. ⬜ Carnet · 4. ⬜ Aujourd'hui · 5. ⬜ Corps · 6. ⬜ Séances ·
+   7. ⬜ Analyse · 8. ⬜ Réglages
 

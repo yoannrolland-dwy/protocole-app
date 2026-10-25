@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { LayoutDashboard, Scale, Moon, Dumbbell, HeartPulse, Flame, TrendingUp, Footprints, Settings } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
 import { store, getSync } from "./store.js";
@@ -26,6 +25,9 @@ import { StepsTab } from "./screens/StepsTab.jsx";
 import { TrainTab } from "./screens/train/TrainTab.jsx";
 import { PainTab } from "./screens/PainTab.jsx";
 import { PerformanceTab } from "./screens/perf/PerformanceTab.jsx";
+import { CorpsTab, CORPS_SUBS } from "./screens/CorpsTab.jsx";
+import { TabBar, TABS } from "./components/TabBar.jsx";
+import { AppHeader } from "./components/AppHeader.jsx";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -40,6 +42,16 @@ import { PerformanceTab } from "./screens/perf/PerformanceTab.jsx";
 
 export default function App({ silent = false } = {}) {
   const [tab, setTab] = useState("dash");
+  // U3 étape 1 (25/10/2026) : Poids, Énergie, Pas et Genou vivent dans l'onglet « Corps ».
+  // Le dernier sous-onglet ouvert est retenu pendant la session (pas sauvegardé).
+  const [corpsSub, setCorpsSub] = useState("weight");
+  // Les écrans (tuiles du tableau de bord…) appellent encore les anciennes clés d'onglet
+  // ("weight", "sleep"…) : `goTo` les envoie sur le bon sous-onglet de Corps.
+  const goTo = (key) => {
+    if (CORPS_SUBS.some((c) => c.key === key)) { setCorpsSub(key); setTab("corps"); }
+    else setTab(key);
+    setShowSettings(false);
+  };
   const [showSettings, setShowSettings] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -449,18 +461,8 @@ export default function App({ silent = false } = {}) {
   // entre deux onglets, donc le navigateur conservait le scroll de l'onglet précédent au
   // lieu de repartir du haut.
   const mainRef = useRef(null);
-  useEffect(() => { mainRef.current?.scrollTo(0, 0); }, [tab, showSettings]);
+  useEffect(() => { mainRef.current?.scrollTo(0, 0); }, [tab, corpsSub, showSettings]);
 
-  const NAV = [
-    { key: "dash", label: "Bord", icon: LayoutDashboard },
-    { key: "weight", label: "Poids", icon: Scale },
-    { key: "sleep", label: "Énergie", icon: Moon },
-    { key: "steps", label: "Pas", icon: Footprints },
-    { key: "train", label: "Séances", icon: Dumbbell },
-    { key: "pain", label: "Douleurs", icon: HeartPulse },
-    { key: "perf", label: "TDEE", icon: TrendingUp },
-    { key: "macro", label: "Macro", icon: Flame },
-  ];
 
   // Lancé par le bouton Sync du widget (SilentSyncActivity, voir main.jsx) : tous les
   // effets ci-dessus (chargement, runHealthSync, mise à jour du widget) tournent
@@ -474,26 +476,9 @@ export default function App({ silent = false } = {}) {
       fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
     }}>
       {/* En-tête */}
-      <header style={{
-        flexShrink: 0, padding: "14px 16px 12px",
-        paddingTop: "calc(14px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))",
-        borderBottom: `1.5px solid ${C.divider}`,
-        display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-      }}>
-        <div>
-          <div style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 800, letterSpacing: 3, color: C.accent }}>Protocole</div>
-          <div style={{ fontSize: 11, color: C.muted, marginTop: 2, textTransform: "uppercase", letterSpacing: 1 }}>{longDate(today())}</div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{
-            fontSize: 10, color: "#000", background: C.accent, padding: "4px 9px",
-            borderRadius: 5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1,
-          }}>{PHASES[phase].label}</span>
-          <button onClick={() => setShowSettings((s) => !s)} style={{ background: "none", border: "none", cursor: "pointer", color: showSettings ? C.accent : C.dim, padding: 0 }}>
-            <Settings size={19} />
-          </button>
-        </div>
-      </header>
+      <AppHeader title={showSettings ? "Réglages" : TABS.find((t) => t.key === tab)?.label}
+        phaseLabel={PHASES[phase].label} settingsOpen={showSettings}
+        onToggleSettings={() => setShowSettings((v) => !v)} />
 
       {/* Contenu */}
       <main ref={mainRef} style={{ flex: 1, overflowY: "auto", padding: "14px 16px 24px" }}>
@@ -501,12 +486,16 @@ export default function App({ silent = false } = {}) {
           <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, setTab, lastCloudBackup, basketSchedule, planFor: planForDate(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier, saveKnee: save.knee, onStart: startSession }} openSettings={() => setShowSettings(true)} />}
-            {tab === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
-            {tab === "sleep" && <SleepTab {...{ sleep, rhr, steps, naps, save }} />}
-            {tab === "steps" && <StepsTab {...{ steps, save }} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, coach, todayNote, saveNote, saveJournal, lastCloudBackup, basketSchedule, planFor: planForDate(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier, saveKnee: save.knee, onStart: startSession }} setTab={goTo} openSettings={() => setShowSettings(true)} />}
+            {tab === "corps" && (
+              <CorpsTab sub={corpsSub} onSub={setCorpsSub}>
+                {corpsSub === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
+                {corpsSub === "sleep" && <SleepTab {...{ sleep, rhr, steps, naps, save }} />}
+                {corpsSub === "steps" && <StepsTab {...{ steps, save }} />}
+                {corpsSub === "pain" && <PainTab {...{ knee, save, hsrWeek }} />}
+              </CorpsTab>
+            )}
             {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, startType }} onStartConsumed={() => setStartType(null)} />}
-            {tab === "pain" && <PainTab {...{ knee, save, hsrWeek }} />}
             {tab === "perf" && <PerformanceTab {...{ macros, targets, training, weight, phase }} />}
             {tab === "macro" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} apiKey={apiKey} model={model} />}
           </>
@@ -514,28 +503,7 @@ export default function App({ silent = false } = {}) {
       </main>
 
       {/* Navigation */}
-      <nav style={{
-        flexShrink: 0, display: "flex", justifyContent: "space-around",
-        padding: "9px 4px 12px", paddingBottom: "calc(12px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))",
-        borderTop: `1.5px solid ${C.divider}`, background: C.bg,
-      }}>
-        {NAV.map(({ key, label, icon: Icon }) => {
-          const on = tab === key && !showSettings;
-          return (
-            <button key={key} onClick={() => { setTab(key); setShowSettings(false); }} style={{
-              // 8 onglets depuis l'ajout de « Repas » : le padding horizontal passe de 6 à 3
-              // pour que les libellés les plus longs (« Sommeil », « Séances ») tiennent
-              // encore sur une ligne à 360 px de large.
-              background: "none", border: "none", cursor: "pointer", padding: "2px 3px",
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-              color: on ? C.accent : C.dim, fontFamily: "inherit",
-            }}>
-              <Icon size={19} />
-              <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</span>
-            </button>
-          );
-        })}
-      </nav>
+      <TabBar tab={tab} dimmed={showSettings} onSelect={goTo} />
     </div>
   );
 }
