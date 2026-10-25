@@ -1,7 +1,8 @@
-// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) : code déplacé tel quel.
+// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; rendu v2 à l'étape 8 d'U3 via
+// design/compat.jsx (mêmes primitives, valeurs v2), polices écrites en dur remontées à 12-13 px.
 import { useState } from "react";
 import { X } from "lucide-react";
-import { C, today, fmt, Card, Label, Body, Btn, inputStyle } from "../../ui.jsx";
+import { C, today, fmt, Card, Label, Body, Btn, inputStyle } from "../../design/compat.jsx";
 
 // Planning Basket fixe (01/09/2026) : jours de semaine récurrents (entraînement hebdo,
 // 0=dimanche...6=samedi comme Date#getDay()) + dates de matchs ponctuelles (calendrier de
@@ -40,7 +41,7 @@ export function BasketScheduleCard({ basketSchedule, setBasketSchedule }) {
   return (
     <Card>
       <Label style={{ marginBottom: 8 }}>Planning Basket fixe</Label>
-      <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 10 }}>
+      <Body style={{ fontSize: 13, color: C.dim, marginBottom: 10 }}>
         Le recommandeur sait qu'un Basket est prévu avant même que tu l'aies loggé : il évite
         de proposer un Lower le même jour, le propose en priorité ("c'est le jour de
         l'entraînement") le jour même, et bascule sur le planning "semaine avec match" dès
@@ -52,12 +53,8 @@ export function BasketScheduleCard({ basketSchedule, setBasketSchedule }) {
         {WEEKDAYS.map((d) => {
           const on = weekly.includes(d.key);
           return (
-            <button key={d.key} onClick={() => toggleDay(d.key)} style={{
-              padding: "7px 12px", borderRadius: 6, cursor: "pointer",
-              fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5,
-              background: on ? C.accent : C.card, color: on ? "#000" : C.muted,
-              border: `1.5px solid ${on ? C.accent : C.border}`, fontFamily: "inherit",
-            }}>{d.label}</button>
+            <button key={d.key} type="button" className="p-tap p-chip" aria-pressed={on} onClick={() => toggleDay(d.key)}
+              style={on ? { background: C.accent, color: "#0a0a0a", borderColor: C.accent } : undefined}>{d.label}</button>
           );
         })}
       </div>
@@ -68,21 +65,22 @@ export function BasketScheduleCard({ basketSchedule, setBasketSchedule }) {
         <Btn variant="primary" disabled={!newDate} onClick={addMatch} style={{ padding: "0 16px" }}>Ajouter</Btn>
       </div>
       {matchDates.length === 0 ? (
-        <Body style={{ fontSize: 11, color: C.dim }}>Aucune date de match enregistrée.</Body>
+        <Body style={{ fontSize: 13, color: C.dim }}>Aucune date de match enregistrée.</Body>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {shown.map((d) => (
-            <div key={d} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 2px", borderBottom: `1px solid ${C.divider}` }}>
-              <span style={{ fontSize: 12, color: C.text, fontFamily: C.mono }}>{fmt(d)}</span>
-              <button onClick={() => removeMatch(d)} style={{ background: "none", border: "none", cursor: "pointer", color: C.dim, padding: 4 }}>
-                <X size={13} />
+            <div key={d} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 2px", borderBottom: `1px solid ${C.divider}` }}>
+              <span style={{ fontSize: 15, color: C.text, fontFamily: C.mono }}>{fmt(d)}</span>
+              <button type="button" className="p-tap" onClick={() => removeMatch(d)} aria-label={`Retirer le match du ${fmt(d)}`}
+                style={{ width: 44, height: 44, display: "grid", placeItems: "center", background: "none", border: "none", color: C.text2, padding: 0 }}>
+                <X size={18} aria-hidden="true" />
               </button>
             </div>
           ))}
           {(hiddenCount > 0 || showAll) && (
-            <button onClick={() => setShowAll((v) => !v)} style={{
-              background: "none", border: "none", cursor: "pointer", padding: "8px 2px 2px",
-              textAlign: "left", color: C.accent, fontSize: 11, fontWeight: 700,
+            <button type="button" className="p-tap" onClick={() => setShowAll((v) => !v)} aria-expanded={showAll} style={{
+              background: "none", border: "none", cursor: "pointer", padding: "0 2px", minHeight: 44,
+              textAlign: "left", color: C.accent, fontSize: 13, fontWeight: 700,
               textTransform: "uppercase", letterSpacing: 1, fontFamily: "inherit",
             }}>
               {showAll ? "Réduire" : `Voir tout (${matchDates.length})`}

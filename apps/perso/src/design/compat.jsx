@@ -55,6 +55,13 @@ export const inputStyle = () => ({
   minHeight: 52, padding: "0 12px", fontFamily: C.mono, fontSize: 16, color: C.text, fontWeight: 700, width: "100%", outline: "none",
 });
 
+export function TextInput({ value, onChange, placeholder, type = "text", inputMode, style = {} }) {
+  return (
+    <input type={type} inputMode={inputMode} value={value} placeholder={placeholder} onChange={onChange}
+      className="p-field" style={{ fontFamily: FONTS.body, fontWeight: 600, ...style }} />
+  );
+}
+
 // Même comportement que le Stepper v1 (frappe libre, validation et bornes à la sortie du
 // champ ou sur Entrée), en 52 px.
 export function Stepper({ value, set, step = 1, unit = "", min = 0, max = null, int = false }) {

@@ -3685,6 +3685,21 @@ décompte** (la pastille épinglée en permanence de juillet gênait le défilem
   le graphique kcal sans ses barres alors qu'elles sont dans le DOM (8 barres citron) — l'aperçu ne
   dessinait plus qu'une image toutes les 300 ms ; vérifié sur le téléphone, barres présentes.
 
+## Chantier U — U3 étape 8 : Réglages en v2 (25/10/2026, v3.118.0)
+
+- `SettingsPanel` et `BasketScheduleCard` passent sur `design/compat.jsx` (qui gagne `TextInput`).
+  Titre « Réglages » et sa croix retirés de la page : l'en-tête de l'app affiche déjà « Réglages »
+  et l'engrenage devient une croix de fermeture.
+- **Planning basket** : jours de la semaine en pastilles `p-chip` (44 px, `aria-pressed`), croix
+  de retrait d'un match en 44 px avec nom accessible, « Voir tout / Réduire » en 44 px.
+- **Cibles macro de base** : une seule colonne — en deux colonnes, le champ ne faisait que 30 px
+  entre ses −/+ de 52 px (une valeur à 3 chiffres aurait été coupée, bug déjà vu le 06/08).
+- Zones de texte du coach (contexte permanent, carnet, briefing) : marge intérieure rétablie
+  (le style de champ v2 en 52 px la mettait à zéro en haut).
+- **Mesuré dans l'aperçu (375 px)** : 0 texte sous 12 px, 0 sous 4,5:1, 0 cible sous 44 px. Testé :
+  un jour fixe activé puis désactivé (`basketSchedule.weekly`). Vérifié sur le téléphone : planning,
+  matchs et phase intacts.
+
 ## Minuteur de repos calé sur l'heure réelle (25/10/2026, apps/perso v3.109.3)
 
 Remonté par Yoann pendant U1 : le chrono du carnet prenait du retard sur celui de la

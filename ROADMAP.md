@@ -29,7 +29,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | U0 | Refonte IHM — socle : découper `App.jsx` par écran, zéro changement visible, captures « avant » | moyen | ✅ 25/10/2026 (v3.109.2) |
 | U1 | Refonte IHM — cadrage : audit chiffré + moments d'usage + arborescence maquettée | petit | ✅ 25/10/2026 (option A) |
 | U2 | Refonte IHM — directions visuelles en maquettes, choix, design system v2 (variables CSS) | gros | ✅ 25/10/2026 (v3.110.0, direction A) |
-| U3 | Refonte IHM — écran par écran (un commit + une install par écran) | gros | 🟡 7/8 (… Séances, Analyse — v3.117.0) |
+| U3 | Refonte IHM — écran par écran (un commit + une install par écran) | gros | ✅ 25/10/2026 (8 étapes, v3.111.0 → v3.118.0) |
 | U4 | Refonte IHM — audit final avant/après + mise à jour CLAUDE.md | petit | ⬜ |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il
@@ -994,5 +994,9 @@ section design system. **Reste pour U3 (étape 1, barre d'onglets + en-tête)** 
    44 px.
 7. ✅ Analyse (25/10/2026, v3.117.0) — planning idéal → Séance, péri-training et protocoles
    basket → Nutrition.
-8. ⬜ Réglages
+8. ✅ Réglages (25/10/2026, v3.118.0) — pastilles du planning basket, cibles macro sur une
+   colonne.
+
+**Restent en v1 après U3** (fonctionnels, pas refaits ni mesurés) : création/modification de
+recette, correction des valeurs d'un aliment (V6), Carte resto, Photo d'un plat (`nutrition/`).
 
