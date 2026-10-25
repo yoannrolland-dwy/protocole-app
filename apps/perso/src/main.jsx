@@ -5,6 +5,11 @@ import { Capacitor } from "@capacitor/core";
 import App from "./App.jsx";
 import { isSilentSync } from "./silentSync.js";
 import "./index.css";
+import "./design/theme.css";
+import { applyTheme } from "./design/tokens.js";
+
+// Design system v2 (U2) : variables CSS posées avant le premier rendu.
+applyTheme();
 
 if (Capacitor.isNativePlatform()) {
   // App native : les assets sont embarqués dans l'APK, le service worker n'apporte rien

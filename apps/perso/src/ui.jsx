@@ -21,7 +21,12 @@ export { localDateKey, today, shiftDateKey, fmt, round, longDate, byDate, upsert
 // App.jsx puisse continuer à tout importer depuis un seul endroit.
 export { lastN, daysBetween, fmtHM } from "@rawcare/core/dateUtils";
 
-/* ---------- jetons de design ---------- */
+// Design system v2 (chantier U, U2, 25/10/2026) : jetons de la direction A dans
+// design/tokens.js, classes d'état dans design/theme.css. Un écran refait en U3 utilise
+// `T` (var(--…)) et les classes p-* ; `C` ci-dessous reste pour les écrans pas encore migrés.
+export { T, COLORS } from "./design/tokens.js";
+
+/* ---------- jetons de design (v1, en cours de remplacement) ---------- */
 export const C = {
   bg: "#050505",
   card: "#121212",

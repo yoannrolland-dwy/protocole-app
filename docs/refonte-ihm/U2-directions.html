@@ -1,0 +1,381 @@
+<title>Directions visuelles PROTOCOLE</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;600;700&family=JetBrains+Mono:wght@500;700;800&family=Barlow:wght@400;600;700&family=Barlow+Condensed:wght@600;700;800&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500;700&display=swap">
+<style>
+/* Page : un sélecteur de direction, trois téléphones (Aujourd'hui · Séance · Nutrition), puis la palette avec ses contrastes mesurés. Les téléphones ont l'apparence fixe de la direction ; la page autour suit le thème. */
+:root {
+  --pg-bg: #f2f1ec; --pg-panel: #ffffff; --pg-line: #d4d2c8; --pg-fg: #151513; --pg-fg2: #55544d; --pg-accent: #4d6400; --pg-on: #ffffff;
+  --pg-body: "Instrument Sans", system-ui, sans-serif; --pg-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --pg-bg: #0c0c0b; --pg-panel: #171715; --pg-line: #33332f; --pg-fg: #f2f2ec; --pg-fg2: #b2b2aa; --pg-accent: #d7ff3f; --pg-on: #0c0c0b; color-scheme: dark; } }
+:root[data-theme="dark"] { --pg-bg: #0c0c0b; --pg-panel: #171715; --pg-line: #33332f; --pg-fg: #f2f2ec; --pg-fg2: #b2b2aa; --pg-accent: #d7ff3f; --pg-on: #0c0c0b; color-scheme: dark; }
+body { background: var(--pg-bg); color: var(--pg-fg); font-family: var(--pg-body); font-size: 16px; line-height: 1.5; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 24px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 24px; }
+h1 { font-size: 1.7rem; margin: 0; text-wrap: balance; } h2 { font-size: 1.2rem; margin: 0; }
+.pg-p { margin: 0; max-width: 68ch; color: var(--pg-fg2); }
+.pg-label { font-family: var(--pg-mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pg-fg2); }
+.picker { display: flex; flex-wrap: wrap; gap: 8px; }
+.picker button { font: inherit; font-weight: 700; min-height: 48px; padding: 0 18px; border-radius: 10px; border: 1.5px solid var(--pg-line); background: var(--pg-panel); color: var(--pg-fg); cursor: pointer; }
+.picker button[aria-pressed="true"] { background: var(--pg-accent); border-color: var(--pg-accent); color: var(--pg-on); }
+.picker button:focus-visible, .ph button:focus-visible { outline: 3px solid var(--pg-accent); outline-offset: 2px; }
+.picker a { font-weight: 700; min-height: 48px; padding: 0 16px; border-radius: 10px; border: 1.5px solid var(--pg-line); background: var(--pg-panel); color: var(--pg-fg); display: inline-flex; align-items: center; text-decoration: none; }
+.picker a:focus-visible, summary:focus-visible { outline: 3px solid var(--pg-accent); outline-offset: 2px; }
+.wrap, .wrap > section, .dirsec { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.wrap > * { min-width: 0; }
+.dirsec { scroll-margin-top: 16px; border-top: 2px solid var(--pg-line); padding-top: 20px; }
+.dirhead { display: flex; align-items: center; gap: 14px; }
+.dirletter { width: 56px; height: 56px; border-radius: 14px; display: grid; place-items: center; font-family: var(--x-head); font-weight: 800; font-size: 30px; background: var(--x-bg); color: var(--x-accent-text); border: 2px solid var(--x-line); flex: 0 0 auto; }
+summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.phones { scroll-padding-left: 0; }
+.intent { border-left: 3px solid var(--pg-accent); padding-left: 12px; display: grid; gap: 4px; }
+.intent p { margin: 0; max-width: 70ch; }
+.phones { display: flex; gap: 18px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; }
+.phones > figure { margin: 0; flex: 0 0 auto; display: grid; gap: 8px; justify-items: center; scroll-snap-align: start; }
+.phones figcaption { font-family: var(--pg-mono); font-size: 0.8rem; color: var(--pg-fg2); text-transform: uppercase; letter-spacing: 0.06em; }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.sw { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; align-items: center; background: var(--pg-panel); border: 1px solid var(--pg-line); border-radius: 10px; padding: 8px 10px; font-size: 0.9rem; }
+.sw i { width: 44px; height: 32px; border-radius: 6px; border: 1px solid var(--pg-line); display: grid; place-items: center; font-style: normal; font-weight: 700; font-size: 0.9rem; }
+.sw b { font-family: var(--pg-mono); font-variant-numeric: tabular-nums; }
+.sw .ok { color: var(--pg-accent); } .sw .ko { color: #c8261b; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.notes div { background: var(--pg-panel); border: 1px solid var(--pg-line); border-radius: 10px; padding: 12px; }
+.notes h3 { margin: 0 0 4px; font-size: 0.8rem; font-family: var(--pg-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--pg-fg2); }
+.notes ul { margin: 0; padding-left: 18px; }
+
+/* ===== Téléphone : tout passe par les variables --x-*, posées par direction ===== */
+.ph { width: 340px; height: 700px; border-radius: 30px; overflow: hidden; display: flex; flex-direction: column; background: var(--x-bg); color: var(--x-text); font-family: var(--x-body); font-size: 15px; line-height: 1.35; border: 6px solid #2b2b28; box-sizing: border-box; position: relative; }
+.ph * { box-sizing: border-box; }
+.ph .top { padding: 14px 16px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ph .top .t { font-family: var(--x-head); font-weight: var(--x-head-w); font-size: 22px; letter-spacing: var(--x-head-ls); text-transform: var(--x-head-tt); }
+.ph .top .d { font-size: 13px; color: var(--x-text2); }
+.ph .pill { font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 999px; background: var(--x-accent); color: var(--x-on-accent); letter-spacing: 0.04em; text-transform: uppercase; }
+.ph .gear { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--x-line); background: transparent; color: var(--x-text2); display: grid; place-items: center; }
+.ph .scroll { flex: 1; overflow-y: auto; padding: 4px 14px 14px; display: grid; gap: 10px; align-content: start; }
+.ph .card { background: var(--x-card); border: var(--x-card-border); box-shadow: var(--x-shadow); border-radius: var(--x-radius); padding: 14px; display: grid; gap: 8px; }
+.ph .lbl { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--x-text2); }
+.ph .num { font-family: var(--x-num); font-variant-numeric: tabular-nums; font-weight: var(--x-num-w); letter-spacing: var(--x-num-ls); }
+.ph .sec { color: var(--x-text2); font-size: 13px; }
+.ph .muted { color: var(--x-muted); font-size: 13px; }
+.ph .acc { color: var(--x-accent-text); }
+.ph .warn { color: var(--x-warn); }
+.ph .row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ph .big { font-size: 34px; line-height: 1; }
+.ph .mid { font-size: 22px; line-height: 1.1; }
+.ph .btn { min-height: 52px; border-radius: calc(var(--x-radius) - 2px); border: none; font: inherit; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; cursor: pointer; }
+.ph .btn.pri { background: var(--x-accent); color: var(--x-on-accent); }
+.ph .btn.out { background: transparent; color: var(--x-accent-text); border: 2px solid var(--x-accent-text); }
+.ph .btn.plain { background: var(--x-raised); color: var(--x-text); }
+.ph .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ph .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ph .tile { background: var(--x-card); border: var(--x-card-border); box-shadow: var(--x-shadow); border-radius: var(--x-radius); padding: 12px; display: grid; gap: 4px; min-width: 0; }
+.ph .bar { height: 6px; border-radius: 99px; background: var(--x-raised); overflow: hidden; } .ph .bar > span { display: block; height: 100%; background: var(--x-accent); border-radius: 99px; }
+.ph .bar.n > span { background: var(--x-data2); }
+.ph .divider { height: 1px; background: var(--x-line); }
+.ph .tabs { display: flex; border-top: 1px solid var(--x-line); background: var(--x-tabbar); }
+.ph .tabs div { flex: 1; min-height: 62px; display: grid; place-items: center; align-content: center; gap: 3px; font-size: 12px; font-weight: 700; color: var(--x-text2); }
+.ph .tabs div svg { width: 22px; height: 22px; }
+.ph .tabs div { white-space: nowrap; letter-spacing: -0.02em; min-width: 0; }
+.ph { border-width: 4px; }
+.ph .tabs div.on { color: var(--x-accent-text); }
+.ph .live { margin: 0 10px 8px; min-height: 48px; border-radius: calc(var(--x-radius) - 2px); background: var(--x-accent); color: var(--x-on-accent); display: flex; align-items: center; justify-content: space-between; padding: 0 14px; font-weight: 700; font-size: 14px; }
+/* carnet */
+.ph .timer { background: var(--x-timer-bg); color: var(--x-timer-fg); border-radius: var(--x-radius); padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; }
+.ph .timer .num { font-size: 40px; line-height: 1; }
+.ph .setrow { display: grid; grid-template-columns: 28px 1fr 1fr 52px; gap: 8px; align-items: center; }
+.ph .setrow .n { font-family: var(--x-num); color: var(--x-text2); font-size: 15px; text-align: center; }
+.ph .field { min-height: 52px; border-radius: calc(var(--x-radius) - 4px); background: var(--x-field); border: 1.5px solid var(--x-line); display: flex; align-items: center; justify-content: space-between; padding: 0 12px; }
+.ph .field .num { font-size: 22px; }
+.ph .field small { color: var(--x-muted); font-size: 12px; }
+.ph .field.focus { border-color: var(--x-accent-text); }
+.ph .check { width: 52px; height: 52px; border-radius: calc(var(--x-radius) - 4px); border: 2px solid var(--x-line); background: transparent; display: grid; place-items: center; color: var(--x-text2); }
+.ph .check.done { background: var(--x-accent); border-color: var(--x-accent); color: var(--x-on-accent); }
+.ph .setrow.past .field { background: transparent; border-style: dashed; }
+.ph .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.ph .chip { min-height: 44px; padding: 0 12px; border-radius: 999px; border: 1.5px solid var(--x-line); display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--x-text); background: var(--x-card); }
+.ph .chip b { color: var(--x-accent-text); font-size: 18px; line-height: 1; }
+.ph .line { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; min-height: 48px; border-bottom: 1px solid var(--x-line); }
+.ph .line:last-of-type { border-bottom: none; }
+.ph .line .nm { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph .line .q { font-size: 13px; color: var(--x-text2); }
+.ph .macro4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ph .macro4 > div { display: grid; gap: 3px; min-width: 0; }
+
+/* ===== Directions ===== */
+[data-dir="A"] { --x-bg:#050505; --x-card:#131312; --x-raised:#22221f; --x-field:#0b0b0a; --x-line:#34342f; --x-text:#f5f5f0; --x-text2:#bdbdb4; --x-muted:#96968d; --x-accent:#d7ff3f; --x-accent-text:#d7ff3f; --x-on-accent:#0a0a0a; --x-warn:#f2a33a; --x-data2:#d7ff3f;
+  --x-card-border: 1px solid #262623; --x-shadow:none; --x-radius:14px; --x-tabbar:#050505; --x-timer-bg:#131312; --x-timer-fg:#d7ff3f;
+  --x-body:"Instrument Sans", system-ui, sans-serif; --x-num:"JetBrains Mono", ui-monospace, monospace; --x-num-w:700; --x-num-ls:-0.01em;
+  --x-head:"Instrument Sans", system-ui, sans-serif; --x-head-w:700; --x-head-ls:-0.01em; --x-head-tt:none; }
+[data-dir="B"] { --x-bg:#111315; --x-card:#1a1d20; --x-raised:#272b2f; --x-field:#0d0f11; --x-line:#363b40; --x-text:#eef1f2; --x-text2:#b6bfc5; --x-muted:#929ca3; --x-accent:#d7ff3f; --x-accent-text:#d7ff3f; --x-on-accent:#101200; --x-warn:#ff9a4a; --x-data2:#62d6e8;
+  --x-card-border: 1px solid #2a2e32; --x-shadow:none; --x-radius:6px; --x-tabbar:#0d0f11; --x-timer-bg:#d7ff3f; --x-timer-fg:#101200;
+  --x-body:"Barlow", system-ui, sans-serif; --x-num:"Barlow Condensed", "Arial Narrow", sans-serif; --x-num-w:800; --x-num-ls:0.01em;
+  --x-head:"Barlow Condensed", "Arial Narrow", sans-serif; --x-head-w:800; --x-head-ls:0.04em; --x-head-tt:uppercase; }
+[data-dir="C"] { --x-bg:#f3f2ec; --x-card:#ffffff; --x-raised:#e9e8e1; --x-field:#f7f6f1; --x-line:#cfcdc2; --x-text:#121210; --x-text2:#46453f; --x-muted:#62615a; --x-accent:#d7ff3f; --x-accent-text:#4a6000; --x-on-accent:#121210; --x-warn:#9a5300; --x-data2:#1f6f8b;
+  --x-card-border: 1px solid #e2e0d6; --x-shadow:0 1px 2px rgba(20,20,10,.08); --x-radius:16px; --x-tabbar:#ffffff; --x-timer-bg:#121210; --x-timer-fg:#d7ff3f;
+  --x-body:"Atkinson Hyperlegible", system-ui, sans-serif; --x-num:"IBM Plex Mono", ui-monospace, monospace; --x-num-w:700; --x-num-ls:0;
+  --x-head:"Atkinson Hyperlegible", system-ui, sans-serif; --x-head-w:700; --x-head-ls:0; --x-head-tt:none; }
+[data-dir="B"] .lbl { font-family: var(--x-head); font-size: 13px; letter-spacing: 0.1em; }
+[data-dir="B"] .card { border-left: 3px solid var(--x-line); }
+[data-dir="B"] .card.hl { border-left-color: var(--x-accent); }
+[data-dir="A"] .card.hl { border-color: #4a5a12; }
+[data-dir="C"] .card.hl { box-shadow: 0 0 0 2px var(--x-accent), var(--x-shadow); }
+.ph[data-dir="C"] { border-color: #bdbbb1; }
+/* Sur fond clair le citron ne se voit pas comme trait : barres en olive, aplats citron cernés de noir. */
+[data-dir="C"] .bar > span { background: var(--x-accent-text); }
+[data-dir="C"] .pill, [data-dir="C"] .btn.pri, [data-dir="C"] .check.done, [data-dir="C"] .live { box-shadow: inset 0 0 0 1.5px var(--x-text); }
+[data-dir="C"] .card.hl { box-shadow: 0 0 0 2px var(--x-accent-text), var(--x-shadow); }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:10px">
+    <div class="pg-label">Chantier U · étape U2 · 25/10/2026</div>
+    <h1>Trois directions visuelles</h1>
+    <p class="pg-p">Mêmes écrans, mêmes données, trois styles. Les trois respectent déjà les règles de l'audit : texte de 12 px minimum, contraste mesuré ci-dessous, boutons de 48 px et plus. Fais défiler les téléphones horizontalement, puis choisis une direction (tu peux aussi en mélanger deux, dis-moi quoi prendre où).</p>
+  </header>
+  <nav class="picker" aria-label="Aller à une direction"><a href="#cmp">Comparer</a><a href="#dir-A">A · Affirmée mûrie</a><a href="#dir-B">B · Tableau de salle</a><a href="#dir-C">C · Plein jour</a></nav>
+  <section id="cmp" class="dirsec" style="display:grid;gap:12px">
+    <h2>Le même écran dans les 3 directions</h2>
+    <p class="pg-p">Le carnet en pleine séance, l'écran où la lisibilité compte le plus. Fais glisser vers la gauche pour voir B puis C.</p>
+    <div class="phones"><figure><div class="ph" data-dir="A"><div class="top"><div><div class="t">Upper A</div><div class="d">débuté 07:12 · 3/9 exos</div></div><div style="display:flex;gap:8px;align-items:center"><button class="gear" aria-label="Réglages"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></div></div>
+<div class="scroll">
+  <div class="timer"><div><div class="lbl" style="color:inherit;opacity:.85">Repos</div><div class="num">1:28</div></div><button class="btn plain" style="width:auto;padding:0 16px;min-height:48px">+30 s</button></div>
+  <div class="card hl">
+    <div class="mid" style="font-weight:700;font-size:20px">Développé incliné haltères</div>
+    <div class="row"><span class="sec">4 × 8-10 · 1-2 reps en réserve</span><span class="sec num">série 3/4</span></div>
+    <div class="row"><span class="acc" style="font-weight:700">Dernière fois 34 kg × 9</span><span class="muted">★ record 34 × 9</span></div>
+    <div class="setrow past"><span class="n">1</span><div class="field"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check done" aria-label="Série 1 faite"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow past"><span class="n">2</span><div class="field"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check done" aria-label="Série 2 faite"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow"><span class="n" style="color:var(--x-accent-text);font-weight:800">3</span><div class="field focus"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check" aria-label="Valider la série 3"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow"><span class="n">4</span><div class="field"><span class="num" style="color:var(--x-muted)">9</span><small>reps</small></div><div class="field"><span class="num" style="color:var(--x-muted)">34</span><small>kg</small></div><button class="check" aria-label="Valider la série 4"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="row" style="align-items:center"><span class="sec">Réserve</span><div class="chips"><span class="chip">0</span><span class="chip">1</span><span class="chip" style="border-color:var(--x-accent-text)">2</span><span class="chip">3+</span></div></div>
+  </div>
+  <div class="card"><span class="lbl">Ensuite</span><div class="row"><span style="font-weight:700">Tirage vertical prise neutre</span><span class="sec num">3 × 8-10</span></div><span class="sec">Dernière fois 70 kg × 10</span></div>
+</div><div class="tabs"><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Aujourd'hui</div><div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg>Séance</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c3 3 5 6 5 9a5 5 0 0 1-10 0c0-3 2-6 5-9z"/></svg>Nutrition</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 11h8M12 15l-3 6M12 15l3 6"/></svg>Corps</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Analyse</div></div></div><figcaption>A · Affirmée mûrie</figcaption></figure><figure><div class="ph" data-dir="B"><div class="top"><div><div class="t">Upper A</div><div class="d">débuté 07:12 · 3/9 exos</div></div><div style="display:flex;gap:8px;align-items:center"><button class="gear" aria-label="Réglages"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></div></div>
+<div class="scroll">
+  <div class="timer"><div><div class="lbl" style="color:inherit;opacity:.85">Repos</div><div class="num">1:28</div></div><button class="btn plain" style="width:auto;padding:0 16px;min-height:48px">+30 s</button></div>
+  <div class="card hl">
+    <div class="mid" style="font-weight:700;font-size:20px">Développé incliné haltères</div>
+    <div class="row"><span class="sec">4 × 8-10 · 1-2 reps en réserve</span><span class="sec num">série 3/4</span></div>
+    <div class="row"><span class="acc" style="font-weight:700">Dernière fois 34 kg × 9</span><span class="muted">★ record 34 × 9</span></div>
+    <div class="setrow past"><span class="n">1</span><div class="field"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check done" aria-label="Série 1 faite"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow past"><span class="n">2</span><div class="field"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check done" aria-label="Série 2 faite"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow"><span class="n" style="color:var(--x-accent-text);font-weight:800">3</span><div class="field focus"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check" aria-label="Valider la série 3"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow"><span class="n">4</span><div class="field"><span class="num" style="color:var(--x-muted)">9</span><small>reps</small></div><div class="field"><span class="num" style="color:var(--x-muted)">34</span><small>kg</small></div><button class="check" aria-label="Valider la série 4"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="row" style="align-items:center"><span class="sec">Réserve</span><div class="chips"><span class="chip">0</span><span class="chip">1</span><span class="chip" style="border-color:var(--x-accent-text)">2</span><span class="chip">3+</span></div></div>
+  </div>
+  <div class="card"><span class="lbl">Ensuite</span><div class="row"><span style="font-weight:700">Tirage vertical prise neutre</span><span class="sec num">3 × 8-10</span></div><span class="sec">Dernière fois 70 kg × 10</span></div>
+</div><div class="tabs"><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Aujourd'hui</div><div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg>Séance</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c3 3 5 6 5 9a5 5 0 0 1-10 0c0-3 2-6 5-9z"/></svg>Nutrition</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 11h8M12 15l-3 6M12 15l3 6"/></svg>Corps</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Analyse</div></div></div><figcaption>B · Tableau de salle</figcaption></figure><figure><div class="ph" data-dir="C"><div class="top"><div><div class="t">Upper A</div><div class="d">débuté 07:12 · 3/9 exos</div></div><div style="display:flex;gap:8px;align-items:center"><button class="gear" aria-label="Réglages"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></div></div>
+<div class="scroll">
+  <div class="timer"><div><div class="lbl" style="color:inherit;opacity:.85">Repos</div><div class="num">1:28</div></div><button class="btn plain" style="width:auto;padding:0 16px;min-height:48px">+30 s</button></div>
+  <div class="card hl">
+    <div class="mid" style="font-weight:700;font-size:20px">Développé incliné haltères</div>
+    <div class="row"><span class="sec">4 × 8-10 · 1-2 reps en réserve</span><span class="sec num">série 3/4</span></div>
+    <div class="row"><span class="acc" style="font-weight:700">Dernière fois 34 kg × 9</span><span class="muted">★ record 34 × 9</span></div>
+    <div class="setrow past"><span class="n">1</span><div class="field"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check done" aria-label="Série 1 faite"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow past"><span class="n">2</span><div class="field"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check done" aria-label="Série 2 faite"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow"><span class="n" style="color:var(--x-accent-text);font-weight:800">3</span><div class="field focus"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check" aria-label="Valider la série 3"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow"><span class="n">4</span><div class="field"><span class="num" style="color:var(--x-muted)">9</span><small>reps</small></div><div class="field"><span class="num" style="color:var(--x-muted)">34</span><small>kg</small></div><button class="check" aria-label="Valider la série 4"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="row" style="align-items:center"><span class="sec">Réserve</span><div class="chips"><span class="chip">0</span><span class="chip">1</span><span class="chip" style="border-color:var(--x-accent-text)">2</span><span class="chip">3+</span></div></div>
+  </div>
+  <div class="card"><span class="lbl">Ensuite</span><div class="row"><span style="font-weight:700">Tirage vertical prise neutre</span><span class="sec num">3 × 8-10</span></div><span class="sec">Dernière fois 70 kg × 10</span></div>
+</div><div class="tabs"><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Aujourd'hui</div><div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg>Séance</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c3 3 5 6 5 9a5 5 0 0 1-10 0c0-3 2-6 5-9z"/></svg>Nutrition</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 11h8M12 15l-3 6M12 15l3 6"/></svg>Corps</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Analyse</div></div></div><figcaption>C · Plein jour</figcaption></figure></div>
+  </section>
+  <div style="display:grid;gap:40px">
+  <section id="dir-A" class="dirsec" style="display:grid;gap:14px">
+    <div class="dirhead" data-dir="A"><span class="dirletter">A</span><div><h2>Affirmée mûrie</h2><span class="pg-label">Direction A sur 3</span></div></div>
+    <div class="intent"><p>Ton identité actuelle, corrigée : noir profond, citron, chiffres en monospace. Les gris remontent (lisibles en plein jour à la salle), le texte grossit, le citron est réservé aux actions et à ce qui compte aujourd'hui. Le moins de changement à apprendre.</p></div>
+    <p class="pg-p">Fais glisser vers la gauche pour les 3 écrans : Aujourd'hui, Séance, Nutrition.</p>
+    <div class="phones"><figure><div class="ph" data-dir="A"><div class="top"><div><div class="t">Aujourd'hui</div><div class="d">dimanche 25 octobre</div></div><div style="display:flex;gap:8px;align-items:center"><span class="pill">Recompo</span><button class="gear" aria-label="Réglages"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></div></div>
+<div class="scroll">
+  <div class="card hl">
+    <div class="row"><span class="lbl">Prochaine séance</span><span class="muted num">score 61</span></div>
+    <div class="mid" style="font-weight:700">Upper A</div>
+    <div class="sec">Planning du jour · haut du corps reposé depuis 3 jours</div>
+    <button class="btn pri">Démarrer Upper A</button>
+    <div class="divider"></div>
+    <div class="row"><span class="sec">Demain · lun. 26/10</span><span style="font-weight:700">Mobilité</span></div>
+  </div>
+  <div class="grid2">
+    <div class="tile"><span class="lbl">Énergie</span><span class="num big acc">82</span><span class="sec">Bon · nuit 6 h 12</span></div>
+    <div class="tile"><span class="lbl">Poids moy. 7 j</span><span class="num big">94,3</span><span class="sec"><span class="acc">▼ 0,2</span> kg/sem</span></div>
+  </div>
+  <div class="grid3">
+    <div class="tile"><span class="lbl">Kcal</span><span class="num mid">1 840</span><span class="muted">/ 2 470</span><div class="bar"><span style="width:74%"></span></div></div>
+    <div class="tile"><span class="lbl">Pas</span><span class="num mid">6 420</span><span class="muted">/ 10 000</span><div class="bar"><span style="width:64%"></span></div></div>
+    <div class="tile"><span class="lbl">Eau</span><span class="num mid">1,25</span><span class="muted">/ 2,0 L</span><div class="bar n"><span style="width:62%"></span></div></div>
+  </div>
+  <div class="card"><div class="row"><span class="lbl">Constats</span><span class="sec">4 ›</span></div><div class="sec">Streak entraînement : <span class="num" style="color:var(--x-text)">6 j</span></div></div>
+</div><div class="tabs"><div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Aujourd'hui</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg>Séance</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c3 3 5 6 5 9a5 5 0 0 1-10 0c0-3 2-6 5-9z"/></svg>Nutrition</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 11h8M12 15l-3 6M12 15l3 6"/></svg>Corps</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Analyse</div></div></div><figcaption>Aujourd'hui</figcaption></figure><figure><div class="ph" data-dir="A"><div class="top"><div><div class="t">Upper A</div><div class="d">débuté 07:12 · 3/9 exos</div></div><div style="display:flex;gap:8px;align-items:center"><button class="gear" aria-label="Réglages"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></div></div>
+<div class="scroll">
+  <div class="timer"><div><div class="lbl" style="color:inherit;opacity:.85">Repos</div><div class="num">1:28</div></div><button class="btn plain" style="width:auto;padding:0 16px;min-height:48px">+30 s</button></div>
+  <div class="card hl">
+    <div class="mid" style="font-weight:700;font-size:20px">Développé incliné haltères</div>
+    <div class="row"><span class="sec">4 × 8-10 · 1-2 reps en réserve</span><span class="sec num">série 3/4</span></div>
+    <div class="row"><span class="acc" style="font-weight:700">Dernière fois 34 kg × 9</span><span class="muted">★ record 34 × 9</span></div>
+    <div class="setrow past"><span class="n">1</span><div class="field"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check done" aria-label="Série 1 faite"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow past"><span class="n">2</span><div class="field"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check done" aria-label="Série 2 faite"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow"><span class="n" style="color:var(--x-accent-text);font-weight:800">3</span><div class="field focus"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check" aria-label="Valider la série 3"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow"><span class="n">4</span><div class="field"><span class="num" style="color:var(--x-muted)">9</span><small>reps</small></div><div class="field"><span class="num" style="color:var(--x-muted)">34</span><small>kg</small></div><button class="check" aria-label="Valider la série 4"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="row" style="align-items:center"><span class="sec">Réserve</span><div class="chips"><span class="chip">0</span><span class="chip">1</span><span class="chip" style="border-color:var(--x-accent-text)">2</span><span class="chip">3+</span></div></div>
+  </div>
+  <div class="card"><span class="lbl">Ensuite</span><div class="row"><span style="font-weight:700">Tirage vertical prise neutre</span><span class="sec num">3 × 8-10</span></div><span class="sec">Dernière fois 70 kg × 10</span></div>
+</div><div class="tabs"><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Aujourd'hui</div><div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg>Séance</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c3 3 5 6 5 9a5 5 0 0 1-10 0c0-3 2-6 5-9z"/></svg>Nutrition</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 11h8M12 15l-3 6M12 15l3 6"/></svg>Corps</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Analyse</div></div></div><figcaption>Séance en cours</figcaption></figure><figure><div class="ph" data-dir="A"><div class="top"><div><div class="t">Nutrition</div><div class="d">aujourd'hui · glisser pour changer de jour</div></div><div style="display:flex;gap:8px;align-items:center"><span class="pill">Recompo</span><button class="gear" aria-label="Réglages"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></div></div>
+<div class="scroll">
+  <div class="card">
+    <div class="row"><span class="lbl">Total du jour</span><span class="sec num">cible 2 470</span></div>
+    <div class="row" style="align-items:flex-end"><span class="num big">1 840</span><span class="sec">kcal · reste <span class="num" style="color:var(--x-text)">630</span></span></div>
+    <div class="macro4">
+      <div><span class="lbl">Prot</span><span class="num" style="font-size:17px">162<span class="muted">/200</span></span><div class="bar"><span style="width:81%"></span></div></div>
+      <div><span class="lbl">Gluc</span><span class="num" style="font-size:17px">190<span class="muted">/280</span></span><div class="bar n"><span style="width:68%"></span></div></div>
+      <div><span class="lbl">Lip</span><span class="num" style="font-size:17px">58<span class="muted">/85</span></span><div class="bar n"><span style="width:68%"></span></div></div>
+      <div><span class="lbl">Fib</span><span class="num" style="font-size:17px">24<span class="muted">/35</span></span><div class="bar n"><span style="width:69%"></span></div></div>
+    </div>
+  </div>
+  <div class="card hl">
+    <div class="row"><span style="font-weight:700;font-size:17px">Déjeuner</span><span class="num sec">657 kcal</span></div>
+    <div class="line"><div style="min-width:0"><div class="nm">Blanc de poulet</div><div class="q num">200 g · 52 P</div></div><span class="num">242</span></div>
+    <div class="line"><div style="min-width:0"><div class="nm">Riz basmati cuit</div><div class="q num">250 g · 70 G</div></div><span class="num">325</span></div>
+    <div class="line"><div style="min-width:0"><div class="nm">Huile d'olive</div><div class="q num">10 g</div></div><span class="num">90</span></div>
+    <span class="lbl" style="margin-top:4px">Tes habituels · 1 tap</span>
+    <div class="chips"><span class="chip"><b>+</b>Haricots verts 200 g</span><span class="chip"><b>+</b>Skyr 150 g</span><span class="chip"><b>+</b>Pomme</span></div>
+    <button class="btn out">Chercher un aliment</button>
+  </div>
+  <div class="card"><div class="row"><span style="font-weight:700;font-size:17px">Dîner</span><span class="sec">prévu · 0 kcal</span></div><div class="chips"><span class="chip"><b>+</b>Comme hier soir</span><span class="chip"><b>+</b>Saumon 180 g</span></div></div>
+</div>
+<div class="live"><span>Séance en cours · Upper A · 3/9</span><span class="num">1:28</span></div><div class="tabs"><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Aujourd'hui</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg>Séance</div><div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c3 3 5 6 5 9a5 5 0 0 1-10 0c0-3 2-6 5-9z"/></svg>Nutrition</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 11h8M12 15l-3 6M12 15l3 6"/></svg>Corps</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Analyse</div></div></div><figcaption>Nutrition</figcaption></figure></div>
+    <div class="notes"><div><h3>Ce qui reste</h3><ul><li>Fond noir, accent citron unique</li><li>Chiffres en monospace</li><li>Même sensation qu'aujourd'hui, en plus lisible</li></ul></div><div><h3>Ce qui change</h3><ul><li>Gris secondaires à 9:1 et 6:1 au lieu de 3,5:1 et 2,1:1</li><li>Libellés 12 px au lieu de 9</li><li>Coins plus ronds (14 px), cartes moins bordées</li></ul></div></div>
+    <details><summary class="pg-label">Palette et contrastes mesurés (minimum lisible 4,5:1)</summary><div class="swatches" style="margin-top:8px"><div class="sw"><i style="background:#131312;color:#f5f5f0">Aa</i><span>Texte</span><b class="ok">17.0:1</b></div><div class="sw"><i style="background:#131312;color:#bdbdb4">Aa</i><span>Texte secondaire</span><b class="ok">9.8:1</b></div><div class="sw"><i style="background:#131312;color:#96968d">Aa</i><span>Texte discret</span><b class="ok">6.2:1</b></div><div class="sw"><i style="background:#131312;color:#d7ff3f">Aa</i><span>Accent (texte)</span><b class="ok">16.2:1</b></div><div class="sw"><i style="background:#d7ff3f;color:#0a0a0a">Aa</i><span>Sur bouton accent</span><b class="ok">17.2:1</b></div><div class="sw"><i style="background:#131312;color:#f2a33a">Aa</i><span>Alerte</span><b class="ok">8.9:1</b></div><div class="sw"><i style="background:#131312;color:#d7ff3f">Aa</i><span>Donnée 2</span><b class="ok">16.2:1</b></div><div class="sw"><i style="background:#121212;color:#8a8a84">Aa</i><span>Actuel · text2</span><b class="ok">5.4:1</b></div><div class="sw"><i style="background:#121212;color:#6b6b66">Aa</i><span>Actuel · muted</span><b class="ko">3.5:1</b></div><div class="sw"><i style="background:#121212;color:#4a4a46">Aa</i><span>Actuel · dim</span><b class="ko">2.1:1</b></div></div></details>
+  </section>
+  <section id="dir-B" class="dirsec" style="display:grid;gap:14px">
+    <div class="dirhead" data-dir="B"><span class="dirletter">B</span><div><h2>Tableau de salle</h2><span class="pg-label">Direction B sur 3</span></div></div>
+    <div class="intent"><p>Esprit chronomètre et tableau d'affichage de gymnase : anthracite bleuté, chiffres condensés très gros, minuteur en bloc citron plein. Une 2e couleur (bleu cyan) pour la nutrition, l'orange pour les alertes. Plus dense, plus « instrument ».</p></div>
+    <p class="pg-p">Fais glisser vers la gauche pour les 3 écrans : Aujourd'hui, Séance, Nutrition.</p>
+    <div class="phones"><figure><div class="ph" data-dir="B"><div class="top"><div><div class="t">Aujourd'hui</div><div class="d">dimanche 25 octobre</div></div><div style="display:flex;gap:8px;align-items:center"><span class="pill">Recompo</span><button class="gear" aria-label="Réglages"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></div></div>
+<div class="scroll">
+  <div class="card hl">
+    <div class="row"><span class="lbl">Prochaine séance</span><span class="muted num">score 61</span></div>
+    <div class="mid" style="font-weight:700">Upper A</div>
+    <div class="sec">Planning du jour · haut du corps reposé depuis 3 jours</div>
+    <button class="btn pri">Démarrer Upper A</button>
+    <div class="divider"></div>
+    <div class="row"><span class="sec">Demain · lun. 26/10</span><span style="font-weight:700">Mobilité</span></div>
+  </div>
+  <div class="grid2">
+    <div class="tile"><span class="lbl">Énergie</span><span class="num big acc">82</span><span class="sec">Bon · nuit 6 h 12</span></div>
+    <div class="tile"><span class="lbl">Poids moy. 7 j</span><span class="num big">94,3</span><span class="sec"><span class="acc">▼ 0,2</span> kg/sem</span></div>
+  </div>
+  <div class="grid3">
+    <div class="tile"><span class="lbl">Kcal</span><span class="num mid">1 840</span><span class="muted">/ 2 470</span><div class="bar"><span style="width:74%"></span></div></div>
+    <div class="tile"><span class="lbl">Pas</span><span class="num mid">6 420</span><span class="muted">/ 10 000</span><div class="bar"><span style="width:64%"></span></div></div>
+    <div class="tile"><span class="lbl">Eau</span><span class="num mid">1,25</span><span class="muted">/ 2,0 L</span><div class="bar n"><span style="width:62%"></span></div></div>
+  </div>
+  <div class="card"><div class="row"><span class="lbl">Constats</span><span class="sec">4 ›</span></div><div class="sec">Streak entraînement : <span class="num" style="color:var(--x-text)">6 j</span></div></div>
+</div><div class="tabs"><div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Aujourd'hui</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg>Séance</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c3 3 5 6 5 9a5 5 0 0 1-10 0c0-3 2-6 5-9z"/></svg>Nutrition</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 11h8M12 15l-3 6M12 15l3 6"/></svg>Corps</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Analyse</div></div></div><figcaption>Aujourd'hui</figcaption></figure><figure><div class="ph" data-dir="B"><div class="top"><div><div class="t">Upper A</div><div class="d">débuté 07:12 · 3/9 exos</div></div><div style="display:flex;gap:8px;align-items:center"><button class="gear" aria-label="Réglages"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></div></div>
+<div class="scroll">
+  <div class="timer"><div><div class="lbl" style="color:inherit;opacity:.85">Repos</div><div class="num">1:28</div></div><button class="btn plain" style="width:auto;padding:0 16px;min-height:48px">+30 s</button></div>
+  <div class="card hl">
+    <div class="mid" style="font-weight:700;font-size:20px">Développé incliné haltères</div>
+    <div class="row"><span class="sec">4 × 8-10 · 1-2 reps en réserve</span><span class="sec num">série 3/4</span></div>
+    <div class="row"><span class="acc" style="font-weight:700">Dernière fois 34 kg × 9</span><span class="muted">★ record 34 × 9</span></div>
+    <div class="setrow past"><span class="n">1</span><div class="field"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check done" aria-label="Série 1 faite"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow past"><span class="n">2</span><div class="field"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check done" aria-label="Série 2 faite"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow"><span class="n" style="color:var(--x-accent-text);font-weight:800">3</span><div class="field focus"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check" aria-label="Valider la série 3"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow"><span class="n">4</span><div class="field"><span class="num" style="color:var(--x-muted)">9</span><small>reps</small></div><div class="field"><span class="num" style="color:var(--x-muted)">34</span><small>kg</small></div><button class="check" aria-label="Valider la série 4"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="row" style="align-items:center"><span class="sec">Réserve</span><div class="chips"><span class="chip">0</span><span class="chip">1</span><span class="chip" style="border-color:var(--x-accent-text)">2</span><span class="chip">3+</span></div></div>
+  </div>
+  <div class="card"><span class="lbl">Ensuite</span><div class="row"><span style="font-weight:700">Tirage vertical prise neutre</span><span class="sec num">3 × 8-10</span></div><span class="sec">Dernière fois 70 kg × 10</span></div>
+</div><div class="tabs"><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Aujourd'hui</div><div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg>Séance</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c3 3 5 6 5 9a5 5 0 0 1-10 0c0-3 2-6 5-9z"/></svg>Nutrition</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 11h8M12 15l-3 6M12 15l3 6"/></svg>Corps</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Analyse</div></div></div><figcaption>Séance en cours</figcaption></figure><figure><div class="ph" data-dir="B"><div class="top"><div><div class="t">Nutrition</div><div class="d">aujourd'hui · glisser pour changer de jour</div></div><div style="display:flex;gap:8px;align-items:center"><span class="pill">Recompo</span><button class="gear" aria-label="Réglages"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></div></div>
+<div class="scroll">
+  <div class="card">
+    <div class="row"><span class="lbl">Total du jour</span><span class="sec num">cible 2 470</span></div>
+    <div class="row" style="align-items:flex-end"><span class="num big">1 840</span><span class="sec">kcal · reste <span class="num" style="color:var(--x-text)">630</span></span></div>
+    <div class="macro4">
+      <div><span class="lbl">Prot</span><span class="num" style="font-size:17px">162<span class="muted">/200</span></span><div class="bar"><span style="width:81%"></span></div></div>
+      <div><span class="lbl">Gluc</span><span class="num" style="font-size:17px">190<span class="muted">/280</span></span><div class="bar n"><span style="width:68%"></span></div></div>
+      <div><span class="lbl">Lip</span><span class="num" style="font-size:17px">58<span class="muted">/85</span></span><div class="bar n"><span style="width:68%"></span></div></div>
+      <div><span class="lbl">Fib</span><span class="num" style="font-size:17px">24<span class="muted">/35</span></span><div class="bar n"><span style="width:69%"></span></div></div>
+    </div>
+  </div>
+  <div class="card hl">
+    <div class="row"><span style="font-weight:700;font-size:17px">Déjeuner</span><span class="num sec">657 kcal</span></div>
+    <div class="line"><div style="min-width:0"><div class="nm">Blanc de poulet</div><div class="q num">200 g · 52 P</div></div><span class="num">242</span></div>
+    <div class="line"><div style="min-width:0"><div class="nm">Riz basmati cuit</div><div class="q num">250 g · 70 G</div></div><span class="num">325</span></div>
+    <div class="line"><div style="min-width:0"><div class="nm">Huile d'olive</div><div class="q num">10 g</div></div><span class="num">90</span></div>
+    <span class="lbl" style="margin-top:4px">Tes habituels · 1 tap</span>
+    <div class="chips"><span class="chip"><b>+</b>Haricots verts 200 g</span><span class="chip"><b>+</b>Skyr 150 g</span><span class="chip"><b>+</b>Pomme</span></div>
+    <button class="btn out">Chercher un aliment</button>
+  </div>
+  <div class="card"><div class="row"><span style="font-weight:700;font-size:17px">Dîner</span><span class="sec">prévu · 0 kcal</span></div><div class="chips"><span class="chip"><b>+</b>Comme hier soir</span><span class="chip"><b>+</b>Saumon 180 g</span></div></div>
+</div>
+<div class="live"><span>Séance en cours · Upper A · 3/9</span><span class="num">1:28</span></div><div class="tabs"><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Aujourd'hui</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg>Séance</div><div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c3 3 5 6 5 9a5 5 0 0 1-10 0c0-3 2-6 5-9z"/></svg>Nutrition</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 11h8M12 15l-3 6M12 15l3 6"/></svg>Corps</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Analyse</div></div></div><figcaption>Nutrition</figcaption></figure></div>
+    <div class="notes"><div><h3>Ce qui reste</h3><ul><li>Accent citron pour les actions</li><li>Fond sombre</li></ul></div><div><h3>Ce qui change</h3><ul><li>Chiffres condensés, titres en capitales</li><li>Une couleur de données en plus (cyan)</li><li>Coins presque droits (6 px), filet citron sur la carte importante</li></ul></div></div>
+    <details><summary class="pg-label">Palette et contrastes mesurés (minimum lisible 4,5:1)</summary><div class="swatches" style="margin-top:8px"><div class="sw"><i style="background:#1a1d20;color:#eef1f2">Aa</i><span>Texte</span><b class="ok">14.9:1</b></div><div class="sw"><i style="background:#1a1d20;color:#b6bfc5">Aa</i><span>Texte secondaire</span><b class="ok">9.1:1</b></div><div class="sw"><i style="background:#1a1d20;color:#929ca3">Aa</i><span>Texte discret</span><b class="ok">6.1:1</b></div><div class="sw"><i style="background:#1a1d20;color:#d7ff3f">Aa</i><span>Accent (texte)</span><b class="ok">14.7:1</b></div><div class="sw"><i style="background:#d7ff3f;color:#101200">Aa</i><span>Sur bouton accent</span><b class="ok">16.5:1</b></div><div class="sw"><i style="background:#1a1d20;color:#ff9a4a">Aa</i><span>Alerte</span><b class="ok">8.0:1</b></div><div class="sw"><i style="background:#1a1d20;color:#62d6e8">Aa</i><span>Donnée 2</span><b class="ok">9.9:1</b></div></div></details>
+  </section>
+  <section id="dir-C" class="dirsec" style="display:grid;gap:14px">
+    <div class="dirhead" data-dir="C"><span class="dirletter">C</span><div><h2>Plein jour</h2><span class="pg-label">Direction C sur 3</span></div></div>
+    <div class="intent"><p>Version claire pensée pour la lumière forte de la salle et l'extérieur : fond papier, texte presque noir, citron utilisé seulement en aplat (boutons, minuteur), vert olive pour le texte d'accent. La police Atkinson Hyperlegible est dessinée pour la lisibilité.</p></div>
+    <p class="pg-p">Fais glisser vers la gauche pour les 3 écrans : Aujourd'hui, Séance, Nutrition.</p>
+    <div class="phones"><figure><div class="ph" data-dir="C"><div class="top"><div><div class="t">Aujourd'hui</div><div class="d">dimanche 25 octobre</div></div><div style="display:flex;gap:8px;align-items:center"><span class="pill">Recompo</span><button class="gear" aria-label="Réglages"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></div></div>
+<div class="scroll">
+  <div class="card hl">
+    <div class="row"><span class="lbl">Prochaine séance</span><span class="muted num">score 61</span></div>
+    <div class="mid" style="font-weight:700">Upper A</div>
+    <div class="sec">Planning du jour · haut du corps reposé depuis 3 jours</div>
+    <button class="btn pri">Démarrer Upper A</button>
+    <div class="divider"></div>
+    <div class="row"><span class="sec">Demain · lun. 26/10</span><span style="font-weight:700">Mobilité</span></div>
+  </div>
+  <div class="grid2">
+    <div class="tile"><span class="lbl">Énergie</span><span class="num big acc">82</span><span class="sec">Bon · nuit 6 h 12</span></div>
+    <div class="tile"><span class="lbl">Poids moy. 7 j</span><span class="num big">94,3</span><span class="sec"><span class="acc">▼ 0,2</span> kg/sem</span></div>
+  </div>
+  <div class="grid3">
+    <div class="tile"><span class="lbl">Kcal</span><span class="num mid">1 840</span><span class="muted">/ 2 470</span><div class="bar"><span style="width:74%"></span></div></div>
+    <div class="tile"><span class="lbl">Pas</span><span class="num mid">6 420</span><span class="muted">/ 10 000</span><div class="bar"><span style="width:64%"></span></div></div>
+    <div class="tile"><span class="lbl">Eau</span><span class="num mid">1,25</span><span class="muted">/ 2,0 L</span><div class="bar n"><span style="width:62%"></span></div></div>
+  </div>
+  <div class="card"><div class="row"><span class="lbl">Constats</span><span class="sec">4 ›</span></div><div class="sec">Streak entraînement : <span class="num" style="color:var(--x-text)">6 j</span></div></div>
+</div><div class="tabs"><div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Aujourd'hui</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg>Séance</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c3 3 5 6 5 9a5 5 0 0 1-10 0c0-3 2-6 5-9z"/></svg>Nutrition</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 11h8M12 15l-3 6M12 15l3 6"/></svg>Corps</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Analyse</div></div></div><figcaption>Aujourd'hui</figcaption></figure><figure><div class="ph" data-dir="C"><div class="top"><div><div class="t">Upper A</div><div class="d">débuté 07:12 · 3/9 exos</div></div><div style="display:flex;gap:8px;align-items:center"><button class="gear" aria-label="Réglages"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></div></div>
+<div class="scroll">
+  <div class="timer"><div><div class="lbl" style="color:inherit;opacity:.85">Repos</div><div class="num">1:28</div></div><button class="btn plain" style="width:auto;padding:0 16px;min-height:48px">+30 s</button></div>
+  <div class="card hl">
+    <div class="mid" style="font-weight:700;font-size:20px">Développé incliné haltères</div>
+    <div class="row"><span class="sec">4 × 8-10 · 1-2 reps en réserve</span><span class="sec num">série 3/4</span></div>
+    <div class="row"><span class="acc" style="font-weight:700">Dernière fois 34 kg × 9</span><span class="muted">★ record 34 × 9</span></div>
+    <div class="setrow past"><span class="n">1</span><div class="field"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check done" aria-label="Série 1 faite"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow past"><span class="n">2</span><div class="field"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check done" aria-label="Série 2 faite"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow"><span class="n" style="color:var(--x-accent-text);font-weight:800">3</span><div class="field focus"><span class="num">9</span><small>reps</small></div><div class="field"><span class="num">34</span><small>kg</small></div><button class="check" aria-label="Valider la série 3"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="setrow"><span class="n">4</span><div class="field"><span class="num" style="color:var(--x-muted)">9</span><small>reps</small></div><div class="field"><span class="num" style="color:var(--x-muted)">34</span><small>kg</small></div><button class="check" aria-label="Valider la série 4"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+    <div class="row" style="align-items:center"><span class="sec">Réserve</span><div class="chips"><span class="chip">0</span><span class="chip">1</span><span class="chip" style="border-color:var(--x-accent-text)">2</span><span class="chip">3+</span></div></div>
+  </div>
+  <div class="card"><span class="lbl">Ensuite</span><div class="row"><span style="font-weight:700">Tirage vertical prise neutre</span><span class="sec num">3 × 8-10</span></div><span class="sec">Dernière fois 70 kg × 10</span></div>
+</div><div class="tabs"><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Aujourd'hui</div><div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg>Séance</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c3 3 5 6 5 9a5 5 0 0 1-10 0c0-3 2-6 5-9z"/></svg>Nutrition</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 11h8M12 15l-3 6M12 15l3 6"/></svg>Corps</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Analyse</div></div></div><figcaption>Séance en cours</figcaption></figure><figure><div class="ph" data-dir="C"><div class="top"><div><div class="t">Nutrition</div><div class="d">aujourd'hui · glisser pour changer de jour</div></div><div style="display:flex;gap:8px;align-items:center"><span class="pill">Recompo</span><button class="gear" aria-label="Réglages"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button></div></div>
+<div class="scroll">
+  <div class="card">
+    <div class="row"><span class="lbl">Total du jour</span><span class="sec num">cible 2 470</span></div>
+    <div class="row" style="align-items:flex-end"><span class="num big">1 840</span><span class="sec">kcal · reste <span class="num" style="color:var(--x-text)">630</span></span></div>
+    <div class="macro4">
+      <div><span class="lbl">Prot</span><span class="num" style="font-size:17px">162<span class="muted">/200</span></span><div class="bar"><span style="width:81%"></span></div></div>
+      <div><span class="lbl">Gluc</span><span class="num" style="font-size:17px">190<span class="muted">/280</span></span><div class="bar n"><span style="width:68%"></span></div></div>
+      <div><span class="lbl">Lip</span><span class="num" style="font-size:17px">58<span class="muted">/85</span></span><div class="bar n"><span style="width:68%"></span></div></div>
+      <div><span class="lbl">Fib</span><span class="num" style="font-size:17px">24<span class="muted">/35</span></span><div class="bar n"><span style="width:69%"></span></div></div>
+    </div>
+  </div>
+  <div class="card hl">
+    <div class="row"><span style="font-weight:700;font-size:17px">Déjeuner</span><span class="num sec">657 kcal</span></div>
+    <div class="line"><div style="min-width:0"><div class="nm">Blanc de poulet</div><div class="q num">200 g · 52 P</div></div><span class="num">242</span></div>
+    <div class="line"><div style="min-width:0"><div class="nm">Riz basmati cuit</div><div class="q num">250 g · 70 G</div></div><span class="num">325</span></div>
+    <div class="line"><div style="min-width:0"><div class="nm">Huile d'olive</div><div class="q num">10 g</div></div><span class="num">90</span></div>
+    <span class="lbl" style="margin-top:4px">Tes habituels · 1 tap</span>
+    <div class="chips"><span class="chip"><b>+</b>Haricots verts 200 g</span><span class="chip"><b>+</b>Skyr 150 g</span><span class="chip"><b>+</b>Pomme</span></div>
+    <button class="btn out">Chercher un aliment</button>
+  </div>
+  <div class="card"><div class="row"><span style="font-weight:700;font-size:17px">Dîner</span><span class="sec">prévu · 0 kcal</span></div><div class="chips"><span class="chip"><b>+</b>Comme hier soir</span><span class="chip"><b>+</b>Saumon 180 g</span></div></div>
+</div>
+<div class="live"><span>Séance en cours · Upper A · 3/9</span><span class="num">1:28</span></div><div class="tabs"><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Aujourd'hui</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 7v10M18 7v10M3 9v6M21 9v6M6 12h12"/></svg>Séance</div><div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c3 3 5 6 5 9a5 5 0 0 1-10 0c0-3 2-6 5-9z"/></svg>Nutrition</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M8 11h8M12 15l-3 6M12 15l3 6"/></svg>Corps</div><div class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>Analyse</div></div></div><figcaption>Nutrition</figcaption></figure></div>
+    <div class="notes"><div><h3>Ce qui reste</h3><ul><li>Citron en aplat sur les actions</li><li>Chiffres en monospace</li></ul></div><div><h3>Ce qui change</h3><ul><li>Fond clair (rupture avec l'identité noire)</li><li>Citron illisible en texte sur blanc : remplacé par un olive</li><li>Ombres légères au lieu de bordures</li></ul></div></div>
+    <details><summary class="pg-label">Palette et contrastes mesurés (minimum lisible 4,5:1)</summary><div class="swatches" style="margin-top:8px"><div class="sw"><i style="background:#ffffff;color:#121210">Aa</i><span>Texte</span><b class="ok">18.8:1</b></div><div class="sw"><i style="background:#ffffff;color:#46453f">Aa</i><span>Texte secondaire</span><b class="ok">9.6:1</b></div><div class="sw"><i style="background:#ffffff;color:#62615a">Aa</i><span>Texte discret</span><b class="ok">6.2:1</b></div><div class="sw"><i style="background:#ffffff;color:#4a6000">Aa</i><span>Accent (texte)</span><b class="ok">7.1:1</b></div><div class="sw"><i style="background:#d7ff3f;color:#121210">Aa</i><span>Sur bouton accent</span><b class="ok">16.3:1</b></div><div class="sw"><i style="background:#ffffff;color:#9a5300">Aa</i><span>Alerte</span><b class="ok">5.8:1</b></div><div class="sw"><i style="background:#ffffff;color:#1f6f8b">Aa</i><span>Donnée 2</span><b class="ok">5.7:1</b></div></div></details>
+  </section></div>
+  <section class="notes"><div><h3>Commun aux trois</h3><ul><li>Case de série 52 × 52 px, plus de × collé</li><li>Minuteur fixé en haut du carnet</li><li>Habituels en 1 tap dans chaque repas</li><li>Barre « Séance en cours » hors du carnet</li></ul></div></section>
+</div>
+

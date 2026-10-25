@@ -1,0 +1,69 @@
+/* Design system v2, direction A « Affirmée mûrie » (chantier U, U2, 25/10/2026).
+   Les VALEURS viennent de design/tokens.js (variables --c-*, --f-*, --t-*, --s-*, --r-*,
+   posées par applyTheme() au démarrage) ; ce fichier ne porte que les classes, surtout
+   pour ce que le style en ligne ne sait pas faire : états au toucher, focus clavier,
+   désactivé, transitions. Préfixe p- pour ne jamais croiser une classe Tailwind.
+   Aucune classe n'est encore utilisée : les écrans migrent un par un en U3. */
+
+/* Polices embarquées (l'app native tourne hors ligne) : déclarées ici, téléchargées par le
+   navigateur seulement quand un élément les utilise. Sous-ensemble latin uniquement. */
+@import "@fontsource/instrument-sans/latin-400.css";
+@import "@fontsource/instrument-sans/latin-600.css";
+@import "@fontsource/instrument-sans/latin-700.css";
+@import "@fontsource/jetbrains-mono/latin-500.css";
+@import "@fontsource/jetbrains-mono/latin-700.css";
+@import "@fontsource/jetbrains-mono/latin-800.css";
+
+/* ---------- texte ---------- */
+.p-label { font-size: var(--t-label); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c-text2); }
+.p-num { font-family: var(--f-num); font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -0.01em; }
+.p-sec { font-size: var(--t-small); color: var(--c-text2); }
+.p-muted { font-size: var(--t-small); color: var(--c-muted); }
+
+/* ---------- surfaces ---------- */
+.p-card { background: var(--c-card); border: 1px solid var(--c-line-soft); border-radius: var(--r-lg); padding: var(--s-4); }
+.p-card--key { border-color: var(--c-accent-line); }
+.p-card--danger { background: var(--c-danger-bg); border-color: var(--c-danger-line); }
+
+/* ---------- tout ce qui se touche ---------- */
+.p-tap {
+  min-height: var(--touch); min-width: var(--touch);
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation; cursor: pointer;
+  transition: transform 120ms ease-out, filter 120ms ease-out, background-color 120ms ease-out, border-color 120ms ease-out;
+}
+.p-tap:active:not(:disabled) { transform: scale(0.97); filter: brightness(1.15); }
+.p-tap:focus-visible { outline: 3px solid var(--c-accent); outline-offset: 2px; }
+.p-tap:disabled, .p-tap[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
+
+.p-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2);
+  min-height: 52px; padding: 0 var(--s-4); border-radius: var(--r-md); border: 2px solid transparent;
+  font-family: inherit; font-size: var(--t-body-l); font-weight: 700;
+}
+.p-btn--primary { background: var(--c-accent); color: var(--c-on-accent); }
+.p-btn--outline { background: transparent; color: var(--c-accent); border-color: var(--c-accent); }
+.p-btn--plain { background: var(--c-raised); color: var(--c-text); }
+.p-btn--danger { background: transparent; color: var(--c-danger); border-color: var(--c-danger-line); }
+.p-btn--block { width: 100%; }
+
+.p-chip {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 var(--s-3);
+  border-radius: var(--r-pill); border: 1.5px solid var(--c-line); background: var(--c-card); color: var(--c-text);
+  font-family: inherit; font-size: 14px; font-weight: 600;
+}
+.p-chip[aria-pressed="true"] { border-color: var(--c-accent); color: var(--c-accent); }
+
+/* ---------- saisie ---------- */
+.p-field {
+  min-height: 52px; width: 100%; padding: 0 var(--s-3); border-radius: var(--r-sm);
+  background: var(--c-field); border: 1.5px solid var(--c-line); color: var(--c-text);
+  font-family: var(--f-num); font-size: var(--t-body-l); font-weight: 700;
+  transition: border-color 120ms ease-out;
+}
+.p-field::placeholder { color: var(--c-muted); font-weight: 500; }
+.p-field:focus { outline: none; border-color: var(--c-accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .p-tap, .p-field { transition: none; }
+  .p-tap:active:not(:disabled) { transform: none; }
+}

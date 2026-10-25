@@ -80,6 +80,8 @@ versions plus anciennes que Claude connaîtrait mieux par défaut) :
   énergie, hydratation — PAS le détail des macros, voir plus bas)
 - @capacitor-mlkit/barcode-scanning 8.1.0 (scan code-barres, module Nutrition M3,
   natif seulement)
+- @fontsource/instrument-sans 5.3.0 et @fontsource/jetbrains-mono 5.3.0 (polices du
+  design system v2, embarquées pour le hors-ligne)
 
 ### Structure des fichiers
 
@@ -138,7 +140,9 @@ protocole-app/                    (racine = workspaces npm uniquement)
                                     # BasketScheduleCard)
         store.js                   # persistance localStorage + export/import JSON
         healthSync.js              # synchro Health Connect (pas/sommeil/macros/eau)
-        ui.jsx                     # design system "Affirmée" (jetons C + primitives),
+        design/                    # design system v2 (U2) : tokens.js (source unique des
+                                    # jetons) + theme.css (classes p-*, polices)
+        ui.jsx                     # primitives v1 (jetons C) + ré-export de T/COLORS v2,
                                     # ré-exporte dateUtils depuis @rawcare/core
         claudeApi.js                # shim de ré-export vers @rawcare/core/coach/claudeApi
         nutrition/
@@ -155,20 +159,41 @@ protocole-app/                    (racine = workspaces npm uniquement)
       package.json                 # name "@rawcare/public", dépend de @rawcare/core
 ```
 
-### Design system — "Affirmée" (à respecter strictement pour toute nouvelle UI)
-- Fond : `#050505` · Cartes : `#121212`, bordure `#2a2a2a`
-- Accent : citron vert `#d7ff3f` (jamais d'autre couleur d'accent)
-- Texte : `#f5f5f0` (principal), `#8a8a84` (secondaire), `#6b6b66` (muted),
-  `#4a4a46` (dim)
-- Danger : `#ff3b30`
-- Typographie : `ui-monospace, Menlo, Monaco, monospace` pour TOUS les
-  chiffres/valeurs ; labels en majuscules, petite taille, `letter-spacing`
-  large
-- Boutons : coins arrondis ~8-10px, `primary` = fond accent/texte noir,
-  `outline` = bordure accent/texte accent, `plain` = gris
-- Tout le styling est en `style={{}}` inline (objet `C` de tokens en haut du
-  fichier), pas de classes Tailwind dans les composants (Tailwind sert
-  seulement au reset CSS global)
+### Design system v2 — direction A « Affirmée mûrie » (U2, 25/10/2026)
+
+Choisie par Yoann sur maquettes (`docs/refonte-ihm/U2-directions.html`, face à « Tableau
+de salle » et « Plein jour »). C'est l'identité Affirmée gardée (noir, citron, chiffres en
+monospace), corrigée pour la lisibilité mesurée à l'audit U1.
+
+- **Source unique des jetons : `apps/perso/src/design/tokens.js`** (JS pur). `applyTheme()`
+  (appelé dans `main.jsx`) les pose en variables CSS : `--c-*` couleurs, `--f-*` polices,
+  `--t-*` tailles, `--s-*` espacements, `--r-*` rayons, `--touch`. `T` (ré-exporté par
+  `ui.jsx`) donne les mêmes jetons en `var(--…)` pour le style en ligne ; **dans un attribut
+  SVG (fill/stroke de recharts), passer `COLORS.x`**, `var()` n'y fonctionne pas.
+- **Couleurs** : fond `#050505` · carte `#131312` · relief `#22221f` · champ `#0b0b0a` ·
+  filets `#34342f` / `#262623` · texte `#f5f5f0` · secondaire `#bdbdb4` (9,8:1) · discret
+  `#96968d` (6,2:1) · accent citron `#d7ff3f` (texte posé dessus `#0a0a0a`) · bordure de
+  carte mise en avant `#4a5a12` · alerte `#f2a33a` · danger `#ff5a4f`. **Le citron reste le
+  seul accent**, réservé aux actions et à ce qui compte aujourd'hui. Les anciens gris
+  `#6b6b66` / `#4a4a46` (3,5:1 et 2,1:1) ne doivent plus servir de couleur de texte.
+- **Contraste garanti par un test** : `apps/perso/test/tokens.test.mjs` (lancé par
+  `npm test`, donc par le hook pre-commit) exige 4,5:1 sur chaque paire texte/fond déclarée
+  dans `TEXT_PAIRS`. Ajouter une couleur de texte = l'ajouter à `TEXT_PAIRS`.
+- **Typographie** : Instrument Sans (texte) et JetBrains Mono (TOUS les chiffres), embarquées
+  via `@fontsource` (l'app tourne hors ligne, 116 Ko au total, sous-ensemble latin). Échelle
+  `TYPE` : libellé 12 (capitales, interlettrage large) · secondaire 13 · texte 15 · saisie et
+  boutons 16 · titre 20/22 · chiffres 22/34/40. **Rien sous 12 px.**
+- **Toucher** : cible minimale 48 px (`TOUCH`), boutons et champs principaux 52 px.
+- **Classes `p-*`** (`design/theme.css`) pour ce que le style en ligne ne sait pas faire :
+  `p-tap` (retour au toucher, focus visible, désactivé à 45 %, transitions 120 ms coupées si
+  « réduire les animations »), `p-btn` + `--primary/--outline/--plain/--danger/--block`,
+  `p-chip` (`aria-pressed`), `p-field`, `p-card` (+ `--key`, `--danger`), `p-label`, `p-num`,
+  `p-sec`, `p-muted`. **La règle « tout en style en ligne » est levée** (décision 5 du
+  chantier U) ; le style en ligne reste permis pour du ponctuel.
+- **Migration écran par écran (U3)** : l'ancien objet `C` et les primitives de `ui.jsx`
+  (`Card`, `Label`, `Btn`…) restent tels quels tant qu'un écran n'est pas refait, pour que
+  chaque écran change dans son propre commit et sa propre installation. Ne pas modifier `C`
+  globalement : ça changerait tous les écrans d'un coup.
 
 ## Fonctionnalités en place (ne pas régresser sans le signaler)
 
@@ -3446,6 +3471,25 @@ Première étape de la refonte IHM (spec et décisions dans `ROADMAP.md`, « Cha
   « Remplacer cet exercice », quitter/revenir → brouillon restauré, Annuler → brouillon effacé,
   recherche d'aliment) ; analyse Babel : aucun nom utilisé sans être défini dans les nouveaux
   fichiers (un import oublié ne casse pas le build, seulement le clic) ; aucune erreur console.
+
+## Chantier U — U1 et U2 : audit, arborescence, design system v2 (25/10/2026, v3.110.0)
+
+- **U1** (détail et chiffres dans `ROADMAP.md`) : audit chiffré (Lighthouse accessibilité
+  64/100, 57-94 % du texte sous 12 px, case de série 26 × 18 px), moments d'usage mesurés sur
+  le téléphone (20,8 lignes de journal par jour, 30 % saisies à l'avance, 51 séances sur 80
+  entre 6 h et 8 h), **arborescence A retenue** : Aujourd'hui · Séance · Nutrition · Corps ·
+  Analyse. Sur Aujourd'hui, **Énergie et Poids restent AU-DESSUS de « Prochaine séance »**
+  (ordre actuel conservé, choix de Yoann).
+- **U2** : direction A « Affirmée mûrie » retenue sur maquettes ; design system v2 posé sans
+  aucun changement visible (voir la section design system plus haut). Vérifié : HTML des 8
+  onglets identique avant/après sur le jeu de données U0 (capture reproductible en entrant
+  dans chaque onglet depuis le tableau de bord, identifiants recharts neutralisés), classes
+  `p-*` testées sur des éléments témoins (bouton 52 px citron, libellé 12 px `#bdbdb4`,
+  champ JetBrains Mono 16 px, désactivé 45 %), police chargée sans réseau, 116 tests, builds
+  perso et public.
+- **Maquettes** dans `docs/refonte-ihm/` (U1-arborescence.html, U2-directions.html). Piège
+  retenu : une page d'artifact dessinée par script peut s'afficher vide sur le téléphone de
+  Yoann → écrire le HTML en dur.
 
 ## Minuteur de repos calé sur l'heure réelle (25/10/2026, apps/perso v3.109.3)
 

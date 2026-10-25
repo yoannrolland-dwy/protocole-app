@@ -28,7 +28,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | T5 | Bonus : retour haptique au cochage d'une série ; champ « alcool » en saisie libre | petit | ✅ 04/10/2026 (v3.97.0) |
 | U0 | Refonte IHM — socle : découper `App.jsx` par écran, zéro changement visible, captures « avant » | moyen | ✅ 25/10/2026 (v3.109.2) |
 | U1 | Refonte IHM — cadrage : audit chiffré + moments d'usage + arborescence maquettée | petit | ✅ 25/10/2026 (option A) |
-| U2 | Refonte IHM — directions visuelles en maquettes, choix, design system v2 (variables CSS) | gros | ⬜ |
+| U2 | Refonte IHM — directions visuelles en maquettes, choix, design system v2 (variables CSS) | gros | ✅ 25/10/2026 (v3.110.0, direction A) |
 | U3 | Refonte IHM — écran par écran (un commit + une install par écran) | gros | ⬜ |
 | U4 | Refonte IHM — audit final avant/après + mise à jour CLAUDE.md | petit | ⬜ |
 
@@ -843,8 +843,8 @@ lignes ; 100 % styles en ligne ; 0 attribut d'accessibilité ; texte majoritaire
 
 ### Décisions prises (ne pas les rouvrir sans raison)
 1. **Périmètre : `apps/perso` seul.** `apps/public` plus tard, si ça a du sens (pas par réflexe).
-2. **Identité : explorer en maquettes.** 2-3 directions (dont une « Affirmée mûrie ») en
-   artifact HTML, choisies par Yoann sur son téléphone avant tout code d'écran.
+2. **Identité : direction A « Affirmée mûrie » retenue le 25/10/2026 (U2)**, face à
+   « Tableau de salle » et « Plein jour » (`docs/refonte-ihm/U2-directions.html`).
 3. **Navigation : option A retenue le 25/10/2026 (U1)** : 5 onglets (Aujourd'hui ·
    Séance · Nutrition · Corps · Analyse). Yoann consulte peu Poids, Pas et Douleurs → candidats
    au regroupement dans « Corps ».
@@ -959,3 +959,17 @@ Répartition actée (sert de référence à U3) :
 - **Analyse** : Coach IA (Analyser, Bilan 3 mois, note du jour), TDEE, moyenne kcal/protéines.
 - **Réglages** : engrenage en haut, inchangé.
 - **Barre « Séance en cours »** visible sur les autres onglets tant qu'un carnet est ouvert.
+
+**Précision de Yoann (25/10/2026, U2)** : sur Aujourd'hui, Énergie et Poids restent
+au-dessus de « Prochaine séance » (ordre actuel). La maquette U2 les montrait en dessous :
+ne pas la suivre sur ce point en U3.
+
+### U2 — Design system v2 (25/10/2026, v3.110.0)
+
+Posé sans changement visible : `apps/perso/src/design/tokens.js` (jetons, source unique),
+`design/theme.css` (classes `p-*`, polices embarquées), `T`/`COLORS` ré-exportés par
+`ui.jsx`, test de contraste `apps/perso/test/tokens.test.mjs`. L'objet `C` reste en place :
+chaque écran migre dans son propre commit en U3. Description complète dans CLAUDE.md,
+section design system. **Reste pour U3 (étape 1, barre d'onglets + en-tête)** : retirer
+`maximum-scale=1` d'`index.html` (zoom bloqué, échec Lighthouse).
+

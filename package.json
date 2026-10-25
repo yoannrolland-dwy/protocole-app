@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "node --test \"packages/core/test/*.test.mjs\"",
+    "test": "node --test \"packages/core/test/*.test.mjs\" \"apps/perso/test/*.test.mjs\"",
     "prepare": "git config core.hooksPath .githooks || true"
   }
 }
