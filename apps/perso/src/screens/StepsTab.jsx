@@ -5,6 +5,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 import { Plus, Trash2 } from "lucide-react";
 import { C, today, fmt, upsert, lastN, Card, Label, Empty, Btn, Stepper, Field, DateField, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../design/compat.jsx";
 import { avg, STEPS_TARGET } from "../lib/helpers.js";
+import { progressColor } from "../lib/progress.js";
 import { SyncedBanner } from "../components/SyncedBanner.jsx";
 
 export function StepsTab({ steps, save }) {
@@ -30,10 +31,10 @@ export function StepsTab({ steps, save }) {
           <span style={{ fontSize: 13, color: C.muted, fontWeight: 700 }}>cible {STEPS_TARGET.toLocaleString("fr-FR")}</span>
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 10px" }}>
-          <span style={{ fontFamily: C.mono, fontSize: 38, fontWeight: 800, color: C.text }}>{n.toLocaleString("fr-FR")}</span>
+          <span style={{ fontFamily: C.mono, fontSize: 38, fontWeight: 800, color: n >= STEPS_TARGET ? C.over : C.text }}>{n.toLocaleString("fr-FR")}</span>
         </div>
         <div style={{ background: C.bg, borderRadius: 6, height: 8, overflow: "hidden" }}>
-          <div style={{ background: C.accent, width: `${Math.min(100, (n / STEPS_TARGET) * 100)}%`, height: "100%" }} />
+          <div style={{ background: progressColor(n, STEPS_TARGET, "goal"), width: `${Math.min(100, (n / STEPS_TARGET) * 100)}%`, height: "100%" }} />
         </div>
       </Card>
 
@@ -73,7 +74,8 @@ export function StepsTab({ steps, save }) {
                 <Tooltip formatter={(v) => [v.toLocaleString("fr-FR"), "Pas"]} contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle} />
                 <ReferenceLine y={STEPS_TARGET} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
                 <Bar dataKey="count" radius={[3, 3, 0, 0]}>
-                  {data.map((d, i) => <Cell key={i} fill={d.count >= STEPS_TARGET ? C.accent : C.border} />)}
+                  {/* Bleu = cible atteinte (lib/progress.js, même règle que le tableau de bord). */}
+                  {data.map((d, i) => <Cell key={i} fill={d.count >= STEPS_TARGET ? C.over : C.border} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

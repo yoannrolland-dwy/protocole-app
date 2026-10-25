@@ -478,7 +478,7 @@ export default function App({ silent = false } = {}) {
       fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
     }}>
       {/* En-tête */}
-      <AppHeader title={showSettings ? "Réglages" : TABS.find((t) => t.key === tab)?.label}
+      <AppHeader title={showSettings ? "Réglages" : (() => { const t = TABS.find((x) => x.key === tab); return t?.title ?? t?.label; })()}
         phaseLabel={PHASES[phase].label} settingsOpen={showSettings}
         onToggleSettings={() => setShowSettings((v) => !v)} />
 

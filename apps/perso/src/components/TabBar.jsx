@@ -1,10 +1,11 @@
 // Barre d'onglets v2 (chantier U, U3 étape 1, 25/10/2026) : 5 onglets de l'arborescence A
 // retenue en U1, au lieu de 8 onglets de 26-62 px de large en 9 px.
-import { Sun, Dumbbell, Flame, PersonStanding, TrendingUp } from "lucide-react";
+import { LayoutDashboard, Dumbbell, Flame, PersonStanding, TrendingUp } from "lucide-react";
 import { T } from "../design/tokens.js";
 
 export const TABS = [
-  { key: "dash", label: "Aujourd'hui", icon: Sun },
+  // « Aujourd'hui » → « Bord » (25/10/2026, choix de Yoann) ; `title` = titre de l'écran dans l'en-tête.
+  { key: "dash", label: "Bord", title: "Tableau de bord", icon: LayoutDashboard },
   { key: "train", label: "Séance", icon: Dumbbell },
   { key: "macro", label: "Nutrition", icon: Flame },
   { key: "corps", label: "Corps", icon: PersonStanding },

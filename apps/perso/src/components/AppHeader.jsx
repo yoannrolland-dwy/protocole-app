@@ -8,19 +8,22 @@ import { longDate, today } from "../ui.jsx";
 export function AppHeader({ title, phaseLabel, settingsOpen, onToggleSettings }) {
   return (
     <header style={{
-      flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+      flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
       padding: "10px 12px 10px 16px",
       paddingTop: "calc(10px + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))",
       borderBottom: `1px solid ${T.c.lineSoft}`, background: T.c.bg, fontFamily: T.f.body,
     }}>
       <div style={{ minWidth: 0 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: "-0.01em", color: T.c.text, lineHeight: 1.15 }}>{title}</h1>
+        {/* Une seule ligne : « Tableau de bord » (25/10/2026) passait sur deux lignes à 22 px à côté
+            de la pastille de phase et de l'engrenage. */}
+        <h1 style={{ margin: 0, fontSize: (title?.length ?? 0) > 11 ? 19 : 22, fontWeight: 700, letterSpacing: "-0.01em", color: T.c.text, lineHeight: 1.15,
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</h1>
         <div style={{ fontSize: 13, color: T.c.text2, marginTop: 2 }}>{longDate(today())}</div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
         <span style={{
-          fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
-          color: T.c.onAccent, background: T.c.accent, padding: "6px 10px", borderRadius: 999,
+          fontSize: 12, fontWeight: 700, letterSpacing: "0.02em", textTransform: "uppercase",
+          color: T.c.onAccent, background: T.c.accent, padding: "6px 8px", borderRadius: 999,
         }}>{phaseLabel}</span>
         <button type="button" className="p-tap" onClick={onToggleSettings}
           aria-label={settingsOpen ? "Fermer les réglages" : "Ouvrir les réglages"} aria-pressed={settingsOpen}

@@ -21,6 +21,7 @@ export const COLORS = {
   accentLine: "#4a5a12", // bordure d'une carte mise en avant
   accentRow: "#0d1000", // fond d'une ligne sélectionnée
   warn: "#f2a33a",
+  over: "#5ab4ff",      // objectif atteint/dépassé (pas, eau, protéines, fibres) — 25/10/2026
   danger: "#ff5a4f",
   dangerBg: "#1a0e0c",
   dangerLine: "#5a2218",
@@ -33,6 +34,7 @@ export const TEXT_PAIRS = [
   ["muted", "bg"], ["muted", "card"],
   ["accent", "bg"], ["accent", "card"], ["onAccent", "accent"],
   ["warn", "card"], ["danger", "card"], ["danger", "dangerBg"],
+  ["over", "card"], ["over", "bg"], ["over", "raised"],
 ];
 
 export const FONTS = {

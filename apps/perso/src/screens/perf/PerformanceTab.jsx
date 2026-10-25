@@ -10,6 +10,7 @@ import { PERI, BASKET_PROTOCOLS } from "@rawcare/core/session/templates";
 import { PHASES, targetsForDate, kcalFromMacros, tdeeNow, weeklyKcalTrend, weeklyProteinTrend, buildKcalByDate, recompWindows } from "@rawcare/core/targets";
 import { C, today, fmt, Card, Label, Body, Empty, Pills, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../../design/compat.jsx";
 import { PROT_LINE } from "../../lib/helpers.js";
+import { progressColor } from "../../lib/progress.js";
 import { TdeeCard } from "./TdeeCard.jsx";
 import { WEEKLY_PLAN } from "../../lib/plan.js";
 // Coach IA (U3 étape 4, 25/10/2026) : quitte le tableau de bord pour l'onglet Analyse
@@ -75,7 +76,9 @@ export function PerformanceTab({ macros, targets, training, weight, phase, coach
                 <ReferenceLine yAxisId="kcal" y={kcalTargetToday} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
                 <Bar yAxisId="kcal" dataKey="avgKcal" radius={[3, 3, 0, 0]}>
                   {weeklyTrend.map((d, i) => (
-                    <Cell key={i} fill={d.avgKcal == null ? "transparent" : Math.abs(d.avgKcal - kcalTargetToday) <= kcalTargetToday * 0.1 ? C.accent : C.border} />
+                    // Au-delà de la cible : orange puis rouge (lib/progress.js) ; jusqu'à 10 % sous la
+                    // cible : citron ; plus bas : gris.
+                    <Cell key={i} fill={d.avgKcal == null ? "transparent" : d.avgKcal > kcalTargetToday ? progressColor(d.avgKcal, kcalTargetToday, "limit") : d.avgKcal >= kcalTargetToday * 0.9 ? C.accent : C.border} />
                   ))}
                 </Bar>
                 <Line yAxisId="prot" type="monotone" dataKey="avgProtein" stroke={PROT_LINE} strokeWidth={2} dot={{ r: 3, fill: PROT_LINE, strokeWidth: 0 }} connectNulls />

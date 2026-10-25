@@ -201,8 +201,8 @@ monospace), corrigée pour la lisibilité mesurée à l'audit U1.
 
 ## Fonctionnalités en place (ne pas régresser sans le signaler)
 
-- **5 onglets depuis le 25/10/2026 (chantier U, U3 étape 1)** : Aujourd'hui (ex-Tableau
-  de bord), Séance, Nutrition (ex-Macro, module Nutrition interne), **Corps** (sous-onglets
+- **5 onglets depuis le 25/10/2026 (chantier U, U3 étape 1)** : Bord (écran « Tableau de
+  bord » ; s'est appelé « Aujourd'hui » de U3 au 25/10/2026), Séance, Nutrition (ex-Macro, module Nutrition interne), **Corps** (sous-onglets
   Poids · Énergie · Pas · Genou — les 4 anciens onglets), Analyse (ex-TDEE/Performance).
   Clés internes inchangées (`dash`, `train`, `macro`, `corps`, `perf` ; sous-onglets
   `weight`, `sleep`, `steps`, `pain`) : `goTo` dans App.jsx traduit les anciennes clés
@@ -3738,6 +3738,30 @@ les primitives v1 de `ui.jsx`** (plus aucun écran ne s'en sert depuis v3.119.0)
   principaux ET les 9 sous-écrans de Nutrition (recherche, quantité, correction V6, Carte resto,
   Photo, saisie libre, recette, ajout et quantité d'ingrédient). Testé : création complète d'une
   recette (117 kcal/100 g, identique à CIQUAL), correction V6 enregistrée puis annulée.
+
+## Couleurs de dépassement, onglet « Bord », pesée en tête, carte Eau compacte (25/10/2026, v3.120.0)
+
+Quatre demandes de Yoann, seuils et cas protéines/fibres tranchés par question :
+- **Règle unique `lib/progress.js`** (`progressColor(valeur, cible, kind)`, testée dans
+  `apps/perso/test/progress.test.mjs`) : `kind: "limit"` (calories, glucides, lipides) → citron
+  jusqu'à la cible, **orange jusqu'à +10 %**, **rouge au-delà** ; `kind: "goal"` (pas, eau,
+  **protéines, fibres**) → citron avant la cible, **bleu** (`COLORS.over = #5ab4ff`, 8,3:1 sur
+  carte, ajouté aux `TEXT_PAIRS`) une fois atteinte ou dépassée, jamais d'alerte (dépasser les
+  protéines/fibres est une bonne nouvelle en recomposition, choix de Yoann). `MACRO_KIND` donne le
+  `kind` de chaque macro. Appliquée : tuiles Kcal/Pas/Eau du tableau de bord (barre + chiffre),
+  total du jour de Nutrition (calories, « Dépassement +193 », 4 macros barre + chiffre), carte Eau,
+  Corps › Pas (barre, chiffre du jour, barres du graphique ≥ cible en bleu), barres de la moyenne
+  kcal par semaine d'Analyse (au-delà de la cible orange/rouge, jusqu'à −10 % citron, plus bas
+  gris). **Toute nouvelle jauge vers une cible passe par `progressColor`**.
+- **« Aujourd'hui » → « Bord »** dans la barre d'onglets, titre d'écran **« Tableau de bord »**
+  (`TABS[].title`, lu par `App` pour l'en-tête), icône `LayoutDashboard` (comme avant la refonte).
+  Le mot « Aujourd'hui » reste là où il signifie le jour même (barre du jour de Nutrition, carte
+  Prochaine séance). En-tête : titre de plus de 11 caractères en 19 px sur une ligne, pastille de
+  phase resserrée — vérifié sans troncature à 360 px.
+- **Tuile Poids** : la **pesée** est la valeur principale (« Poids · 24/10 » si elle n'est pas du
+  jour), la moyenne 7 j passe en note ; tendance hebdo inchangée.
+- **Carte Eau de Nutrition** : une seule rangée (valeur + barre fine, boutons +250/+500/−250 de
+  52 × 48 px), 70 px de haut au lieu d'environ 180.
 
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 

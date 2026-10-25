@@ -14,7 +14,8 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Plus, Trash2, ChevronDown, ChevronRight, ChevronLeft, Droplet, Zap, Copy, Search, Check, History } from "lucide-react";
 import { today, fmt, longDate, upsert, shiftDateKey } from "../ui.jsx";
-import { T } from "../design/tokens.js";
+import { T, COLORS } from "../design/tokens.js";
+import { progressColor, MACRO_KIND } from "../lib/progress.js";
 import { Panel, Eyebrow, Button, IconButton, Chip, NumberField } from "../design/primitives.jsx";
 import {
   MEALS, useFoodLog, makeEntry, amounts, entriesFor, totals, isQuickRef, newQuickRef,
@@ -293,6 +294,8 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
   const water = curMacro.water ?? 0;
   const basketDay = training.some((tr) => tr.type === "Basket" && tr.date === date);
   const waterTgt = tg.water + (basketDay ? 1000 : 0);
+  const kcalColor = progressColor(t.kcal, kcalTarget, "limit");
+  const waterColor = progressColor(water, waterTgt, "goal");
   const addWater = (ml) => {
     const next = Math.max(0, (macros.find((m) => m.date === date)?.water ?? 0) + ml);
     save.macros(upsert(macros, { date, water: next, source: "manual" }));
@@ -462,44 +465,50 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
           </div>
           <div style={{ textAlign: "right" }}>
             <Eyebrow>{left >= 0 ? "Il reste" : "Dépassement"}</Eyebrow>
-            <div style={{ ...mono, fontSize: 22, fontWeight: 700, marginTop: 4, color: left >= 0 ? T.c.accent : T.c.danger }}>
-              {n0(Math.abs(left))}
+            <div style={{ ...mono, fontSize: 22, fontWeight: 700, marginTop: 4, color: kcalColor }}>
+              {left >= 0 ? "" : "+"}{n0(Math.abs(left))}
             </div>
           </div>
         </div>
-        <Bar pct={(t.kcal / kcalTarget) * 100} color={left >= 0 ? T.c.accent : T.c.danger} h={8} />
+        <Bar pct={(t.kcal / kcalTarget) * 100} color={kcalColor} h={8} />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 }}>
           {["prot", "gluc", "lip", "fib"].map((m) => {
             const target = tg[TARGET_KEY[m]];
+            // Protéines/fibres : bleu une fois la cible atteinte ; glucides/lipides : orange puis
+            // rouge au-delà (lib/progress.js, même règle partout).
+            const col = progressColor(t[m], target, MACRO_KIND[m]);
             return (
               <div key={m} style={{ display: "grid", gap: 4, minWidth: 0 }}>
                 <Eyebrow>{MACRO_SHORT[m]}</Eyebrow>
-                <div style={{ ...mono, fontSize: 17, fontWeight: 700, whiteSpace: "nowrap" }}>
+                <div style={{ ...mono, fontSize: 17, fontWeight: 700, whiteSpace: "nowrap", color: col === COLORS.accent ? T.c.text : col }}>
                   {n0(t[m])}
                   {/* Une donnée absente de la table ne doit pas se cacher derrière un total d'apparence exacte. */}
                   {t.missing[m] > 0 && <span style={{ fontSize: 13, color: T.c.muted }} title={`${t.missing[m]} aliment(s) sans cette donnée`}>+?</span>}
                 </div>
                 <div style={{ ...mono, fontSize: 13, color: T.c.muted }}>/ {target} g</div>
-                <Bar pct={target ? (t[m] / target) * 100 : 0} />
+                <Bar pct={target ? (t[m] / target) * 100 : 0} color={col} />
               </div>
             );
           })}
         </div>
       </Panel>
 
-      <Panel>
+      {/* Eau en une seule rangée (25/10/2026, « beaucoup trop grosse ») : valeur + barre fine à
+          gauche, trois boutons compacts de 44 px à droite. Bleu une fois la cible atteinte. */}
+      <Panel aria-label="Eau" style={{ padding: "10px 12px", gap: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Droplet size={18} color={T.c.accent} aria-hidden="true" />
-          <Eyebrow>Eau</Eyebrow>
-          <span style={{ ...mono, marginLeft: "auto", fontSize: 17, fontWeight: 700 }}>
-            {(water / 1000).toFixed(2)}<span style={{ fontSize: 13, color: T.c.text2 }}> / {(waterTgt / 1000).toFixed(1)} L</span>
-          </span>
-        </div>
-        <Bar pct={(water / waterTgt) * 100} />
-        <div style={{ display: "flex", gap: 8 }}>
-          <Button variant="plain" style={{ flex: 1 }} onClick={() => addWater(250)}>+250 ml</Button>
-          <Button variant="plain" style={{ flex: 1 }} onClick={() => addWater(500)}>+500 ml</Button>
-          <Button variant="plain" onClick={() => addWater(-250)} aria-label="Retirer 250 ml">−250</Button>
+          <Droplet size={18} color={waterColor} aria-hidden="true" style={{ flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 5 }}>
+            <span style={{ ...mono, fontSize: 15, fontWeight: 700, whiteSpace: "nowrap", color: waterColor === COLORS.accent ? T.c.text : waterColor }}>
+              {(water / 1000).toFixed(2)}<span style={{ fontSize: 13, color: T.c.text2 }}> / {(waterTgt / 1000).toFixed(1)} L</span>
+            </span>
+            <Bar pct={(water / waterTgt) * 100} color={waterColor} h={4} />
+          </div>
+          {[[250, "+250"], [500, "+500"], [-250, "−250"]].map(([ml, l]) => (
+            <button key={ml} type="button" className="p-tap" onClick={() => addWater(ml)} aria-label={ml > 0 ? `Ajouter ${ml} ml d'eau` : "Retirer 250 ml d'eau"}
+              style={{ minWidth: 52, height: 44, padding: "0 8px", borderRadius: 10, border: `1px solid ${T.c.line}`, background: T.c.raised,
+                color: T.c.text, fontFamily: T.f.num, fontSize: 14, fontWeight: 700, flexShrink: 0 }}>{l}</button>
+          ))}
         </div>
       </Panel>
 

@@ -16,7 +16,7 @@ export const C = {
   bg: COLORS.bg, card: COLORS.card, border: COLORS.line, borderDim: COLORS.lineSoft, divider: COLORS.lineSoft,
   accent: COLORS.accent, accentRow: COLORS.accentRow, text: COLORS.text, text2: COLORS.text2,
   muted: COLORS.muted, dim: COLORS.muted, danger: COLORS.danger, dangerBg: COLORS.dangerBg,
-  dangerBorder: COLORS.dangerLine, dangerText: COLORS.danger, warn: COLORS.warn, mono: FONTS.num,
+  dangerBorder: COLORS.dangerLine, dangerText: COLORS.danger, warn: COLORS.warn, over: COLORS.over, mono: FONTS.num,
 };
 
 // Avec `onClick`, la carte est un vrai bouton (cible tactile, focus, lecteur d'écran) — un

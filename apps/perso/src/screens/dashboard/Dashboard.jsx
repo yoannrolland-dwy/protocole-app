@@ -1,5 +1,5 @@
 // Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; refait en design system v2 à
-// l'étape 4 d'U3 (25/10/2026) : Énergie et Poids en tête (ordre gardé, choix de Yoann),
+// l'étape 4 d'U3 (25/10/2026), onglet « Bord » / écran « Tableau de bord » : Énergie et Poids en tête (ordre gardé, choix de Yoann),
 // puis Calories · Pas · Eau, Prochaine séance, Constats repliés, Palier seulement s'il y a une
 // proposition. Le Coach IA a déménagé dans l'onglet Analyse.
 import { useState, useEffect, useMemo } from "react";
@@ -12,7 +12,8 @@ import { computeFreeInsights } from "@rawcare/core/insights";
 import { PHASES, targetsForDate, kcalFromMacros, kcalOfEntry, tdeeNow, weightTrend7 } from "@rawcare/core/targets";
 import { nextSessions } from "@rawcare/core/nextSession";
 import { today, fmt, round, lastN, fmtHM } from "../../ui.jsx";
-import { T } from "../../design/tokens.js";
+import { T, COLORS } from "../../design/tokens.js";
+import { progressColor } from "../../lib/progress.js";
 import { Panel, Eyebrow, Button } from "../../design/primitives.jsx";
 import { phaseTarget, recompTrendColor, scoreColor, STEPS_TARGET } from "../../lib/helpers.js";
 import { KneeQuickLog } from "./KneeQuickLog.jsx";
@@ -22,16 +23,16 @@ import { PalierCard } from "./PalierCard.jsx";
 
 const mono = { fontFamily: T.f.num, fontVariantNumeric: "tabular-nums" };
 
-function Bar({ pct }) {
+function Bar({ pct, color = T.c.accent }) {
   return (
     <div style={{ background: T.c.raised, borderRadius: 99, height: 6, overflow: "hidden" }}>
-      <div style={{ background: T.c.accent, width: `${Math.max(0, Math.min(100, pct))}%`, height: "100%", borderRadius: 99 }} />
+      <div style={{ background: color, width: `${Math.max(0, Math.min(100, pct))}%`, height: "100%", borderRadius: 99 }} />
     </div>
   );
 }
 
 // Tuile cliquable vers l'écran de détail. `big` : les deux tuiles de tête (Énergie, Poids).
-function Tile({ label, value, unit, note, extra, bar, onClick, big = false, valueColor = T.c.text }) {
+function Tile({ label, value, unit, note, extra, bar, barColor, onClick, big = false, valueColor = T.c.text }) {
   return (
     <button type="button" className="p-tap p-card" onClick={onClick} style={{
       display: "grid", gap: 4, alignContent: "start", minWidth: 0, textAlign: "left",
@@ -44,7 +45,7 @@ function Tile({ label, value, unit, note, extra, bar, onClick, big = false, valu
       </span>
       {extra && <span style={{ fontSize: 14, fontWeight: 700, color: extra.col }}>{extra.txt}</span>}
       {note && <span style={{ fontSize: 13, color: T.c.text2, lineHeight: 1.3 }}>{note}</span>}
-      {bar != null && <Bar pct={bar} />}
+      {bar != null && <Bar pct={bar} color={barColor} />}
     </button>
   );
 }
@@ -132,18 +133,33 @@ export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targe
           // (`scoreColor`) — un 59 « Risque » ne doit pas s'afficher en citron.
           extra={energy.status === "ok" ? { txt: scoreLabel(energy.total), col: scoreColor(energy.total) } : null}
           note={energy.status === "ok" ? nightNote : "pas assez de données"} />
-        <Tile big label={tgtW != null ? "Poids" : "Poids · moy. 7 j"} onClick={() => setTab("weight")}
-          value={tgtW != null ? (wLast ? wLast.kg : "—") : (wTrend?.avg7 ?? "—")} unit="kg"
+        {/* La PESÉE est la valeur principale, la moyenne 7 j passe en note (25/10/2026, demande de
+            Yoann : « la pesée du jour doit être primordiale »). */}
+        <Tile big label={wLast && wLast.date !== today() ? `Poids · ${fmt(wLast.date)}` : "Poids"} onClick={() => setTab("weight")}
+          value={wLast ? wLast.kg : "—"} unit="kg"
           extra={wExtra}
-          note={tgtW != null ? `cible ${tgtW} kg` : wLast ? `pesée ${wLast.kg} kg${wLast.date !== today() ? ` (${fmt(wLast.date)})` : ""}` : "pas de pesée"} />
+          note={tgtW != null ? `cible ${tgtW} kg` : `moy. 7 j ${wTrend?.avg7 ?? "—"} kg`} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
-        <Tile label="Kcal" onClick={() => setTab("macro")} value={kcalToday ?? "—"} note={`/ ${kcalTgt}`}
-          bar={kcalToday != null ? (kcalToday / kcalTgt) * 100 : null} />
-        <Tile label="Pas" onClick={() => setTab("steps")} value={stepsToday.toLocaleString("fr-FR")} note={`/ ${STEPS_TARGET.toLocaleString("fr-FR")}`}
-          bar={(stepsToday / STEPS_TARGET) * 100} />
-        <Tile label="Eau" onClick={() => setTab("macro")} value={(waterToday / 1000).toFixed(2)} unit="L"
-          note={`/ ${(waterTgt / 1000).toFixed(1)} L${basketToday ? " · basket" : ""}`} bar={(waterToday / waterTgt) * 100} />
+        {/* Couleurs d'avancement partagées (lib/progress.js) : calories orange/rouge au-delà de la
+            cible, pas et eau en bleu une fois la cible atteinte. Le chiffre prend la même couleur
+            dès qu'on n'est plus « en cours ». */}
+        {(() => {
+          const kc = progressColor(kcalToday, kcalTgt, "limit");
+          const st = progressColor(stepsToday, STEPS_TARGET, "goal");
+          const wa = progressColor(waterToday, waterTgt, "goal");
+          const val = (c) => (c === T.c.accent || c === COLORS.accent ? T.c.text : c);
+          return (
+            <>
+              <Tile label="Kcal" onClick={() => setTab("macro")} value={kcalToday ?? "—"} note={`/ ${kcalTgt}`}
+                bar={kcalToday != null ? (kcalToday / kcalTgt) * 100 : null} barColor={kc} valueColor={val(kc)} />
+              <Tile label="Pas" onClick={() => setTab("steps")} value={stepsToday.toLocaleString("fr-FR")} note={`/ ${STEPS_TARGET.toLocaleString("fr-FR")}`}
+                bar={(stepsToday / STEPS_TARGET) * 100} barColor={st} valueColor={val(st)} />
+              <Tile label="Eau" onClick={() => setTab("macro")} value={(waterToday / 1000).toFixed(2)} unit="L"
+                note={`/ ${(waterTgt / 1000).toFixed(1)} L${basketToday ? " · basket" : ""}`} bar={(waterToday / waterTgt) * 100} barColor={wa} valueColor={val(wa)} />
+            </>
+          );
+        })()}
       </div>
 
       {/* Prochaine séance */}
