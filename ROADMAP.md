@@ -30,7 +30,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | U1 | Refonte IHM — cadrage : audit chiffré + moments d'usage + arborescence maquettée | petit | ✅ 25/10/2026 (option A) |
 | U2 | Refonte IHM — directions visuelles en maquettes, choix, design system v2 (variables CSS) | gros | ✅ 25/10/2026 (v3.110.0, direction A) |
 | U3 | Refonte IHM — écran par écran (un commit + une install par écran) | gros | ✅ 25/10/2026 (8 étapes, v3.111.0 → v3.118.0) |
-| U4 | Refonte IHM — audit final avant/après + mise à jour CLAUDE.md | petit | ⬜ |
+| U4 | Refonte IHM — audit final avant/après + mise à jour CLAUDE.md | petit | ✅ 25/10/2026 (v3.118.1) |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il
 alimente le recommandeur + le Coach IA. V2 tôt parce que c'est une protection, pas
@@ -999,4 +999,39 @@ section design system. **Reste pour U3 (étape 1, barre d'onglets + en-tête)** 
 
 **Restent en v1 après U3** (fonctionnels, pas refaits ni mesurés) : création/modification de
 recette, correction des valeurs d'un aliment (V6), Carte resto, Photo d'un plat (`nutrition/`).
+
+### U4 — Audit final avant/après (25/10/2026, v3.118.1)
+
+Même fonction de mesure qu'en U1 (tous les éléments texte visibles de la page, en-tête et barre
+d'onglets compris ; contraste contre le fond réel ; seuil 3:1 pour le gros texte), même jeu de
+données U0 rechargé à l'identique, aperçu 375 px. Les écrans de l'arborescence A remplacent les
+anciens onglets (Poids/Énergie/Pas/Douleurs → Corps).
+
+| Écran (avant → après) | Texte < 12 px | Contraste < 4,5:1 | Cibles < 44 px | Boutons sans nom |
+|---|---|---|---|---|
+| Tableau de bord → Aujourd'hui | 79 % → **0** | 58 % → **0** | 13/13 → **0/15** | 1 → **0** |
+| Poids → Corps › Poids | 58 % → **0** | 40 % → **0** | 15/15 → **0/16** | 2 → **0** |
+| Énergie → Corps › Énergie | 78 % → **0** | 42 % → **0** | 11/11 → **0/12** | 1 → **0** |
+| Pas → Corps › Pas | 81 % → **0** | 41 % → **0** | 14/14 → **0/15** | 1 → **0** |
+| Douleurs → Corps › Genou | 57 % → **0** | 59 % → **0** | 25/25 → **0/26** | 2 → **0** |
+| Séances (liste) → Séance | 59 % → **0** | 62 % → **0** | 22/31 → **0/40** | 11 → **0** |
+| Carnet Upper A | 74 % → **0** | 60 % → **0** | 42/42 → **0/47** | 10 → **0** |
+| TDEE → Analyse | 94 % → **0** | 43 % → **0** | 14/14 → **0/9** | 1 → **0** |
+| Macro → Nutrition | 73 % → **0** | 63 % → **0** | 34/35 → **0/43** | 15 → **0** |
+| Recherche d'aliment | 71 % → **0** | 62 % → **0** | 38/41 → **0/57** | 16 → **0** |
+| Réglages (non mesuré en U1) | — | **0** | **0/54** | **0** |
+
+- **Lighthouse mobile, accessibilité : 64 → 100** (bonnes pratiques 100 → 100). Zoom réautorisé.
+- Seul correctif fait pendant U4 : les 4 corbeilles « supprimer l'entrée de ce jour » de Corps
+  (Poids, Énergie, Pas, Genou) n'avaient pas de nom accessible → `aria-label` ajouté (v3.118.1).
+- **Restent en v1, mesurés pour mémoire** (pas refaits en U3) :
+
+| Écran v1 | Texte < 12 px | Contraste < 4,5:1 | Cibles < 44 px | Boutons sans nom |
+|---|---|---|---|---|
+| Nouvelle recette | 1 % | 1 % | 4/48 | 1 |
+| Carte resto | 4 % | 4 % | 3/50 | 1 |
+| Photo d'un plat | 4 % | 4 % | 2/49 | 1 |
+| Correction des valeurs (V6) | 4 % | 5 % | 7/64 | 0 |
+
+  Chantier séparé possible : les passer sur `design/compat.jsx` comme les étapes 5 à 8.
 

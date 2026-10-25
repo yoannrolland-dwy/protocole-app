@@ -65,7 +65,7 @@ export function WeightTab({ weight, targets, save, phase }) {
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
               <Btn variant="primary" onClick={add} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
               {weight.some((w) => w.date === date) && (
-                <Btn variant="danger" onClick={() => save.weight(weight.filter((w) => w.date !== date))}><Trash2 size={14} /></Btn>
+                <Btn variant="danger" aria-label="Supprimer l'entrée de ce jour" onClick={() => save.weight(weight.filter((w) => w.date !== date))}><Trash2 size={18} aria-hidden="true" /></Btn>
               )}
             </div>
           </>

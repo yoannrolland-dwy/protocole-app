@@ -135,7 +135,7 @@ export function PainTab({ knee, save, hsrWeek }) {
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <Btn variant="primary" onClick={add} disabled={pain == null} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
           {log.some((k) => k.date === date) && (
-            <Btn variant="danger" onClick={() => save.knee(log.filter((k) => k.date !== date))}><Trash2 size={14} /></Btn>
+            <Btn variant="danger" aria-label="Supprimer l'entrée de ce jour" onClick={() => save.knee(log.filter((k) => k.date !== date))}><Trash2 size={18} aria-hidden="true" /></Btn>
           )}
         </div>
       </Card>

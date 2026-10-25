@@ -190,6 +190,9 @@ monospace), corrigée pour la lisibilité mesurée à l'audit U1.
   `p-chip` (`aria-pressed`), `p-field`, `p-card` (+ `--key`, `--danger`), `p-label`, `p-num`,
   `p-sec`, `p-muted`. **La règle « tout en style en ligne » est levée** (décision 5 du
   chantier U) ; le style en ligne reste permis pour du ponctuel.
+- **État après U3/U4** : tous les écrans de l'arborescence passent par `design/primitives.jsx` ou
+  `design/compat.jsx` (mêmes noms que les primitives v1, valeurs v2) ; seuls les 4 sous-écrans de
+  `nutrition/` listés au chantier U4 restent sur `ui.jsx`.
 - **Migration écran par écran (U3)** : l'ancien objet `C` et les primitives de `ui.jsx`
   (`Card`, `Label`, `Btn`…) restent tels quels tant qu'un écran n'est pas refait, pour que
   chaque écran change dans son propre commit et sa propre installation. Ne pas modifier `C`
@@ -3699,6 +3702,21 @@ décompte** (la pastille épinglée en permanence de juillet gênait le défilem
 - **Mesuré dans l'aperçu (375 px)** : 0 texte sous 12 px, 0 sous 4,5:1, 0 cible sous 44 px. Testé :
   un jour fixe activé puis désactivé (`basketSchedule.weekly`). Vérifié sur le téléphone : planning,
   matchs et phase intacts.
+
+## Chantier U — U4 : audit final, chantier terminé (25/10/2026, v3.118.1)
+
+Chantier U (refonte IHM, `apps/perso`) **terminé** : U0 → U4, v3.109.2 → v3.118.1. Mesures U1 refaites
+à l'identique (même fonction, même jeu de données, 375 px) : **sur les 11 écrans de
+l'arborescence A, 0 texte sous 12 px, 0 texte sous 4,5:1, 0 cible sous 44 px, 0 bouton sans nom**
+(avant : 57-94 % du texte sous 12 px, 40-63 % sous 4,5:1, presque toutes les cibles trop petites).
+**Lighthouse accessibilité 64 → 100.** Tableau complet écran par écran dans `ROADMAP.md` (U4).
+Correctif livré pendant U4 : `aria-label` sur les corbeilles « supprimer l'entrée de ce jour » de
+Poids, Énergie, Pas et Genou (v3.118.1).
+**Restent en v1** (fonctionnels, mesurés pour mémoire, 1-5 % de texte trop petit/pâle, 2-7 cibles
+trop petites) : création/modification de recette, correction V6, Carte resto, Photo d'un plat — à
+passer sur `design/compat.jsx` si Yoann le demande. **Pour tout nouvel écran ou toute retouche :
+utiliser les primitives v2 (`design/primitives.jsx`) ou `design/compat.jsx`, jamais l'objet `C` ni
+les primitives v1 de `ui.jsx`**, qui restent seulement pour ces quatre écrans.
 
 ## Minuteur de repos calé sur l'heure réelle (25/10/2026, apps/perso v3.109.3)
 

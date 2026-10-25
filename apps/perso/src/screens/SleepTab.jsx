@@ -146,7 +146,7 @@ export function SleepTab({ sleep, rhr, steps, naps, save }) {
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
               <Btn variant="primary" onClick={add} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
               {sleep.some((s) => s.date === date) && (
-                <Btn variant="danger" onClick={() => save.sleep(sleep.filter((s) => s.date !== date))}><Trash2 size={14} /></Btn>
+                <Btn variant="danger" aria-label="Supprimer l'entrée de ce jour" onClick={() => save.sleep(sleep.filter((s) => s.date !== date))}><Trash2 size={18} aria-hidden="true" /></Btn>
               )}
             </div>
           </>
