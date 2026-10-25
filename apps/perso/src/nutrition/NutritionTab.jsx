@@ -605,10 +605,6 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
       {/* Péri-training + protocoles basket (déplacés depuis l'onglet Analyse, U3 étape 7) */}
       <PeriCard />
 
-      <div className="p-muted" style={{ textAlign: "center", padding: "0 0 8px" }}>
-        Calories et macros alimentent aussi la dépense estimée de l'onglet Analyse.
-      </div>
-
       <UndoBar undo={undo} onUndo={runUndo} />
 
       {openMeal && (

@@ -95,7 +95,6 @@ export function PainTab({ knee, save, hsrWeek }) {
             </ResponsiveContainer>
           </div>
         ) : <Empty>Aucun relevé.</Empty>}
-        <Body style={{ fontSize: 13, marginTop: 6 }}>Point cerclé = douleur non revenue à la base sous 24 h (surcharge).</Body>
       </Card>
 
       {alert && (

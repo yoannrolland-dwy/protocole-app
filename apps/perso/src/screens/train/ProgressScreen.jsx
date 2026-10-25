@@ -119,7 +119,7 @@ export function ProgressScreen({ training, knee, onBack }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader title="Progression" subtitle="par exercice · meilleure série de chaque séance"
+      <ScreenHeader title="Progression"
         right={<Btn variant="ghost" onClick={onBack} aria-label="Fermer" style={{ width: 52, padding: 0 }}><X size={20} aria-hidden="true" /></Btn>} />
       <Card style={{ padding: "6px 14px" }}>
         {list.length ? list.map((e) => {

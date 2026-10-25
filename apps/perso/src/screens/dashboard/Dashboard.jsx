@@ -3,7 +3,7 @@
 // puis Calories · Pas · Eau, Prochaine séance, Constats repliés, Palier seulement s'il y a une
 // proposition. Le Coach IA a déménagé dans l'onglet Analyse.
 import { useState, useEffect, useMemo } from "react";
-import { AlertTriangle, Play, ChevronRight } from "lucide-react";
+import { AlertTriangle, Play } from "lucide-react";
 import { getSync } from "../../store.js";
 import { isBackupStale, daysSinceBackup } from "../../cloudBackup.js";
 import { TEMPLATES } from "@rawcare/core/session/templates";
@@ -236,7 +236,6 @@ export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targe
               À éviter : {next.tomorrow.avoid.map((a) => a.type).join(", ")}
             </div>
           )}
-          <div className="p-muted" style={{ fontStyle: "italic" }}>{next.tomorrow.caveat}</div>
           <WhyNot items={next.tomorrow.notProposed} />
         </div>
       </Panel>
@@ -247,14 +246,6 @@ export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targe
       {/* Palier de la semaine (R3) — recomposition seulement, et seulement s'il y a une proposition */}
       {PHASES[phase]?.noTarget && palier?.result && <PalierCard palier={palier} targets={targets} onApply={onApplyPalier} />}
 
-      <button type="button" className="p-tap" onClick={() => setTab("perf")} style={{
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 48,
-        background: "none", border: "none", color: T.c.text2, fontSize: 14, fontFamily: "inherit",
-      }}>Coach IA et dépense estimée : onglet Analyse <ChevronRight size={16} aria-hidden="true" /></button>
-
-      <div className="p-muted" style={{ textAlign: "center", padding: "0 8px 8px" }}>
-        Outil de suivi personnel, pas un avis médical. Douleur aiguë ou persistante → kiné.
-      </div>
     </div>
   );
 }

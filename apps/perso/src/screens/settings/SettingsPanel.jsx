@@ -149,8 +149,7 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, hea
       <Card>
         <Label style={{ marginBottom: 8 }}>Coach IA · contexte permanent</Label>
         <Body style={{ fontSize: 13, color: C.dim, marginBottom: 8 }}>
-          Envoyé à chaque analyse comme une contrainte. C'est ici que vit ton objectif en cours —
-          après tes vacances, remplace-le par le suivant.
+          Envoyé à chaque analyse comme une contrainte. C'est ici que vit ton objectif en cours.
         </Body>
         <textarea rows={10} value={prof} onChange={(e) => setProf(e.target.value)}
           onBlur={() => setCoachProfile(prof)}

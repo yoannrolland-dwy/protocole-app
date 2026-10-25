@@ -19,7 +19,7 @@ export function KneeQuickLog({ knee, saveKnee }) {
     <div style={{ display: "grid", gap: 10, padding: 12, borderRadius: 12, border: `1px solid ${T.c.warn}`, background: T.c.field }}>
       <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
         <AlertTriangle size={18} color={T.c.warn} style={{ flexShrink: 0, marginTop: 1 }} aria-hidden="true" />
-        <span style={{ fontSize: 14, color: T.c.text, lineHeight: 1.4 }}>Douleur genou aujourd'hui ? Sans cette info, le recommandeur reste prudent par défaut.</span>
+        <span style={{ fontSize: 14, color: T.c.text, lineHeight: 1.4 }}>Douleur genou aujourd'hui ?</span>
       </div>
       <div role="group" aria-label="Douleur genou de 0 à 10" style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 6 }}>
         {Array.from({ length: 11 }, (_, i) => (

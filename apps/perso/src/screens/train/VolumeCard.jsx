@@ -33,9 +33,7 @@ export function VolumeCard({ training }) {
           </span>
         </div>
       ))}
-      <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>
-        {any ? "Gainage et isométries non comptés. Pecs et épaules : groupes prioritaires, zone 10-20 séries/semaine." : "Aucune série de musculation cochée sur les 7 derniers jours."}
-      </Body>
+      {!any && <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>Aucune série de musculation cochée sur les 7 derniers jours.</Body>}
     </Card>
   );
 }

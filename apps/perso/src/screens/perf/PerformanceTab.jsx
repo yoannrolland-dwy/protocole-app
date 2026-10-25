@@ -8,7 +8,7 @@ import { getSync } from "../../store.js";
 import { realDeficit, tdeeTrend, tdeeOverWindow } from "@rawcare/core/tdee";
 import { PERI, BASKET_PROTOCOLS } from "@rawcare/core/session/templates";
 import { PHASES, targetsForDate, kcalFromMacros, tdeeNow, weeklyKcalTrend, weeklyProteinTrend, buildKcalByDate, recompWindows } from "@rawcare/core/targets";
-import { C, today, fmt, Card, Label, Body, Empty, Pills, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../../design/compat.jsx";
+import { C, today, fmt, Card, Label, Empty, Pills, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../../design/compat.jsx";
 import { PROT_LINE } from "../../lib/helpers.js";
 import { progressColor } from "../../lib/progress.js";
 import { TdeeCard } from "./TdeeCard.jsx";
@@ -86,9 +86,6 @@ export function PerformanceTab({ macros, targets, training, weight, phase, coach
             </ResponsiveContainer>
           </div>
         ) : <Empty>Aucune donnée.</Empty>}
-        <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>
-          Barres : kcal, moyenne des jours réellement loggés (axe gauche). Courbe : protéines g/j, jours terminés seulement (axe droit).
-        </Body>
       </Card>
 
       {/* Dépense énergétique adaptative (V7) */}

@@ -6,7 +6,7 @@ import { store, getSync } from "../../store.js";
 import { splitExerciseList, recordsBySession, painOutOfBase } from "@rawcare/core/training";
 import { loadLabel, geneLabel } from "@rawcare/core/sessionLoad";
 import { TEMPLATES, TYPES, hsrForWeek } from "@rawcare/core/session/templates";
-import { C, today, fmt, round, byDate, lastN, daysBetween, Card, Label, Body, Empty, Btn, inputStyle, Stepper, Field, DateField, ScreenHeader } from "../../design/compat.jsx";
+import { C, today, fmt, round, byDate, lastN, daysBetween, Card, Label, Body, Empty, Btn, inputStyle, Stepper, Field, DateField } from "../../design/compat.jsx";
 import { MuscuLogger } from "./MuscuLogger.jsx";
 import { restTimer } from "../../lib/restTimer.js";
 import { ProgressScreen } from "./ProgressScreen.jsx";
@@ -110,8 +110,6 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader subtitle="carnet · progressive overload" />
-
       {/* Choix du type */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         {TYPES.map((type) => {
@@ -141,7 +139,6 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
           </div>
           {/* Basket est passé en carnet d'exercices (04/09/2026, kind:"muscu") : cette carte
               ne sert plus qu'à Escalade, seul type "sport" restant. */}
-          <Body style={{ marginBottom: 12 }}>Compte comme volume tirage — jamais un jour Upper, pour protéger le coude.</Body>
           <div style={{ marginBottom: 10 }}><DateField value={date} onChange={setDate} /></div>
           <div style={{ display: "grid", gap: 10, marginBottom: 10 }}>
             <Field label="Début">
@@ -165,9 +162,7 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <Label style={{ letterSpacing: 1.5 }}>Progression par exercice</Label>
-            <Body style={{ marginTop: 3 }}>
-              {exoCount ? `${exoCount} exercice${exoCount > 1 ? "s" : ""} suivi${exoCount > 1 ? "s" : ""} · courbe et tendance` : "Aucune séance de muscu enregistrée pour l'instant."}
-            </Body>
+            {!exoCount && <Body style={{ marginTop: 3 }}>Aucune séance de muscu enregistrée pour l'instant.</Body>}
           </div>
           <ChevronRight size={15} color={C.accent} />
         </div>

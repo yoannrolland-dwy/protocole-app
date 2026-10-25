@@ -42,9 +42,8 @@ export function BasketScheduleCard({ basketSchedule, setBasketSchedule }) {
     <Card>
       <Label style={{ marginBottom: 8 }}>Planning Basket fixe</Label>
       <Body style={{ fontSize: 13, color: C.dim, marginBottom: 10 }}>
-        Le recommandeur sait qu'un Basket est prévu avant même que tu l'aies loggé : il évite
-        de proposer un Lower le même jour, le propose en priorité ("c'est le jour de
-        l'entraînement") le jour même, et bascule sur le planning "semaine avec match" dès
+        Le recommandeur sait qu'un Basket est prévu avant même que tu l'aies loggé : il le
+        propose en priorité le jour même, et bascule sur le planning "semaine avec match" dès
         qu'un match tombe le dimanche.
       </Body>
 

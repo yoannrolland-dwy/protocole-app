@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Cell } from "recharts";
 import { Plus, Trash2 } from "lucide-react";
-import { C, today, fmt, upsert, lastN, Card, Label, Empty, Btn, Stepper, Field, DateField, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../design/compat.jsx";
+import { C, today, fmt, upsert, lastN, Card, Label, Empty, Btn, Stepper, Field, DateField, chartAxis, tooltipStyle, tooltipItemStyle } from "../design/compat.jsx";
 import { avg, STEPS_TARGET } from "../lib/helpers.js";
 import { progressColor } from "../lib/progress.js";
 import { SyncedBanner } from "../components/SyncedBanner.jsx";
@@ -23,7 +23,6 @@ export function StepsTab({ steps, save }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader subtitle="saisie manuelle · activité quotidienne" />
 
       <Card style={{ padding: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>

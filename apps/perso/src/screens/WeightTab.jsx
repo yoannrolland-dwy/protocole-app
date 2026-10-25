@@ -1,11 +1,10 @@
 // Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; rendu v2 à l'étape 5 d'U3 via
 // design/compat.jsx (mêmes primitives, valeurs v2), polices écrites en dur remontées à 12-13 px.
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from "recharts";
 import { Plus, Trash2 } from "lucide-react";
-import { weighTimeAnalysis } from "@rawcare/core/weighTime";
 import { PHASES, weightTrend7 } from "@rawcare/core/targets";
-import { C, today, fmt, round, upsert, lastN, Card, Label, Body, Big, Empty, Btn, Stepper, Field, DateField, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../design/compat.jsx";
+import { C, today, fmt, round, upsert, lastN, Card, Label, Big, Empty, Btn, Stepper, Field, DateField, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../design/compat.jsx";
 import { phaseTarget, recompTrendColor } from "../lib/helpers.js";
 import { SyncedBanner } from "../components/SyncedBanner.jsx";
 
@@ -81,29 +80,6 @@ export function WeightTab({ weight, targets, save, phase }) {
           </div>
         )) : <Empty>Aucune donnée.</Empty>}
       </Card>
-      <WeighTimeCard weight={weight} />
     </div>
-  );
-}
-
-// Heure de pesée (08/10/2026) — observation seulement, aucune pesée exclue (décision de
-// Yoann). Écart moyen à la tendance EMA selon que la pesée est avant ou après 7 h.
-function WeighTimeCard({ weight }) {
-  const r = useMemo(() => weighTimeAnalysis(weight), [weight]);
-  if (!r.early.n && !r.late.n) return null;
-  const sg = (x) => (x == null ? "—" : `${x > 0 ? "+" : ""}${x.toFixed(2)} kg`);
-  return (
-    <Card>
-      <Label style={{ marginBottom: 6 }}>Heure de pesée</Label>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontFamily: C.mono, fontSize: 12 }}>
-        <div><div style={{ color: C.muted, fontSize: 12 }}>AVANT {r.cutoffHour} H · {r.early.n} pesée{r.early.n > 1 ? "s" : ""}</div><div style={{ color: C.text, fontWeight: 700 }}>{sg(r.early.meanDelta)}</div></div>
-        <div><div style={{ color: C.muted, fontSize: 12 }}>APRÈS {r.cutoffHour} H · {r.late.n} pesée{r.late.n > 1 ? "s" : ""}</div><div style={{ color: C.text, fontWeight: 700 }}>{sg(r.late.meanDelta)}</div></div>
-      </div>
-      <Body style={{ fontSize: 13, color: C.dim, marginTop: 8 }}>
-        {r.ready
-          ? `Écart de chaque pesée à la tendance lissée, centré sur l'ensemble des pesées (90 derniers jours). Les pesées à l'aube sortent ${r.diff > 0 ? "+" : ""}${r.diff.toFixed(2)} kg par rapport aux autres. Pour information : aucune pesée n'est exclue du calcul.`
-          : "Écart de chaque pesée à la tendance lissée, centré sur l'ensemble des pesées. Lecture possible dès 3 pesées horodatées de chaque côté."}
-      </Body>
-    </Card>
   );
 }

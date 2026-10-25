@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Cell } from "recharts";
 import { Plus, Trash2 } from "lucide-react";
 import { computeEnergyScore, computeSleepScore, scoreLabel } from "@rawcare/core/energy";
-import { C, today, fmt, round, upsert, lastN, fmtHM, Card, Label, Body, Empty, Btn, Stepper, Field, DateField, Pills, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../design/compat.jsx";
+import { C, today, fmt, round, upsert, lastN, fmtHM, Card, Label, Body, Empty, Btn, Stepper, Field, DateField, Pills, chartAxis, tooltipStyle, tooltipItemStyle } from "../design/compat.jsx";
 import { scoreColor, avg } from "../lib/helpers.js";
 import { SyncedBanner } from "../components/SyncedBanner.jsx";
 
@@ -78,7 +78,6 @@ export function SleepTab({ sleep, rhr, steps, naps, save }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader subtitle="récupération tendon & muscle" />
 
       <EnergyScoreCard energy={energy} />
 

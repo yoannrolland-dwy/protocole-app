@@ -3763,6 +3763,30 @@ Quatre demandes de Yoann, seuils et cas protéines/fibres tranchés par question
 - **Carte Eau de Nutrition** : une seule rangée (valeur + barre fine, boutons +250/+500/−250 de
   52 × 48 px), 70 px de haut au lieu d'environ 180.
 
+## Phrases d'aide retirées, carte « Heure de pesée » supprimée (25/10/2026, v3.120.1 → v3.120.2)
+
+Yoann a choisi sur une liste de 39 phrases d'aide celles à garder. **Retirées** : pied de page
+« Outil de suivi personnel… » et lien « Coach IA et dépense estimée : onglet Analyse » (Bord),
+mention « Prévision — sous réserve… » sous Demain (le champ `caveat` reste calculé par
+`nextSession.js`, il n'est plus affiché), « Sans cette info, le recommandeur reste prudent par
+défaut » (saisie genou), sous-titres « carnet · progressive overload », « récupération tendon &
+muscle », « saisie manuelle · activité quotidienne », « par exercice · meilleure série… », phrase
+« Compte comme volume tirage… » (carte Escalade), « … · courbe et tendance » (carte Progression,
+seul le message vide reste), note de la carte Volume (seul le message vide reste), « Calories et
+macros alimentent aussi… » (Nutrition), « Pré-rempli depuis les macros… » (saisie libre),
+« S'applique partout… » (correction V6), « Point cerclé = … » (graphique genou), légende du
+graphique hebdo d'Analyse. **Gardées** : sous-titre genou, « Macros de la portion réellement
+mangée », mention CIQUAL/Open Food Facts (licence), explications du Coach IA, de la note du jour,
+de la comparaison des fenêtres TDEE, de la zone de recomposition et de la tendance de poids, toutes
+les phrases des Réglages, et les messages d'erreur/d'écran vide.
+**Carte « Heure de pesée » supprimée** de l'onglet Poids (jugée inutile : aucun effet mesuré sur
+90 j). L'heure reste stockée (`weightLog.time`) et affichée dans l'historique, et le Coach IA
+reçoit toujours `summary.poids.heure_pesee` (non demandé, non touché).
+**Deux phrases périmées des Réglages corrigées (v3.120.2)** : le planning Basket ne dit plus que
+le recommandeur évite un Lower le jour d'un basket (règle retirée le 13/09/2026), et le contexte
+permanent du coach ne dit plus « après tes vacances, remplace-le par le suivant ». Le reste de
+chaque phrase, toujours exact, est gardé.
+
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 
 Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la

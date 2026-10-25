@@ -276,10 +276,6 @@ function FreeEntry({ onAdd, onBack, backLabel = "Saisie libre" }) {
         <Eyebrow>Calories</Eyebrow>
         <NumberField value={kcal} onChange={(v) => { setKcalTouched(true); setKcal(v); }} unit="kcal" label="Calories" big
           inputRef={(el) => { refs.current[FIELDS.length] = el; }} onEnter={submit} style={{ color: T.c.accent }} />
-        <div className="p-muted">
-          Pré-rempli depuis les macros (4/4/9 + fibres + alcool 7 kcal/g) — modifiable pour toute
-          source de calories que ces champs ne couvrent pas.
-        </div>
       </div>
       <Button variant="primary" block disabled={!ok} onClick={submit}>{remove ? "Retirer" : "Ajouter"}</Button>
     </div>
@@ -605,10 +601,6 @@ function OverridePanel({ food, shown, override, onSave, onClear, onCancel }) {
   return (
     <div style={{ background: C.bg, border: `1.5px solid ${C.accent}`, borderRadius: 8, padding: 12 }}>
       <Label style={{ marginBottom: 4 }}>Corriger · valeurs pour 100 g</Label>
-      <Body style={{ fontSize: 12, color: C.dim, marginBottom: 10 }}>
-        S'applique partout où cet aliment apparaît, y compris dans les repas déjà enregistrés.
-        Champ vide = on garde la valeur d'origine.
-      </Body>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6 }}>
         {MACROS.map((m) => (
           <div key={m}>
