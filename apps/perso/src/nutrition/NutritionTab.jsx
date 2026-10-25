@@ -1,87 +1,95 @@
 // Onglet Nutrition — journal alimentaire interne (M1 du chantier du 01/08/2026).
 //
 // BASCULE M6 (02/08/2026) : `foodLog` alimente désormais `macroLog` (voir l'effet de
-// dérivation plus bas et `deriveMacroLog` dans foodStore.js) — l'onglet Macros, le Coach
+// dérivation plus bas et `deriveMacroLog` dans foodStore.js) — l'onglet Analyse, le Coach
 // IA et le widget reflètent donc directement ce qui est loggé ici, sans code
 // supplémentaire de leur côté. La lecture nutrition/eau depuis Health Connect est coupée
 // (healthSync.js) : `foodLog` est l'unique écrivain des macros au quotidien désormais.
+//
+// Design system v2 (chantier U, U3 étape 2, 25/10/2026) : primitives de design/primitives.jsx,
+// texte 12 px minimum, cibles de 48 px. Ajouts de cette étape : flèches veille/lendemain,
+// 3 habituels du repas en un tap (+ Annuler 5 s), « Comme hier » à cocher, ligne du journal
+// modifiable au clavier numérique (Entrée = Enregistrer).
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { Plus, Trash2, ChevronDown, ChevronRight, Droplet, Zap, Copy } from "lucide-react";
-import { C, Card, Label, Body, Btn, Empty, Stepper, DateField, ScreenHeader, Pills, today, fmt, longDate, upsert, shiftDateKey } from "../ui.jsx";
+import { Plus, Trash2, ChevronDown, ChevronRight, ChevronLeft, Droplet, Zap, Copy, Search, Check, History } from "lucide-react";
+import { today, fmt, longDate, upsert, shiftDateKey } from "../ui.jsx";
+import { T } from "../design/tokens.js";
+import { Panel, Eyebrow, Button, IconButton, Chip, NumberField } from "../design/primitives.jsx";
 import {
   MEALS, useFoodLog, makeEntry, amounts, entriesFor, totals, isQuickRef, newQuickRef,
-  copySourceCandidates, copyEntries, deriveMacroLog,
+  copySourceCandidates, copyEntries, deriveMacroLog, suggestions,
 } from "./foodStore.js";
 import FoodSearch from "./FoodSearch.jsx";
 
-const MEAL_OPTIONS = MEALS.map((m) => ({ key: m.key, label: m.label }));
-
 // Cibles PROTOCOLE (protein/carbs/fat/fiber) → noms internes du module (prot/gluc/lip/fib).
 const TARGET_KEY = { prot: "protein", gluc: "carbs", lip: "fat", fib: "fiber" };
-const MACRO_LABEL = { prot: "Protéines", gluc: "Glucides", lip: "Lipides", fib: "Fibres" };
+const MACRO_SHORT = { prot: "Prot", gluc: "Gluc", lip: "Lip", fib: "Fib" };
 
 const n0 = (x) => Math.round(x);
 const n1 = (x) => Math.round(x * 10) / 10;
+const mono = { fontFamily: T.f.num, fontVariantNumeric: "tabular-nums" };
 
-function MacroTile({ m, value, target, missing }) {
-  const pct = target ? Math.min(100, (value / target) * 100) : 0;
+function Bar({ pct, color = T.c.accent, h = 6 }) {
   return (
-    <div style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
-      <Label>{MACRO_LABEL[m]}</Label>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 3, marginTop: 3 }}>
-        <span style={{ fontFamily: C.mono, fontSize: 18, fontWeight: 800, color: C.text }}>{n1(value)}g</span>
-        {/* Une donnée absente de la table ne doit pas se cacher derrière un total d'apparence exacte. */}
-        {missing > 0 && <span style={{ fontSize: 10, color: C.dim, fontFamily: C.mono }} title={`${missing} aliment(s) sans cette donnée`}>+?</span>}
-      </div>
-      <div style={{ fontSize: 9.5, color: C.dim, marginTop: 1, fontFamily: C.mono }}>/ {target}g</div>
-      <div style={{ background: C.bg, borderRadius: 5, height: 5, overflow: "hidden", marginTop: 7 }}>
-        <div style={{ background: C.accent, width: `${pct}%`, height: "100%" }} />
-      </div>
+    <div style={{ background: T.c.raised, borderRadius: 99, height: h, overflow: "hidden" }}>
+      <div style={{ background: color, width: `${Math.max(0, Math.min(100, pct))}%`, height: "100%", borderRadius: 99 }} />
     </div>
   );
 }
 
 function EntryRow({ e, onUpdate, onRemove, corrected = false }) {
   const [open, setOpen] = useState(false);
-  const [q, setQ] = useState(e.q);
+  const [q, setQ] = useState(String(e.q));
   const [meal, setMeal] = useState(e.meal);
   const a = amounts(e);
   // Une saisie libre stocke la portion telle quelle (q = 100) : proposer d'en changer les
   // grammes n'aurait aucun sens. Le repas, en revanche, reste modifiable dans tous les cas.
   const isQuick = isQuickRef(e.ref);
-  const changed = meal !== e.meal || (!isQuick && Number(q) !== e.q);
+  const qNum = Number(q);
+  const valid = isQuick || (Number.isFinite(qNum) && qNum > 0);
+  const changed = meal !== e.meal || (!isQuick && qNum !== e.q);
+  const commit = () => { if (!changed || !valid) return; onUpdate(e.id, { q: isQuick ? e.q : qNum, meal }); setOpen(false); };
+  const toggle = () => { if (!open) { setQ(String(e.q)); setMeal(e.meal); } setOpen(!open); };
   return (
-    <div style={{ borderBottom: `1px solid ${C.divider}` }}>
-      <div onClick={() => setOpen(!open)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 0", cursor: "pointer" }}>
+    <div style={{ borderBottom: `1px solid ${T.c.lineSoft}` }}>
+      <button type="button" className="p-tap" onClick={toggle} aria-expanded={open}
+        style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", minHeight: 56, padding: "8px 0",
+          background: "none", border: "none", color: T.c.text, textAlign: "left", fontFamily: "inherit" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Astérisque accent = valeurs corrigées à la main (V6). Une correction
               rétroactive ne doit jamais être invisible sur les lignes qu'elle modifie. */}
-          <div style={{ fontSize: 12, color: C.text, fontWeight: 600, lineHeight: 1.35 }}>
-            {e.name}{corrected && <span title="valeurs corrigées" style={{ color: C.accent, fontWeight: 800 }}> *</span>}
+          <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
+            {e.name}{corrected && <span title="valeurs corrigées" style={{ color: T.c.accent, fontWeight: 800 }}> *</span>}
           </div>
-          <div style={{ display: "flex", gap: 9, marginTop: 2, fontFamily: C.mono, fontSize: 10, color: C.muted }}>
+          <div style={{ ...mono, display: "flex", flexWrap: "wrap", columnGap: 10, marginTop: 3, fontSize: 13, color: T.c.text2 }}>
             <span>{isQuick ? "portion" : `${e.q} g`}</span>
-            <span>P{a.prot ?? "—"}</span>
-            <span>G{a.gluc ?? "—"}</span>
-            <span>L{a.lip ?? "—"}</span>
-            <span>Fib{a.fib ?? "—"}</span>
+            <span>P{a.prot ?? "—"}</span><span>G{a.gluc ?? "—"}</span><span>L{a.lip ?? "—"}</span><span>Fib{a.fib ?? "—"}</span>
           </div>
         </div>
-        <span style={{ fontFamily: C.mono, fontSize: 14, fontWeight: 800, color: C.accent }}>{a.kcal ?? "—"}</span>
-        {open ? <ChevronDown size={13} color={C.dim} /> : <ChevronRight size={13} color={C.dim} />}
-      </div>
+        <span style={{ ...mono, fontSize: 16, fontWeight: 700, color: T.c.accent }}>{a.kcal ?? "—"}</span>
+        {open ? <ChevronDown size={18} color={T.c.muted} aria-hidden="true" /> : <ChevronRight size={18} color={T.c.muted} aria-hidden="true" />}
+      </button>
       {open && (
-        <div style={{ padding: "4px 0 12px", display: "flex", flexDirection: "column", gap: 9 }}>
-          <div>
-            <Label style={{ marginBottom: 5 }}>Repas</Label>
-            <Pills small options={MEAL_OPTIONS} value={meal} onChange={setMeal} />
+        <div style={{ padding: "4px 0 14px", display: "grid", gap: 12 }}>
+          {!isQuick && (
+            <div style={{ display: "grid", gap: 6 }}>
+              <Eyebrow>Quantité</Eyebrow>
+              <NumberField value={q} onChange={setQ} unit="g" step={10} min={1} inputMode="numeric"
+                label="Quantité en grammes" onEnter={commit} />
+            </div>
+          )}
+          <div style={{ display: "grid", gap: 6 }}>
+            <Eyebrow>Repas</Eyebrow>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {MEALS.map((m) => <Chip key={m.key} on={meal === m.key} onClick={() => setMeal(m.key)}>{m.label}</Chip>)}
+            </div>
           </div>
-          {!isQuick && <Stepper value={q} set={setQ} step={10} unit="g" min={1} int />}
           <div style={{ display: "flex", gap: 8 }}>
-            <Btn variant="primary" style={{ flex: 1 }} disabled={!changed}
-              onClick={() => { onUpdate(e.id, { q: Number(q), meal }); setOpen(false); }}>Enregistrer</Btn>
-            <Btn variant="danger" onClick={() => onRemove(e.id)}><Trash2 size={13} /></Btn>
+            <Button variant="primary" style={{ flex: 1 }} disabled={!changed || !valid} onClick={commit}>Enregistrer</Button>
+            <IconButton label={`Supprimer ${e.name}`} tone="danger" size={52} onClick={() => onRemove(e.id)}>
+              <Trash2 size={20} aria-hidden="true" />
+            </IconButton>
           </div>
         </div>
       )}
@@ -94,21 +102,59 @@ function EntryRow({ e, onUpdate, onRemove, corrected = false }) {
 // peu d'options, pas une recherche.
 function CopyPanel({ candidates, onPick, onClose }) {
   return (
-    <div style={{ padding: "4px 0 10px" }}>
+    <div style={{ display: "grid", gap: 4 }}>
+      <Eyebrow>Copier depuis le…</Eyebrow>
       {candidates.length === 0 ? (
-        <Body style={{ fontSize: 11, color: C.dim }}>Aucun autre jour avec ce repas rempli.</Body>
+        <div className="p-sec" style={{ padding: "8px 0" }}>Aucun autre jour avec ce repas rempli.</div>
       ) : candidates.map((c) => (
-        <div key={c.date} onClick={() => onPick(c.date)} style={{
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          padding: "8px 2px", borderBottom: `1px solid ${C.divider}`, cursor: "pointer",
+        <button key={c.date} type="button" className="p-tap" onClick={() => onPick(c.date)} style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, minHeight: 52,
+          padding: "0 4px", background: "none", border: "none", borderBottom: `1px solid ${T.c.lineSoft}`,
+          color: T.c.text, fontFamily: "inherit", fontSize: 15, textAlign: "left",
         }}>
-          <span style={{ fontSize: 12, color: C.text }}>{fmt(c.date)}</span>
-          <span style={{ fontFamily: C.mono, fontSize: 11, color: C.muted }}>
+          <span>{fmt(c.date)}</span>
+          <span style={{ ...mono, fontSize: 13, color: T.c.text2 }}>
             {c.count} aliment{c.count > 1 ? "s" : ""} · {c.kcal} kcal{c.missing > 0 ? " +?" : ""}
           </span>
-        </div>
+        </button>
       ))}
-      <Btn variant="ghost" onClick={onClose} style={{ width: "100%", marginTop: 6, padding: "6px 12px", fontSize: 10.5 }}>Annuler</Btn>
+      <Button variant="plain" block onClick={onClose} style={{ marginTop: 6 }}>Annuler</Button>
+    </div>
+  );
+}
+
+// « Comme hier » (U3 étape 2, demande de Yoann) : le même repas de la veille, chaque aliment
+// coché au départ — on décoche ce qu'on ne reprend pas, puis on ajoute. Comme CopyPanel,
+// n'AJOUTE que des lignes, ne remplace jamais rien.
+function YesterdayPanel({ entries, onConfirm, onClose }) {
+  const [kept, setKept] = useState(() => new Set(entries.map((e) => e.id)));
+  const toggle = (id) => { const n = new Set(kept); if (n.has(id)) n.delete(id); else n.add(id); setKept(n); };
+  const chosen = entries.filter((e) => kept.has(e.id));
+  const kcal = n0(totals(chosen).kcal);
+  return (
+    <div style={{ display: "grid", gap: 4 }}>
+      <Eyebrow>Hier · décoche ce que tu ne reprends pas</Eyebrow>
+      {entries.map((e) => {
+        const on = kept.has(e.id);
+        const a = amounts(e);
+        return (
+          <button key={e.id} type="button" role="checkbox" aria-checked={on} className="p-tap p-check" onClick={() => toggle(e.id)}>
+            <span className="p-check__box">{on && <Check size={18} strokeWidth={3} aria-hidden="true" />}</span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontWeight: 600 }}>{e.name}</span>
+              <span style={{ ...mono, display: "block", fontSize: 13, color: on ? T.c.text2 : T.c.muted }}>
+                {isQuickRef(e.ref) ? "portion" : `${e.q} g`} · {a.kcal ?? "—"} kcal
+              </span>
+            </span>
+          </button>
+        );
+      })}
+      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <Button variant="primary" style={{ flex: 1 }} disabled={!chosen.length} onClick={() => onConfirm(chosen)}>
+          {chosen.length ? `Ajouter ${chosen.length} · ${kcal} kcal` : "Rien de coché"}
+        </Button>
+        <Button variant="plain" onClick={onClose}>Annuler</Button>
+      </div>
     </div>
   );
 }
@@ -131,34 +177,42 @@ function DuplicatePanel({ entries, date, onConfirm, onClose }) {
   const count = entries.filter((e) => checked.has(e.meal)).length;
   const canConfirm = target && target !== date && checked.size > 0;
 
-  const chip = (on) => ({
-    padding: "6px 11px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 800,
-    textTransform: "uppercase", letterSpacing: 0.5,
-    background: on ? C.accent : C.card, color: on ? "#000" : C.muted,
-    border: `1.5px solid ${on ? C.accent : C.border}`, fontFamily: "inherit",
-  });
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <Label>Repas à copier</Label>
+    <div style={{ display: "grid", gap: 10 }}>
+      <Eyebrow>Repas à copier</Eyebrow>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {MEALS.map((m) => (
-          <button key={m.key} onClick={() => toggle(m.key)} style={chip(checked.has(m.key))}>{m.label}</button>
-        ))}
-        <button onClick={() => setChecked(allChecked ? new Set() : new Set(MEALS.map((m) => m.key)))} style={chip(allChecked)}>
-          Toute la journée
-        </button>
+        {MEALS.map((m) => <Chip key={m.key} on={checked.has(m.key)} onClick={() => toggle(m.key)}>{m.label}</Chip>)}
+        <Chip on={allChecked} onClick={() => setChecked(allChecked ? new Set() : new Set(MEALS.map((m) => m.key)))}>Toute la journée</Chip>
       </div>
-      <Label>Vers le</Label>
-      <input type="date" value={target} onChange={(e) => setTarget(e.target.value)}
-        style={{ background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 6, padding: "8px 10px", fontFamily: "inherit", fontSize: 13, color: C.text, width: "100%" }} />
-      <Body style={{ fontSize: 10.5, color: C.dim }}>
+      <Eyebrow>Vers le</Eyebrow>
+      <input type="date" value={target} onChange={(e) => setTarget(e.target.value)} className="p-field" aria-label="Date de destination" />
+      <div className="p-sec">
         {count} aliment{count > 1 ? "s" : ""} {count > 1 ? "seront ajoutés" : "sera ajouté"} au jour choisi — l'existant n'est jamais remplacé.
-      </Body>
-      <div style={{ display: "flex", gap: 8 }}>
-        <Btn variant="primary" style={{ flex: 1 }} disabled={!canConfirm} onClick={() => onConfirm([...checked], target)}>Copier</Btn>
-        <Btn variant="ghost" onClick={onClose}>Annuler</Btn>
       </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <Button variant="primary" style={{ flex: 1 }} disabled={!canConfirm} onClick={() => onConfirm([...checked], target)}>Copier</Button>
+        <Button variant="plain" onClick={onClose}>Annuler</Button>
+      </div>
+    </div>
+  );
+}
+
+// Bandeau « Ajouté · Annuler » (5 s) pour les ajouts en un tap : un doigt qui glisse sur un
+// habituel ne doit pas obliger à rouvrir la ligne pour la supprimer. Fixé juste au-dessus
+// de la barre d'onglets (62 px + zone système).
+function UndoBar({ undo, onUndo }) {
+  if (!undo) return null;
+  return (
+    <div role="status" style={{
+      position: "fixed", left: 12, right: 12, zIndex: 40,
+      bottom: "calc(62px + 12px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))",
+      display: "flex", alignItems: "center", gap: 10, padding: "6px 6px 6px 14px",
+      background: T.c.raised, border: `1px solid ${T.c.accent}`, borderRadius: 14,
+      boxShadow: "0 8px 24px rgba(0,0,0,.5)", fontFamily: T.f.body,
+    }}>
+      <Check size={18} color={T.c.accent} aria-hidden="true" />
+      <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: T.c.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{undo.text}</span>
+      <Button variant="outline" onClick={onUndo} style={{ minHeight: 44 }}>Annuler</Button>
     </div>
   );
 }
@@ -171,7 +225,10 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
   // veut éviter pour un ajout rapide de macros sans aliment précis en tête.
   const [quickAdd, setQuickAdd] = useState(false);
   const [copyMeal, setCopyMeal] = useState(null);
+  const [yesterdayMeal, setYesterdayMeal] = useState(null);
   const [duplicating, setDuplicating] = useState(false);
+  const [undo, setUndo] = useState(null); // { ids, text }
+  const undoTimer = useRef(null);
   const food = useFoodLog();
 
   // BASCULE M6 : recalcule les totaux macroLog pour CHAQUE date présente dans foodLog à
@@ -201,8 +258,23 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [food.log, food.ready, macros]);
 
+  useEffect(() => () => clearTimeout(undoTimer.current), []);
+  const offerUndo = (ids, text) => {
+    clearTimeout(undoTimer.current);
+    setUndo({ ids, text });
+    undoTimer.current = setTimeout(() => setUndo(null), 5000);
+  };
+  const runUndo = () => {
+    if (!undo) return;
+    food.removeMany(undo.ids);
+    clearTimeout(undoTimer.current);
+    setUndo(null);
+  };
+
   const dayEntries = useMemo(() => entriesFor(food.log, date), [food.log, date]);
   const t = useMemo(() => totals(dayEntries), [dayEntries]);
+  const yesterday = shiftDateKey(date, -1);
+  const yesterdayEntries = useMemo(() => entriesFor(food.log, yesterday), [food.log, yesterday]);
 
   const tg = targetsFor(date);
   // Fibres comptées (2 kcal/g, règlement UE 1169/2011) : sans ça, la cible était
@@ -214,8 +286,8 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
   // Eau : PAS une donnée du module Nutrition. `macroLog.water` existe déjà (saisie
   // manuelle + synchro Health Connect via runHealthSync dans App.jsx) — on l'affiche
   // simplement ici aussi, pour éviter d'avoir à changer d'onglet, sans dupliquer ni
-  // déplacer la donnée. Mêmes boutons que l'onglet Macros, même cible (dont le bonus
-  // basket +1 L, porté par targetsFor via targetsForDate).
+  // déplacer la donnée. Même cible que partout (dont le bonus basket +1 L, porté par
+  // targetsFor via targetsForDate).
   const curMacro = macros.find((m) => m.date === date) || {};
   const water = curMacro.water ?? 0;
   const basketDay = training.some((tr) => tr.type === "Basket" && tr.date === date);
@@ -231,6 +303,15 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
   // bouton "X" (closeSearch) referme le tiroir désormais.
   const add = (f, q) => {
     food.add(makeEntry({ date, meal: openMeal, food: f, q }));
+  };
+
+  // Habituel en un tap (U3 étape 2) : dernière quantité utilisée, comme le + de la liste
+  // « Vos aliments habituels » dans la recherche.
+  const addHabit = (mealKey, s) => {
+    const q = s.lastQ ?? 100;
+    const entry = makeEntry({ date, meal: mealKey, food: s, q });
+    food.add(entry);
+    offerUndo([entry.id], `${s.name} · ${q} g ajouté`);
   };
 
   // Carte resto : le reste de macros envoyé à l'IA et la date d'enregistrement sont ceux
@@ -268,8 +349,17 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
 
   const copyFrom = (mealKey, fromDate) => {
     const entries = food.log.filter((e) => e.date === fromDate && e.meal === mealKey);
-    food.addMany(copyEntries(entries, { date, meal: mealKey }));
+    const copies = copyEntries(entries, { date, meal: mealKey });
+    food.addMany(copies);
     setCopyMeal(null);
+    offerUndo(copies.map((e) => e.id), `${copies.length} aliment${copies.length > 1 ? "s" : ""} copié${copies.length > 1 ? "s" : ""}`);
+  };
+
+  const addFromYesterday = (mealKey, chosen) => {
+    const copies = copyEntries(chosen, { date, meal: mealKey });
+    food.addMany(copies);
+    setYesterdayMeal(null);
+    offerUndo(copies.map((e) => e.id), `${copies.length} aliment${copies.length > 1 ? "s" : ""} repris d'hier`);
   };
 
   const duplicateTo = (mealKeys, targetDate) => {
@@ -291,180 +381,207 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
   const SWIPE_MAX_SLOPE = 0.6; // vertical / horizontal — au-delà, c'est un scroll, pas un swipe
   const onTouchStart = (e) => {
     if (openMeal) { touchStart.current = null; return; } // FoodSearch est une feuille à part, pas concernée
-    const t = e.touches[0];
-    touchStart.current = t.clientX < EDGE_GUARD ? null : { x: t.clientX, y: t.clientY };
+    const tt = e.touches[0];
+    touchStart.current = tt.clientX < EDGE_GUARD ? null : { x: tt.clientX, y: tt.clientY };
   };
   const onTouchEnd = (e) => {
     const start = touchStart.current;
     touchStart.current = null;
     if (!start) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - start.x;
-    const dy = t.clientY - start.y;
+    const tt = e.changedTouches[0];
+    const dx = tt.clientX - start.x;
+    const dy = tt.clientY - start.y;
     if (Math.abs(dx) < SWIPE_MIN_DIST || Math.abs(dy) > Math.abs(dx) * SWIPE_MAX_SLOPE) return;
     setDate((d) => shiftDateKey(d, dx < 0 ? 1 : -1));
   };
 
-  // Barre collante (05/08/2026) : le sous-titre + la date à côté de chaque repas se
-  // perdaient dès qu'on scrollait un peu — remonté par Yoann. `position: sticky` plutôt
-  // qu'une pastille flottante, volontairement : le minuteur de repos a déjà expérimenté une
-  // pastille épinglée en permanence et l'a abandonnée ("ça gênait le scroll"), même piège à
-  // éviter ici. Écart de jours en arithmétique locale pure (mêmes `new Date(y,m-1,d)` que
-  // `shiftDateKey`), jamais un aller-retour par un instant UTC.
+  // Barre du jour collante (05/08/2026, refaite en U3) : le jour affiché reste visible en
+  // scrollant, avec flèches veille/lendemain de 48 px (30 % des repas sont saisis à l'avance,
+  // mesuré en U1). Toucher la date ouvre le calendrier. Écart de jours en arithmétique
+  // locale pure (mêmes `new Date(y,m-1,d)` que `shiftDateKey`), jamais par un instant UTC.
   const dayDiff = (key) => {
     const [y, m, d] = key.split("-").map(Number);
     const [ty, tm, td] = today().split("-").map(Number);
     return Math.round((new Date(y, m - 1, d) - new Date(ty, tm - 1, td)) / 86400000);
   };
   const diff = dayDiff(date);
-  const dayLabel = diff < 0
-    ? `${diff === -1 ? "Hier" : `Il y a ${-diff} jours`} · ${longDate(date)}`
-    : `${longDate(date)} · ${diff === 1 ? "demain" : `dans ${diff} jours`}`;
+  const dayName = diff === 0 ? "Aujourd'hui" : diff === -1 ? "Hier" : diff === 1 ? "Demain"
+    : diff < 0 ? `Il y a ${-diff} jours` : `Dans ${diff} jours`;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}
+    <div style={{ display: "grid", gap: 12, fontFamily: T.f.body, color: T.c.text }}
       onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-      <ScreenHeader
-        title="Macro"
-        subtitle={date === today() ? "aujourd'hui" : fmt(date)}
-      />
 
+      <div style={{
+        position: "sticky", top: -14, zIndex: 5, margin: "-14px -16px 0", padding: "10px 12px",
+        display: "flex", alignItems: "center", gap: 8,
+        background: diff === 0 ? T.c.bg : T.c.accentRow,
+        borderBottom: `1px solid ${diff === 0 ? T.c.lineSoft : T.c.accentLine}`,
+      }}>
+        <IconButton label="Jour précédent" onClick={() => setDate((d) => shiftDateKey(d, -1))}><ChevronLeft size={22} aria-hidden="true" /></IconButton>
+        <label style={{ position: "relative", flex: 1, minWidth: 0, textAlign: "center", cursor: "pointer" }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: diff === 0 ? T.c.text : T.c.accent }}>{dayName}</div>
+          <div style={{ fontSize: 13, color: T.c.text2 }}>{longDate(date)}</div>
+          {/* Champ date invisible posé sur le libellé : le toucher ouvre le calendrier natif. */}
+          <input type="date" value={date} aria-label="Choisir le jour"
+            onChange={(e) => e.target.value && setDate(e.target.value)}
+            style={{ position: "absolute", inset: 0, opacity: 0, width: "100%", cursor: "pointer" }} />
+        </label>
+        <IconButton label="Jour suivant" onClick={() => setDate((d) => shiftDateKey(d, 1))}><ChevronRight size={22} aria-hidden="true" /></IconButton>
+      </div>
       {diff !== 0 && (
-        <div style={{
-          position: "sticky", top: 0, zIndex: 5,
-          margin: "0 -16px", padding: "9px 16px",
-          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
-          background: C.accentRow, borderBottom: `1.5px solid ${C.accent}`,
-        }}>
-          <span style={{ fontFamily: C.mono, fontSize: 11.5, fontWeight: 700, color: C.accent }}>
-            {diff < 0 ? "← " : ""}{dayLabel}{diff > 0 ? " →" : ""}
-          </span>
-          <button onClick={() => setDate(today())} style={{
-            fontFamily: C.mono, fontSize: 9.5, fontWeight: 700, textTransform: "uppercase",
-            letterSpacing: 0.4, color: C.bg, background: C.accent, border: "none",
-            borderRadius: 5, padding: "5px 8px", cursor: "pointer",
-          }}>Aujourd'hui</button>
-        </div>
+        <Button variant="outline" block onClick={() => setDate(today())}>Revenir à aujourd'hui</Button>
       )}
 
-      <Card>
-        <DateField value={date} onChange={setDate} future />
-        {duplicating ? (
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.divider}` }}>
-            <DuplicatePanel entries={dayEntries} date={date} onConfirm={duplicateTo} onClose={() => setDuplicating(false)} />
-          </div>
-        ) : (
-          <Btn variant="ghost" onClick={() => setDuplicating(true)} style={{ width: "100%", marginTop: 10, padding: "6px 0", fontSize: 10.5 }}>
-            <Copy size={11} style={{ display: "inline", verticalAlign: -1, marginRight: 5 }} />
-            Dupliquer cette journée vers un autre jour
-          </Btn>
-        )}
-      </Card>
-
       {/* Calories du jour + reste à consommer : c'est l'information qu'on vient chercher
-          en premier quand on ouvre l'app avant un repas. */}
-      <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+          en premier quand on ouvre l'app avant un repas. Les 4 macros dans la même carte. */}
+      <Panel>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 8 }}>
           <div>
-            <Label>Calories</Label>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginTop: 4 }}>
-              <span style={{ fontFamily: C.mono, fontSize: 34, fontWeight: 800, color: C.text, letterSpacing: -1 }}>{n0(t.kcal)}</span>
-              <span style={{ fontSize: 12, color: C.muted, fontWeight: 700 }}>/ {kcalTarget}</span>
+            <Eyebrow>Calories</Eyebrow>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 4 }}>
+              <span style={{ ...mono, fontSize: 34, fontWeight: 700, letterSpacing: "-0.02em" }}>{n0(t.kcal)}</span>
+              <span style={{ ...mono, fontSize: 14, color: T.c.text2 }}>/ {kcalTarget}</span>
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <Label>{left >= 0 ? "Il reste" : "Dépassement"}</Label>
-            <div style={{ fontFamily: C.mono, fontSize: 20, fontWeight: 800, marginTop: 4, color: left >= 0 ? C.accent : C.danger }}>
+            <Eyebrow>{left >= 0 ? "Il reste" : "Dépassement"}</Eyebrow>
+            <div style={{ ...mono, fontSize: 22, fontWeight: 700, marginTop: 4, color: left >= 0 ? T.c.accent : T.c.danger }}>
               {n0(Math.abs(left))}
             </div>
           </div>
         </div>
-        <div style={{ background: C.bg, borderRadius: 6, height: 8, overflow: "hidden", marginTop: 10 }}>
-          <div style={{ background: left >= 0 ? C.accent : C.danger, width: `${Math.min(100, (t.kcal / kcalTarget) * 100)}%`, height: "100%" }} />
+        <Bar pct={(t.kcal / kcalTarget) * 100} color={left >= 0 ? T.c.accent : T.c.danger} h={8} />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 }}>
+          {["prot", "gluc", "lip", "fib"].map((m) => {
+            const target = tg[TARGET_KEY[m]];
+            return (
+              <div key={m} style={{ display: "grid", gap: 4, minWidth: 0 }}>
+                <Eyebrow>{MACRO_SHORT[m]}</Eyebrow>
+                <div style={{ ...mono, fontSize: 17, fontWeight: 700, whiteSpace: "nowrap" }}>
+                  {n0(t[m])}
+                  {/* Une donnée absente de la table ne doit pas se cacher derrière un total d'apparence exacte. */}
+                  {t.missing[m] > 0 && <span style={{ fontSize: 13, color: T.c.muted }} title={`${t.missing[m]} aliment(s) sans cette donnée`}>+?</span>}
+                </div>
+                <div style={{ ...mono, fontSize: 13, color: T.c.muted }}>/ {target} g</div>
+                <Bar pct={target ? (t[m] / target) * 100 : 0} />
+              </div>
+            );
+          })}
         </div>
-      </Card>
+      </Panel>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        {["prot", "gluc", "lip", "fib"].map((m) => (
-          <MacroTile key={m} m={m} value={t[m]} target={tg[TARGET_KEY[m]]} missing={t.missing[m]} />
-        ))}
-      </div>
-
-      <Card>
-        <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 8 }}>
-          <Droplet size={12} color={C.accent} />
-          <Label>Eau</Label>
-          <span style={{ marginLeft: "auto", fontFamily: C.mono, fontSize: 15, fontWeight: 800, color: C.text }}>
-            {(water / 1000).toFixed(2)}<span style={{ fontSize: 10, color: C.muted, fontWeight: 700 }}> / {(waterTgt / 1000).toFixed(1)} L</span>
+      <Panel>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Droplet size={18} color={T.c.accent} aria-hidden="true" />
+          <Eyebrow>Eau</Eyebrow>
+          <span style={{ ...mono, marginLeft: "auto", fontSize: 17, fontWeight: 700 }}>
+            {(water / 1000).toFixed(2)}<span style={{ fontSize: 13, color: T.c.text2 }}> / {(waterTgt / 1000).toFixed(1)} L</span>
           </span>
         </div>
-        <div style={{ background: C.bg, borderRadius: 6, height: 6, overflow: "hidden", marginBottom: 10 }}>
-          <div style={{ background: C.accent, width: `${Math.min(100, (water / waterTgt) * 100)}%`, height: "100%" }} />
-        </div>
+        <Bar pct={(water / waterTgt) * 100} />
         <div style={{ display: "flex", gap: 8 }}>
-          <Btn variant="plain" onClick={() => addWater(250)} style={{ flex: 1 }}>+250 ml</Btn>
-          <Btn variant="plain" onClick={() => addWater(500)} style={{ flex: 1 }}>+500 ml</Btn>
-          <Btn variant="ghost" onClick={() => addWater(-250)}>−250</Btn>
+          <Button variant="plain" style={{ flex: 1 }} onClick={() => addWater(250)}>+250 ml</Button>
+          <Button variant="plain" style={{ flex: 1 }} onClick={() => addWater(500)}>+500 ml</Button>
+          <Button variant="plain" onClick={() => addWater(-250)} aria-label="Retirer 250 ml">−250</Button>
         </div>
-      </Card>
+      </Panel>
 
       {MEALS.map((meal) => {
         const entries = dayEntries.filter((e) => e.meal === meal.key);
         const mt = totals(entries);
+        const yEntries = yesterdayEntries.filter((e) => e.meal === meal.key);
+        // 3 habituels de CE repas (même classement que la recherche), sans ceux déjà
+        // présents dans le repas du jour affiché.
+        const present = new Set(entries.map((e) => e.ref));
+        const habits = suggestions(food.log, { meal: meal.key, pins: food.pins, muted: food.muted, date })
+          .filter((s) => !present.has(s.ref)).slice(0, 3);
+        const panelOpen = copyMeal === meal.key || yesterdayMeal === meal.key;
         return (
-          <Card key={meal.key}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: entries.length ? 2 : 10 }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                <Label style={{ fontSize: 10, color: C.text2 }}>{meal.label}</Label>
-                {/* Repère discret du jour affiché — le swipe seul ne se voit pas assez
-                    (demandé le 03/08/2026) : sans ça, rien à l'écran n'indique qu'on a
-                    changé de jour après un swipe. */}
-                <span style={{ fontSize: 9, color: C.dim, fontFamily: C.mono }}>
-                  {date === today() ? "aujourd'hui" : fmt(date)}
-                </span>
-              </div>
-              <span style={{ fontFamily: C.mono, fontSize: 12, fontWeight: 800, color: entries.length ? C.accent : C.dim }}>
+          <Panel key={meal.key} aria-label={meal.label}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{meal.label}</h2>
+              <span style={{ ...mono, fontSize: 15, fontWeight: 700, color: entries.length ? T.c.accent : T.c.muted }}>
                 {entries.length ? `${n0(mt.kcal)} kcal` : "—"}
               </span>
             </div>
             {entries.length > 0 && (
-              <div style={{ display: "flex", gap: 10, marginBottom: 8, fontFamily: C.mono, fontSize: 10, color: C.muted }}>
-                <span>P{mt.prot}</span><span>G{mt.gluc}</span><span>L{mt.lip}</span><span>Fib{mt.fib}</span>
+              <div style={{ ...mono, display: "flex", flexWrap: "wrap", columnGap: 12, fontSize: 13, color: T.c.text2, marginTop: -6 }}>
+                <span>P{n1(mt.prot)}</span><span>G{n1(mt.gluc)}</span><span>L{n1(mt.lip)}</span><span>Fib{n1(mt.fib)}</span>
               </div>
             )}
-            {entries.map((e) => (
-              <EntryRow key={e.id} e={e} onUpdate={food.update} onRemove={food.remove}
-                corrected={!!food.overrides?.[e.ref]} />
-            ))}
-            {copyMeal === meal.key ? (
+            {entries.length > 0 && (
+              <div>
+                {entries.map((e) => (
+                  <EntryRow key={e.id} e={e} onUpdate={food.update} onRemove={food.remove}
+                    corrected={!!food.overrides?.[e.ref]} />
+                ))}
+              </div>
+            )}
+
+            {copyMeal === meal.key && (
               <CopyPanel
                 candidates={copySourceCandidates(food.log, { meal: meal.key, excludeDate: date })}
                 onPick={(d) => copyFrom(meal.key, d)}
                 onClose={() => setCopyMeal(null)}
               />
-            ) : (
-              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                <Btn variant="plain" onClick={() => { setOpenMeal(meal.key); setQuickAdd(false); }} style={{ flex: 1, padding: "7px 12px", fontSize: 11 }}>
-                  <Plus size={12} style={{ display: "inline", verticalAlign: -2, marginRight: 5 }} />Ajouter
-                </Btn>
-                <Btn variant="plain" onClick={() => { setOpenMeal(meal.key); setQuickAdd(true); }} style={{ padding: "7px 12px", fontSize: 11 }}>
-                  <Zap size={12} style={{ display: "inline", verticalAlign: -2, marginRight: 5 }} />
-                </Btn>
-                <Btn variant="plain" onClick={() => setCopyMeal(meal.key)} style={{ padding: "7px 12px", fontSize: 11 }}>
-                  <Copy size={12} />
-                </Btn>
-              </div>
             )}
-          </Card>
+            {yesterdayMeal === meal.key && (
+              <YesterdayPanel entries={yEntries} onConfirm={(chosen) => addFromYesterday(meal.key, chosen)} onClose={() => setYesterdayMeal(null)} />
+            )}
+
+            {!panelOpen && (
+              <>
+                {(habits.length > 0 || (entries.length === 0 && yEntries.length > 0)) && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {entries.length === 0 && yEntries.length > 0 && (
+                      <Chip onClick={() => { setYesterdayMeal(meal.key); setCopyMeal(null); }}>
+                        <History size={16} color={T.c.accent} aria-hidden="true" />Comme hier
+                      </Chip>
+                    )}
+                    {habits.map((s) => (
+                      <Chip key={s.ref} onClick={() => addHabit(meal.key, s)} aria-label={`Ajouter ${s.name}, ${s.lastQ ?? 100} grammes`}>
+                        <Plus size={16} color={T.c.accent} aria-hidden="true" />
+                        <span style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
+                        <span style={{ ...mono, fontSize: 13, color: T.c.text2 }}>{s.lastQ ?? 100} g</span>
+                      </Chip>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Button variant="outline" style={{ flex: 1 }} onClick={() => { setOpenMeal(meal.key); setQuickAdd(false); }}>
+                    <Search size={18} aria-hidden="true" />Chercher
+                  </Button>
+                  <IconButton label={`Macro rapide · ${meal.label}`} size={52} onClick={() => { setOpenMeal(meal.key); setQuickAdd(true); }}>
+                    <Zap size={20} aria-hidden="true" />
+                  </IconButton>
+                  <IconButton label={`Copier ${meal.label} depuis un autre jour`} size={52} onClick={() => { setCopyMeal(meal.key); setYesterdayMeal(null); }}>
+                    <Copy size={20} aria-hidden="true" />
+                  </IconButton>
+                </div>
+              </>
+            )}
+          </Panel>
         );
       })}
 
-      {dayEntries.length === 0 && <Empty>Aucun aliment enregistré ce jour.</Empty>}
+      {dayEntries.length === 0 && <div className="p-sec" style={{ textAlign: "center", padding: "8px 0" }}>Aucun aliment enregistré ce jour.</div>}
 
-      <Body style={{ fontSize: 10, color: C.dim, textAlign: "center", padding: "4px 0 2px" }}>
-        Calories et macros alimentent aussi la dépense estimée de l'onglet TDEE
-        (Health Connect côté nutrition reste coupé depuis la bascule M6).
-      </Body>
+      <Panel>
+        {duplicating ? (
+          <DuplicatePanel entries={dayEntries} date={date} onConfirm={duplicateTo} onClose={() => setDuplicating(false)} />
+        ) : (
+          <Button variant="plain" block onClick={() => setDuplicating(true)}>
+            <Copy size={18} aria-hidden="true" />Dupliquer cette journée vers un autre jour
+          </Button>
+        )}
+      </Panel>
+
+      <div className="p-muted" style={{ textAlign: "center", padding: "0 0 8px" }}>
+        Calories et macros alimentent aussi la dépense estimée de l'onglet Analyse.
+      </div>
+
+      <UndoBar undo={undo} onUndo={runUndo} />
 
       {openMeal && (
         <FoodSearch

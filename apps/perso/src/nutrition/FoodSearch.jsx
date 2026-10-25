@@ -15,6 +15,11 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Search, X, ChevronLeft, Star, PencilLine, Trash2, ScanBarcode, ChefHat, Utensils, Camera, Plus, Check } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { C, Btn, Label, Body, Empty, Stepper, TextInput, inputStyle } from "../ui.jsx";
+// v2 (chantier U, U3 étape 2) : la feuille, la recherche, les lignes, la quantité et la saisie
+// libre passent sur le design system v2 ; recettes, corrections V6, Carte resto et Photo
+// restent en v1 (C, Btn, Label…) jusqu'à leur tour.
+import { T } from "../design/tokens.js";
+import { Eyebrow, Button, IconButton, Chip, NumberField, TextField } from "../design/primitives.jsx";
 import { searchCiqual, normalize, getCiqual } from "@rawcare/core/nutrition/ciqual";
 import { searchOFF, getOFFByBarcode } from "@rawcare/core/nutrition/off";
 import { suggestions, searchBoost, MACROS, newQuickRef, portionsFor, compileRecipe, recipeAsFood, isRecipeRef,
@@ -123,72 +128,61 @@ const missingCount = (food) => MACROS.filter((m) => food.per100[m] === null || f
 // sans ouvrir le détail ni fermer le tiroir de recherche — le but est d'enchaîner plusieurs
 // ajouts sans revenir à l'écran précédent à chaque fois. Retour visuel bref (coche) le temps
 // qu'il n'y a pas de navigation pour confirmer l'action autrement.
-function QuickAddButton({ onAdd }) {
+function QuickAddButton({ onAdd, name }) {
   const [done, setDone] = useState(false);
   return (
-    <button
-      onClick={(e) => { e.stopPropagation(); if (done) return; onAdd(); setDone(true); setTimeout(() => setDone(false), 900); }}
-      style={{
-        background: done ? "transparent" : C.card, border: `1.5px solid ${done ? C.accent : C.border}`,
-        borderRadius: 6, padding: 6, cursor: done ? "default" : "pointer",
-        color: done ? C.accent : C.accent, display: "flex", alignItems: "center", flexShrink: 0,
-      }}
-    >
-      {done ? <Check size={14} /> : <Plus size={14} />}
-    </button>
+    <IconButton label={done ? "Ajouté" : `Ajouter ${name || "cet aliment"}`} tone="accent"
+      onClick={(e) => { e.stopPropagation(); if (done) return; onAdd(); setDone(true); setTimeout(() => setDone(false), 900); }}>
+      {done ? <Check size={20} aria-hidden="true" /> : <Plus size={20} aria-hidden="true" />}
+    </IconButton>
   );
 }
 
 function Row({ food, onClick, pinned, onPin, onRemove, onEdit, onQuickAdd }) {
   const incomplete = food.ref.startsWith("off:") && missingCount(food) > 0;
+  const mono = { fontFamily: T.f.num, fontVariantNumeric: "tabular-nums" };
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 8,
-      borderBottom: `1px solid ${C.divider}`, padding: "10px 2px",
-    }}>
-      <div onClick={onClick} style={{ flex: 1, cursor: "pointer", minWidth: 0 }}>
-        <div style={{ fontSize: 12.5, color: C.text, fontWeight: 600, lineHeight: 1.35 }}>{food.name}</div>
-        <div style={{ display: "flex", gap: 10, marginTop: 3, fontFamily: C.mono, fontSize: 10.5, color: C.muted }}>
-          <span style={{ color: C.accent, fontWeight: 700 }}>{val(food.per100.kcal)} kcal</span>
+    <div style={{ display: "flex", alignItems: "center", gap: 4, borderBottom: `1px solid ${T.c.lineSoft}`, fontFamily: T.f.body }}>
+      <button type="button" className="p-tap" onClick={onClick} style={{
+        flex: 1, minWidth: 0, minHeight: 60, padding: "8px 2px", background: "none", border: "none",
+        textAlign: "left", color: T.c.text, fontFamily: "inherit",
+      }}>
+        <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>{food.name}</div>
+        <div style={{ ...mono, display: "flex", flexWrap: "wrap", columnGap: 10, marginTop: 3, fontSize: 13, color: T.c.text2 }}>
+          <span style={{ color: T.c.accent, fontWeight: 700 }}>{val(food.per100.kcal)} kcal</span>
           <span>P{val(food.per100.prot)}</span>
           <span>G{val(food.per100.gluc)}</span>
           <span>L{val(food.per100.lip)}</span>
-          <span style={{ color: C.dim }}>/100 g</span>
+          <span style={{ color: T.c.muted }}>/100 g</span>
         </div>
         {(food.brand || food.grp) && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
-            <span style={{ fontSize: 9, color: C.dim, textTransform: "uppercase", letterSpacing: 0.8 }}>{food.brand || food.grp}</span>
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 3 }}>
+            <span style={{ fontSize: 12, color: T.c.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>{food.brand || food.grp}</span>
             {incomplete && (
-              <span style={{ fontSize: 8.5, color: C.dim, border: `1px solid ${C.border}`, borderRadius: 3, padding: "1px 4px" }}>
+              <span style={{ fontSize: 12, color: T.c.muted, border: `1px solid ${T.c.line}`, borderRadius: 4, padding: "0 5px" }}>
                 données incomplètes
               </span>
             )}
           </div>
         )}
-      </div>
+      </button>
       {onPin && (
-        <button onClick={onPin} style={{
-          background: "none", border: "none", cursor: "pointer", padding: 6,
-          color: pinned ? C.accent : C.dim,
-        }}>
-          <Star size={15} fill={pinned ? C.accent : "none"} />
-        </button>
+        <IconButton label={pinned ? `Retirer ${food.name} des favoris` : `Épingler ${food.name}`} aria-pressed={pinned} size={44}
+          style={{ border: "none" }} onClick={onPin}>
+          <Star size={18} fill={pinned ? T.c.accent : "none"} aria-hidden="true" />
+        </IconButton>
       )}
       {onEdit && (
-        <button onClick={onEdit} style={{
-          background: "none", border: "none", cursor: "pointer", padding: 6, color: C.dim,
-        }}>
-          <PencilLine size={14} />
-        </button>
+        <IconButton label={`Modifier ${food.name}`} size={44} style={{ border: "none" }} onClick={onEdit}>
+          <PencilLine size={18} aria-hidden="true" />
+        </IconButton>
       )}
       {onRemove && (
-        <button onClick={onRemove} style={{
-          background: "none", border: "none", cursor: "pointer", padding: 6, color: C.dim,
-        }}>
-          <Trash2 size={14} />
-        </button>
+        <IconButton label={`Masquer ${food.name}`} size={44} style={{ border: "none" }} onClick={onRemove}>
+          <Trash2 size={18} aria-hidden="true" />
+        </IconButton>
       )}
-      {onQuickAdd && <QuickAddButton onAdd={onQuickAdd} />}
+      {onQuickAdd && <QuickAddButton onAdd={onQuickAdd} name={food.name} />}
     </div>
   );
 }
@@ -232,65 +226,62 @@ function FreeEntry({ onAdd, onBack, backLabel = "Saisie libre" }) {
   }, [kcalComputed, kcalTouched]);
 
   const ok = macrosEntered || num(kcal) > 0;
+  const submit = () => {
+    if (!ok) return;
+    onAdd({
+      ref: newQuickRef(),
+      name: name.trim() || (remove ? `Correction (−${Math.round(num(kcal))} kcal)` : "Ajout rapide"),
+      ...(remove ? { correction: true } : {}),
+      per100: macrosEntered
+        ? { kcal: sign * Math.round(num(kcal)), prot: sign * num(m.prot), gluc: sign * num(m.gluc), lip: sign * num(m.lip), fib: sign * num(m.fib), ...(alcohol > 0 ? { alcool: sign * alcohol } : {}) }
+        // Calories seules : les macros sont vraiment INCONNUES (null), pas nulles —
+        // même principe que les fibres manquantes d'un produit Open Food Facts.
+        : { kcal: sign * Math.round(num(kcal)), prot: null, gluc: null, lip: null, fib: null },
+    }, 100);
+    onBack();
+  };
+
+  // Entrée passe au champ suivant (clavier numérique « Suivant »), Entrée sur les calories valide.
+  const FIELDS = [["prot", "Protéines"], ["gluc", "Glucides"], ["lip", "Lipides"], ["fib", "Fibres"], ["alcool", "Alcool"]];
+  const refs = useRef([]);
+  const next = (i) => refs.current[i + 1]?.focus();
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <div style={{ display: "grid", gap: 14, fontFamily: T.f.body, color: T.c.text }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <button onClick={onBack} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", padding: 4 }}>
-          <ChevronLeft size={20} />
-        </button>
-        <Label style={{ fontSize: 11 }}>{backLabel}</Label>
+        <IconButton label="Retour" size={44} style={{ border: "none", color: T.c.accent }} onClick={onBack}><ChevronLeft size={24} aria-hidden="true" /></IconButton>
+        <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{backLabel}</h3>
       </div>
-      <div style={{ display: "flex", gap: 6 }}>
-        {[[false, "Ajouter"], [true, "Retirer"]].map(([v, l]) => {
-          const on = remove === v;
-          return (
-            <button key={l} onClick={() => setRemove(v)} style={{
-              flex: 1, padding: "7px 0", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5,
-              background: on ? C.accent : C.card, color: on ? "#000" : C.muted, border: `1.5px solid ${on ? C.accent : C.border}`, fontFamily: "inherit",
-            }}>{l}</button>
-          );
-        })}
+      <div role="group" aria-label="Ajouter ou retirer" style={{ display: "flex", gap: 6 }}>
+        {[[false, "Ajouter"], [true, "Retirer"]].map(([v, l]) => (
+          <Chip key={l} on={remove === v} onClick={() => setRemove(v)} style={{ flex: 1, justifyContent: "center" }}>{l}</Chip>
+        ))}
       </div>
-      <Body style={{ fontSize: 10.5, color: C.dim }}>
+      <div className="p-sec">
         {remove
           ? "Correction : ce que tu saisis sera RETIRÉ des totaux du repas (estimation trop haute faite plus tôt)."
           : "Macros de la portion réellement mangée, pas pour 100 g."}
-      </Body>
-      <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom (optionnel — ex. Skyr vanille 150 g)" />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        {[["prot", "Protéines"], ["gluc", "Glucides"], ["lip", "Lipides"], ["fib", "Fibres"], ["alcool", "Alcool"]].map(([k, l]) => (
-          <div key={k}>
-            <Label style={{ marginBottom: 4 }}>{l} (g)</Label>
-            <input type="text" inputMode="decimal" value={m[k]} placeholder="0"
-              onChange={(e) => setM({ ...m, [k]: e.target.value })}
-              style={{ ...inputStyle(false), textAlign: "center" }} />
+      </div>
+      <TextField value={name} onChange={setName} placeholder="Nom (optionnel — ex. Skyr vanille 150 g)" label="Nom" enterKeyHint="next" onEnter={() => refs.current[0]?.focus()} />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {FIELDS.map(([k, l], i) => (
+          <div key={k} style={{ display: "grid", gap: 6, minWidth: 0 }}>
+            <Eyebrow>{l} (g)</Eyebrow>
+            <NumberField value={m[k]} onChange={(v) => setM((p) => ({ ...p, [k]: v }))} label={l}
+              inputRef={(el) => { refs.current[i] = el; }} enterKeyHint="next" onEnter={() => next(i)} />
           </div>
         ))}
       </div>
-      <div>
-        <Label style={{ marginBottom: 4 }}>Calories</Label>
-        <input type="text" inputMode="decimal" value={kcal} placeholder="0"
-          onChange={(e) => { setKcalTouched(true); setKcal(e.target.value); }}
-          style={{ ...inputStyle(false), textAlign: "center", fontSize: 16, fontWeight: 800, color: C.accent }} />
-        <Body style={{ fontSize: 9.5, color: C.dim, marginTop: 4 }}>
+      <div style={{ display: "grid", gap: 6 }}>
+        <Eyebrow>Calories</Eyebrow>
+        <NumberField value={kcal} onChange={(v) => { setKcalTouched(true); setKcal(v); }} unit="kcal" label="Calories" big
+          inputRef={(el) => { refs.current[FIELDS.length] = el; }} onEnter={submit} style={{ color: T.c.accent }} />
+        <div className="p-muted">
           Pré-rempli depuis les macros (4/4/9 + fibres + alcool 7 kcal/g) — modifiable pour toute
           source de calories que ces champs ne couvrent pas.
-        </Body>
+        </div>
       </div>
-      <Btn variant="primary" disabled={!ok} onClick={() => {
-        onAdd({
-          ref: newQuickRef(),
-          name: name.trim() || (remove ? `Correction (−${Math.round(num(kcal))} kcal)` : "Ajout rapide"),
-          ...(remove ? { correction: true } : {}),
-          per100: macrosEntered
-            ? { kcal: sign * Math.round(num(kcal)), prot: sign * num(m.prot), gluc: sign * num(m.gluc), lip: sign * num(m.lip), fib: sign * num(m.fib), ...(alcohol > 0 ? { alcool: sign * alcohol } : {}) }
-            // Calories seules : les macros sont vraiment INCONNUES (null), pas nulles —
-            // même principe que les fibres manquantes d'un produit Open Food Facts.
-            : { kcal: sign * Math.round(num(kcal)), prot: null, gluc: null, lip: null, fib: null },
-        }, 100);
-        onBack();
-      }}>{remove ? "Retirer" : "Ajouter"}</Btn>
+      <Button variant="primary" block disabled={!ok} onClick={submit}>{remove ? "Retirer" : "Ajouter"}</Button>
     </div>
   );
 }
@@ -472,11 +463,15 @@ function RecipeBuilder({ recipe, onSave, onBack, log, pins, muted }) {
 // les saisies futures de cet aliment précis.
 function QtyPanel({ food, initialQ, portions, onSavePortion, onRemovePortion, onAdd, onBack,
                     override, onSaveOverride, onClearOverride }) {
-  const [q, setQ] = useState(initialQ ?? 100);
+  // Quantité en CHAÎNE pendant la frappe (champ vide, « 12 » en cours…), convertie à l'ajout.
+  const [qTxt, setQTxt] = useState(String(initialQ ?? 100));
+  const q = Number(qTxt);
+  const qOk = Number.isFinite(q) && q > 0;
+  const setQ = (v) => setQTxt(String(v));
   const [addingPortion, setAddingPortion] = useState(false);
   const [portionLabel, setPortionLabel] = useState("");
   const [fixing, setFixing] = useState(false);
-  const k = q / 100;
+  const k = qOk ? q / 100 : 0;
   // Valeurs AFFICHÉES = snapshot + corrections. `food.per100` n'est jamais modifié : c'est
   // lui qui part dans `onAdd`, donc une nouvelle ligne stocke toujours la valeur d'origine
   // et la correction reste une couche réversible, y compris sur les saisies futures.
@@ -487,102 +482,89 @@ function QtyPanel({ food, initialQ, portions, onSavePortion, onRemovePortion, on
   // kcal a été jugée trompeuse.
   const amount = (v, int = false) =>
     (v === null || v === undefined ? "—" : int ? Math.round(v * k) : Math.round(v * k * 10) / 10);
+  const submit = () => { if (!qOk) return; onAdd(food, q); onBack(); };
+  const mono = { fontFamily: T.f.num, fontVariantNumeric: "tabular-nums" };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <div style={{ display: "grid", gap: 16, fontFamily: T.f.body, color: T.c.text }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-        <button onClick={onBack} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", padding: 4 }}>
-          <ChevronLeft size={20} />
-        </button>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13.5, color: C.text, fontWeight: 700, lineHeight: 1.35 }}>{food.name}</div>
-          {food.grp && <div style={{ fontSize: 9, color: C.dim, marginTop: 3, textTransform: "uppercase", letterSpacing: 0.8 }}>{food.grp}</div>}
+        <IconButton label="Retour" size={44} style={{ border: "none", color: T.c.accent }} onClick={onBack}><ChevronLeft size={24} aria-hidden="true" /></IconButton>
+        <div style={{ flex: 1, minWidth: 0, paddingTop: 8 }}>
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, lineHeight: 1.3 }}>{food.name}</h3>
+          {food.grp && <div style={{ fontSize: 12, color: T.c.muted, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>{food.grp}</div>}
         </div>
       </div>
 
-      <div>
-        <Label style={{ marginBottom: 6 }}>Quantité (g)</Label>
-        <Stepper value={q} set={setQ} step={10} unit="g" min={1} int />
+      <div style={{ display: "grid", gap: 8 }}>
+        <Eyebrow>Quantité</Eyebrow>
+        {/* Entrée = Ajouter : régler la quantité puis valider sans quitter le clavier. */}
+        <NumberField value={qTxt} onChange={setQTxt} unit="g" step={10} min={1} inputMode="numeric"
+          label="Quantité en grammes" onEnter={submit} big />
 
         {portions.length > 0 && (
-          <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {portions.map((p) => (
-              <div key={p.label} style={{
-                display: "flex", alignItems: "center", gap: 4, borderRadius: 6,
-                background: q === p.grams ? C.accent : C.card,
-                border: `1.5px solid ${q === p.grams ? C.accent : C.border}`,
-                paddingLeft: 10,
-              }}>
-                <button onClick={() => setQ(p.grams)} style={{
-                  background: "none", border: "none", cursor: "pointer", padding: "5px 0",
-                  fontSize: 11, fontWeight: 800, color: q === p.grams ? "#000" : C.text,
-                }}>{p.label} · {p.grams}g</button>
-                <button onClick={() => onRemovePortion(food.ref, p.label)} style={{
-                  background: "none", border: "none", cursor: "pointer", padding: "5px 7px",
-                  color: q === p.grams ? "#000" : C.dim,
-                }}><X size={11} /></button>
-              </div>
+              <span key={p.label} style={{ display: "inline-flex", alignItems: "center" }}>
+                <Chip on={q === p.grams} onClick={() => setQ(p.grams)}>{p.label} · {p.grams} g</Chip>
+                <IconButton label={`Supprimer la portion ${p.label}`} size={44} style={{ border: "none" }}
+                  onClick={() => onRemovePortion(food.ref, p.label)}><X size={16} aria-hidden="true" /></IconButton>
+              </span>
             ))}
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {[30, 50, 100, 150, 200, 250].map((v) => (
-            <button key={v} onClick={() => setQ(v)} style={{
-              padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontFamily: C.mono,
-              fontSize: 11, fontWeight: 800,
-              background: q === v ? C.accent : C.card, color: q === v ? "#000" : C.muted,
-              border: `1.5px solid ${q === v ? C.accent : C.border}`,
-            }}>{v}</button>
+            <Chip key={v} on={q === v} onClick={() => setQ(v)}><span style={mono}>{v}</span></Chip>
           ))}
         </div>
 
         {addingPortion ? (
-          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-            <input value={portionLabel} onChange={(e) => setPortionLabel(e.target.value)}
-              placeholder={`Nom (ex. 1 pot)`} style={{ ...inputStyle(false), flex: 1, fontSize: 12 }} />
-            <Btn variant="primary" disabled={!portionLabel.trim()} style={{ padding: "0 12px" }} onClick={() => {
+          <div style={{ display: "flex", gap: 6 }}>
+            <TextField value={portionLabel} onChange={setPortionLabel} placeholder="Nom (ex. 1 pot)" label="Nom de la portion"
+              onEnter={() => { if (portionLabel.trim() && qOk) { onSavePortion(food.ref, portionLabel.trim(), q); setPortionLabel(""); setAddingPortion(false); } }} />
+            <Button variant="primary" disabled={!portionLabel.trim() || !qOk} onClick={() => {
               onSavePortion(food.ref, portionLabel.trim(), q);
               setPortionLabel(""); setAddingPortion(false);
-            }}>OK</Btn>
+            }}>OK</Button>
           </div>
         ) : (
-          <button onClick={() => setAddingPortion(true)} style={{
-            background: "none", border: "none", cursor: "pointer", padding: "7px 0 0",
-            fontSize: 10.5, color: C.muted, textDecoration: "underline",
-          }}>Enregistrer {q} g comme portion nommée</button>
+          <button type="button" className="p-tap" onClick={() => setAddingPortion(true)} disabled={!qOk} style={{
+            background: "none", border: "none", padding: 0, minHeight: 44, textAlign: "left",
+            fontSize: 14, color: T.c.text2, textDecoration: "underline", fontFamily: "inherit",
+          }}>Enregistrer {qOk ? q : "—"} g comme portion nommée</button>
         )}
       </div>
 
-      <div style={{ background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: 12 }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
-          <Label>Apport</Label>
+      <div style={{ background: T.c.field, border: `1px solid ${T.c.line}`, borderRadius: 12, padding: 14, display: "grid", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+          <Eyebrow>Apport</Eyebrow>
           <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-            <span style={{ fontFamily: C.mono, fontSize: 26, fontWeight: 800, color: C.accent }}>{amount(shown.kcal, true)}</span>
-            <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>kcal{isFixed("kcal") ? "*" : ""}</span>
+            <span style={{ ...mono, fontSize: 28, fontWeight: 700, color: T.c.accent }}>{amount(shown.kcal, true)}</span>
+            <span style={{ fontSize: 13, color: T.c.text2, fontWeight: 700 }}>kcal{isFixed("kcal") ? "*" : ""}</span>
           </div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 6 }}>
           {["prot", "gluc", "lip", "fib"].map((m) => (
             <div key={m} style={{ textAlign: "center" }}>
               {/* Marqueur discret : une valeur corrigée passe en accent et porte un *.
                   Une correction ne doit jamais être invisible. */}
-              <div style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 800, color: isFixed(m) ? C.accent : C.text }}>
+              <div style={{ ...mono, fontSize: 17, fontWeight: 700, color: isFixed(m) ? T.c.accent : T.c.text }}>
                 {amount(shown[m])}{isFixed(m) ? "*" : ""}
               </div>
-              <div style={{ fontSize: 8.5, color: C.muted, textTransform: "uppercase", letterSpacing: 0.8, marginTop: 2 }}>{MACRO_LABEL[m]}</div>
+              <div className="p-label" style={{ marginTop: 2 }}>{MACRO_LABEL[m]}</div>
             </div>
           ))}
         </div>
         {MACROS.some((m) => shown[m] === null || shown[m] === undefined) && (
-          <Body style={{ fontSize: 10, color: C.dim, marginTop: 9 }}>
+          <div className="p-muted">
             Certaines valeurs sont absentes {isRecipeRef(food.ref) ? "d'un des ingrédients de cette recette" : food.ref.startsWith("off:") ? "de la fiche Open Food Facts" : "de la table CIQUAL"} et ne seront pas comptées. Tu peux les corriger ci-dessous.
-          </Body>
+          </div>
         )}
         {anyFixed && (
-          <Body style={{ fontSize: 10, color: C.accent, marginTop: 9 }}>
+          <div style={{ fontSize: 13, color: T.c.accent }}>
             * valeur corrigée par toi — appliquée à cet aliment partout, y compris dans les repas déjà enregistrés.
-          </Body>
+          </div>
         )}
       </div>
 
@@ -592,13 +574,13 @@ function QtyPanel({ food, initialQ, portions, onSavePortion, onRemovePortion, on
           onClear={() => { onClearOverride(food.ref); setFixing(false); }}
           onCancel={() => setFixing(false)} />
       ) : (
-        <button onClick={() => setFixing(true)} style={{
-          background: "none", border: "none", cursor: "pointer", padding: 0,
-          fontSize: 11, color: C.muted, textDecoration: "underline", textAlign: "left",
+        <button type="button" className="p-tap" onClick={() => setFixing(true)} style={{
+          background: "none", border: "none", padding: 0, minHeight: 44, textAlign: "left",
+          fontSize: 14, color: T.c.text2, textDecoration: "underline", fontFamily: "inherit",
         }}>Corriger les valeurs de cet aliment{anyFixed ? " (déjà corrigé)" : ""}</button>
       ))}
 
-      <Btn variant="primary" onClick={() => { onAdd(food, q); onBack(); }}>Ajouter</Btn>
+      <Button variant="primary" block disabled={!qOk} onClick={submit}>Ajouter{qOk ? ` ${q} g` : ""}</Button>
     </div>
   );
 }
@@ -652,6 +634,10 @@ function OverridePanel({ food, shown, override, onSave, onClear, onCancel }) {
     </div>
   );
 }
+
+// 4 entrées en grille 2 × 2 : 15 px et marges courtes pour que « Nouvelle recette » et
+// « Photo d'un plat » tiennent sur une ligne à 360 px de large.
+const ACTION = { flex: "1 1 calc(50% - 4px)", fontSize: 15, padding: "0 10px", whiteSpace: "nowrap" };
 
 /* ---------- feuille principale ---------- */
 export default function FoodSearch({
@@ -728,16 +714,14 @@ export default function FoodSearch({
       paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)",
     }}>
       <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "12px 14px", borderBottom: `1.5px solid ${C.border}`,
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+        padding: "8px 8px 8px 16px", borderBottom: `1px solid ${T.c.lineSoft}`, fontFamily: T.f.body,
       }}>
-        <Label style={{ fontSize: 11, color: C.text }}>{mealLabel}</Label>
-        <button onClick={onClose} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", padding: 4 }}>
-          <X size={20} />
-        </button>
+        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: T.c.text }}>{mealLabel}</h2>
+        <IconButton label="Fermer la recherche" onClick={onClose}><X size={22} aria-hidden="true" /></IconButton>
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: 14 }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: 16, fontFamily: T.f.body }}>
         {building ? (
           <RecipeBuilder recipe={editingRecipe} log={log} pins={pins} muted={muted}
             onBack={() => { setBuilding(false); setEditingRecipe(null); }}
@@ -764,22 +748,14 @@ export default function FoodSearch({
         ) : (
           <>
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              <div style={{ position: "relative", flex: 1 }}>
-                <Search size={15} color={C.muted} style={{ position: "absolute", left: 10, top: 11 }} />
-                <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)}
-                  placeholder="Rechercher un aliment…"
-                  style={{ ...inputStyle(false), paddingLeft: 32, fontFamily: "inherit", fontWeight: 600 }} />
-              </div>
+              <TextField inputRef={inputRef} value={q} onChange={setQ} icon={Search}
+                placeholder="Rechercher un aliment…" label="Rechercher un aliment" enterKeyHint="search" />
               {/* M3, natif seulement : scan() (Google Code Scanner) — pas de permission
                   caméra, pas d'écran web équivalent. */}
               {Capacitor.isNativePlatform() && (
-                <button onClick={scan} disabled={scanState === "lookup"} style={{
-                  background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 6,
-                  width: 40, color: scanState === "lookup" ? C.dim : C.accent, cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <ScanBarcode size={18} />
-                </button>
+                <IconButton label="Scanner un code-barres" tone="accent" size={52} onClick={scan} disabled={scanState === "lookup"}>
+                  <ScanBarcode size={22} aria-hidden="true" />
+                </IconButton>
               )}
             </div>
 
@@ -789,41 +765,37 @@ export default function FoodSearch({
                 "Photo d'un plat" sont des points d'entrée au même niveau que la recherche,
                 pas un repli à découvrir en scrollant. */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-              <Btn variant="plain" onClick={() => setFree(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
-                <PencilLine size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
-                Saisie libre
-              </Btn>
-              <Btn variant="plain" onClick={() => setBuilding(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
-                <ChefHat size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
-                Nouvelle recette
-              </Btn>
-              <Btn variant="plain" onClick={() => setResto(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
-                <Utensils size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
-                Carte resto
-              </Btn>
-              <Btn variant="plain" onClick={() => setPhotoMode(true)} style={{ flex: "1 1 calc(50% - 4px)" }}>
-                <Camera size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 6 }} />
-                Photo d'un plat
-              </Btn>
+              <Button variant="plain" onClick={() => setFree(true)} style={ACTION}>
+                <PencilLine size={18} aria-hidden="true" />Saisie libre
+              </Button>
+              <Button variant="plain" onClick={() => setBuilding(true)} style={ACTION}>
+                <ChefHat size={18} aria-hidden="true" />Nouvelle recette
+              </Button>
+              <Button variant="plain" onClick={() => setResto(true)} style={ACTION}>
+                <Utensils size={18} aria-hidden="true" />Carte resto
+              </Button>
+              <Button variant="plain" onClick={() => setPhotoMode(true)} style={ACTION}>
+                <Camera size={18} aria-hidden="true" />Photo d'un plat
+              </Button>
             </div>
 
             {scanState === "lookup" && (
-              <Body style={{ fontSize: 11, color: C.dim, padding: "0 0 10px" }}>Recherche du produit scanné…</Body>
+              <div className="p-sec" style={{ padding: "0 0 10px" }}>Recherche du produit scanné…</div>
             )}
             {scanState === "notfound" && (
-              <Body style={{ fontSize: 11, color: C.dim, padding: "0 0 10px" }}>
+              <div className="p-sec" style={{ padding: "0 0 10px" }}>
                 Code {scanCode} inconnu d'Open Food Facts. Cherchez-le à la main ou utilisez la saisie libre.
-              </Body>
+              </div>
             )}
             {scanState === "error" && (
-              <Body style={{ fontSize: 11, color: C.dim, padding: "0 0 10px" }}>
+              <div className="p-sec" style={{ padding: "0 0 10px" }}>
                 Scan indisponible pour le moment — réessayez.
-              </Body>
+              </div>
             )}
 
             {matchedRecipes.length > 0 && (
               <>
-                <Label style={{ marginBottom: 4 }}>Vos recettes</Label>
+                <Eyebrow style={{ marginBottom: 2 }}>Vos recettes</Eyebrow>
                 {matchedRecipes.map((r) => (
                   <Row key={`recipe:${r.id}`} food={recipeAsFood(r)}
                     onClick={() => setSel(recipeAsFood(r))}
@@ -835,7 +807,7 @@ export default function FoodSearch({
 
             {!showSugg && favMatches.length > 0 && (
               <>
-                <Label style={{ marginBottom: 4, marginTop: matchedRecipes.length > 0 ? 14 : 0 }}>Favoris et récents</Label>
+                <Eyebrow style={{ marginBottom: 2, marginTop: matchedRecipes.length > 0 ? 16 : 0 }}>Favoris et récents</Eyebrow>
                 {favMatches.map((f) => (
                   <Row key={f.ref + f.name} food={f} pinned={f.pinned}
                     onClick={() => setSel(f)}
@@ -846,9 +818,9 @@ export default function FoodSearch({
               </>
             )}
 
-            <Label style={{ marginBottom: 4, marginTop: (matchedRecipes.length > 0 || favMatches.length > 0) ? 14 : 0 }}>
+            <Eyebrow style={{ marginBottom: 2, marginTop: (matchedRecipes.length > 0 || favMatches.length > 0) ? 16 : 0 }}>
               {showSugg ? "Vos aliments habituels" : `${results.length} résultat${results.length > 1 ? "s" : ""}`}
-            </Label>
+            </Eyebrow>
 
             {list.length === 0 ? (
               <Empty>{showSugg ? "Rien encore. Cherchez un aliment." : "Aucun résultat dans CIQUAL."}</Empty>
@@ -864,10 +836,10 @@ export default function FoodSearch({
 
             {!showSugg && <OffSection offState={offState} offResults={offResults} onPick={setSel} />}
 
-            <Body style={{ fontSize: 9.5, color: C.dim, marginTop: 10, textAlign: "center" }}>
+            <div className="p-muted" style={{ marginTop: 14, textAlign: "center", fontSize: 12 }}>
               Table Ciqual 2020 — ANSES · Licence Ouverte 2.0<br />
               Open Food Facts · Licence Open Database (ODbL)
-            </Body>
+            </div>
           </>
         )}
       </div>

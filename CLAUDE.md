@@ -3522,6 +3522,46 @@ Première étape de la refonte IHM (spec et décisions dans `ROADMAP.md`, « Cha
   onglet, Réglages ouverts/fermés, aucune erreur console ; 116 tests ; installé et vérifié sur
   le téléphone.
 
+## Chantier U — U3 étape 2 : saisie Nutrition (25/10/2026, v3.112.0)
+
+Choix de Yoann avant de coder : habituel en un tap avec Annuler, « Comme hier » où l'on
+COCHE ce qu'on garde, flèches veille/lendemain.
+
+- **`design/primitives.jsx`** (nouveau, réutilisé par les étapes suivantes) : `Panel`,
+  `Eyebrow`, `Button`, `IconButton` (nom accessible obligatoire), `Chip`, `NumberField`
+  (clavier numérique, Entrée = `onEnter`, × pour vider sans perdre le clavier, unité, −/+
+  optionnels, valeur gardée en chaîne pendant la frappe), `TextField` (× pour vider). Classes
+  ajoutées à `theme.css` : `p-iconbtn`, `p-clear`, `p-check`.
+- **`NutritionTab.jsx` refait** (logique M6/eau/resto/copie/duplication inchangée) :
+  - **barre du jour collante** : ‹ jour › en 48 px, « Aujourd'hui / Hier / Demain / Il y a N
+    jours », la date ouvre le calendrier natif (champ date invisible posé dessus), bouton
+    « Revenir à aujourd'hui » hors du jour courant. **La date en estompé à côté de chaque repas
+    (03/08/2026) est retirée** : la barre collante, toujours visible, la remplace.
+  - **calories + 4 macros dans une seule carte** (au lieu d'une carte + 4 tuiles) ;
+  - **3 habituels de CE repas en boutons** (`suggestions()` avec `meal`, donc même filtre strict
+    du 17/09/2026, sans ceux déjà présents dans le repas) : un tap ajoute à la dernière quantité
+    et affiche « … ajouté · Annuler » 5 s, fixé au-dessus de la barre d'onglets ;
+  - **« Comme hier »** sur un repas vide dont le même repas était rempli la veille : liste à
+    cocher (tout coché au départ), « Ajouter N · X kcal ». N'ajoute que des lignes, comme la
+    copie M4. Copier depuis un autre jour et reprendre d'hier offrent aussi Annuler ;
+  - **ligne du journal** : 56 px, tap = éditeur en place avec quantité au clavier numérique
+    (Entrée = Enregistrer, ×, −/+ 10), repas en pastilles, supprimer en bouton de 52 px ;
+  - actions d'un repas : « Chercher » (+ loupe) · Macro rapide · Copier, en 52 px avec noms
+    accessibles ; « Dupliquer cette journée » descend en bas de l'écran.
+- **`useFoodLog`** gagne `removeMany(ids)` (Annuler d'un ajout de plusieurs lignes en une seule
+  écriture ; plusieurs `remove` d'affilée perdraient les précédents, `raw` étant capturé au rendu).
+- **`FoodSearch.jsx`**, partie utilisée à chaque repas passée en v2 : en-tête, recherche avec ×,
+  lignes de 60 px avec boutons de 44-48 px nommés, réglage de quantité (Entrée = Ajouter,
+  bouton « Ajouter 125 g »), saisie libre (Entrée passe au champ suivant, Entrée sur les
+  calories valide). **Restent en v1, à reprendre plus tard** : création/modification de recette,
+  sélecteur d'ingrédients, correction V6, Carte resto, Photo d'un plat, section Open Food Facts.
+- **Mesuré dans l'aperçu (375 px)** : texte sous 12 px 73 % → 0 %, texte sous 4,5:1 63 % → 0 %,
+  cibles sous 44 px 34/35 → 0. Parcours testés : Comme hier (décocher un aliment), Annuler,
+  habituel en un tap, ligne modifiée au clavier + Entrée, × qui vide, recherche → quantité →
+  Entrée, saisie libre au clavier, recettes toujours ouvrables, `macroLog` dérivé identique au
+  journal. Installé et vérifié sur le téléphone avec les vraies données (habituels affichés,
+  aucune écriture faite).
+
 ## Minuteur de repos calé sur l'heure réelle (25/10/2026, apps/perso v3.109.3)
 
 Remonté par Yoann pendant U1 : le chrono du carnet prenait du retard sur celui de la

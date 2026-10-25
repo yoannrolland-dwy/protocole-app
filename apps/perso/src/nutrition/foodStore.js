@@ -54,6 +54,10 @@ export function useFoodLog() {
     addMany: (es) => write([...raw, ...es]),
     update: (id, patch) => write(raw.map((e) => (e.id === id ? { ...e, ...patch } : e))),
     remove: (id) => write(raw.filter((e) => e.id !== id)),
+    // « Annuler » d'un ajout en un tap (U3 étape 2) : retire en une seule écriture toutes les
+    // lignes qu'il a créées (un appel à `remove` par ligne perdrait les précédentes, `raw`
+    // étant capturé au rendu — même piège que addMany/add).
+    removeMany: (ids) => { const s = new Set(ids); write(raw.filter((e) => !s.has(e.id))); },
     /**
      * Enregistre/retire une correction pour un `ref`. `patch` ne porte que les champs
      * touchés ; une valeur `null` efface la correction de ce champ et rend sa valeur
