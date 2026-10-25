@@ -413,26 +413,41 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
     <div style={{ display: "grid", gap: 12, fontFamily: T.f.body, color: T.c.text }}
       onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
 
-      <div style={{
-        position: "sticky", top: -14, zIndex: 5, margin: "-14px -16px 0", padding: "10px 12px",
-        display: "flex", alignItems: "center", gap: 8,
-        background: diff === 0 ? T.c.bg : T.c.accentRow,
-        borderBottom: `1px solid ${diff === 0 ? T.c.lineSoft : T.c.accentLine}`,
-      }}>
-        <IconButton label="Jour précédent" onClick={() => setDate((d) => shiftDateKey(d, -1))}><ChevronLeft size={22} aria-hidden="true" /></IconButton>
-        <label style={{ position: "relative", flex: 1, minWidth: 0, textAlign: "center", cursor: "pointer" }}>
-          <div style={{ fontSize: 17, fontWeight: 700, color: diff === 0 ? T.c.text : T.c.accent }}>{dayName}</div>
-          <div style={{ fontSize: 13, color: T.c.text2 }}>{longDate(date)}</div>
-          {/* Champ date invisible posé sur le libellé : le toucher ouvre le calendrier natif. */}
-          <input type="date" value={date} aria-label="Choisir le jour"
-            onChange={(e) => e.target.value && setDate(e.target.value)}
-            style={{ position: "absolute", inset: 0, opacity: 0, width: "100%", cursor: "pointer" }} />
-        </label>
-        <IconButton label="Jour suivant" onClick={() => setDate((d) => shiftDateKey(d, 1))}><ChevronRight size={22} aria-hidden="true" /></IconButton>
-      </div>
-      {diff !== 0 && (
-        <Button variant="outline" block onClick={() => setDate(today())}>Revenir à aujourd'hui</Button>
-      )}
+      {/* Barre du jour collante. Hors aujourd'hui elle passe en CITRON PLEIN, texte noir, avec le
+          bouton « Aujourd'hui » à l'intérieur (25/10/2026, retour de Yoann : « beaucoup plus
+          visible ») : en v2 elle restait sombre et seul le mot « Hier » changeait de couleur — on
+          ne voyait plus en scrollant qu'on n'était pas sur le jour courant (c'était tout l'intérêt
+          de la barre du 05/08/2026). */}
+      {(() => {
+        const away = diff !== 0;
+        const fg = away ? T.c.onAccent : T.c.text;
+        const arrow = away ? { color: T.c.onAccent, borderColor: "rgba(0,0,0,.35)" } : undefined;
+        return (
+          <div style={{
+            position: "sticky", top: -14, zIndex: 5, margin: "-14px -16px 0", padding: "10px 12px",
+            display: "flex", alignItems: "center", gap: 8,
+            background: away ? T.c.accent : T.c.bg,
+            borderBottom: `1px solid ${away ? T.c.accent : T.c.lineSoft}`,
+          }}>
+            <IconButton label="Jour précédent" style={arrow} onClick={() => setDate((d) => shiftDateKey(d, -1))}><ChevronLeft size={22} aria-hidden="true" /></IconButton>
+            <label style={{ position: "relative", flex: 1, minWidth: 0, textAlign: "center", cursor: "pointer", color: fg }}>
+              <div style={{ fontSize: 17, fontWeight: 800 }}>{dayName}</div>
+              <div style={{ fontSize: 13, fontWeight: away ? 700 : 400, color: away ? fg : T.c.text2 }}>{longDate(date)}</div>
+              {/* Champ date invisible posé sur le libellé : le toucher ouvre le calendrier natif. */}
+              <input type="date" value={date} aria-label="Choisir le jour"
+                onChange={(e) => e.target.value && setDate(e.target.value)}
+                style={{ position: "absolute", inset: 0, opacity: 0, width: "100%", cursor: "pointer" }} />
+            </label>
+            {away && (
+              <button type="button" className="p-tap" onClick={() => setDate(today())} style={{
+                minHeight: 44, padding: "0 12px", borderRadius: 10, border: "none", flexShrink: 0,
+                background: T.c.onAccent, color: T.c.accent, fontFamily: "inherit", fontSize: 14, fontWeight: 700,
+              }}>Aujourd'hui</button>
+            )}
+            <IconButton label="Jour suivant" style={arrow} onClick={() => setDate((d) => shiftDateKey(d, 1))}><ChevronRight size={22} aria-hidden="true" /></IconButton>
+          </div>
+        );
+      })()}
 
       {/* Calories du jour + reste à consommer : c'est l'information qu'on vient chercher
           en premier quand on ouvre l'app avant un repas. Les 4 macros dans la même carte. */}

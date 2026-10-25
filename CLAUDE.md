@@ -3739,6 +3739,18 @@ les primitives v1 de `ui.jsx`** (plus aucun écran ne s'en sert depuis v3.119.0)
   Photo, saisie libre, recette, ajout et quantité d'ingrédient). Testé : création complète d'une
   recette (117 kcal/100 g, identique à CIQUAL), correction V6 enregistrée puis annulée.
 
+## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
+
+Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la
+barre du jour collante de l'étape 2 restait sombre (#0d1000) hors aujourd'hui, seul le mot « Hier »
+passait en citron, et le bouton « Revenir à aujourd'hui » était SOUS la barre, donc partait au
+défilement. Désormais, dès que le jour affiché n'est pas aujourd'hui, **toute la barre passe en
+citron plein, texte noir** (« Hier · sam. 24 oct. ») avec un bouton **« Aujourd'hui »** noir
+DANS la barre (toujours visible, 44 px). Le jour courant garde la barre sombre. Le bouton séparé
+est supprimé. Vérifié : barre fixée en haut en faisant défiler, « Aujourd'hui » ramène au jour
+courant et rend la barre sombre. Ne pas réatténuer ce signal : c'est ce qui évite de saisir un
+repas sur le mauvais jour (30 % des lignes sont saisies à l'avance, mesuré en U1).
+
 ## Minuteur de repos calé sur l'heure réelle (25/10/2026, apps/perso v3.109.3)
 
 Remonté par Yoann pendant U1 : le chrono du carnet prenait du retard sur celui de la
