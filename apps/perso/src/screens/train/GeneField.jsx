@@ -1,6 +1,7 @@
-// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) : code déplacé tel quel.
+// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; rendu v2 à l'étape 6 d'U3 via
+// design/compat.jsx (mêmes primitives, valeurs v2), polices écrites en dur remontées à 12-13 px.
 import { GENE_ZONES } from "@rawcare/core/sessionLoad";
-import { C, Label, Body } from "../../ui.jsx";
+import { C, Label, Body } from "../../design/compat.jsx";
 
 /* ============================================================
    GÊNE ARTICULAIRE PENDANT UNE ESCALADE (08/10/2026)
@@ -23,14 +24,14 @@ export function GeneField({ gene, setGene }) {
       {GENE_ZONES.map((z) => {
         const pain = map[z.key] ?? null;
         return (
-          <div key={z.key} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
-            <span style={{ width: 62, fontSize: 10, color: pain ? C.accent : C.muted, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>{z.label}</span>
-            <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+          <div key={z.key} style={{ display: "grid", gap: 6, marginTop: 10 }}>
+            <span style={{ fontSize: 12, color: pain ? C.accent : C.text2, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>{z.label}{pain ? ` · ${pain}/10` : ""}</span>
+            <div role="group" aria-label={`Gêne ${z.label} de 0 à 10`} style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 6 }}>
               {Array.from({ length: 11 }, (_, i) => i).map((n) => {
                 const on = n === 0 ? pain == null : pain === n;
                 return (
-                  <button key={n} onClick={() => setPain(z.key, n)}
-                    style={{ width: 24, height: 24, borderRadius: 5, border: `1.5px solid ${on ? C.accent : C.border}`, background: on ? C.accent : C.card, color: on ? "#000" : C.text2, fontFamily: C.mono, fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>
+                  <button key={n} type="button" className="p-tap" onClick={() => setPain(z.key, n)} aria-pressed={on} aria-label={`${z.label} ${n} sur 10`}
+                    style={{ minHeight: 44, borderRadius: 10, border: `1.5px solid ${on ? C.accent : C.border}`, background: on ? C.accent : C.card, color: on ? "#000" : C.text2, fontFamily: C.mono, fontSize: 16, fontWeight: 700, cursor: "pointer", padding: 0 }}>
                     {n}
                   </button>
                 );
@@ -39,7 +40,7 @@ export function GeneField({ gene, setGene }) {
           </div>
         );
       })}
-      <Body style={{ fontSize: 10, color: C.dim, marginTop: 6 }}>
+      <Body style={{ fontSize: 12, color: C.dim, marginTop: 6 }}>
         À partir de 4/10, l'escalade et le tirage lourd sont pénalisés le lendemain. Si ça revient plusieurs séances de suite, rouvre une zone de douleur.
       </Body>
     </div>

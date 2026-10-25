@@ -1,11 +1,12 @@
-// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) : code déplacé tel quel.
-import { useState, useEffect, useMemo } from "react";
+// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; rendu v2 à l'étape 6 d'U3 via
+// design/compat.jsx (mêmes primitives, valeurs v2), polices écrites en dur remontées à 12-13 px.
+import { useState, useEffect, useMemo, useRef } from "react";
 import { CheckCircle2, Trash2, ChevronRight } from "lucide-react";
 import { store, getSync } from "../../store.js";
 import { splitExerciseList, recordsBySession, painOutOfBase } from "@rawcare/core/training";
 import { loadLabel, geneLabel } from "@rawcare/core/sessionLoad";
 import { TEMPLATES, TYPES, hsrForWeek } from "@rawcare/core/session/templates";
-import { C, today, fmt, round, byDate, lastN, daysBetween, Card, Label, Body, Empty, Btn, inputStyle, Stepper, Field, DateField, ScreenHeader } from "../../ui.jsx";
+import { C, today, fmt, round, byDate, lastN, daysBetween, Card, Label, Body, Empty, Btn, inputStyle, Stepper, Field, DateField, ScreenHeader } from "../../design/compat.jsx";
 import { MuscuLogger } from "./MuscuLogger.jsx";
 import { restTimer } from "../../lib/restTimer.js";
 import { ProgressScreen } from "./ProgressScreen.jsx";
@@ -13,6 +14,10 @@ import { GeneField } from "./GeneField.jsx";
 import { VolumeCard } from "./VolumeCard.jsx";
 
 export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType, onStartConsumed }) {
+  // Séance dont la suppression est « armée » (1er tap sur la corbeille), voir Dernières séances.
+  const [armed, setArmed] = useState(null);
+  const armTimer = useRef(null);
+  useEffect(() => () => clearTimeout(armTimer.current), []);
   // Brouillon auto-sauvegardé (localStorage, hors DATA_KEYS — voir Règles absolues #1) :
   // restaure au montage la séance laissée en cours (TrainTab démonte tout son état à
   // chaque changement d'onglet, ce qui effaçait la séance avant ce correctif). Lu une
@@ -104,7 +109,7 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader title="Séances" subtitle="carnet · progressive overload" />
+      <ScreenHeader subtitle="carnet · progressive overload" />
 
       {/* Choix du type */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -119,7 +124,7 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
                 <span style={{ fontSize: 13, fontWeight: 800, color: sel ? C.accent : C.text, textTransform: "uppercase" }}>{type}</span>
                 <ChevronRight size={13} color={sel ? C.accent : C.dim} />
               </div>
-              <div style={{ fontSize: 10, color: C.muted, marginTop: 3, fontFamily: C.mono }}>
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 3, fontFamily: C.mono }}>
                 {vol[type] ? `${vol[type]}× / 14j` : "—"}
               </div>
             </button>
@@ -131,13 +136,13 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
       {open && TEMPLATES[open].kind !== "muscu" && (
         <Card style={{ borderColor: C.accent }}>
           <div style={{ fontSize: 14, color: C.accent, fontWeight: 800, textTransform: "uppercase", marginBottom: 8 }}>
-            {open}{editing && <span style={{ fontSize: 11, textTransform: "none", marginLeft: 6 }}>(modification)</span>}
+            {open}{editing && <span style={{ fontSize: 13, textTransform: "none", marginLeft: 6 }}>(modification)</span>}
           </div>
           {/* Basket est passé en carnet d'exercices (04/09/2026, kind:"muscu") : cette carte
               ne sert plus qu'à Escalade, seul type "sport" restant. */}
           <Body style={{ marginBottom: 12 }}>Compte comme volume tirage — jamais un jour Upper, pour protéger le coude.</Body>
           <div style={{ marginBottom: 10 }}><DateField value={date} onChange={setDate} /></div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <div style={{ display: "grid", gap: 10, marginBottom: 10 }}>
             <Field label="Début">
               <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={inputStyle(false)} />
             </Field>
@@ -179,7 +184,7 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
           <span style={{ fontFamily: C.mono, fontSize: 12, color: C.accent, fontWeight: 800 }}>{hsrForWeek(hsrWeek).scheme}</span>
         </div>
         <Stepper value={hsrWeek} set={setHsrWeek} step={1} min={1} max={12} int unit="/12" />
-        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>Pilote presse à cuisses + leg extension en Lower A et Lower C. Tempo 6 s · repos 2-3 min.</Body>
+        <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>Pilote presse à cuisses + leg extension en Lower A et Lower C. Tempo 6 s · repos 2-3 min.</Body>
       </Card>
 
       {/* Historique */}
@@ -191,18 +196,21 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
           const rec = records.get(t);
           const recShown = rec && !painOutOfBase([knee], t.date);
           return (
-          <div key={i} onClick={() => editSession(t)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderTop: `1px solid ${C.divider}`, cursor: "pointer" }}>
+          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6, borderTop: `1px solid ${C.divider}` }}>
+            <button type="button" className="p-tap" onClick={() => editSession(t)} aria-label={`Modifier la séance ${t.type} du ${fmt(t.date)}`} style={{
+              flex: 1, minWidth: 0, minHeight: 60, padding: "8px 0", background: "none", border: "none", textAlign: "left", fontFamily: "inherit", color: C.text,
+              display: "grid", gap: 3,
+            }}>
             <div>
-              <span style={{ fontSize: 12.5, color: C.text, fontWeight: 700 }}>{t.type}</span>
+              <span style={{ fontSize: 13, color: C.text, fontWeight: 700 }}>{t.type}</span>
               {recShown && (
-                <span title={rec.join(" · ")} style={{ fontSize: 10, color: C.accent, fontWeight: 800, marginLeft: 6, fontFamily: C.mono }}>
+                <span title={rec.join(" · ")} style={{ fontSize: 12, color: C.accent, fontWeight: 800, marginLeft: 6, fontFamily: C.mono }}>
                   ★{rec.length > 1 ? rec.length : ""}
                 </span>
               )}
-              <span style={{ fontSize: 10.5, color: C.muted, marginLeft: 8, fontFamily: C.mono }}>{fmt(t.date)}{t.start ? ` · ${t.start}` : ""}</span>
+              <span style={{ fontSize: 13, color: C.muted, marginLeft: 8, fontFamily: C.mono }}>{fmt(t.date)}{t.start ? ` · ${t.start}` : ""}</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono }}>
+              <span style={{ fontSize: 13, color: C.text2, fontFamily: C.mono }}>
                 {/* Basket (04/09/2026) porte désormais exercices ET durée/RPE à la fois — les
                     deux se combinent, au lieu de l'ancien "soit l'un soit l'autre". */}
                 {[
@@ -213,11 +221,22 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
                   geneLabel(t) || null,
                 ].filter(Boolean).join(" · ")}
               </span>
-              <button onClick={(ev) => { ev.stopPropagation(); save.training(training.filter((x) => x !== t)); }}
-                style={{ background: "none", border: "none", cursor: "pointer", color: C.dim, padding: 0 }}>
-                <Trash2 size={13} />
-              </button>
-            </div>
+            </button>
+            {/* Suppression en deux taps (U3 étape 6) : la corbeille passe de 13 à 48 px, donc plus
+                facile à toucher par erreur — le 1er tap arme « Supprimer ? » 3 s, le 2e supprime. */}
+            <button type="button" className="p-tap" aria-label={armed === t ? `Confirmer la suppression de ${t.type} du ${fmt(t.date)}` : `Supprimer la séance ${t.type} du ${fmt(t.date)}`}
+              onClick={() => {
+                if (armed === t) { setArmed(null); save.training(training.filter((x) => x !== t)); return; }
+                setArmed(t); clearTimeout(armTimer.current); armTimer.current = setTimeout(() => setArmed(null), 3000);
+              }}
+              style={{
+                flexShrink: 0, minWidth: 48, height: 48, padding: armed === t ? "0 10px" : 0, borderRadius: 10,
+                display: "grid", placeItems: "center", fontFamily: "inherit", fontSize: 13, fontWeight: 700,
+                background: armed === t ? C.dangerBg : "transparent", color: armed === t ? C.danger : C.text2,
+                border: `1px solid ${armed === t ? C.danger : "transparent"}`,
+              }}>
+              {armed === t ? "Supprimer ?" : <Trash2 size={18} aria-hidden="true" />}
+            </button>
           </div>
           );
         }) : <Empty>Aucune séance enregistrée.</Empty>}

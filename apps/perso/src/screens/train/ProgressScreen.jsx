@@ -1,9 +1,10 @@
-// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) : code déplacé tel quel.
+// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; rendu v2 à l'étape 6 d'U3 via
+// design/compat.jsx (mêmes primitives, valeurs v2), polices écrites en dur remontées à 12-13 px.
 import { useState, useMemo } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { ChevronRight, X } from "lucide-react";
 import { splitExerciseList, exerciseSessions, exerciseTrend, isTimeMode, setLabel, painOutOfBase, progressiveOverloadSuggestion } from "@rawcare/core/training";
-import { C, today, fmt, Card, Label, Body, Empty, Btn, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../../ui.jsx";
+import { C, today, fmt, Card, Label, Body, Empty, Btn, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../../design/compat.jsx";
 import { trendColor } from "../../lib/helpers.js";
 
 function ExerciseDetail({ training, knee, nom, onBack }) {
@@ -30,7 +31,7 @@ function ExerciseDetail({ training, knee, nom, onBack }) {
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
           <Label>{temps ? "Tenue · secondes" : "Volume · charge × reps"}</Label>
-          <span style={{ fontSize: 11, fontFamily: C.mono, fontWeight: 800, color: trendColor(trend.key) }}>{trend.label}</span>
+          <span style={{ fontSize: 13, fontFamily: C.mono, fontWeight: 800, color: trendColor(trend.key) }}>{trend.label}</span>
         </div>
         {data.length > 1 ? (
           <div style={{ height: 150 }}>
@@ -77,10 +78,10 @@ function ExerciseDetail({ training, knee, nom, onBack }) {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <span style={{ fontSize: 12, color: C.text, fontWeight: 700, fontFamily: C.mono }}>{fmt(s.date)}</span>
               <span style={{ fontSize: 12, color: C.accent, fontWeight: 800, fontFamily: C.mono }}>
-                {setLabel(s.best, s.mode)}{s.rir != null && <span style={{ fontSize: 10, color: C.muted, fontWeight: 400 }}> · RIR {s.rir === 3 ? "3+" : s.rir}</span>}
+                {setLabel(s.best, s.mode)}{s.rir != null && <span style={{ fontSize: 12, color: C.muted, fontWeight: 400 }}> · RIR {s.rir === 3 ? "3+" : s.rir}</span>}
               </span>
             </div>
-            <div style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono, marginTop: 3 }}>
+            <div style={{ fontSize: 13, color: C.muted, fontFamily: C.mono, marginTop: 3 }}>
               {s.series.map((x, j) => (
                 <span key={j}>{j > 0 ? " · " : ""}{isTimeMode(s.mode) ? `${x.val}s` : `${x.poids}×${x.val}`}{x.leg ? ` ${x.leg}` : ""}</span>
               ))}
@@ -106,8 +107,8 @@ export function ProgressScreen({ training, knee, onBack }) {
       padding: "11px 0", borderTop: `1px solid ${C.divider}`, cursor: "pointer", gap: 10,
     }}>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 12.5, color: C.text2, fontWeight: 700 }}>{e.nom}</div>
-        <div style={{ fontSize: 10, color: C.muted, fontFamily: C.mono, marginTop: 2 }}>
+        <div style={{ fontSize: 13, color: C.text2, fontWeight: 700 }}>{e.nom}</div>
+        <div style={{ fontSize: 12, color: C.muted, fontFamily: C.mono, marginTop: 2 }}>
           {e.count} séance{e.count > 1 ? "s" : ""} · dernière {fmt(e.last)}
         </div>
       </div>
@@ -137,18 +138,18 @@ export function ProgressScreen({ training, knee, onBack }) {
               padding: "11px 0", borderTop: `1px solid ${C.divider}`, cursor: "pointer", gap: 10,
             }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 12.5, color: C.text, fontWeight: 700 }}>{e.nom}</div>
-                <div style={{ fontSize: 10, color: C.muted, fontFamily: C.mono, marginTop: 2 }}>
+                <div style={{ fontSize: 13, color: C.text, fontWeight: 700 }}>{e.nom}</div>
+                <div style={{ fontSize: 12, color: C.muted, fontFamily: C.mono, marginTop: 2 }}>
                   {e.count} séance{e.count > 1 ? "s" : ""} · dernière {fmt(e.last)}
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                 {showPlateau && (
-                  <span style={{ fontSize: 9, fontFamily: C.mono, fontWeight: 800, color: "#e8a33d", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  <span style={{ fontSize: 12, fontFamily: C.mono, fontWeight: 800, color: C.warn, textTransform: "uppercase", letterSpacing: 0.5 }}>
                     Plateau
                   </span>
                 )}
-                <span style={{ fontSize: 10, fontFamily: C.mono, fontWeight: 800, color: trendColor(t.key) }}>{t.label}</span>
+                <span style={{ fontSize: 12, fontFamily: C.mono, fontWeight: 800, color: trendColor(t.key) }}>{t.label}</span>
                 <ChevronRight size={13} color={C.dim} />
               </div>
             </div>

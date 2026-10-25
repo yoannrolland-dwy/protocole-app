@@ -29,7 +29,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | U0 | Refonte IHM — socle : découper `App.jsx` par écran, zéro changement visible, captures « avant » | moyen | ✅ 25/10/2026 (v3.109.2) |
 | U1 | Refonte IHM — cadrage : audit chiffré + moments d'usage + arborescence maquettée | petit | ✅ 25/10/2026 (option A) |
 | U2 | Refonte IHM — directions visuelles en maquettes, choix, design system v2 (variables CSS) | gros | ✅ 25/10/2026 (v3.110.0, direction A) |
-| U3 | Refonte IHM — écran par écran (un commit + une install par écran) | gros | 🟡 5/8 (barre + en-tête, Nutrition, carnet, Aujourd'hui, Corps — v3.115.0) |
+| U3 | Refonte IHM — écran par écran (un commit + une install par écran) | gros | 🟡 6/8 (barre + en-tête, Nutrition, carnet, Aujourd'hui, Corps, Séances — v3.116.0) |
 | U4 | Refonte IHM — audit final avant/après + mise à jour CLAUDE.md | petit | ⬜ |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il
@@ -990,6 +990,7 @@ section design system. **Reste pour U3 (étape 1, barre d'onglets + en-tête)** 
    seulement s'il propose, Coach IA déplacé dans Analyse. Lighthouse accessibilité 100.
 5. ✅ Corps (25/10/2026, v3.115.0) — via design/compat.jsx (primitives v1, rendu v2), échelle
    de douleur en 48 px.
-6. ⬜ Séances ·
-   7. ⬜ Analyse · 8. ⬜ Réglages
+6. ✅ Séances (25/10/2026, v3.116.0) — suppression d'une séance en deux taps, gêne escalade en
+   44 px.
+7. ⬜ Analyse · 8. ⬜ Réglages
 

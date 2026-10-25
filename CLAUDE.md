@@ -3648,6 +3648,25 @@ décompte** (la pastille épinglée en permanence de juillet gênait le défilem
   0 cible sous 44 px, textes d'axes à 12 px. Testé : saisie de pas (−/+ 500, Enregistrer → `source:
   manual`, Supprimer).
 
+## Chantier U — U3 étape 6 : onglet Séance (liste, Escalade, Progression, Volume) en v2 (25/10/2026, v3.116.0)
+
+- `TrainTab`, `ProgressScreen`, `VolumeCard`, `GeneField` passent sur `design/compat.jsx` (même
+  méthode qu'à l'étape 5 : import changé, tailles en dur remontées à 12-13 px, ambre en `C.warn`,
+  titre « Séances » retiré, l'en-tête dit déjà « Séance »).
+- **Dernières séances** : chaque ligne est un bouton de 60 px (« Modifier la séance … »), le
+  résumé passe sous le type/la date. **Suppression en deux taps** : la corbeille passe de 13 à
+  48 px (grise), donc plus facile à toucher par erreur — le 1er tap affiche « Supprimer ? » en
+  rouge 3 s, le 2e supprime. Avant, un seul tap supprimait la séance sans confirmation.
+- **Gêne en escalade** (`GeneField`) : 11 boutons de 24 × 24 px par zone → grille 6 colonnes en
+  44 px sous le nom de la zone, valeur rappelée à côté du nom (« COUDES · 5/10 »), `aria-label`.
+- **Carte Escalade** : Début et Durée l'un sous l'autre (le champ Durée ne faisait que 30 px de
+  large entre ses −/+ en demi-colonne).
+- **`trendColor`** (`lib/helpers.js`, utilisé par Progression seul) : gris v2 pour « stable »
+  (3,5:1 → 6,2:1).
+- **Mesuré dans l'aperçu (375 px)** : liste, carte Escalade, Progression et fiche exercice à
+  0 texte sous 12 px, 0 sous 4,5:1, 0 cible sous 44 px. Testé : suppression armée puis désarmée
+  seule après 3 s (rien d'effacé), puis 2e tap → séance supprimée.
+
 ## Minuteur de repos calé sur l'heure réelle (25/10/2026, apps/perso v3.109.3)
 
 Remonté par Yoann pendant U1 : le chrono du carnet prenait du retard sur celui de la

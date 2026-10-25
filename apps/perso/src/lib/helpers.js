@@ -1,6 +1,7 @@
 // Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) : code déplacé tel quel.
 import { phaseTarget as phaseTargetCore } from "@rawcare/core/targets";
 import { C, today, daysBetween } from "../ui.jsx";
+import { COLORS } from "../design/tokens.js";
 
 // Courbe des protéines du graphique hebdo (09/10/2026) : ambre déjà utilisé ailleurs dans l'app
 // (fiabilité TDEE, volume sous la zone), distinct des barres kcal en citron.
@@ -58,7 +59,9 @@ export const STEPS_TARGET = 10000;
    l'app avait des courbes pour le poids, le sommeil, les pas, la douleur et les calories,
    mais aucune pour l'entraînement, qui est pourtant son cœur.
    ============================================================ */
-export const trendColor = (key) => (key === "up" ? C.accent : key === "down" ? C.danger : C.muted);
+// Gris v2 pour « stable » (U3 étape 6) : le muted v1 n'atteignait que 3,5:1. Utilisé par
+// ProgressScreen seul.
+export const trendColor = (key) => (key === "up" ? COLORS.accent : key === "down" ? COLORS.danger : COLORS.muted);
 
 // Couleur par palier de fiabilité — mêmes seuils visuels que la douleur (accent = bon,
 // ambre = à nuancer, danger = à prendre avec de grosses pincettes). "Faible" n'utilise pas
