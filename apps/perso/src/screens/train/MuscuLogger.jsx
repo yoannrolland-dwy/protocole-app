@@ -131,10 +131,20 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
     } catch { /* ignore */ }
     try { navigator.vibrate?.([200, 90, 200]); } catch { /* ignore */ }
   };
+  // Décompte calé sur l'heure de fin, pas sur le nombre de tics : Android ralentit les
+  // `setInterval` quand l'app passe en arrière-plan, et l'ancien `r - 1` prenait du retard
+  // sur la notification (25/10/2026). Recalcul immédiat au retour au premier plan.
   useEffect(() => {
     if (!tRun) return;
-    tRef.current = setInterval(() => setTRem((r) => { if (r <= 1) { clearInterval(tRef.current); setTRun(false); return 0; } return r - 1; }), 1000);
-    return () => clearInterval(tRef.current);
+    const end = Date.now() + tRem * 1000; // tRem lu au lancement / à la reprise seulement
+    const tick = () => {
+      const r = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+      setTRem(r);
+      if (r === 0) { clearInterval(tRef.current); setTRun(false); }
+    };
+    tRef.current = setInterval(tick, 1000);
+    document.addEventListener("visibilitychange", tick);
+    return () => { clearInterval(tRef.current); document.removeEventListener("visibilitychange", tick); };
   }, [tRun]);
   useEffect(() => {
     // Sur l'app native, la notification système sonne déjà (plus fort, écran verrouillé

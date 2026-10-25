@@ -3447,6 +3447,16 @@ Première étape de la refonte IHM (spec et décisions dans `ROADMAP.md`, « Cha
   recherche d'aliment) ; analyse Babel : aucun nom utilisé sans être défini dans les nouveaux
   fichiers (un import oublié ne casse pas le build, seulement le clic) ; aucune erreur console.
 
+## Minuteur de repos calé sur l'heure réelle (25/10/2026, apps/perso v3.109.3)
+
+Remonté par Yoann pendant U1 : le chrono du carnet prenait du retard sur celui de la
+notification quand il passait sur une autre app entre deux séries (Instagram). Cause : l'effet
+du minuteur (`MuscuLogger.jsx`) retirait 1 s à chaque tic de `setInterval`, et Android ralentit
+ces tics en arrière-plan. Le décompte part désormais d'une heure de fin (`Date.now() + tRem`)
+et se recalcule à chaque tic ET à `visibilitychange` (retour au premier plan). Pause/reprise
+inchangées (la reprise repart du reste affiché). Notification et réveil natif non touchés.
+Vérifié dans l'aperçu : 1:58 → 1:28 après un saut d'horloge de 30 s simulé ; 112 tests, build.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
