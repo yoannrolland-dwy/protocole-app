@@ -27,7 +27,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | T4 | Reps en réserve (RIR) par exercice, optionnel → plateau + Coach IA | moyen | ✅ 04/10/2026 (v3.96.0) |
 | T5 | Bonus : retour haptique au cochage d'une série ; champ « alcool » en saisie libre | petit | ✅ 04/10/2026 (v3.97.0) |
 | U0 | Refonte IHM — socle : découper `App.jsx` par écran, zéro changement visible, captures « avant » | moyen | ✅ 25/10/2026 (v3.109.2) |
-| U1 | Refonte IHM — cadrage : audit chiffré + moments d'usage + arborescence maquettée | petit | ⬜ |
+| U1 | Refonte IHM — cadrage : audit chiffré + moments d'usage + arborescence maquettée | petit | ✅ 25/10/2026 (option A) |
 | U2 | Refonte IHM — directions visuelles en maquettes, choix, design system v2 (variables CSS) | gros | ⬜ |
 | U3 | Refonte IHM — écran par écran (un commit + une install par écran) | gros | ⬜ |
 | U4 | Refonte IHM — audit final avant/après + mise à jour CLAUDE.md | petit | ⬜ |
@@ -845,7 +845,7 @@ lignes ; 100 % styles en ligne ; 0 attribut d'accessibilité ; texte majoritaire
 1. **Périmètre : `apps/perso` seul.** `apps/public` plus tard, si ça a du sens (pas par réflexe).
 2. **Identité : explorer en maquettes.** 2-3 directions (dont une « Affirmée mûrie ») en
    artifact HTML, choisies par Yoann sur son téléphone avant tout code d'écran.
-3. **Navigation : décidée sur maquette.** Proposition de départ : 5 onglets (Aujourd'hui ·
+3. **Navigation : option A retenue le 25/10/2026 (U1)** : 5 onglets (Aujourd'hui ·
    Séance · Nutrition · Corps · Analyse). Yoann consulte peu Poids, Pas et Douleurs → candidats
    au regroupement dans « Corps ».
 4. **Coach IA quitte le Dashboard** → onglet « Analyse » (avec TDEE, progression, Bilan 3 mois).
@@ -929,9 +929,33 @@ refera à l'identique.**
   correction négative de Macro rapide du 07/10).
 - **Regroupement Poids/Énergie/Pas/Douleurs** : à décider sur maquette.
 
+**Mesuré sur le téléphone (lecture seule, 25/08 → 25/10/2026, 59 jours de journal)** :
+- **Macro est de loin l'écran le plus écrit : 1 230 lignes, soit 20,8 par jour.** C'est ce qui
+  justifie de traiter la saisie Macro en premier en U3.
+- **30 % des lignes sont saisies en avance** (369 sur 1 230, date du repas après le jour de
+  saisie), 70 % le jour même, quasi aucune en rattrapage (2). Le « mélange » de Yoann est
+  donc surtout de la planification, puis des ajustements.
+- Pics de saisie : 13 h (104 lignes), puis 18 h à 21 h (97 à 125 par heure).
+- **20 aliments font 57 % des lignes** (247 aliments distincts) : les habituels en 1 tap
+  couvriront plus de la moitié des saisies. 15 % sont des saisies libres (186), 4 % des
+  recettes (53), 3 corrections négatives.
+- **Séances : 51 sur 80 commencent entre 6 h et 8 h** (salle le matin), basket à 12 h ou
+  21 h. Le carnet est donc utilisé tôt, souvent juste après le réveil.
+
 ### U1 — Arborescence maquettée
 
 `docs/refonte-ihm/U1-arborescence.html` (publiée en artifact) : 3 options cliquables —
 **A** 5 onglets Aujourd'hui · Séance · Nutrition · Corps · Analyse (recommandée), **B**
-Énergie garde son onglet + « Plus », **C** 4 onglets + bouton d'ajout central. Choix de Yoann :
-_en attente_.
+Énergie garde son onglet + « Plus », **C** 4 onglets + bouton d'ajout central.
+
+**Choix de Yoann le 25/10/2026 : option A** — Aujourd'hui · Séance · Nutrition · Corps · Analyse.
+Répartition actée (sert de référence à U3) :
+- **Aujourd'hui** : Prochaine séance (+ Démarrer, genou en un tap), Énergie + Poids en tête,
+  Calories · Pas · Eau, Constats replié, Palier si proposition. Plus de Coach IA.
+- **Séance** : choix du type, carnet, dernières séances, Progression, Volume 7 j, **planning
+  idéal** (déplacé depuis TDEE).
+- **Nutrition** : l'actuel Macro + **péri-training et protocoles basket** (déplacés depuis TDEE).
+- **Corps** : sous-onglets Poids · Énergie · Pas · Genou, le dernier ouvert retenu.
+- **Analyse** : Coach IA (Analyser, Bilan 3 mois, note du jour), TDEE, moyenne kcal/protéines.
+- **Réglages** : engrenage en haut, inchangé.
+- **Barre « Séance en cours »** visible sur les autres onglets tant qu'un carnet est ouvert.
