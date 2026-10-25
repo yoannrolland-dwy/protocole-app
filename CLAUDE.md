@@ -191,8 +191,9 @@ monospace), corrigée pour la lisibilité mesurée à l'audit U1.
   `p-sec`, `p-muted`. **La règle « tout en style en ligne » est levée** (décision 5 du
   chantier U) ; le style en ligne reste permis pour du ponctuel.
 - **État après U3/U4** : tous les écrans de l'arborescence passent par `design/primitives.jsx` ou
-  `design/compat.jsx` (mêmes noms que les primitives v1, valeurs v2) ; seuls les 4 sous-écrans de
-  `nutrition/` listés au chantier U4 restent sur `ui.jsx`.
+  `design/compat.jsx` (mêmes noms que les primitives v1, valeurs v2) ; depuis v3.119.0 plus aucun
+  écran ne passe par les primitives v1 de `ui.jsx`. Un `onClick` va sur un `<button>`, jamais sur
+  un `<div>` (les mesures d'accessibilité ne voient pas un `div` cliquable).
 - **Migration écran par écran (U3)** : l'ancien objet `C` et les primitives de `ui.jsx`
   (`Card`, `Label`, `Btn`…) restent tels quels tant qu'un écran n'est pas refait, pour que
   chaque écran change dans son propre commit et sa propre installation. Ne pas modifier `C`
@@ -3712,11 +3713,31 @@ l'arborescence A, 0 texte sous 12 px, 0 texte sous 4,5:1, 0 cible sous 44 px, 0 
 **Lighthouse accessibilité 64 → 100.** Tableau complet écran par écran dans `ROADMAP.md` (U4).
 Correctif livré pendant U4 : `aria-label` sur les corbeilles « supprimer l'entrée de ce jour » de
 Poids, Énergie, Pas et Genou (v3.118.1).
-**Restent en v1** (fonctionnels, mesurés pour mémoire, 1-5 % de texte trop petit/pâle, 2-7 cibles
-trop petites) : création/modification de recette, correction V6, Carte resto, Photo d'un plat — à
-passer sur `design/compat.jsx` si Yoann le demande. **Pour tout nouvel écran ou toute retouche :
+**Restaient en v1** : création/modification de recette, correction V6, Carte resto, Photo d'un
+plat — passés en v2 le même jour (v3.119.0, section suivante). **Pour tout nouvel écran ou toute retouche :
 utiliser les primitives v2 (`design/primitives.jsx`) ou `design/compat.jsx`, jamais l'objet `C` ni
-les primitives v1 de `ui.jsx`**, qui restent seulement pour ces quatre écrans.
+les primitives v1 de `ui.jsx`** (plus aucun écran ne s'en sert depuis v3.119.0).
+
+## Après le chantier U : derniers écrans de Nutrition en v2, `div` cliquables (25/10/2026, v3.119.0)
+
+- **Recettes (création/modification + sélecteur d'ingrédient), correction des valeurs (V6), Carte
+  resto, Photo d'un plat** passent sur `design/compat.jsx` (`FoodSearch.jsx`, `RestaurantMenu.jsx`,
+  `PhotoDish.jsx`) : tailles en dur remontées (dont deux libellés en 7,5 px dans Carte resto), bouton
+  retour en 44 px nommé « Retour », vignettes et boutons Galerie/Photo de Carte resto en 72 px comme
+  Photo d'un plat, croix « Retirer cette photo » avec une zone de toucher de 44 px (rond visible de
+  24 px). **Plus aucun écran n'utilise les primitives v1 de `ui.jsx`** : il n'en sert plus que les
+  utilitaires de date/format (et `C` dans `App.jsx`/`lib/helpers.js` pour quelques couleurs).
+- **Angle mort de la mesure U1/U4, corrigé** : elle ne comptait que les boutons/champs/liens, donc
+  ratait les `<div onClick>`. Il en restait 6 : résultats du sélecteur d'ingrédient, lignes
+  d'ingrédients d'une recette, carte « Progression par exercice » de l'onglet Séance, lignes et
+  repli « Anciens exercices » de Progression. Tous devenus des boutons (52-60 px). `Card` de
+  `compat.jsx` rend désormais un `<button>` quand il reçoit `onClick`. Les croix de fermeture de
+  Progression/fiche exercice ont un nom (« Fermer »). « Chargement… » au démarrage en gris v2.
+- **Mesure élargie** (tout élément au curseur `pointer` hors bouton, en plus des boutons/champs) :
+  0 texte sous 12 px, 0 sous 4,5:1, 0 cible sous 44 px, 0 bouton sans nom sur les 12 écrans
+  principaux ET les 9 sous-écrans de Nutrition (recherche, quantité, correction V6, Carte resto,
+  Photo, saisie libre, recette, ajout et quantité d'ingrédient). Testé : création complète d'une
+  recette (117 kcal/100 g, identique à CIQUAL), correction V6 enregistrée puis annulée.
 
 ## Minuteur de repos calé sur l'heure réelle (25/10/2026, apps/perso v3.109.3)
 

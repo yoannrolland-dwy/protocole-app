@@ -1033,5 +1033,7 @@ anciens onglets (Poids/Énergie/Pas/Douleurs → Corps).
 | Photo d'un plat | 4 % | 4 % | 2/49 | 1 |
 | Correction des valeurs (V6) | 4 % | 5 % | 7/64 | 0 |
 
-  Chantier séparé possible : les passer sur `design/compat.jsx` comme les étapes 5 à 8.
+  **Faits le même jour (v3.119.0)** : les 4 passés sur `design/compat.jsx`, et 6 `<div onClick>`
+  que la mesure ne voyait pas (elle ne comptait que boutons/champs/liens) changés en boutons. Mesure
+  élargie aux éléments au curseur `pointer` : 0 partout, écrans principaux et 9 sous-écrans de Nutrition.
 

@@ -26,7 +26,7 @@ function ExerciseDetail({ training, knee, nom, onBack }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <ScreenHeader title={nom} subtitle={`${sessions.length} séance${sessions.length > 1 ? "s" : ""} · ${temps ? "tenue la plus longue" : "meilleure série"}`}
-        right={<Btn variant="ghost" onClick={onBack}><X size={16} /></Btn>} />
+        right={<Btn variant="ghost" onClick={onBack} aria-label="Fermer" style={{ width: 52, padding: 0 }}><X size={20} aria-hidden="true" /></Btn>} />
 
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
@@ -102,9 +102,10 @@ export function ProgressScreen({ training, knee, onBack }) {
   if (sel) return <ExerciseDetail training={training} knee={knee} nom={sel} onBack={() => setSel(null)} />;
 
   const oldRow = (e) => (
-    <div key={e.nom} onClick={() => setSel(e.nom)} style={{
-      display: "flex", justifyContent: "space-between", alignItems: "center",
-      padding: "11px 0", borderTop: `1px solid ${C.divider}`, cursor: "pointer", gap: 10,
+    <button type="button" className="p-tap" key={e.nom} onClick={() => setSel(e.nom)} style={{
+      display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", minHeight: 60,
+      padding: "11px 0", borderTop: `1px solid ${C.divider}`, gap: 10,
+      background: "none", border: "none", borderTopStyle: "solid", textAlign: "left", fontFamily: "inherit", color: C.text,
     }}>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13, color: C.text2, fontWeight: 700 }}>{e.nom}</div>
@@ -112,14 +113,14 @@ export function ProgressScreen({ training, knee, onBack }) {
           {e.count} séance{e.count > 1 ? "s" : ""} · dernière {fmt(e.last)}
         </div>
       </div>
-      <ChevronRight size={13} color={C.dim} />
-    </div>
+      <ChevronRight size={18} color={C.text2} aria-hidden="true" />
+    </button>
   );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <ScreenHeader title="Progression" subtitle="par exercice · meilleure série de chaque séance"
-        right={<Btn variant="ghost" onClick={onBack}><X size={16} /></Btn>} />
+        right={<Btn variant="ghost" onClick={onBack} aria-label="Fermer" style={{ width: 52, padding: 0 }}><X size={20} aria-hidden="true" /></Btn>} />
       <Card style={{ padding: "6px 14px" }}>
         {list.length ? list.map((e) => {
           // Tendance calculée par exercice : c'est l'information qu'on vient chercher, la
@@ -133,9 +134,10 @@ export function ProgressScreen({ training, knee, onBack }) {
           const overload = progressiveOverloadSuggestion(sessions, e.nom);
           const showPlateau = overload && !painOutOfBase([knee], today());
           return (
-            <div key={e.nom} onClick={() => setSel(e.nom)} style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "11px 0", borderTop: `1px solid ${C.divider}`, cursor: "pointer", gap: 10,
+            <button type="button" className="p-tap" key={e.nom} onClick={() => setSel(e.nom)} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", minHeight: 60,
+              padding: "11px 0", borderTop: `1px solid ${C.divider}`, gap: 10,
+              background: "none", border: "none", borderTopStyle: "solid", textAlign: "left", fontFamily: "inherit", color: C.text,
             }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 13, color: C.text, fontWeight: 700 }}>{e.nom}</div>
@@ -150,9 +152,9 @@ export function ProgressScreen({ training, knee, onBack }) {
                   </span>
                 )}
                 <span style={{ fontSize: 12, fontFamily: C.mono, fontWeight: 800, color: trendColor(t.key) }}>{t.label}</span>
-                <ChevronRight size={13} color={C.dim} />
+                <ChevronRight size={18} color={C.text2} aria-hidden="true" />
               </div>
-            </div>
+            </button>
           );
         }) : <Empty>{stale.length
           ? "Aucun exercice fait ces 60 derniers jours."
@@ -160,12 +162,13 @@ export function ProgressScreen({ training, knee, onBack }) {
       </Card>
       {stale.length > 0 && (
         <Card style={{ padding: "6px 14px" }}>
-          <div onClick={() => setShowOld((v) => !v)} style={{
-            display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 0", cursor: "pointer",
+          <button type="button" className="p-tap" onClick={() => setShowOld((v) => !v)} aria-expanded={showOld} style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, width: "100%", minHeight: 52, padding: "4px 0",
+            background: "none", border: "none", textAlign: "left", fontFamily: "inherit",
           }}>
             <Label style={{ margin: 0 }}>Anciens exercices ({stale.length}) · pas faits depuis plus de 60 j</Label>
-            <ChevronRight size={13} color={C.dim} style={{ transform: showOld ? "rotate(90deg)" : "none" }} />
-          </div>
+            <ChevronRight size={18} color={C.text2} aria-hidden="true" style={{ transform: showOld ? "rotate(90deg)" : "none", flexShrink: 0 }} />
+          </button>
           {showOld && stale.map(oldRow)}
         </Card>
       )}

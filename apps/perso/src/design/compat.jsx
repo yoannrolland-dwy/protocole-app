@@ -19,11 +19,17 @@ export const C = {
   dangerBorder: COLORS.dangerLine, dangerText: COLORS.danger, warn: COLORS.warn, mono: FONTS.num,
 };
 
-export const Card = ({ children, style = {}, accentLeft = false, danger = false, onClick }) => (
-  <div onClick={onClick} className={`p-card${danger ? " p-card--danger" : ""}`} style={{
-    borderLeft: accentLeft ? `3px solid ${C.accent}` : danger ? `3px solid ${C.danger}` : undefined, ...style,
-  }}>{children}</div>
-);
+// Avec `onClick`, la carte est un vrai bouton (cible tactile, focus, lecteur d'écran) — un
+// <div> cliquable passait inaperçu des mesures d'U1/U4 (trouvé après U4).
+export const Card = ({ children, style = {}, accentLeft = false, danger = false, onClick }) => {
+  const cls = `p-card${danger ? " p-card--danger" : ""}`;
+  const st = { borderLeft: accentLeft ? `3px solid ${C.accent}` : danger ? `3px solid ${C.danger}` : undefined, ...style };
+  if (!onClick) return <div className={cls} style={st}>{children}</div>;
+  return (
+    <button type="button" onClick={onClick} className={`p-tap ${cls}`}
+      style={{ display: "block", width: "100%", textAlign: "left", fontFamily: "inherit", color: C.text, ...st }}>{children}</button>
+  );
+};
 
 export const Label = ({ children, style = {} }) => <div className="p-label" style={style}>{children}</div>;
 

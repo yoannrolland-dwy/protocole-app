@@ -28,7 +28,7 @@
 
 import React, { useState, useRef } from "react";
 import { ChevronLeft, Sparkles, Plus, Check, Camera, Image, X, Link } from "lucide-react";
-import { C, Btn, Label, Body, inputStyle } from "../ui.jsx";
+import { C, Btn, Label, Body, inputStyle } from "../design/compat.jsx";
 import { callClaude, costCents } from "../claudeApi.js";
 import { fileToImagePayload } from "@rawcare/core/nutrition/imageUtils";
 
@@ -119,7 +119,7 @@ function buildUserText(menuText, remaining, hasPhotos, menuUrl) {
 
 function MacroLine({ kcal, prot, gluc, lip, fib }) {
   return (
-    <div style={{ display: "flex", gap: 9, fontFamily: C.mono, fontSize: 10, color: C.muted, flexWrap: "wrap" }}>
+    <div style={{ display: "flex", gap: 9, fontFamily: C.mono, fontSize: 12, color: C.muted, flexWrap: "wrap" }}>
       <span style={{ color: C.accent, fontWeight: 800 }}>{Math.round(kcal)} kcal</span>
       <span>P{Math.round(prot)}</span>
       <span>G{Math.round(gluc)}</span>
@@ -150,12 +150,12 @@ function DishRow({ dish, onLog, logged }) {
 function SuggestionCard({ s, dishesByName, onLog, logged }) {
   return (
     <div style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 12, marginBottom: 8 }}>
-      <div style={{ fontSize: 12.5, color: C.text, fontWeight: 800, marginBottom: 2 }}>{s.titre}</div>
-      <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 6 }}>{s.plats.join(" + ")}</div>
+      <div style={{ fontSize: 13, color: C.text, fontWeight: 800, marginBottom: 2 }}>{s.titre}</div>
+      <div style={{ fontSize: 13, color: C.muted, marginBottom: 6 }}>{s.plats.join(" + ")}</div>
       <MacroLine {...s} />
-      {s.pourquoi && <Body style={{ fontSize: 10.5, color: C.dim, marginTop: 6 }}>{s.pourquoi}</Body>}
+      {s.pourquoi && <Body style={{ fontSize: 13, color: C.dim, marginTop: 6 }}>{s.pourquoi}</Body>}
       <Btn variant={logged ? "plain" : "primary"} disabled={logged} onClick={() => onLog(s)}
-        style={{ width: "100%", marginTop: 9, padding: "7px 0", fontSize: 11 }}>
+        style={{ width: "100%", marginTop: 9, padding: "7px 0", fontSize: 13 }}>
         {logged ? "Ajouté au journal ✓" : "Logger cette suggestion"}
       </Btn>
     </div>
@@ -284,10 +284,10 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <button onClick={onBack} style={{ background: "none", border: "none", color: C.accent, cursor: "pointer", padding: 4 }}>
-          <ChevronLeft size={20} />
+        <button type="button" className="p-tap" onClick={onBack} aria-label="Retour" style={{ background: "none", border: "none", color: C.accent, width: 44, height: 44, display: "grid", placeItems: "center", padding: 0, flexShrink: 0 }}>
+          <ChevronLeft size={24} aria-hidden="true" />
         </button>
-        <Label style={{ fontSize: 11 }}>Carte resto</Label>
+        <Label style={{ fontSize: 13 }}>Carte resto</Label>
       </div>
 
       <div>
@@ -307,38 +307,40 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
         <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={pickPhotos} style={{ display: "none" }} />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
           {photos.map((p) => (
-            <div key={p.id} style={{ position: "relative", width: 56, height: 56 }}>
-              <img src={p.dataUrl} alt="" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, border: `1.5px solid ${C.border}` }} />
-              <button onClick={() => removePhoto(p.id)} style={{
-                position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: "50%",
-                background: C.danger, border: "none", color: "#fff", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+            <div key={p.id} style={{ position: "relative", width: 72, height: 72 }}>
+              <img src={p.dataUrl} alt="" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 6, border: `1.5px solid ${C.border}` }} />
+              {/* Zone de toucher 44 px (U3 après U4), rond visible de 24 px dans le coin de la vignette. */}
+              <button type="button" className="p-tap" onClick={() => removePhoto(p.id)} aria-label="Retirer cette photo" style={{
+                position: "absolute", top: -14, right: -14, width: 44, height: 44, background: "transparent", border: "none",
+                display: "grid", placeItems: "center", padding: 0, cursor: "pointer",
               }}>
-                <X size={11} />
+                <span style={{ width: 24, height: 24, borderRadius: "50%", background: C.danger, color: "#fff", display: "grid", placeItems: "center" }}>
+                  <X size={14} aria-hidden="true" />
+                </span>
               </button>
             </div>
           ))}
           {photos.length < MAX_PHOTOS && (
             <>
               <button onClick={() => fileInputRef.current?.click()} style={{
-                width: 56, height: 56, borderRadius: 6, border: `1.5px dashed ${C.border}`, background: "transparent",
+                width: 72, height: 72, borderRadius: 6, border: `1.5px dashed ${C.border}`, background: "transparent",
                 color: C.muted, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3,
               }}>
-                <Image size={15} />
-                <span style={{ fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.4 }}>Galerie</span>
+                <Image size={18} aria-hidden="true" />
+                <span style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Galerie</span>
               </button>
               <button onClick={() => cameraInputRef.current?.click()} style={{
-                width: 56, height: 56, borderRadius: 6, border: `1.5px dashed ${C.border}`, background: "transparent",
+                width: 72, height: 72, borderRadius: 6, border: `1.5px dashed ${C.border}`, background: "transparent",
                 color: C.muted, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3,
               }}>
-                <Camera size={15} />
-                <span style={{ fontSize: 7.5, textTransform: "uppercase", letterSpacing: 0.4 }}>Photo</span>
+                <Camera size={18} aria-hidden="true" />
+                <span style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Photo</span>
               </button>
             </>
           )}
         </div>
 
-        {photoErr && <Body style={{ fontSize: 10, color: C.danger, marginTop: 4 }}>{photoErr}</Body>}
+        {photoErr && <Body style={{ fontSize: 12, color: C.danger, marginTop: 4 }}>{photoErr}</Body>}
 
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
           <Link size={12} color={C.muted} style={{ flexShrink: 0 }} />
@@ -347,7 +349,7 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
             style={{ ...inputStyle(false), fontSize: 12, fontWeight: 400, width: "100%" }} />
         </div>
 
-        <Body style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>
+        <Body style={{ fontSize: 12, color: C.dim, marginTop: 4 }}>
           Estimations IA, pas des valeurs mesurées — utile pour choisir, pas une pesée. Un lien
           fonctionne surtout pour un menu en texte ; les cartes en PDF/image sur le site risquent
           de ne rien donner (utilise la photo dans ce cas).
@@ -359,7 +361,7 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
         {state === "loading" ? (progress || "Analyse…") : "Analyser la carte"}
       </Btn>
 
-        {state === "error" && <Body style={{ fontSize: 11, color: C.danger }}>{err}</Body>}
+        {state === "error" && <Body style={{ fontSize: 13, color: C.danger }}>{err}</Body>}
 
         {result && (
           <>
@@ -384,13 +386,13 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
             ))}
 
             {result.plats.length === 0 && (
-              <Body style={{ fontSize: 11, color: meta?.fetchErr ? C.danger : C.dim }}>
+              <Body style={{ fontSize: 13, color: meta?.fetchErr ? C.danger : C.dim }}>
                 {meta?.fetchErr ? `Lecture du lien échouée : ${meta.fetchErr} Essaie une photo à la place.` : "Aucun plat reconnu."}
               </Body>
             )}
 
             {meta && (
-              <Body style={{ fontSize: 9.5, color: C.dim, textAlign: "center" }}>
+              <Body style={{ fontSize: 12, color: C.dim, textAlign: "center" }}>
                 {meta.model}{meta.fellBack ? " (bascule)" : ""} · {meta.cents.toFixed(1)}¢
               </Body>
             )}

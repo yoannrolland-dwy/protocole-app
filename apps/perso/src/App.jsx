@@ -12,7 +12,8 @@ import { buildCoachPrompt, buildCoachBriefing, buildBilanPrompt, SEED_COACH_PROF
 import { syncHealthConnect } from "./healthSync.js";
 import { updateDashboardWidget } from "./widgetSync.js";
 import { runAutoBackup } from "./autoBackup.js";
-import { C, today, shiftDateKey, fmt, round, longDate, byDate, upsert, lastN, fmtHM, Empty } from "./ui.jsx";
+import { C, today, shiftDateKey, fmt, round, longDate, byDate, upsert, lastN, fmtHM } from "./ui.jsx";
+import { Empty } from "./design/compat.jsx"; // « Chargement… » en gris lisible v2
 import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { STEPS_TARGET } from "./lib/helpers.js";
