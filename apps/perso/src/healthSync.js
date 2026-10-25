@@ -132,7 +132,7 @@ export async function syncHealthConnect() {
 
     if (canWeight) {
       // Poids lu sur 90 jours (08/10/2026) au lieu de SYNC_DAYS, pour l'heure de pesée
-      // (weighTime.js) : une entrée par jour, coût négligeable. Côté App.jsx, seules les dates
+      // affichée dans l'historique : une entrée par jour, coût négligeable. Côté App.jsx, seules les dates
       // de la fenêtre de synchro normale écrasent le kg ; au-delà, seule l'heure est ajoutée
       // aux pesées déjà présentes (jamais un kg réécrit hors fenêtre).
       const startW = new Date(localMidnight); startW.setDate(startW.getDate() - 89);

@@ -3763,7 +3763,7 @@ Quatre demandes de Yoann, seuils et cas protéines/fibres tranchés par question
 - **Carte Eau de Nutrition** : une seule rangée (valeur + barre fine, boutons +250/+500/−250 de
   52 × 48 px), 70 px de haut au lieu d'environ 180.
 
-## Phrases d'aide retirées, carte « Heure de pesée » supprimée (25/10/2026, v3.120.1 → v3.120.2)
+## Phrases d'aide retirées, carte « Heure de pesée » supprimée (25/10/2026, v3.120.1 → v3.120.3)
 
 Yoann a choisi sur une liste de 39 phrases d'aide celles à garder. **Retirées** : pied de page
 « Outil de suivi personnel… » et lien « Coach IA et dépense estimée : onglet Analyse » (Bord),
@@ -3780,8 +3780,9 @@ mangée », mention CIQUAL/Open Food Facts (licence), explications du Coach IA, 
 de la comparaison des fenêtres TDEE, de la zone de recomposition et de la tendance de poids, toutes
 les phrases des Réglages, et les messages d'erreur/d'écran vide.
 **Carte « Heure de pesée » supprimée** de l'onglet Poids (jugée inutile : aucun effet mesuré sur
-90 j). L'heure reste stockée (`weightLog.time`) et affichée dans l'historique, et le Coach IA
-reçoit toujours `summary.poids.heure_pesee` (non demandé, non touché).
+90 j). L'heure reste stockée (`weightLog.time`) et affichée dans l'historique. **Retirée aussi du
+Coach IA (v3.120.3)** : `summary.poids.heure_pesee` et sa consigne ne sont plus envoyés, et le module
+`weighTime.js` (plus utilisé nulle part) est supprimé avec ses 2 tests (117 tests).
 **Deux phrases périmées des Réglages corrigées (v3.120.2)** : le planning Basket ne dit plus que
 le recommandeur évite un Lower le jour d'un basket (règle retirée le 13/09/2026), et le contexte
 permanent du coach ne dit plus « après tes vacances, remplace-le par le suivant ». Le reste de
@@ -5034,9 +5035,8 @@ tard ») : rien de fait. Constat à garder pour la reprise : « Copier le contex
 complet (phase, cibles, paliers, carnet, 14 j) mais jamais ce qui a changé ni le programme de
 séances, et l'app ne peut pas écrire dans un projet claude.ai (texte à coller à la main). Idée
 discutée : bloc « Changements depuis le dernier export » + bouton « Copier la fiche projet ».
-**Le contexte permanent du téléphone (`coachProfile`) dit encore « élévations latérales 5 séries
-par séance Upper » alors que c'est 3 + 2 depuis le 08/10 : à corriger (via `cdp.mjs`, comme le
-05/10) si Yoann le demande.**
+Le contexte permanent du téléphone (`coachProfile`) a bien été mis à jour depuis (« 3 + 2 séries par
+séance Upper », vérifié le 25/10/2026).
 
 - **Courbe de protéines au-dessus du graphique hebdo** (onglet TDEE/Performance, carte « Moyenne
   kcal ») : `ComposedChart` à trois éléments, barres kcal (axe gauche), ligne de cible kcal

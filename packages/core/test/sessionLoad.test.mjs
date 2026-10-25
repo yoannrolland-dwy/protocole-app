@@ -5,7 +5,6 @@ import { sessionLoad, loadLabel, sessionGene, sessionGenes, geneLabel, LOAD_LIGH
 import { recommendSessions } from "../src/recommender.js";
 import { buildCoachPrompt } from "../src/coach/prompt.js";
 import { DEFAULT_TARGETS } from "../src/targets.js";
-import { weighTimeAnalysis } from "../src/weighTime.js";
 import { fixClock, T0, d, session, kneeOk } from "./_helpers.mjs";
 
 fixClock();
@@ -71,26 +70,4 @@ test("prompt : charge/niveau et gêne dans les séances sans séries, légende g
   const c = buildCoachPrompt({ ...empty, training: [{ date: d(1), type: "Escalade", duration: 60, rpe: 7, gene: { doigts: 4, coudes: 2 } }] }, "").user;
   assert.ok(c.includes('"gene":"doigts 4/10, coudes 2/10"'));
   assert.ok(!a.includes("blocs") && !a.includes("cotation"));
-});
-
-test("weighTimeAnalysis : écart à la tendance par groupe d'heure, prêt dès 3 et 3, pesée sans heure ignorée", () => {
-  const log = [];
-  for (let i = 30; i >= 0; i--) log.push({ date: d(i), kg: 94, time: i % 5 === 0 ? "05:30" : "08:00" });
-  log.find((w) => w.date === d(10)).kg = 94.4; // une pesée précoce plus haute
-  log.push({ date: d(3), kg: 93, time: undefined }); // doublon sans heure : ignoré (upsert pas appliqué ici, mais l'entrée sans time n'entre dans aucun groupe)
-  const r = weighTimeAnalysis(log);
-  assert.ok(r.ready && r.early.n >= 3 && r.late.n >= 3);
-  assert.ok(r.early.meanDelta > r.late.meanDelta);
-  assert.equal(r.cutoffHour, 7);
-  assert.equal(weighTimeAnalysis([{ date: d(1), kg: 94 }]).ready, false);
-});
-
-test("prompt : `poids.heure_pesee` et sa consigne seulement avec 3 pesées horodatées de chaque côté", () => {
-  const empty = { sleep: [], training: [], knee: [], macros: [], notes: [], steps: [], targets: DEFAULT_TARGETS, phase: "seche", foodLog: [], foodOverrides: {}, profile: "", journal: "" };
-  const noTime = Array.from({ length: 20 }, (_, i) => ({ date: d(i), kg: 94 }));
-  const a = buildCoachPrompt({ ...empty, weight: noTime }, "").user;
-  assert.ok(!a.includes("heure_pesee"));
-  const withTime = noTime.map((w, i) => ({ ...w, time: i % 4 === 0 ? "05:30" : "08:10" }));
-  const b = buildCoachPrompt({ ...empty, weight: withTime }, "").user;
-  assert.ok(b.includes('"heure_pesee":{"avant_7h":{"n":5') && b.includes("Pour information seulement"));
 });

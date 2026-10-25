@@ -206,7 +206,7 @@ export default function App({ silent = false } = {}) {
       setWeight((prev) => {
         let next = prev;
         // `time` (08/10/2026, heure de pesée) : "HH:MM" local, posé seulement quand Health Connect
-        // la fournit — une pesée manuelle n'en a pas. Observation seulement (weighTime.js).
+        // la fournit — une pesée manuelle n'en a pas. Affichée dans l'historique du poids.
         Object.entries(result.weightByDate || {}).forEach(([date, kg]) => {
           const time = result.weightTimeByDate?.[date];
           next = upsert(next, { date, kg, source: "healthconnect", ...(time ? { time } : {}) });

@@ -17,7 +17,6 @@ import { volumeForCoach, PRIORITY_GROUPS, VOLUME_TARGET } from "../volume.js";
 // de « fiable/moyenne/faible » — même mot que l'écran, clés internes inchangées.
 const CONFIANCE = { fiable: "élevée", moyenne: "moyenne", faible: "faible" };
 import { sessionLoad, sessionGenes, geneZoneLabel } from "../sessionLoad.js";
-import { weighTimeAnalysis } from "../weighTime.js";
 import { PHASES, phaseTarget, targetsForDate, kcalFromMacros, kcalOfEntry, isCutWindow, tdeeNow, weightTrend7, recompWindows } from "../targets.js";
 import { realDeficit } from "../tdee.js";
 import { isPalierEntry } from "../palier.js";
@@ -282,7 +281,6 @@ export function buildCoachPrompt(data, note) {
     ...painRealtime,
   };
 
-  const weighTime = weighTimeAnalysis(weight);
   const volumeRaw = volumeForCoach(training);
   const volumeHebdo = Object.values(volumeRaw).some((n) => n > 0) ? volumeRaw : null;
   const summary = {
@@ -290,12 +288,7 @@ export function buildCoachPrompt(data, note) {
     poids: { dernier: lastN(weight, 1)[0]?.kg ?? null, moy_7j: w7, moy_7j_precedents: w14, tendance_kg_sur_semaine: (w7 != null && w14 != null) ? round(w7 - w14) : null,
       // 3e semaine seulement en Recomposition (règle "perte > 0,3 kg/sem sur 2 semaines") —
       // ajoutée aux autres phases, elle changerait leur prompt, vérifié identique par hash.
-      ...(PHASES[phase].noTarget ? { moy_7j_il_y_a_2_sem: wt.avg7prev2, tendance_kg_sem_precedente: wt.deltaWeekPrev } : {}),
-      // Heure de pesée (08/10/2026, weighTime.js) : écart moyen pesée − tendance EMA selon
-      // que la pesée est faite avant ou après 7 h. POUR INFORMATION (demande de Yoann) —
-      // aucune pesée n'est exclue ni corrigée. Clé absente tant que les deux groupes n'ont
-      // pas 3 pesées horodatées : prompt identique à avant dans ce cas.
-      ...(weighTime.ready ? { heure_pesee: { avant_7h: { n: weighTime.early.n, ecart_relatif_kg: weighTime.early.meanDelta }, apres_7h: { n: weighTime.late.n, ecart_relatif_kg: weighTime.late.meanDelta }, difference_kg: weighTime.diff } } : {}) },
+      ...(PHASES[phase].noTarget ? { moy_7j_il_y_a_2_sem: wt.avg7prev2, tendance_kg_sem_precedente: wt.deltaWeekPrev } : {}) },
     macros_moy_7j: { proteines: avgKey(m7, "protein"), glucides: avgKey(m7, "carbs"), lipides: avgKey(m7, "fat"), fibres: avgKey(m7, "fiber"), eau_ml: avgKey(m7, "water") },
     cibles: { proteines: atToday.protein, glucides: atToday.carbs, lipides: atToday.fat, fibres: atToday.fiber, eau_ml: targets.water },
     // Sommeil et genou : ces agrégats remplacent les tableaux bruts 14 j qui étaient
@@ -408,7 +401,7 @@ ${profile.trim()}` : "";
 ${JSON.stringify(realtime)}
 
 RÉSUMÉ 14 JOURS (moyennes fiables, tendance de fond) :
-${JSON.stringify(summary)}${weighTime.ready ? "\n`poids.heure_pesee` : écart moyen de chaque pesée à la tendance lissée, centré sur l'ensemble des pesées, selon l'heure (avant/après 7 h) — positif = plus lourd que les autres pesées. Pour information seulement — commente-le en une phrase (effet de l'heure, lien avec les nuits courtes), sans exclure ni recalculer aucune pesée : la tendance et le TDEE restent la référence." : ""}
+${JSON.stringify(summary)}
 
 JOUR PAR JOUR — pour corréler apports et variations de poids (rétention d'eau via sodium/glucides vs vraie perte de masse grasse). Clés : d=date, p=poids, kc=kcal, P/G/L=protéines/glucides/lipides, F=fibres, eau=ml, pas, cible_kc=cible kcal du jour. Un champ absent = pas de donnée ce jour-là :
 ${JSON.stringify(merged)}
