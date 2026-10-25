@@ -1,0 +1,186 @@
+<title>Arborescence PROTOCOLE</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Maquette fil de fer : chaque option = un téléphone cliquable + la liste de ce qui va où. Pas d'identité visuelle (c'est U2). */
+:root {
+  --bg: #0b0b0a; --panel: #161614; --line: #33332f; --fg: #f2f2ec; --fg2: #b4b4ac; --accent: #d7ff3f; --on-accent: #0b0b0a; --warn: #f0a640;
+  --body: "Atkinson Hyperlegible", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --bg: #f4f4ef; --panel: #ffffff; --line: #d2d2c8; --fg: #161614; --fg2: #55554e; --accent: #4f6b00; --on-accent: #ffffff; --warn: #9a5a00; color-scheme: light; } }
+:root[data-theme="light"] { --bg: #f4f4ef; --panel: #ffffff; --line: #d2d2c8; --fg: #161614; --fg2: #55554e; --accent: #4f6b00; --on-accent: #ffffff; --warn: #9a5a00; color-scheme: light; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.5; }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 24px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 28px; }
+h1 { font-size: 1.7rem; margin: 0; text-wrap: balance; }
+h2 { font-size: 1.25rem; margin: 0 0 8px; text-wrap: balance; }
+p { margin: 0; max-width: 65ch; color: var(--fg2); }
+.lead { color: var(--fg); }
+.label { font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg2); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.fact { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 2px; }
+.fact b { font-family: var(--mono); font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+.fact span { color: var(--fg2); font-size: 0.9rem; }
+.picker { display: flex; flex-wrap: wrap; gap: 8px; }
+.picker button { font: inherit; font-weight: 700; min-height: 48px; padding: 0 18px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
+.picker button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.option { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 760px) { .option { grid-template-columns: minmax(0, 1fr); } }
+.phone { border: 2px solid var(--line); border-radius: 28px; background: var(--panel); overflow: hidden; display: flex; flex-direction: column; height: 620px; max-width: 360px; width: 100%; justify-self: center; }
+.ph-head { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.ph-head strong { font-size: 1.1rem; }
+.ph-body { flex: 1; overflow-y: auto; padding: 12px; display: grid; gap: 8px; align-content: start; }
+.blk { border: 1.5px dashed var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; }
+.blk.key { border-style: solid; border-color: var(--accent); }
+.blk b { font-size: 0.98rem; }
+.blk small { color: var(--fg2); font-size: 0.85rem; line-height: 1.35; }
+.seg { display: flex; gap: 4px; flex-wrap: wrap; }
+.seg span { font-size: 0.85rem; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; color: var(--fg2); }
+.seg span.on { border-color: var(--accent); color: var(--fg); }
+.live { margin: 0 10px 6px; border-radius: 10px; background: var(--accent); color: var(--on-accent); padding: 8px 12px; font-weight: 700; font-size: 0.9rem; display: flex; justify-content: space-between; gap: 8px; }
+.live span { font-family: var(--mono); }
+.tabs { display: flex; border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.tabs button { flex: 1; min-width: 0; min-height: 60px; font: inherit; font-size: 0.8rem; font-weight: 700; background: none; border: none; color: var(--fg2); cursor: pointer; display: grid; place-items: center; gap: 2px; padding: 6px 2px; }
+.tabs button .ico { width: 22px; height: 22px; border-radius: 6px; border: 2px solid currentColor; }
+.tabs button[aria-selected="true"] { color: var(--accent); }
+.tabs button.plus .ico { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); border-color: var(--accent); }
+.side { display: grid; gap: 14px; min-width: 0; }
+.verdict { border-left: 3px solid var(--accent); padding-left: 12px; display: grid; gap: 6px; }
+.verdict p { color: var(--fg); }
+ul.map { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+ul.map li { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr); gap: 10px; font-size: 0.95rem; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+ul.map li span:first-child { font-family: var(--mono); font-size: 0.85rem; color: var(--fg2); }
+.pros { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.pros div { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 0.95rem; }
+.pros h3 { margin: 0 0 4px; font-size: 0.85rem; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; }
+.pros .plus h3 { color: var(--accent); } .pros .minus h3 { color: var(--warn); }
+.pros ul { margin: 0; padding-left: 18px; }
+@media (prefers-reduced-motion: no-preference) { .ph-body { scroll-behavior: smooth; } }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:10px">
+    <div class="label">Chantier U · étape U1 · 25/10/2026</div>
+    <h1>Arborescence de PROTOCOLE : 3 options</h1>
+    <p class="lead">Fil de fer seulement : où va chaque écran, pas encore à quoi il ressemble (c'est U2). Touche les onglets de chaque téléphone pour parcourir l'option, puis dis-moi laquelle garder.</p>
+  </header>
+
+  <section style="display:grid;gap:10px" aria-labelledby="audit-t">
+    <h2 id="audit-t">Ce que l'audit a mesuré aujourd'hui</h2>
+    <div class="facts">
+      <div class="fact"><b>64/100</b><span>Lighthouse accessibilité</span></div>
+      <div class="fact"><b>57-94 %</b><span>du texte sous 12 px selon l'écran</span></div>
+      <div class="fact"><b>40-63 %</b><span>du texte sous le contraste lisible (4,5:1)</span></div>
+      <div class="fact"><b>8 × 9 px</b><span>onglets, 26 à 62 px de large</span></div>
+      <div class="fact"><b>26 × 18 px</b><span>case de série du carnet, collée au ×</span></div>
+      <div class="fact"><b>0</b><span>zoom possible (bloqué par la page)</span></div>
+    </div>
+  </section>
+
+  <section style="display:grid;gap:12px" aria-labelledby="opt-t">
+    <h2 id="opt-t">Les options</h2>
+    <div class="picker" role="group" aria-label="Choisir une option" id="picker"></div>
+    <div id="option"></div>
+  </section>
+</div>
+
+<script>
+const B = (t, s, key) => ({ t, s, key });
+const LIVE = "Séance en cours · Upper A · 3/9 exos";
+const SCREENS = {
+  today: { title: "Aujourd'hui", blocks: [
+    B("Prochaine séance", "Aujourd'hui + demain, bouton Démarrer, genou en un tap si pas noté", true),
+    B("Énergie · Poids", "Score d'énergie et moyenne 7 j du poids, côte à côte, gros chiffres", true),
+    B("Calories · Pas · Eau", "Trois tuiles plus petites, tap = l'écran concerné"),
+    B("Constats", "Replié par défaut, une ligne visible"),
+    B("Palier de la semaine", "Visible seulement s'il y a une proposition") ] },
+  seance: { title: "Séance", blocks: [
+    B("Choisir une séance", "Grille des types, celui proposé aujourd'hui en premier", true),
+    B("Pendant la séance (plein écran)", "Minuteur fixé en haut · série en cours en grand · dernière fois / record · exercice suivant", true),
+    B("Dernières séances", "Liste, tap = modifier"),
+    B("Progression · Volume 7 j", "Deux entrées vers le détail"),
+    B("Planning idéal", "Déplacé depuis l'onglet TDEE") ] },
+  nutrition: { title: "Nutrition", blocks: [
+    B("Journal du jour par repas", "Ligne modifiable sans tout rouvrir, + habituels en 1 tap", true),
+    B("Eau", "Boutons +250 / +500"),
+    B("Péri-training · protocoles basket", "Déplacés depuis l'onglet TDEE") ] },
+  corps: { title: "Corps", seg: ["Poids", "Énergie", "Pas", "Genou"], blocks: [
+    B("Sous-onglets en haut", "Un tap pour passer de l'un à l'autre, le dernier ouvert est retenu", true),
+    B("Poids", "Tendance 7 j, graphique, heure de pesée"),
+    B("Énergie", "Score, sommeil, sieste, graphiques 21 j"),
+    B("Pas · Genou", "Inchangés sur le fond") ] },
+  analyse: { title: "Analyse", blocks: [
+    B("Coach IA", "Analyser · Bilan 3 mois · note du jour (quitte le tableau de bord)", true),
+    B("Dépense estimée (TDEE)", "Chiffre, marge, zone de recomposition, comparaison des fenêtres"),
+    B("Moyenne kcal + protéines par semaine", "Le graphique actuel") ] },
+  energie: { title: "Énergie", blocks: [
+    B("Score d'énergie", "En tête, avec le détail des 5 modules", true),
+    B("Sommeil", "Dernière nuit, qualité 7 j, graphiques 21 j") ] },
+  plus: { title: "Plus", blocks: [
+    B("Poids", "Liste d'entrées, chacune ouvre l'écran"), B("Pas"), B("Genou"),
+    B("Analyse", "TDEE + Coach IA + Bilan"), B("Réglages") ] },
+  suivi: { title: "Suivi", seg: ["Corps", "Analyse"], blocks: [
+    B("Corps", "Poids · Énergie · Pas · Genou en sous-onglets", true),
+    B("Analyse", "TDEE + Coach IA + Bilan 3 mois") ] },
+  ajout: { title: "Ajout rapide", blocks: [
+    B("Ajouter un repas habituel", "Ouvre directement la liste du repas en cours", true),
+    B("Noter le genou", "Échelle 0-10"), B("Démarrer la séance proposée"),
+    B("Note du jour", "Pour le Coach IA"), B("Poids à la main", "Si Health Connect n'a rien") ] },
+};
+const OPTIONS = [
+  { id: "A", name: "A · 5 onglets, Corps regroupé", rec: true,
+    tabs: [["today","Aujourd'hui"],["seance","Séance"],["nutrition","Nutrition"],["corps","Corps"],["analyse","Analyse"]],
+    verdict: "Ma recommandation. Tu regardes énergie et poids le matin sur Aujourd'hui, donc leurs onglets dédiés servent surtout au détail : un onglet Corps à sous-onglets suffit.",
+    plus: ["Onglets de 75 px de large, libellés lisibles", "Chaque onglet = un moment de ta journée", "Coach IA isolé dans Analyse"],
+    minus: ["Énergie en détail = 2 taps au lieu d'1", "Sous-onglets à apprendre"],
+    map: [["Tableau de bord","Aujourd'hui (sans Coach IA)"],["Séances","Séance"],["Macro","Nutrition"],["Poids · Énergie · Pas · Douleurs","Corps (sous-onglets)"],["TDEE","Analyse ; péri-training → Nutrition ; planning idéal → Séance"],["Coach IA","Analyse"],["Réglages","Engrenage en haut, inchangé"]] },
+  { id: "B", name: "B · Énergie garde son onglet",
+    tabs: [["today","Aujourd'hui"],["seance","Séance"],["nutrition","Nutrition"],["energie","Énergie"],["plus","Plus"]],
+    verdict: "Si l'énergie est ce que tu consultes le plus en détail. Poids, Pas, Genou et Analyse vont dans un onglet « Plus ».",
+    plus: ["Énergie à 1 tap", "Toujours 5 onglets larges"],
+    minus: ["« Plus » est un fourre-tout : Analyse et Coach IA y sont cachés", "Poids passe à 2 taps"],
+    map: [["Tableau de bord","Aujourd'hui"],["Séances","Séance"],["Macro","Nutrition"],["Énergie","Énergie"],["Poids · Pas · Douleurs","Plus"],["TDEE · Coach IA","Plus → Analyse"],["Réglages","Plus"]] },
+  { id: "C", name: "C · 4 onglets + bouton d'ajout",
+    tabs: [["today","Aujourd'hui"],["seance","Séance"],["ajout","+"],["nutrition","Nutrition"],["suivi","Suivi"]],
+    verdict: "Pensée pour la saisie : un bouton central ouvre les ajouts rapides depuis n'importe quel écran. Corps et Analyse fusionnent dans « Suivi ».",
+    plus: ["Ajouter un repas ou noter le genou en 2 taps partout", "Le moins d'onglets"],
+    minus: ["Suivi mélange deux choses différentes", "Le + double des boutons qui existent déjà sur Aujourd'hui"],
+    map: [["Tableau de bord","Aujourd'hui"],["Séances","Séance"],["Macro","Nutrition"],["Poids · Énergie · Pas · Douleurs","Suivi → Corps"],["TDEE · Coach IA","Suivi → Analyse"],["Saisies rapides","Bouton + (nouveau)"],["Réglages","Engrenage en haut"]] },
+];
+let cur = "A"; const sel = {};
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function render() {
+  document.getElementById("picker").innerHTML = OPTIONS.map((o) => `<button type="button" aria-pressed="${o.id === cur}" data-opt="${o.id}">${esc(o.name)}${o.rec ? " ★" : ""}</button>`).join("");
+  const o = OPTIONS.find((x) => x.id === cur); const tab = sel[cur] || o.tabs[0][0]; const sc = SCREENS[tab];
+  const showLive = tab !== "seance";
+  document.getElementById("option").innerHTML = `
+  <div class="option">
+    <div class="phone" aria-label="Téléphone, option ${o.id}">
+      <div class="ph-head"><strong>${esc(sc.title)}</strong><span class="label">⚙ Réglages</span></div>
+      <div class="ph-body">
+        ${sc.seg ? `<div class="seg">${sc.seg.map((s, i) => `<span class="${i === 0 ? "on" : ""}">${esc(s)}</span>`).join("")}</div>` : ""}
+        ${sc.blocks.map((b) => `<div class="blk${b.key ? " key" : ""}"><b>${esc(b.t)}</b>${b.s ? `<small>${esc(b.s)}</small>` : ""}</div>`).join("")}
+      </div>
+      ${showLive ? `<div class="live" title="Visible sur tous les onglets tant qu'une séance est ouverte">${esc(LIVE)}<span>1:28</span></div>` : ""}
+      <div class="tabs" role="tablist">
+        ${o.tabs.map(([k, l]) => `<button type="button" role="tab" aria-selected="${k === tab}" class="${l === "+" ? "plus" : ""}" data-tab="${k}"><span class="ico" aria-hidden="true"></span>${l === "+" ? "Ajouter" : esc(l)}</button>`).join("")}
+      </div>
+    </div>
+    <div class="side">
+      <div class="verdict"><span class="label">Option ${o.id}${o.rec ? " · recommandée" : ""}</span><p>${esc(o.verdict)}</p></div>
+      <div class="pros"><div class="plus"><h3>Pour</h3><ul>${o.plus.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div><div class="minus"><h3>Contre</h3><ul>${o.minus.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div></div>
+      <div style="display:grid;gap:8px"><span class="label">Où va chaque écran actuel</span>
+        <ul class="map">${o.map.map(([a, b]) => `<li><span>${esc(a)}</span><span>${esc(b)}</span></li>`).join("")}</ul></div>
+      <p>Dans les trois options : la barre citron « Séance en cours » reste visible quand tu quittes le carnet (pour vérifier Nutrition entre deux séries), et le minuteur suit l'heure réelle.</p>
+    </div>
+  </div>`;
+}
+document.addEventListener("click", (e) => {
+  const op = e.target.closest("[data-opt]"); if (op) { cur = op.dataset.opt; render(); return; }
+  const t = e.target.closest("[data-tab]"); if (t) { sel[cur] = t.dataset.tab; render(); }
+});
+render();
+</script>

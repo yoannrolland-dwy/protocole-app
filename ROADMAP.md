@@ -879,3 +879,59 @@ lignes ; 100 % styles en ligne ; 0 attribut d'accessibilité ; texte majoritaire
 4. Dashboard (allégé, sans Coach IA) · 5. Corps (Poids/Énergie/Pas/Douleurs) · 6. Séances
 (liste, progression, volume) · 7. Analyse (TDEE + Coach IA) · 8. Réglages.
 
+
+### U1 — Audit chiffré (25/10/2026, v3.109.2, aperçu 375 px, jeu de données U0)
+
+Mesuré par script dans l'aperçu (tous les éléments texte visibles de chaque écran, contraste
+calculé contre le fond réel) + Lighthouse mobile. **Ce sont les chiffres « avant » que U4
+refera à l'identique.**
+
+| Écran | Texte < 12 px | Contraste < 4,5:1 | Cibles < 44 px | Boutons sans nom |
+|---|---|---|---|---|
+| Tableau de bord | 79 % | 58 % | 13 / 13 | 1 |
+| Poids | 58 % | 40 % | 15 / 15 | 2 |
+| Énergie | 78 % | 42 % | 11 / 11 | 1 |
+| Pas | 81 % | 41 % | 14 / 14 | 1 |
+| Séances (liste) | 59 % | 62 % | 22 / 31 | 11 |
+| Carnet Upper A | 74 % | 60 % | 42 / 42 | 10 |
+| Douleurs | 57 % | 59 % | 25 / 25 | 2 |
+| TDEE | 94 % | 43 % | 14 / 14 | 1 |
+| Macro | 73 % | 63 % | 34 / 35 | 15 |
+| Recherche d'aliment | 71 % | 62 % | 38 / 41 | 16 |
+
+- **Lighthouse accessibilité : 64/100** (bonnes pratiques 100). Échecs : bouton sans nom
+  (engrenage), contraste (32 nœuds), et `maximum-scale=1` dans `index.html` qui **bloque le
+  zoom** — à retirer en U2/U3.
+- **Tailles** : le texte le plus fréquent est en 9-11 px ; 8,5 px pour les sous-libellés des
+  tuiles (« / 2470 KCAL », « CIBLE 93 »). Les onglets sont en 9 px, 40 px de haut et **26 à
+  62 px de large** (« PAS » = 26 px).
+- **Contraste** : deux couleurs font tout l'échec — `muted #6b6b66` à 3,5:1 (sur carte) /
+  3,8:1 (sur fond), et `dim #4a4a46` à 2,1-2,3:1. Les remonter suffit pour l'essentiel.
+- **Carnet** (le pire endroit, mains moites) : la case de validation d'une série fait
+  **26 × 18 px** et touche le × de suppression (**18 × 13 px**) ; les champs reps/poids font
+  37 px de haut (`inputMode` numeric/decimal déjà en place) ; chips RIR 30 × 26.
+- **Macro** : boutons « Ajouter » d'un repas 215 × 34, icônes voisines 44 × 34 et 39 × 34
+  sans nom ; recherche 39 px de haut.
+- **Accessibilité** : 0 `className`, 767 `style={{}}`, quasi aucun `aria-*`.
+
+### U1 — Moments d'usage (réponses de Yoann, 25/10/2026)
+
+- **Le matin sur le tableau de bord** : Prochaine séance, score d'énergie, poids et tendance
+  (pas Constats/Palier, à replier).
+- **À la salle entre deux séries** : minuteur, dernière fois / record, série en cours,
+  exercice suivant — tout sans scroller. **Il change d'application entre les séries**
+  (Instagram) → d'où la barre « Séance en cours » visible hors du carnet dans les maquettes.
+- **Bug trouvé par cette question, corrigé à part (v3.109.3)** : le minuteur du carnet
+  retirait 1 s par tic de `setInterval`, ralenti par Android en arrière-plan → retard sur la
+  notification. Il se cale maintenant sur l'heure de fin et se recalcule au retour au premier
+  plan (`visibilitychange`).
+- **Repas** : un mélange — planifiés puis corrigés dans la journée (cohérent avec la
+  correction négative de Macro rapide du 07/10).
+- **Regroupement Poids/Énergie/Pas/Douleurs** : à décider sur maquette.
+
+### U1 — Arborescence maquettée
+
+`docs/refonte-ihm/U1-arborescence.html` (publiée en artifact) : 3 options cliquables —
+**A** 5 onglets Aujourd'hui · Séance · Nutrition · Corps · Analyse (recommandée), **B**
+Énergie garde son onglet + « Plus », **C** 4 onglets + bouton d'ajout central. Choix de Yoann :
+_en attente_.
