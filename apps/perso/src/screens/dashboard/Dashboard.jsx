@@ -14,7 +14,7 @@ import { nextSessions } from "@rawcare/core/nextSession";
 import { today, fmt, round, lastN, fmtHM } from "../../ui.jsx";
 import { T } from "../../design/tokens.js";
 import { Panel, Eyebrow, Button } from "../../design/primitives.jsx";
-import { phaseTarget, recompTrendColor, STEPS_TARGET } from "../../lib/helpers.js";
+import { phaseTarget, recompTrendColor, scoreColor, STEPS_TARGET } from "../../lib/helpers.js";
 import { KneeQuickLog } from "./KneeQuickLog.jsx";
 import { WhyNot } from "./WhyNot.jsx";
 import { InsightsCard } from "./InsightsCard.jsx";
@@ -128,9 +128,9 @@ export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targe
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <Tile big label="Énergie" onClick={() => setTab("sleep")}
           value={energy.status === "ok" ? energy.total : "—"} unit={energy.status === "ok" ? "/100" : ""}
-          // Couleur portée par le libellé, pas par le chiffre : citron dès « Bon » (≥ 75), ambre
-          // sous « Correct » (< 60) — un 59 « Risque » ne doit pas s'afficher en citron.
-          extra={energy.status === "ok" ? { txt: scoreLabel(energy.total), col: energy.total >= 75 ? T.c.accent : energy.total < 60 ? T.c.warn : T.c.text } : null}
+          // Couleur portée par le libellé, pas par le chiffre, et la MÊME que dans Corps › Énergie
+          // (`scoreColor`) — un 59 « Risque » ne doit pas s'afficher en citron.
+          extra={energy.status === "ok" ? { txt: scoreLabel(energy.total), col: scoreColor(energy.total) } : null}
           note={energy.status === "ok" ? nightNote : "pas assez de données"} />
         <Tile big label={tgtW != null ? "Poids" : "Poids · moy. 7 j"} onClick={() => setTab("weight")}
           value={tgtW != null ? (wLast ? wLast.kg : "—") : (wTrend?.avg7 ?? "—")} unit="kg"

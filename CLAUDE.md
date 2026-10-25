@@ -3625,6 +3625,29 @@ décompte** (la pastille épinglée en permanence de juillet gênait le défilem
   un tap (Oui → `kneeLog` écrit, panneau disparu), « Démarrer » (horloge de la page avancée à
   9 h) → carnet ouvert, Coach IA présent dans Analyse et absent d'Aujourd'hui.
 
+## Chantier U — U3 étape 5 : Corps (Poids, Énergie, Pas, Genou) en v2 (25/10/2026, v3.115.0)
+
+- **`design/compat.jsx`** (nouveau) : les primitives v1 (`C`, `Card`, `Label`, `Body`, `Big`,
+  `Empty`, `Btn`, `Stepper`, `Field`, `DateField`, `Pills`, `ScreenHeader`, `inputStyle`,
+  `chartAxis`, `tooltipStyle`, `tooltipItemStyle`) avec **les mêmes noms et signatures**, mais les
+  valeurs v2 : texte 12 px minimum, `dim` remplacé par le gris discret lisible, boutons et champs
+  de 52 px, axes de graphique en 12 px `#bdbdb4`. `C` garde des hex bruts (utilisables dans les
+  attributs SVG de recharts). **Un écran migre en changeant sa ligne d'import** ; sa logique ne
+  bouge pas. Servira aux étapes 6 à 8. `ScreenHeader` accepte de ne plus avoir de `title`.
+- **Migrés par ce biais** : `WeightTab`, `SleepTab`, `StepsTab`, `PainTab`, `SyncedBanner`. En plus :
+  tailles écrites en dur remontées (9-10 px → 12, 10,5-11,5 → 13), titres redondants retirés
+  (l'en-tête dit « Corps » et le sous-onglet nomme l'écran ; le sous-titre reste), **échelle de
+  douleur 0-10 du genou** en grille 6 colonnes, 48 px, `aria-label` par chiffre (elle était en
+  30 × 32 px).
+- **`p-tap` ne fait plus de transition sur la couleur de fond/bordure** : dans l'aperçu, le
+  sous-onglet sélectionné restait affiché à mi-chemin (fond citron sur l'ancien, transparent sur
+  le nouveau). Seul l'enfoncement au toucher reste animé.
+- **Couleur du score d'énergie alignée** : la tuile d'Aujourd'hui utilise `scoreColor` (citron
+  ≥ 75, ambre 60-74, rouge < 60), comme Corps › Énergie.
+- **Mesuré dans l'aperçu (375 px)** : sur les 4 sous-onglets, 0 texte sous 12 px, 0 sous 4,5:1,
+  0 cible sous 44 px, textes d'axes à 12 px. Testé : saisie de pas (−/+ 500, Enregistrer → `source:
+  manual`, Supprimer).
+
 ## Minuteur de repos calé sur l'heure réelle (25/10/2026, apps/perso v3.109.3)
 
 Remonté par Yoann pendant U1 : le chrono du carnet prenait du retard sur celui de la

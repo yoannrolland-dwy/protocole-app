@@ -1,8 +1,9 @@
-// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) : code déplacé tel quel.
+// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; rendu v2 à l'étape 5 d'U3 via
+// design/compat.jsx (mêmes primitives, valeurs v2), polices écrites en dur remontées à 12-13 px.
 import { useState } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Cell } from "recharts";
 import { Plus, Trash2 } from "lucide-react";
-import { C, today, fmt, upsert, lastN, Card, Label, Empty, Btn, Stepper, Field, DateField, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../ui.jsx";
+import { C, today, fmt, upsert, lastN, Card, Label, Empty, Btn, Stepper, Field, DateField, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../design/compat.jsx";
 import { avg, STEPS_TARGET } from "../lib/helpers.js";
 import { SyncedBanner } from "../components/SyncedBanner.jsx";
 
@@ -21,12 +22,12 @@ export function StepsTab({ steps, save }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader title="Pas" subtitle="saisie manuelle · activité quotidienne" />
+      <ScreenHeader subtitle="saisie manuelle · activité quotidienne" />
 
       <Card style={{ padding: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <Label style={{ fontSize: 10, letterSpacing: 1.5 }}>{date === today() ? "Aujourd'hui" : fmt(date)}</Label>
-          <span style={{ fontSize: 11, color: C.muted, fontWeight: 700 }}>cible {STEPS_TARGET.toLocaleString("fr-FR")}</span>
+          <Label style={{ fontSize: 12, letterSpacing: 1.5 }}>{date === today() ? "Aujourd'hui" : fmt(date)}</Label>
+          <span style={{ fontSize: 13, color: C.muted, fontWeight: 700 }}>cible {STEPS_TARGET.toLocaleString("fr-FR")}</span>
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 10px" }}>
           <span style={{ fontFamily: C.mono, fontSize: 38, fontWeight: 800, color: C.text }}>{n.toLocaleString("fr-FR")}</span>

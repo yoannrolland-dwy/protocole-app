@@ -1,9 +1,10 @@
-// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) : code déplacé tel quel.
+// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; rendu v2 à l'étape 5 d'U3 via
+// design/compat.jsx (mêmes primitives, valeurs v2), polices écrites en dur remontées à 12-13 px.
 import { useState } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from "recharts";
 import { Plus, Trash2 } from "lucide-react";
 import { HSR_TABLE, hsrForWeek } from "@rawcare/core/session/templates";
-import { C, today, fmt, upsert, lastN, daysBetween, Card, Label, Body, Empty, Btn, DateField, Pills, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../ui.jsx";
+import { C, today, fmt, upsert, lastN, daysBetween, Card, Label, Body, Empty, Btn, DateField, Pills, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../design/compat.jsx";
 
 /* ============================================================
    TAB — DOULEURS (genou — le coude a été retiré le 05/09/2026)
@@ -70,7 +71,7 @@ export function PainTab({ knee, save, hsrWeek }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader title={zone.title} subtitle={zone.sub} />
+      <ScreenHeader subtitle={zone.sub} />
 
       <Card>
         <Label style={{ marginBottom: 8 }}>Douleur · 30 jours</Label>
@@ -94,7 +95,7 @@ export function PainTab({ knee, save, hsrWeek }) {
             </ResponsiveContainer>
           </div>
         ) : <Empty>Aucun relevé.</Empty>}
-        <Body style={{ fontSize: 11, marginTop: 6 }}>Point cerclé = douleur non revenue à la base sous 24 h (surcharge).</Body>
+        <Body style={{ fontSize: 13, marginTop: 6 }}>Point cerclé = douleur non revenue à la base sous 24 h (surcharge).</Body>
       </Card>
 
       {alert && (
@@ -114,16 +115,16 @@ export function PainTab({ knee, save, hsrWeek }) {
         <div style={{ marginBottom: 10 }}><DateField value={date} onChange={pickDate} /></div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
           <Label>Douleur (0-10)</Label>
-          {pain == null && <span style={{ fontSize: 10, color: C.dim }}>choisis un chiffre pour enregistrer</span>}
+          {pain == null && <span style={{ fontSize: 12, color: C.dim }}>choisis un chiffre pour enregistrer</span>}
         </div>
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 12 }}>
+        <div role="group" aria-label="Douleur de 0 à 10" style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 6, marginBottom: 12 }}>
           {[0,1,2,3,4,5,6,7,8,9,10].map((n) => {
             const on = pain === n;
             const col = n >= 6 ? C.danger : n >= 4 ? "#e8a33d" : C.accent;
             return (
-              <button key={n} onClick={() => setPain(n)} style={{
-                width: 30, height: 32, borderRadius: 6, fontFamily: C.mono, fontSize: 13, fontWeight: 800, cursor: "pointer",
-                background: on ? col : C.card, color: on ? "#000" : C.muted,
+              <button key={n} type="button" className="p-tap" onClick={() => setPain(n)} aria-pressed={on} aria-label={`Douleur ${n} sur 10`} style={{
+                minHeight: 48, borderRadius: 10, fontFamily: C.mono, fontSize: 18, fontWeight: 700,
+                background: on ? col : C.card, color: on ? "#000" : C.text2,
                 border: `1.5px solid ${on ? col : C.border}`,
               }}>{n}</button>
             );

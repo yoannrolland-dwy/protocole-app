@@ -1,9 +1,10 @@
-// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) : code déplacé tel quel.
+// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; rendu v2 à l'étape 5 d'U3 via
+// design/compat.jsx (mêmes primitives, valeurs v2), polices écrites en dur remontées à 12-13 px.
 import { useState, useMemo } from "react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Cell } from "recharts";
 import { Plus, Trash2 } from "lucide-react";
 import { computeEnergyScore, computeSleepScore, scoreLabel } from "@rawcare/core/energy";
-import { C, today, fmt, round, upsert, lastN, fmtHM, Card, Label, Body, Empty, Btn, Stepper, Field, DateField, Pills, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../ui.jsx";
+import { C, today, fmt, round, upsert, lastN, fmtHM, Card, Label, Body, Empty, Btn, Stepper, Field, DateField, Pills, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../design/compat.jsx";
 import { scoreColor, avg } from "../lib/helpers.js";
 import { SyncedBanner } from "../components/SyncedBanner.jsx";
 
@@ -15,24 +16,24 @@ function EnergyScoreCard({ energy }) {
   return (
     <Card style={{ padding: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
-        <Label style={{ fontSize: 10, letterSpacing: 1.5 }}>Score d'énergie</Label>
+        <Label style={{ fontSize: 12, letterSpacing: 1.5 }}>Score d'énergie</Label>
         {energy.status === "ok" && (
           <span style={{ fontFamily: C.mono, fontSize: 22, fontWeight: 800, color: scoreColor(energy.total) }}>{energy.total}<span style={{ fontSize: 12, color: C.muted }}>/100</span></span>
         )}
       </div>
       {energy.status !== "ok" && (
-        <Body style={{ fontSize: 10.5, color: C.dim, marginBottom: 8 }}>
+        <Body style={{ fontSize: 13, color: C.dim, marginBottom: 8 }}>
           Pas assez de données pour un score complet — détail des modules ci-dessous.
         </Body>
       )}
       {energy.modules.map((m) => (
         <div key={m.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderTop: `1px solid ${C.divider}` }}>
           <div>
-            <div style={{ fontSize: 11, color: C.text2 }}>{m.label}</div>
-            <div style={{ fontSize: 9.5, color: C.dim, marginTop: 1 }}>{m.reason}</div>
+            <div style={{ fontSize: 13, color: C.text2 }}>{m.label}</div>
+            <div style={{ fontSize: 12, color: C.dim, marginTop: 1 }}>{m.reason}</div>
           </div>
           <div style={{ fontFamily: C.mono, fontSize: 13, fontWeight: 800, color: m.points == null ? C.dim : C.text, flexShrink: 0, marginLeft: 8 }}>
-            {m.points == null ? "—" : m.points}<span style={{ fontSize: 10, color: C.muted }}>/{m.max}</span>
+            {m.points == null ? "—" : m.points}<span style={{ fontSize: 12, color: C.muted }}>/{m.max}</span>
           </div>
         </div>
       ))}
@@ -77,13 +78,13 @@ export function SleepTab({ sleep, rhr, steps, naps, save }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader title="Énergie" subtitle="récupération tendon & muscle" />
+      <ScreenHeader subtitle="récupération tendon & muscle" />
 
       <EnergyScoreCard energy={energy} />
 
       <Card style={{ padding: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <Label style={{ fontSize: 10, letterSpacing: 1.5 }}>Dernière nuit</Label>
+          <Label style={{ fontSize: 12, letterSpacing: 1.5 }}>Dernière nuit</Label>
           {lastNight?.quality != null && (
             <span style={{ fontSize: 13, color: C.accent, letterSpacing: 1 }}>{"★".repeat(lastNight.quality)}<span style={{ color: C.dim }}>{"★".repeat(4 - lastNight.quality)}</span></span>
           )}
@@ -94,7 +95,7 @@ export function SleepTab({ sleep, rhr, steps, naps, save }) {
           </span>
           {sleepScore != null && (
             <span style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 800, color: scoreColor(sleepScore) }}>
-              {sleepScore}<span style={{ fontSize: 10, color: C.muted, fontWeight: 400 }}>/100</span>
+              {sleepScore}<span style={{ fontSize: 12, color: C.muted, fontWeight: 400 }}>/100</span>
             </span>
           )}
         </div>
@@ -105,10 +106,10 @@ export function SleepTab({ sleep, rhr, steps, naps, save }) {
               background: i === last7.length - 1 ? C.accent : C.border,
               height: `${Math.max(8, (s.hours / maxH) * 100)}%`,
             }} />
-          )) : <Body style={{ fontSize: 11, color: C.dim }}>Aucune nuit enregistrée.</Body>}
+          )) : <Body style={{ fontSize: 13, color: C.dim }}>Aucune nuit enregistrée.</Body>}
         </div>
         {todayNap && (
-          <Body style={{ fontSize: 11, color: C.accent, marginTop: 10 }}>
+          <Body style={{ fontSize: 13, color: C.accent, marginTop: 10 }}>
             + sieste aujourd'hui : {fmtHM(todayNap.minutes / 60)}
           </Body>
         )}
@@ -140,7 +141,7 @@ export function SleepTab({ sleep, rhr, steps, naps, save }) {
               <Field label="Qualité">
                 <Pills options={[1, 2, 3, 4].map((n) => ({ key: n, label: "★".repeat(n) }))} value={quality} onChange={setQuality} small />
               </Field>
-              <Body style={{ fontSize: 9.5, color: C.dim, marginTop: 4 }}>★ Attention requise · ★★ Correct · ★★★ Bon · ★★★★ Excellent</Body>
+              <Body style={{ fontSize: 12, color: C.dim, marginTop: 4 }}>★ Attention requise · ★★ Correct · ★★★ Bon · ★★★★ Excellent</Body>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
               <Btn variant="primary" onClick={add} style={{ flex: 1 }}><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Enregistrer</Btn>
@@ -205,7 +206,7 @@ export function SleepTab({ sleep, rhr, steps, naps, save }) {
             {[["Excellent", 90], ["Bon", 80], ["Correct", 65], ["Risque", 30]].map(([label, sample]) => (
               <div key={label} style={{ flex: 1, textAlign: "center" }}>
                 <div style={{ fontFamily: C.mono, fontSize: 20, fontWeight: 800, color: scoreColor(sample) }}>{paliers[label]}</div>
-                <div style={{ fontSize: 9, color: C.dim, textTransform: "uppercase", letterSpacing: 0.4, marginTop: 2 }}>{label}</div>
+                <div style={{ fontSize: 12, color: C.dim, textTransform: "uppercase", letterSpacing: 0.4, marginTop: 2 }}>{label}</div>
               </div>
             ))}
           </div>

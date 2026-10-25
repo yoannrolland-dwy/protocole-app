@@ -1,10 +1,11 @@
-// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) : code déplacé tel quel.
+// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; rendu v2 à l'étape 5 d'U3 via
+// design/compat.jsx (mêmes primitives, valeurs v2), polices écrites en dur remontées à 12-13 px.
 import { useState, useMemo } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from "recharts";
 import { Plus, Trash2 } from "lucide-react";
 import { weighTimeAnalysis } from "@rawcare/core/weighTime";
 import { PHASES, weightTrend7 } from "@rawcare/core/targets";
-import { C, today, fmt, round, upsert, lastN, Card, Label, Body, Big, Empty, Btn, Stepper, Field, DateField, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../ui.jsx";
+import { C, today, fmt, round, upsert, lastN, Card, Label, Body, Big, Empty, Btn, Stepper, Field, DateField, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../design/compat.jsx";
 import { phaseTarget, recompTrendColor } from "../lib/helpers.js";
 import { SyncedBanner } from "../components/SyncedBanner.jsx";
 
@@ -30,12 +31,12 @@ export function WeightTab({ weight, targets, save, phase }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader title="Poids" subtitle={`${PHASES[phase].label} · ${tgtW != null ? `cible ${tgtW} kg` : trendLabel}`} />
+      <ScreenHeader subtitle={`${PHASES[phase].label} · ${tgtW != null ? `cible ${tgtW} kg` : trendLabel}`} />
 
       <Card style={{ padding: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <Label style={{ fontSize: 10, letterSpacing: 1.5 }}>Actuel</Label>
-          <span style={{ fontSize: 11, color: tgtW != null ? C.accent : recompTrendColor(wTrend?.deltaWeek ?? 0), fontWeight: 700 }}>{tgtW != null ? `cible ${tgtW} kg` : trendLabel}</span>
+          <Label style={{ fontSize: 12, letterSpacing: 1.5 }}>Actuel</Label>
+          <span style={{ fontSize: 13, color: tgtW != null ? C.accent : recompTrendColor(wTrend?.deltaWeek ?? 0), fontWeight: 700 }}>{tgtW != null ? `cible ${tgtW} kg` : trendLabel}</span>
         </div>
         <div style={{ margin: "6px 0 12px" }}><Big value={wLast ? wLast.kg : "—"} unit="kg" /></div>
         {data.length > 1 ? (
@@ -75,7 +76,7 @@ export function WeightTab({ weight, targets, save, phase }) {
         <Label style={{ padding: "10px 0 6px", letterSpacing: 1.5 }}>Historique</Label>
         {weight.length ? lastN(weight, 10).reverse().map((w) => (
           <div key={w.date} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderTop: `1px solid ${C.divider}`, fontFamily: C.mono, fontSize: 13 }}>
-            <span style={{ color: C.text2 }}>{fmt(w.date)}{w.time ? <span style={{ color: C.dim, fontSize: 11 }}> · {w.time}</span> : null}</span>
+            <span style={{ color: C.text2 }}>{fmt(w.date)}{w.time ? <span style={{ color: C.dim, fontSize: 13 }}> · {w.time}</span> : null}</span>
             <span style={{ color: C.text, fontWeight: 700 }}>{w.kg}</span>
           </div>
         )) : <Empty>Aucune donnée.</Empty>}
@@ -95,10 +96,10 @@ function WeighTimeCard({ weight }) {
     <Card>
       <Label style={{ marginBottom: 6 }}>Heure de pesée</Label>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontFamily: C.mono, fontSize: 12 }}>
-        <div><div style={{ color: C.muted, fontSize: 10 }}>AVANT {r.cutoffHour} H · {r.early.n} pesée{r.early.n > 1 ? "s" : ""}</div><div style={{ color: C.text, fontWeight: 700 }}>{sg(r.early.meanDelta)}</div></div>
-        <div><div style={{ color: C.muted, fontSize: 10 }}>APRÈS {r.cutoffHour} H · {r.late.n} pesée{r.late.n > 1 ? "s" : ""}</div><div style={{ color: C.text, fontWeight: 700 }}>{sg(r.late.meanDelta)}</div></div>
+        <div><div style={{ color: C.muted, fontSize: 12 }}>AVANT {r.cutoffHour} H · {r.early.n} pesée{r.early.n > 1 ? "s" : ""}</div><div style={{ color: C.text, fontWeight: 700 }}>{sg(r.early.meanDelta)}</div></div>
+        <div><div style={{ color: C.muted, fontSize: 12 }}>APRÈS {r.cutoffHour} H · {r.late.n} pesée{r.late.n > 1 ? "s" : ""}</div><div style={{ color: C.text, fontWeight: 700 }}>{sg(r.late.meanDelta)}</div></div>
       </div>
-      <Body style={{ fontSize: 10.5, color: C.dim, marginTop: 8 }}>
+      <Body style={{ fontSize: 13, color: C.dim, marginTop: 8 }}>
         {r.ready
           ? `Écart de chaque pesée à la tendance lissée, centré sur l'ensemble des pesées (90 derniers jours). Les pesées à l'aube sortent ${r.diff > 0 ? "+" : ""}${r.diff.toFixed(2)} kg par rapport aux autres. Pour information : aucune pesée n'est exclue du calcul.`
           : "Écart de chaque pesée à la tendance lissée, centré sur l'ensemble des pesées. Lecture possible dès 3 pesées horodatées de chaque côté."}
