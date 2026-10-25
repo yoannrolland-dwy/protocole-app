@@ -1,5 +1,6 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { localDateKey } from "./ui.jsx";
+import { stepsByLocalDay } from "@rawcare/core/steps";
 
 // Synchro Health Connect (Android) — pas, sommeil et poids sur 14 jours.
 // N'a d'effet que dans l'app native (Capacitor) ; no-op sur la PWA/navigateur.
@@ -81,17 +82,36 @@ export async function syncHealthConnect() {
 
   try {
     if (canSteps) {
-      const { samples } = await Health.queryAggregated({
-        dataType: "steps",
-        startDate: start.toISOString(),
-        endDate: end.toISOString(),
-        bucket: "day",
-        aggregation: "sum",
-      });
-      samples.forEach((s) => {
-        const key = toKey(new Date(s.startDate));
-        stepsByDate[key] = Math.round(s.value ?? 0);
-      });
+      // Lecture BRUTE des enregistrements (25/10/2026) au lieu de `queryAggregated` : Samsung Health
+      // écrit un total par jour dont les bornes ne suivent pas toujours minuit local, et l'agrégation
+      // par tranches fixes de 24 h le coupait en deux le jour du passage à l'heure d'hiver (pas du
+      // jour écrasés par une tranche d'une heure). Voir packages/core/src/steps.js.
+      try {
+        const startS = new Date(start); startS.setDate(startS.getDate() - 1); // un jour de marge
+        const { samples } = await Health.readSamples({
+          dataType: "steps",
+          startDate: startS.toISOString(),
+          endDate: end.toISOString(),
+          limit: 1000,
+        });
+        const minKey = toKey(start);
+        Object.entries(stepsByLocalDay(samples, { keyOf: toKey })).forEach(([key, count]) => {
+          if (key >= minKey) stepsByDate[key] = count;
+        });
+      } catch {
+        // Repli : ancienne agrégation (juste sauf autour d'un changement d'heure).
+        const { samples } = await Health.queryAggregated({
+          dataType: "steps",
+          startDate: start.toISOString(),
+          endDate: end.toISOString(),
+          bucket: "day",
+          aggregation: "sum",
+        });
+        samples.forEach((s) => {
+          const key = toKey(new Date(s.startDate));
+          stepsByDate[key] = Math.round(s.value ?? 0);
+        });
+      }
     }
 
     if (canSleep) {

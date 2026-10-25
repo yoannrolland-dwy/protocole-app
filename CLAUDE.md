@@ -4796,3 +4796,28 @@ couper le plateau après une longue pause), validée par « GO ».
 - Tests : 109 (borne 60 j, retour dans les actifs, coupure du plateau après pause / 56 j pile qui ne
   coupe pas, constat sans exercice ancien). Aperçu : 1 exercice récent listé, 1 exercice de 90 j
   replié puis consultable, aucune erreur console. Build `apps/perso` ET `apps/public` propres.
+
+## Bug pas Health Connect : jour du passage à l'heure d'hiver (25/10/2026, apps/perso v3.109.1)
+
+Signalé par Yoann : « les pas ne se mettent plus à jour alors que le poids oui ». Diagnostiqué sur le
+téléphone (lecture de `stepsLog`/`weightLog` puis requêtes directes au plugin Health Connect via
+`apps/perso/scripts/cdp.mjs`, qui n'attend pas les promesses : écrire le résultat dans `window.__dbg`
+puis le relire).
+- **Symptôme** : le 25/10 à 14h18, l'app affichait **335 pas** alors que Samsung Health en avait 8 053 ;
+  le 24/10 affichait 6 937 au lieu de 7 239. Le poids n'était pas touché : il passe par le lecteur natif
+  Kotlin (`HealthNutritionPlugin.readWeight`), qui convertit chaque instant en date locale.
+- **Cause** : Samsung Health n'écrit qu'**un enregistrement par jour** (`com.sec.android.app.shealth`,
+  total mis à jour en continu). Jusqu'au 23/10 ses bornes = minuit local d'été (22h UTC) ; à partir du
+  24/10 il les date avec le décalage d'HIVER (23h UTC). `Health.queryAggregated` (bucket « day »)
+  découpe en **tranches fixes de 24 h** depuis `start` et répartit chaque enregistrement **au prorata**
+  de son chevauchement : le total du 25/10 était coupé en 23/24 + 1/24 (= 335), les deux tranches
+  portaient la même date (`toKey(new Date(startDate))`) et la petite **écrasait** la grosse ; la veille
+  perdait 1/24. Le bug serait aussi réapparu 14 jours (fenêtre de synchro) après chaque changement d'heure.
+- **Correctif** : `packages/core/src/steps.js` — `stepsByLocalDay(records)` ; `healthSync.js` lit les
+  enregistrements **bruts** (`Health.readSamples`, 1 jour de marge) et rattache chacun à la date locale
+  de son **milieu** (un total journalier tombe sur le bon jour quelle que soit la dérive de ses bornes).
+  Plusieurs sources : max par jour (jamais la somme, Health Connect dédoublonne dans son agrégation mais
+  pas dans la lecture brute). **Repli** sur l'ancienne agrégation si `readSamples` lève une erreur.
+  Les valeurs fausses déjà stockées (24 et 25/10) sont corrigées à la synchro suivante (fenêtre 14 j).
+- **Test** `steps.test.mjs` (112 tests au total) avec les **enregistrements réels** relevés ce jour-là.
+  Non testable dans l'aperçu (natif) : à vérifier sur le téléphone après install.
