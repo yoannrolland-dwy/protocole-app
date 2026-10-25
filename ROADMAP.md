@@ -21,11 +21,16 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | R4 | Recomposition : bloc de règles Coach IA attaché à la phase | petit | ✅ 02/10/2026 (v3.88.0) |
 | S1 | Recommandeur temporel : créneaux, horizon aujourd'hui/demain, planning par défaut (core) | moyen | ✅ 04/10/2026 (v3.90.0) |
 | S2 | Recommandeur temporel : carte à deux lignes + Coach IA | petit | ✅ 04/10/2026 (v3.91.0) |
-| T1 | Tests committés (`packages/core/test`, `npm test`, bloquant avant commit) | moyen | ⬜ spécifié le 04/10/2026 |
-| T2 | Volume hebdomadaire par groupe musculaire (carte, zéro donnée nouvelle) | petit | ⬜ |
-| T3 | Dashboard actionnable : genou en un tap + bouton « Démarrer » la séance proposée | petit | ⬜ |
-| T4 | Reps en réserve (RIR) par exercice, optionnel → plateau + Coach IA | moyen | ⬜ |
-| T5 | Bonus : retour haptique au cochage d'une série ; champ « alcool » en saisie libre | petit | ⬜ |
+| T1 | Tests committés (`packages/core/test`, `npm test`, bloquant avant commit) | moyen | ✅ 04/10/2026 (v3.93.0) |
+| T2 | Volume hebdomadaire par groupe musculaire (carte, zéro donnée nouvelle) | petit | ✅ 04/10/2026 (v3.94.0) |
+| T3 | Dashboard actionnable : genou en un tap + bouton « Démarrer » la séance proposée | petit | ✅ 04/10/2026 (v3.95.0) |
+| T4 | Reps en réserve (RIR) par exercice, optionnel → plateau + Coach IA | moyen | ✅ 04/10/2026 (v3.96.0) |
+| T5 | Bonus : retour haptique au cochage d'une série ; champ « alcool » en saisie libre | petit | ✅ 04/10/2026 (v3.97.0) |
+| U0 | Refonte IHM — socle : découper `App.jsx` par écran, zéro changement visible, captures « avant » | moyen | ⬜ |
+| U1 | Refonte IHM — cadrage : audit chiffré + moments d'usage + arborescence maquettée | petit | ⬜ |
+| U2 | Refonte IHM — directions visuelles en maquettes, choix, design system v2 (variables CSS) | gros | ⬜ |
+| U3 | Refonte IHM — écran par écran (un commit + une install par écran) | gros | ⬜ |
+| U4 | Refonte IHM — audit final avant/après + mise à jour CLAUDE.md | petit | ⬜ |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il
 alimente le recommandeur + le Coach IA. V2 tôt parce que c'est une protection, pas
@@ -826,3 +831,51 @@ chantier, chacun buildé/testé/commité, install native à la fin de chaque lot
 - Champ « alcool (g) » optionnel dans `FreeEntry` (7 kcal/g, déjà le coefficient CIQUAL),
   stocké dans la ligne `foodLog`, remonté au Coach IA (`alcool_g` dans macros hier/aujourd'hui).
   Jamais une macro cible.
+
+---
+
+## Chantier U — Refonte de l'IHM (cadré le 25/10/2026)
+
+Plan validé par Yoann le 25/10/2026. Constat d'audit (lecture du code, v3.109.1) : l'IHM est
+du React dans une WebView Capacitor (pas de Compose/XML, hors widget) ; `App.jsx` = 3 486
+lignes ; 100 % styles en ligne ; 0 attribut d'accessibilité ; texte majoritairement en
+9-11 px ; gris `muted` à 3,5:1 et `dim` à 2,3:1 (minimum lisible 4,5:1) ; 8 onglets en 9 px.
+
+### Décisions prises (ne pas les rouvrir sans raison)
+1. **Périmètre : `apps/perso` seul.** `apps/public` plus tard, si ça a du sens (pas par réflexe).
+2. **Identité : explorer en maquettes.** 2-3 directions (dont une « Affirmée mûrie ») en
+   artifact HTML, choisies par Yoann sur son téléphone avant tout code d'écran.
+3. **Navigation : décidée sur maquette.** Proposition de départ : 5 onglets (Aujourd'hui ·
+   Séance · Nutrition · Corps · Analyse). Yoann consulte peu Poids, Pas et Douleurs → candidats
+   au regroupement dans « Corps ».
+4. **Coach IA quitte le Dashboard** → onglet « Analyse » (avec TDEE, progression, Bilan 3 mois).
+   Le Dashboard plaît par ailleurs : on l'allège, on ne le réinvente pas.
+5. **La règle « tout en style en ligne » est levée** : jetons en variables CSS + classes pour
+   les états (toucher, focus, désactivé, transitions). Le style en ligne reste permis pour du
+   ponctuel. La section design system de CLAUDE.md sera réécrite à U2.
+6. **Widget Android : après, à part** (XML natif, chantier séparé une fois l'identité fixée).
+7. **Saisie Macro prioritaire** (c'est là que Yoann écrit le plus) : effacer un champ d'un coup
+   (×), clavier numérique pour les quantités + validation par Entrée, modifier une ligne du
+   journal sans tout rouvrir, ajouter un habituel / relancer un repas en 1-2 taps.
+8. **Lisibilité partout** : texte ≥ 12-13 px, contraste ≥ 4,5:1, cibles tactiles ≥ 44-48 px
+   (usage à la salle, mains moites, lumière forte).
+
+### Invariants
+- `packages/core` et ses tests ne bougent pas pour des raisons d'IHM (aucune règle métier).
+- Aucune clé localStorage renommée ; aucune donnée migrée.
+- Une étape = build + `npm test` vert + vérification dans l'aperçu + install + commit.
+
+### Outils retenus
+- U0 : ecc:react-patterns. U1 : Lighthouse (chrome-devtools) + `audit-suite` / `ux-ui-audit`
+  si installés. U2 : ecc:frontend-design-direction, ecc:design-system, ecc:accessibility,
+  UXKIN (références d'écrans réels) si installé. U3 : ecc:make-interfaces-feel-better.
+  U4 : mêmes mesures qu'en U1.
+- Écartés : Compose / Flutter / React Native (réécriture sans bénéfice), plugin « Mobile
+  Design System » (Material 3, effacerait l'identité), ux-superpowers (personas surdimensionnés
+  pour un seul utilisateur).
+
+### Ordre des écrans (U3)
+1. Barre d'onglets + en-tête · 2. Macro (saisie) · 3. Carnet de séance (`MuscuLogger`) ·
+4. Dashboard (allégé, sans Coach IA) · 5. Corps (Poids/Énergie/Pas/Douleurs) · 6. Séances
+(liste, progression, volume) · 7. Analyse (TDEE + Coach IA) · 8. Réglages.
+
