@@ -3788,6 +3788,21 @@ le recommandeur évite un Lower le jour d'un basket (règle retirée le 13/09/20
 permanent du coach ne dit plus « après tes vacances, remplace-le par le suivant ». Le reste de
 chaque phrase, toujours exact, est gardé.
 
+## Widget d'écran d'accueil aligné sur la v2 (25/10/2026, v3.121.0)
+
+Le widget natif (`widget_dashboard.xml`, `DashboardWidgetProvider.kt`, `WidgetBridgePlugin.kt`) n'avait
+pas été touché par le chantier U. Désormais : libellés et notes en **12 sp** (au lieu de 9), gris v2
+(`#bdbdb4` libellés, `#96968d` notes), tuiles `#131312` / `#262623`, une seule ligne par texte
+(`maxLines` + ellipse). **Couleurs calculées par le JS** (`App.jsx`, mêmes règles que le tableau de
+bord) et envoyées dans l'instantané : `color` (chiffre ; `""` = blanc) pour Calories (`limit`), Pas et
+Eau (`goal`) via `progressColor`, le chiffre restant blanc tant que la cible n'est pas atteinte ;
+`labelColor` pour l'énergie (`scoreColor`), appliqué par le Kotlin au seul libellé après le premier
+espace (« 88 **Excellent** »), en police étroite (`sans-serif-condensed`) pour tenir. Les deux clés
+sont réécrites à chaque envoi, pour qu'une couleur ne survive pas au lendemain. **Notes raccourcies**
+pour tenir en 12 sp : « / 3210 » (sans « kcal »), « Nuit 5h17 » (au lieu de « Sommeil »), « MAJ
+21:37 » (sans les secondes). Vérifié sur le téléphone par capture d'écran, avec les vraies données
+et avec le cas le plus long (« 88 Excellent », calories au-dessus de la cible).
+
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 
 Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la

@@ -10,7 +10,8 @@ const WidgetBridge = registerPlugin("WidgetBridge");
 
 /**
  * snapshot attendu : { poids, pas, calories, eau, energie, sync } — chacun
- * { value: string, note: string }. "sync" n'affiche pas sa valeur (juste l'icône Sync),
+ * { value: string, note: string, color?: "#rrggbb" }. color = couleur du chiffre (absente ou
+ * "" = blanc) ; energie porte labelColor = couleur du libellé après le score (« 88 Excellent »). "sync" n'affiche pas sa valeur (juste l'icône Sync),
  * seule sa note (horodatage de dernière synchro) est utilisée. "energie" (ex-"sommeil",
  * 05/09/2026) affiche le score d'énergie en valeur et la durée de sommeil réelle en note.
  */

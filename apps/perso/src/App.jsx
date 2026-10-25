@@ -16,7 +16,9 @@ import { C, today, shiftDateKey, fmt, round, longDate, byDate, upsert, lastN, fm
 import { Empty } from "./design/compat.jsx"; // « Chargement… » en gris lisible v2
 import NutritionTab from "./nutrition/NutritionTab.jsx";
 import { isSilentSync, finishSilentSync } from "./silentSync.js";
-import { STEPS_TARGET } from "./lib/helpers.js";
+import { STEPS_TARGET, scoreColor } from "./lib/helpers.js";
+import { progressColor } from "./lib/progress.js";
+import { COLORS } from "./design/tokens.js";
 import { familiesForToday, isMatchWeek, isPostMatchDay, planForDate } from "./lib/plan.js";
 import { SettingsPanel } from "./screens/settings/SettingsPanel.jsx";
 import { Dashboard } from "./screens/dashboard/Dashboard.jsx";
@@ -313,21 +315,31 @@ export default function App({ silent = false } = {}) {
     const at = targetsForDate(today(), targets);
     const kcalTgt = Math.round(kcalFromMacros(at.protein, at.carbs, at.fat, at.fiber));
 
+    // Notes raccourcies le 25/10/2026 (« / 3210 », « Nuit 5h12 », « MAJ 21:35 ») : en 12 sp elles
+    // ne tenaient plus sur une ligne dans les tuiles du widget.
+    // Couleurs (25/10/2026) : mêmes règles que les tuiles du tableau de bord. Le chiffre reste
+    // blanc tant que la cible n'est pas atteinte (citron = « en cours »), puis prend la couleur
+    // de `progressColor` ; pour l'énergie, seul le libellé est coloré (`scoreColor`). "" = blanc.
+    const valColor = (c) => (c === COLORS.accent ? "" : c);
     updateDashboardWidget({
       poids: { value: wLast ? `${wLast.kg} kg` : "—", note: wLast ? fmt(wLast.date) : "—" },
-      pas: { value: stepsToday.toLocaleString("fr-FR"), note: `/ ${STEPS_TARGET.toLocaleString("fr-FR")}` },
-      calories: { value: kcalToday != null ? `${kcalToday}` : "—", note: `/ ${kcalTgt} kcal` },
-      eau: { value: `${(waterToday / 1000).toFixed(2)} L`, note: `/ ${(waterTgt / 1000).toFixed(1)} L` },
+      pas: { value: stepsToday.toLocaleString("fr-FR"), note: `/ ${STEPS_TARGET.toLocaleString("fr-FR")}`,
+        color: valColor(progressColor(stepsToday, STEPS_TARGET, "goal")) },
+      calories: { value: kcalToday != null ? `${kcalToday}` : "—", note: `/ ${kcalTgt}`,
+        color: valColor(progressColor(kcalToday, kcalTgt, "limit")) },
+      eau: { value: `${(waterToday / 1000).toFixed(2)} L`, note: `/ ${(waterTgt / 1000).toFixed(1)} L`,
+        color: valColor(progressColor(waterToday, waterTgt, "goal")) },
       energie: {
         value: energyDash.status === "ok" ? `${energyDash.total} ${scoreLabel(energyDash.total)}` : "—",
-        note: lastNightDash ? `Sommeil ${fmtHM(lastNightDash.hours)}` : "—",
+        note: lastNightDash ? `Nuit ${fmtHM(lastNightDash.hours)}` : "—",
+        labelColor: energyDash.status === "ok" ? scoreColor(energyDash.total) : "",
       },
       // Pas de "value" affichée pour ce tile (juste l'icône Sync) — seule la note sert,
       // horodatage du dernier instantané poussé au widget (peu importe si déclenché par
       // l'ouverture normale de l'app ou par le bouton Sync lui-même).
       // "À jour · dernière synchro : HH:MM:SS" tient sur 4 lignes et écrase l'icône dans
       // une tuile aussi étroite — condensé pour rester sur une ligne comme les autres notes.
-      sync: { value: "", note: `MAJ ${new Date().toLocaleTimeString("fr-FR")}` },
+      sync: { value: "", note: `MAJ ${new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` },
     });
   }, [loading, weight, sleep, macros, steps, training, targets, naps]);
 

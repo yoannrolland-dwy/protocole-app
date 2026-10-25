@@ -38,6 +38,10 @@ class WidgetBridgePlugin : Plugin() {
             if (tile != null) {
                 editor.putString("${key}_value", tile.getString("value", "—"))
                 editor.putString("${key}_note", tile.getString("note", ""))
+                // Couleurs (25/10/2026) : toujours réécrites, "" = blanc, pour qu'une couleur de
+                // dépassement ne reste pas affichée le lendemain.
+                editor.putString("${key}_color", tile.getString("color", ""))
+                editor.putString("${key}_labelColor", tile.getString("labelColor", ""))
             }
         }
         editor.apply()

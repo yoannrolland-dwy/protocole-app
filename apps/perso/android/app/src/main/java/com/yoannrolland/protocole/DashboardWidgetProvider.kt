@@ -8,8 +8,13 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.text.style.TypefaceSpan
 import android.widget.RemoteViews
 
 /**
@@ -65,8 +70,28 @@ class DashboardWidgetProvider : AppWidgetProvider() {
             if (ids.isNotEmpty()) updateAll(context, AppWidgetManager.getInstance(context), ids)
         }
 
+        private const val TEXT = "#f5f5f0"
+
+        private fun parse(hex: String?): Int? =
+            if (hex.isNullOrEmpty()) null else try { Color.parseColor(hex) } catch (e: IllegalArgumentException) { null }
+
+        // Couleurs (25/10/2026) : mêmes règles que le tableau de bord de l'app, calculées par le JS
+        // (widgetSync.js). `color` colore le chiffre ; `labelColor` colore seulement ce qui suit le
+        // premier espace (« 88 Excellent » → « Excellent »), le chiffre restant blanc comme dans l'app.
         private fun fillTile(views: RemoteViews, valueId: Int, noteId: Int, prefs: SharedPreferences, key: String) {
-            views.setTextViewText(valueId, prefs.getString("${key}_value", "—"))
+            val value = prefs.getString("${key}_value", "—") ?: "—"
+            val labelColor = parse(prefs.getString("${key}_labelColor", ""))
+            val space = value.indexOf(' ')
+            if (labelColor != null && space > 0) {
+                val span = SpannableString(value)
+                span.setSpan(ForegroundColorSpan(labelColor), space + 1, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                // Libellé en police étroite : « 88 Excellent » ne tenait pas en monospace à 13 sp.
+                span.setSpan(TypefaceSpan("sans-serif-condensed"), space + 1, value.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                views.setTextViewText(valueId, span)
+            } else {
+                views.setTextViewText(valueId, value)
+            }
+            views.setTextColor(valueId, parse(prefs.getString("${key}_color", "")) ?: Color.parseColor(TEXT))
             views.setTextViewText(noteId, prefs.getString("${key}_note", ""))
         }
 
