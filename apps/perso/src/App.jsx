@@ -13,7 +13,7 @@ import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
 import { store, getSync, exportData, importData } from "./store.js";
 import { isBackupStale, daysSinceBackup, scheduleBackupReminder } from "./cloudBackup.js";
-import { exoProgress, exerciseList, exerciseSessions, exerciseTrend, isTimeMode, setLabel,
+import { exoProgress, exerciseList, splitExerciseList, exerciseSessions, exerciseTrend, isTimeMode, setLabel,
          beats, recordToBeat, recordsBySession, painOutOfBase, progressiveOverloadSuggestion } from "@rawcare/core/training";
 import { weeklyVolumeByGroup, VOLUME_TARGET } from "@rawcare/core/volume";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
@@ -53,7 +53,7 @@ import { PRICING, costCents, SUPPORTS_EFFORT, FALLBACK_MODEL, callClaude } from 
 // Courbe des protéines du graphique hebdo (09/10/2026) : ambre déjà utilisé ailleurs dans l'app
 // (fiabilité TDEE, volume sous la zone), distinct des barres kcal en citron.
 const PROT_LINE = "#e8a33d";
-const APP_VERSION = "3.108.0";
+const APP_VERSION = "3.109.0";
 
 // Poids cible Sèche/Prise rendus éditables (07/08/2026) — packages/core/src/targets.js garde
 // 93/95 en dur (décision figée, ce sont des valeurs personnelles) : la surcouche vit ici.
@@ -1690,8 +1690,26 @@ function ExerciseDetail({ training, knee, nom, onBack }) {
 
 function ProgressScreen({ training, knee, onBack }) {
   const [sel, setSel] = useState(null);
-  const list = useMemo(() => exerciseList(training), [training]);
+  // Les exercices pas faits depuis plus de 60 j sont repliés dans « Anciens exercices » (25/10/2026,
+  // demande de Yoann) : toujours consultables, jamais supprimés.
+  const { active: list, stale } = useMemo(() => splitExerciseList(training), [training]);
+  const [showOld, setShowOld] = useState(false);
   if (sel) return <ExerciseDetail training={training} knee={knee} nom={sel} onBack={() => setSel(null)} />;
+
+  const oldRow = (e) => (
+    <div key={e.nom} onClick={() => setSel(e.nom)} style={{
+      display: "flex", justifyContent: "space-between", alignItems: "center",
+      padding: "11px 0", borderTop: `1px solid ${C.divider}`, cursor: "pointer", gap: 10,
+    }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 12.5, color: C.text2, fontWeight: 700 }}>{e.nom}</div>
+        <div style={{ fontSize: 10, color: C.muted, fontFamily: C.mono, marginTop: 2 }}>
+          {e.count} séance{e.count > 1 ? "s" : ""} · dernière {fmt(e.last)}
+        </div>
+      </div>
+      <ChevronRight size={13} color={C.dim} />
+    </div>
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1731,8 +1749,21 @@ function ProgressScreen({ training, knee, onBack }) {
               </div>
             </div>
           );
-        }) : <Empty>Aucun exercice enregistré pour l'instant — valide une séance de muscu et il apparaîtra ici.</Empty>}
+        }) : <Empty>{stale.length
+          ? "Aucun exercice fait ces 60 derniers jours."
+          : "Aucun exercice enregistré pour l'instant — valide une séance de muscu et il apparaîtra ici."}</Empty>}
       </Card>
+      {stale.length > 0 && (
+        <Card style={{ padding: "6px 14px" }}>
+          <div onClick={() => setShowOld((v) => !v)} style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 0", cursor: "pointer",
+          }}>
+            <Label style={{ margin: 0 }}>Anciens exercices ({stale.length}) · pas faits depuis plus de 60 j</Label>
+            <ChevronRight size={13} color={C.dim} style={{ transform: showOld ? "rotate(90deg)" : "none" }} />
+          </div>
+          {showOld && stale.map(oldRow)}
+        </Card>
+      )}
     </div>
   );
 }
@@ -1892,7 +1923,7 @@ function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType, onStar
 
   const vol = {};
   training.filter((t) => daysBetween(t.date, today()) <= 14).forEach((t) => { vol[t.type] = (vol[t.type] || 0) + 1; });
-  const exoCount = useMemo(() => exerciseList(training).length, [training]);
+  const exoCount = useMemo(() => splitExerciseList(training).active.length, [training]);
   // Records rejoués sur tout l'historique (V4) : quelles séances contenaient un record au
   // moment où elles ont eu lieu. Clé par référence d'objet, comme la suppression.
   const records = useMemo(() => recordsBySession(training), [training]);

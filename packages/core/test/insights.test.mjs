@@ -65,3 +65,9 @@ test("volume prioritaire sous la zone : seulement ven/sam/dim, groupes prioritai
   const full = [{ date: T0, type: "Upper A", exercices: [{ nom: NOM, mode: "reps", series: sets(12) }, { nom: "Élévations latérales haltères", mode: "reps", series: sets(12) }] }];
   assert.equal(priorityVolumeShortfall(full, T0), null, "tout dans la zone");
 });
+
+test("plateaux en cours (25/10/2026) : un exercice pas fait depuis plus de 60 j n'est plus « en cours »", () => {
+  const old = [95, 90, 85, 80, 75, 70].map(stableSess);
+  assert.equal(activePlateaus(old, [], T0), null);
+  assert.ok(activePlateaus([...[25, 20, 15, 10, 5].map(stableSess), stableSess(0)], [], T0), "même historique mais récent → plateau");
+});

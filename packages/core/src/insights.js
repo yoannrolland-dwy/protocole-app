@@ -10,7 +10,7 @@
 // absent vaut mieux qu'un constat faux.
 
 import { shiftDateKey, daysBetween } from "./dateUtils.js";
-import { recordsBySession, painOutOfBase, exerciseList, exerciseSessions, progressiveOverloadSuggestion } from "./training.js";
+import { recordsBySession, painOutOfBase, splitExerciseList, exerciseSessions, progressiveOverloadSuggestion } from "./training.js";
 import { weeklyVolumeByGroup } from "./volume.js";
 import { smoothedWeightSeries, trendAt } from "./tdee.js";
 import { kcalOfEntry, targetsForDate, kcalFromMacros } from "./targets.js";
@@ -248,7 +248,8 @@ export function sleepEnergyCorrelation({ sleepLog, rhrLog, stepsLog }, todayDate
  */
 export function activePlateaus(training, kneeLog, todayDate) {
   if (!training?.length || painOutOfBase([kneeLog || []], todayDate)) return null;
-  const items = exerciseList(training)
+  // Un exercice pas fait depuis plus de 60 j n'a pas de plateau « en cours » (25/10/2026).
+  const items = splitExerciseList(training, todayDate).active
     .map((e) => ({ nom: e.nom, plateau: progressiveOverloadSuggestion(exerciseSessions(training, e.nom), e.nom) }))
     .filter((x) => x.plateau)
     .map((x) => ({ nom: x.nom, weeks: x.plateau.weeks, sessions: x.plateau.sessions }))

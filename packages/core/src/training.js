@@ -10,7 +10,7 @@
 // Aucune dépendance à React ni à `ui.jsx` : ce module doit rester testable seul en Node.
 
 import { TEMPLATES } from "./session/templates.js";
-import { daysBetween } from "./dateUtils.js";
+import { daysBetween, today } from "./dateUtils.js";
 
 const byDateAsc = (a, b) => a.date.localeCompare(b.date);
 
@@ -130,6 +130,22 @@ export function exerciseList(training) {
     });
   });
   return Object.values(byExo).sort((a, b) => b.last.localeCompare(a.last) || a.nom.localeCompare(b.nom));
+}
+
+/** Un exercice pas fait depuis plus de 60 jours sort de la liste « Progression » et du constat
+ * « Plateaux en cours » (25/10/2026, demande de Yoann) : sa tendance ne dit plus rien d'utile.
+ * Il n'est PAS supprimé — historique, records, « dernière fois » lisent tout le journal, et
+ * l'exercice revient dans la liste dès qu'il est refait. */
+export const STALE_EXERCISE_DAYS = 60;
+/** Au-delà de 8 semaines entre deux séances d'un exercice, la série « stable » est coupée : après
+ * une longue pause le niveau a baissé, « stable » ne veut plus dire « plateau ». */
+export const PLATEAU_GAP_DAYS = 56;
+
+/** `exerciseList` scindée en { active, stale } selon `asOf` (défaut : aujourd'hui). */
+export function splitExerciseList(training, asOf = today()) {
+  const active = [], stale = [];
+  exerciseList(training).forEach((e) => (daysBetween(e.last, asOf) > STALE_EXERCISE_DAYS ? stale : active).push(e));
+  return { active, stale };
 }
 
 /* ============================================================
@@ -315,7 +331,8 @@ export function progressiveOverloadSuggestion(sessions, nom) {
   while (start > 0
     && !beats(sessions[start].best, sessions[start - 1].best, last.mode)
     && !beats(sessions[start - 1].best, sessions[start].best, last.mode)
-    && !rirUp(sessions[start], sessions[start - 1])) {
+    && !rirUp(sessions[start], sessions[start - 1])
+    && daysBetween(sessions[start - 1].date, sessions[start].date) <= PLATEAU_GAP_DAYS) {
     start--;
   }
   const streak = sessions.slice(start);

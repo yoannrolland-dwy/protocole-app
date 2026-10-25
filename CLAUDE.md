@@ -4772,3 +4772,27 @@ l'ordre). Tests d'ordre exact mis à jour — **103 tests**. Build `apps/perso` 
   propre type, jamais mélangée aux séances de charge (non modifié).
 - Tests : 106 (plateau en séances malgré des séances espacées de 20 j, streak sans Mobilité seule,
   recommandeur sans streak sur 12 jours de Mobilité). Build `apps/perso` ET `apps/public` propres.
+
+## Anciens exercices repliés, plateau coupé après une pause (25/10/2026, apps/perso v3.109.0)
+
+Demande de Yoann : un exercice pas fait depuis des mois n'a plus de sens dans la progression, tout en
+gardant l'historique. Proposition challengée avant de coder (2 mois OK ; replier plutôt que cacher ;
+couper le plateau après une longue pause), validée par « GO ».
+- **`splitExerciseList(training, asOf)`** (`training.js`) → `{ active, stale }` : **> 60 jours**
+  (`STALE_EXERCISE_DAYS`) depuis la dernière séance avec une série cochée = ancien (60 j pile = encore
+  actif). `exerciseList` est inchangée (apps/public, qui n'a pas cette règle, continue de l'utiliser).
+- **Écran « Progression »** (`ProgressScreen`, apps/perso) : seuls les actifs sont listés (avec tendance
+  et badge Plateau) ; les anciens sont dans une carte repliée « Anciens exercices (N) · pas faits depuis
+  plus de 60 j », fermée par défaut, dont chaque ligne ouvre la fiche (courbe + séries) comme avant.
+  Le compteur de la carte d'entrée dans l'onglet Séances ne compte que les actifs.
+- **Constat « Plateaux en cours »** (`activePlateaus`, `insights.js`) : actifs seulement — un plateau
+  sur un exercice qu'on ne fait plus n'est pas « en cours ».
+- **Plateau coupé après une pause** (`progressiveOverloadSuggestion`) : la série « stable » s'arrête dès
+  qu'il y a plus de **56 jours** (`PLATEAU_GAP_DAYS`, 8 semaines) entre deux séances de l'exercice —
+  après une longue pause le niveau a baissé, « stable » ne veut plus dire « plateau ». Partagé avec
+  `apps/public` (écran Progression), effet bénin.
+- **Rien n'est supprimé** : « dernière fois », records, carnet, séances passées lisent tout
+  `trainingLog` ; un exercice refait revient seul dans la liste.
+- Tests : 109 (borne 60 j, retour dans les actifs, coupure du plateau après pause / 56 j pile qui ne
+  coupe pas, constat sans exercice ancien). Aperçu : 1 exercice récent listé, 1 exercice de 90 j
+  replié puis consultable, aucune erreur console. Build `apps/perso` ET `apps/public` propres.
