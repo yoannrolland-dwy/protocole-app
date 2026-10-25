@@ -26,7 +26,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | T3 | Dashboard actionnable : genou en un tap + bouton « Démarrer » la séance proposée | petit | ✅ 04/10/2026 (v3.95.0) |
 | T4 | Reps en réserve (RIR) par exercice, optionnel → plateau + Coach IA | moyen | ✅ 04/10/2026 (v3.96.0) |
 | T5 | Bonus : retour haptique au cochage d'une série ; champ « alcool » en saisie libre | petit | ✅ 04/10/2026 (v3.97.0) |
-| U0 | Refonte IHM — socle : découper `App.jsx` par écran, zéro changement visible, captures « avant » | moyen | ⬜ |
+| U0 | Refonte IHM — socle : découper `App.jsx` par écran, zéro changement visible, captures « avant » | moyen | ✅ 25/10/2026 (v3.109.2) |
 | U1 | Refonte IHM — cadrage : audit chiffré + moments d'usage + arborescence maquettée | petit | ⬜ |
 | U2 | Refonte IHM — directions visuelles en maquettes, choix, design system v2 (variables CSS) | gros | ⬜ |
 | U3 | Refonte IHM — écran par écran (un commit + une install par écran) | gros | ⬜ |

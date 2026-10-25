@@ -125,7 +125,17 @@ protocole-app/                    (racine = workspaces npm uniquement)
       public/                      # icônes PWA + privacypolicy.html (Health Connect)
       src/
         main.jsx                   # point d'entrée + enregistrement service worker
-        App.jsx                    # composants React + assemblage (importe @rawcare/core)
+        App.jsx                    # composant racine seul : état, synchro, navigation (U0)
+        version.js                 # APP_VERSION (à bumper à chaque livraison)
+        lib/helpers.js, lib/plan.js # utilitaires partagés, planning idéal / semaine de match
+        components/                # composants partagés entre écrans (SyncedBanner)
+        screens/                   # un fichier par écran (U0, 25/10/2026) :
+                                    # dashboard/ (Dashboard, CoachIA, PalierCard, WhyNot,
+                                    # KneeQuickLog, InsightsCard), WeightTab, SleepTab,
+                                    # StepsTab, PainTab, train/ (TrainTab, MuscuLogger,
+                                    # ProgressScreen, GeneField, VolumeCard), perf/
+                                    # (PerformanceTab, TdeeCard), settings/ (SettingsPanel,
+                                    # BasketScheduleCard)
         store.js                   # persistance localStorage + export/import JSON
         healthSync.js              # synchro Health Connect (pas/sommeil/macros/eau)
         ui.jsx                     # design system "Affirmée" (jetons C + primitives),
@@ -3416,6 +3426,27 @@ résoudre : deux trous identifiés.
 
 Build `apps/perso` ET `apps/public` propres.
 
+## Chantier U — U0 : App.jsx découpé par écran (25/10/2026, apps/perso v3.109.2)
+
+Première étape de la refonte IHM (spec et décisions dans `ROADMAP.md`, « Chantier U »).
+**Aucun changement visible, aucune logique touchée** : le code est déplacé tel quel.
+
+- `App.jsx` passe de 3 486 à ~540 lignes (composant racine seul). Chaque écran vit dans
+  `src/screens/`, les utilitaires partagés dans `src/lib/helpers.js` et `src/lib/plan.js`,
+  `SyncedBanner` dans `src/components/`, `APP_VERSION` dans `src/version.js` (règle absolue #3
+  mise à jour). `src/nutrition/` et `ui.jsx` inchangés.
+- **Fait par script, pas à la main** : parseur Babel → dépendances entre les 50 déclarations de
+  premier niveau (graphe sans cycle), chaque déclaration recopiée avec ses commentaires, imports
+  recalculés par fichier (uniquement ce qui est réellement utilisé), `export` ajouté seulement
+  aux noms utilisés ailleurs.
+- **Vérifié** : build propre, 112 tests verts ; jeu de données synthétique déterministe (70 j)
+  et **HTML complet de 10 écrans** (8 onglets + Progression + Réglages) comparé avant/après :
+  **identique au caractère près** (stabilité de la capture vérifiée d'abord par deux
+  rechargements) ; parcours interactifs (ouvrir le carnet Upper A, cocher une série → minuteur,
+  « Remplacer cet exercice », quitter/revenir → brouillon restauré, Annuler → brouillon effacé,
+  recherche d'aliment) ; analyse Babel : aucun nom utilisé sans être défini dans les nouveaux
+  fichiers (un import oublié ne casse pas le build, seulement le clic) ; aucune erreur console.
+
 ## Règles absolues à ne jamais casser
 
 1. **Ne jamais changer les clés localStorage** (`weightLog`, `sleepLog`,
@@ -3445,7 +3476,7 @@ Build `apps/perso` ET `apps/public` propres.
    datée (`packages/core/test/snapshots/`) diffère, c'est soit une régression à corriger,
    soit un changement voulu à acter avec `UPDATE_SNAPSHOTS=1 npm test` (et à expliquer dans
    le commit).
-3. **Bumper `APP_VERSION`** (dans `apps/perso/src/App.jsx`) et `"version"` (dans
+3. **Bumper `APP_VERSION`** (dans `apps/perso/src/version.js` depuis U0, 25/10/2026) et `"version"` (dans
    `apps/perso/package.json`) à chaque changement livré.
 4. **Déployer sur le MÊME site Netlify existant**, jamais en créer un
    nouveau. Le déploiement continu est déjà en place (voir plus bas), donc un
