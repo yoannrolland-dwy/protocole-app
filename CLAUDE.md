@@ -3603,6 +3603,28 @@ décompte** (la pastille épinglée en permanence de juillet gênait le défilem
   disparue) ; réouverture en modification. Installé ; **le réveil natif et la notification n'ont
   pas pu être écoutés depuis l'ordinateur** : à vérifier à la prochaine séance.
 
+## Chantier U — U3 étape 4 : Aujourd'hui allégé, Coach IA dans Analyse (25/10/2026, v3.114.0)
+
+- **Ordre (choix de Yoann en U2)** : deux grandes tuiles **Énergie** (score, libellé coloré —
+  citron dès 75, ambre sous 60, le chiffre reste blanc —, nuit + étoiles) et **Poids** (moyenne
+  7 j en recomposition + tendance hebdo, ou dernière pesée + écart à la cible), puis **Kcal · Pas
+  · Eau** en trois petites tuiles, puis **Prochaine séance**. **La tuile Sommeil disparaît** : la
+  nuit est dans la tuile Énergie (qui ouvre Corps › Énergie). Toutes les tuiles sont des boutons.
+- **Prochaine séance** : même contenu et même calcul (`nextSessions`), en v2 (type 22 px,
+  « Démarrer » en 52 px, à éviter en danger, demain, « Pourquoi pas les autres ? » en 44 px).
+  **La carte entière n'est plus un lien vers l'onglet Séance** (des boutons à l'intérieur d'un
+  lien posent problème au toucher) ; l'onglet reste à un tap dans la barre.
+  Genou en un tap (`KneeQuickLog`) : mêmes règles, pastilles 48 × 44, Oui/Non en 52 px.
+- **Constats repliés** : première ligne + « Voir les N constats ». **Palier de la semaine
+  affiché seulement s'il y a une proposition** (plus de carte « Première proposition dimanche »).
+- **Coach IA déménagé** en tête de l'onglet Analyse (`PerformanceTab`, style v1 jusqu'à
+  l'étape 7) ; un lien « Coach IA et dépense estimée : onglet Analyse » en bas d'Aujourd'hui.
+  `Dashboard` ne reçoit plus `coach`/`todayNote`/`saveNote`/`saveJournal`.
+- **Mesuré** : Aujourd'hui 0 texte sous 12 px, 0 sous 4,5:1, 0 cible sous 44 px ;
+  **Lighthouse accessibilité 100** (64 avant le chantier, 94 après l'étape 1). Testé : genou en
+  un tap (Oui → `kneeLog` écrit, panneau disparu), « Démarrer » (horloge de la page avancée à
+  9 h) → carnet ouvert, Coach IA présent dans Analyse et absent d'Aujourd'hui.
+
 ## Minuteur de repos calé sur l'heure réelle (25/10/2026, apps/perso v3.109.3)
 
 Remonté par Yoann pendant U1 : le chrono du carnet prenait du retard sur celui de la

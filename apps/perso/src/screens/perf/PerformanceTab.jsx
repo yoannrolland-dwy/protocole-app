@@ -10,11 +10,14 @@ import { C, today, fmt, Card, Label, Body, Empty, Pills, ScreenHeader, chartAxis
 import { PROT_LINE } from "../../lib/helpers.js";
 import { TdeeCard } from "./TdeeCard.jsx";
 import { WEEKLY_PLAN } from "../../lib/plan.js";
+// Coach IA (U3 étape 4, 25/10/2026) : quitte le tableau de bord pour l'onglet Analyse
+// (décision 4 du chantier U). Style v1 jusqu'à l'étape 7 (Analyse).
+import { CoachIA } from "../dashboard/CoachIA.jsx";
 
 /* ============================================================
    TAB — PERFORMANCE
    ============================================================ */
-export function PerformanceTab({ macros, targets, training, weight, phase }) {
+export function PerformanceTab({ macros, targets, training, weight, phase, coach, todayNote, saveNote, saveJournal }) {
   const [showPeri, setShowPeri] = useState(false);
   const [basketProto, setBasketProto] = useState("soir21h");
   const [planVariant, setPlanVariant] = useState("sansMatch");
@@ -53,6 +56,7 @@ export function PerformanceTab({ macros, targets, training, weight, phase }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <ScreenHeader title="TDEE" />
+      {coach && <CoachIA coach={coach} todayNote={todayNote} saveNote={saveNote} saveJournal={saveJournal} />}
 
       {/* Moyenne hebdo kcal, 7 jours glissants */}
       <Card>

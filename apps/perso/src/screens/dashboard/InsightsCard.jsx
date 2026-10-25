@@ -1,6 +1,12 @@
-// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) : code déplacé tel quel.
+// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; v2 et replié à l'étape 4 d'U3 :
+// Yoann ne regarde pas les constats le matin (moments d'usage U1), la carte montre la première
+// ligne et « Voir les N constats ».
+import { useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { VOLUME_TARGET } from "@rawcare/core/volume";
-import { C, fmt, Card, Label } from "../../ui.jsx";
+import { fmt } from "../../ui.jsx";
+import { T } from "../../design/tokens.js";
+import { Panel, Eyebrow } from "../../design/primitives.jsx";
 import { TDEE_RELIABILITY_LABEL } from "../../lib/helpers.js";
 
 /** Carte "Constats" (07/09/2026, point 1 du chantier IA) : aucun appel API, tout est calculé
@@ -8,6 +14,7 @@ import { TDEE_RELIABILITY_LABEL } from "../../lib/helpers.js";
  * Chaque ligne n'apparaît que si le constat correspondant a assez de données ; la carte
  * entière disparaît s'il n'y en a aucune (rien à montrer plutôt qu'une carte vide). */
 export function InsightsCard({ insights }) {
+  const [open, setOpen] = useState(false);
   const rows = [];
   if (insights.streaks.training > 0) {
     rows.push({ label: "Streak entraînement", value: `${insights.streaks.training} j`, note: "jours d'affilée entraînés" });
@@ -60,19 +67,29 @@ export function InsightsCard({ insights }) {
   }
 
   if (!rows.length) return null;
+  const shown = open ? rows : rows.slice(0, 1);
 
   return (
-    <Card style={{ padding: 16 }}>
-      <Label style={{ fontSize: 10, letterSpacing: 1.5, marginBottom: 8 }}>Constats</Label>
-      {rows.map((r, i) => (
-        <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderTop: i === 0 ? "none" : `1px solid ${C.divider}` }}>
+    <Panel aria-label="Constats" style={{ gap: 4 }}>
+      <Eyebrow>Constats</Eyebrow>
+      {shown.map((r, i) => (
+        <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "10px 0", borderTop: i === 0 ? "none" : `1px solid ${T.c.lineSoft}` }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, color: C.text2 }}>{r.label}</div>
-            <div style={{ fontSize: 9.5, color: C.dim, marginTop: 1 }}>{r.note}</div>
+            <div style={{ fontSize: 15, color: T.c.text, fontWeight: 600 }}>{r.label}</div>
+            <div style={{ fontSize: 13, color: T.c.text2, marginTop: 2, lineHeight: 1.4 }}>{r.note}</div>
           </div>
-          <div style={{ fontFamily: C.mono, fontSize: 13, fontWeight: 800, color: C.text, flexShrink: 0, marginLeft: 8, textAlign: "right" }}>{r.value}</div>
+          <div style={{ fontFamily: T.f.num, fontVariantNumeric: "tabular-nums", fontSize: 16, fontWeight: 700, color: T.c.text, flexShrink: 0, textAlign: "right" }}>{r.value}</div>
         </div>
       ))}
-    </Card>
+      {rows.length > 1 && (
+        <button type="button" className="p-tap" onClick={() => setOpen((v) => !v)} aria-expanded={open} style={{
+          display: "flex", alignItems: "center", gap: 6, minHeight: 44, padding: 0,
+          background: "none", border: "none", fontFamily: "inherit", fontSize: 14, color: T.c.text2,
+        }}>
+          {open ? <ChevronDown size={16} aria-hidden="true" /> : <ChevronRight size={16} aria-hidden="true" />}
+          {open ? "Réduire" : `Voir les ${rows.length} constats`}
+        </button>
+      )}
+    </Panel>
   );
 }

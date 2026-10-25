@@ -1,7 +1,9 @@
-// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) : code déplacé tel quel.
+// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; v2 à l'étape 4 d'U3 (pastilles 44 px).
 import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
-import { C, today, upsert } from "../../ui.jsx";
+import { today, upsert } from "../../ui.jsx";
+import { T } from "../../design/tokens.js";
+import { Chip, Button } from "../../design/primitives.jsx";
 
 // Saisie rapide de la douleur genou depuis le Dashboard (T3, 04/10/2026) — remplace la ligne
 // d'alerte « pas notée aujourd'hui ». Même règle que l'onglet Douleurs : AUCUNE valeur
@@ -11,29 +13,27 @@ import { C, today, upsert } from "../../ui.jsx";
 // `save.knee`/`upsert` que PainTab, donc l'onglet Douleurs reflète la saisie immédiatement.
 export function KneeQuickLog({ knee, saveKnee }) {
   const [pain, setPain] = useState(null);
-  const AMBER = "#e8a33d";
   const write = (p, baseline) => saveKnee(upsert(knee, { date: today(), pain: p, baseline }));
   const pick = (p) => { if (p === 0) write(0, true); else setPain(p); };
-  const chip = (on, extra = {}) => ({
-    minWidth: 26, height: 28, padding: "0 6px", borderRadius: 6, cursor: "pointer", fontFamily: C.mono, fontSize: 12, fontWeight: 800,
-    background: on ? C.accent : C.card, color: on ? "#000" : C.muted, border: `1.5px solid ${on ? C.accent : C.border}`, ...extra,
-  });
   return (
-    <div onClick={(e) => e.stopPropagation()} style={{ marginBottom: 10, padding: "8px 10px", borderRadius: 8, border: `1px solid ${AMBER}55`, background: `${AMBER}12` }}>
-      <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
-        <AlertTriangle size={12} color={AMBER} style={{ flexShrink: 0 }} />
-        <span style={{ fontSize: 10.5, color: AMBER, lineHeight: 1.4 }}>Douleur genou aujourd'hui ? Sans cette info, le recommandeur reste prudent par défaut.</span>
+    <div style={{ display: "grid", gap: 10, padding: 12, borderRadius: 12, border: `1px solid ${T.c.warn}`, background: T.c.field }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+        <AlertTriangle size={18} color={T.c.warn} style={{ flexShrink: 0, marginTop: 1 }} aria-hidden="true" />
+        <span style={{ fontSize: 14, color: T.c.text, lineHeight: 1.4 }}>Douleur genou aujourd'hui ? Sans cette info, le recommandeur reste prudent par défaut.</span>
       </div>
-      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+      <div role="group" aria-label="Douleur genou de 0 à 10" style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 6 }}>
         {Array.from({ length: 11 }, (_, i) => (
-          <button key={i} onClick={() => pick(i)} style={chip(pain === i)}>{i}</button>
+          <Chip key={i} on={pain === i} onClick={() => pick(i)} aria-label={`Douleur ${i} sur 10`}
+            style={{ justifyContent: "center", padding: 0, fontFamily: T.f.num, fontSize: 16 }}>{i}</Chip>
         ))}
       </div>
       {pain != null && pain >= 1 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 11, color: C.text2 }}>Retour à la douleur de base sous 24 h ?</span>
-          <button onClick={() => write(pain, true)} style={chip(false, { fontFamily: "inherit", fontSize: 11, padding: "0 10px" })}>Oui</button>
-          <button onClick={() => write(pain, false)} style={chip(false, { fontFamily: "inherit", fontSize: 11, padding: "0 10px", color: C.dangerText, borderColor: C.dangerBorder })}>Non</button>
+        <div style={{ display: "grid", gap: 8 }}>
+          <span style={{ fontSize: 14, color: T.c.text2 }}>Retour à la douleur de base sous 24 h ?</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button variant="plain" style={{ flex: 1 }} onClick={() => write(pain, true)}>Oui</Button>
+            <Button variant="danger" style={{ flex: 1 }} onClick={() => write(pain, false)}>Non</Button>
+          </div>
         </div>
       )}
     </div>

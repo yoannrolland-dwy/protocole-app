@@ -29,7 +29,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | U0 | Refonte IHM — socle : découper `App.jsx` par écran, zéro changement visible, captures « avant » | moyen | ✅ 25/10/2026 (v3.109.2) |
 | U1 | Refonte IHM — cadrage : audit chiffré + moments d'usage + arborescence maquettée | petit | ✅ 25/10/2026 (option A) |
 | U2 | Refonte IHM — directions visuelles en maquettes, choix, design system v2 (variables CSS) | gros | ✅ 25/10/2026 (v3.110.0, direction A) |
-| U3 | Refonte IHM — écran par écran (un commit + une install par écran) | gros | 🟡 3/8 (barre + en-tête, Nutrition, carnet — v3.113.0) |
+| U3 | Refonte IHM — écran par écran (un commit + une install par écran) | gros | 🟡 4/8 (barre + en-tête, Nutrition, carnet, Aujourd'hui — v3.114.0) |
 | U4 | Refonte IHM — audit final avant/après + mise à jour CLAUDE.md | petit | ⬜ |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il
@@ -986,6 +986,8 @@ section design system. **Reste pour U3 (étape 1, barre d'onglets + en-tête)** 
 3. ✅ Carnet + minuteur partagé + barre « Séance en cours » (25/10/2026, v3.113.0) — minuteur
    fixé seulement pendant le décompte, « − série », cases de 52 px. Réveil natif à confirmer à
    la prochaine séance.
-4. ⬜ Aujourd'hui · 5. ⬜ Corps · 6. ⬜ Séances ·
+4. ✅ Aujourd'hui (25/10/2026, v3.114.0) — Énergie + Poids en tête, Constats repliés, Palier
+   seulement s'il propose, Coach IA déplacé dans Analyse. Lighthouse accessibilité 100.
+5. ⬜ Corps · 6. ⬜ Séances ·
    7. ⬜ Analyse · 8. ⬜ Réglages
 
