@@ -7,6 +7,7 @@ import { loadLabel, geneLabel } from "@rawcare/core/sessionLoad";
 import { TEMPLATES, TYPES, hsrForWeek } from "@rawcare/core/session/templates";
 import { C, today, fmt, round, byDate, lastN, daysBetween, Card, Label, Body, Empty, Btn, inputStyle, Stepper, Field, DateField, ScreenHeader } from "../../ui.jsx";
 import { MuscuLogger } from "./MuscuLogger.jsx";
+import { restTimer } from "../../lib/restTimer.js";
 import { ProgressScreen } from "./ProgressScreen.jsx";
 import { GeneField } from "./GeneField.jsx";
 import { VolumeCard } from "./VolumeCard.jsx";
@@ -41,6 +42,7 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
   const pickType = (type, force = false) => {
     const sel = !force && open === type;
     store.set("trainingDraft", null);
+    restTimer.stop(); // minuteur partagé (U3) : une nouvelle séance repart sans le décompte de la précédente
     setEditing(null);
     setDate(today());
     setStartTime(new Date().toTimeString().slice(0, 5));
@@ -52,6 +54,7 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
 
   const editSession = (t) => {
     store.set("trainingDraft", null);
+    restTimer.stop();
     setEditing(t);
     setDate(t.date);
     setStartTime(t.start ?? new Date().toTimeString().slice(0, 5));

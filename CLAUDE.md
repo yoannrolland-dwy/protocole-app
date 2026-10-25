@@ -3562,6 +3562,47 @@ COCHE ce qu'on garde, flèches veille/lendemain.
   journal. Installé et vérifié sur le téléphone avec les vraies données (habituels affichés,
   aucune écriture faite).
 
+## Chantier U — U3 étape 3 : carnet de séance + minuteur partagé (25/10/2026, v3.113.0)
+
+Choix de Yoann avant de coder : minuteur **fixé en haut du carnet SEULEMENT pendant le
+décompte** (la pastille épinglée en permanence de juillet gênait le défilement), et
+**« − série »** à la place du × collé à la case de validation.
+
+- **`lib/restTimer.js`** (nouveau) : le minuteur sort de l'état de `MuscuLogger` et vit au
+  niveau du module (`restTimer.start/toggle/set/add/stop`, hook `useRestTimer()` sur
+  `useSyncExternalStore`). Logique reprise telle quelle : décompte calé sur l'heure de fin,
+  recalcul à `visibilitychange`, bip Web Audio seulement hors app native, réveil natif via
+  `timerNotify.js` (identifiant fixe côté Kotlin, donc reprogrammer remplace). **Il continue
+  quand on quitte l'onglet Séance** ; il ne s'arrête qu'à « Valider la séance », « Annuler »,
+  ou au démarrage/à la réouverture d'une autre séance (`TrainTab`).
+- **Deux changements de comportement assumés** : (1) **ouvrir un autre exercice pendant un
+  repos ne coupe plus le décompte** (avant, `openExo` remettait le minuteur à zéro ET annulait
+  le réveil natif) — hors décompte, il se règle toujours sur le dernier temps de cet exercice ;
+  (2) à l'ouverture d'une séance neuve, le minuteur se règle sur le repos du 1er exercice au
+  lieu de 2:00 fixe. Nouveau bouton **+30 s** pendant le décompte.
+- **`components/SessionBar.jsx`** : barre citron « Upper A · 3/9 · 1:28 › » au-dessus des
+  onglets, sur tous les onglets sauf Séance et Réglages, tant qu'un brouillon `trainingDraft`
+  existe (lu, jamais écrit). Un tap rouvre le carnet. Pose `--session-bar-h` pour que le bandeau
+  « Annuler » de Nutrition ne la recouvre pas.
+- **Carnet v2** (`MuscuLogger.jsx`) : en-tête, date/début, minuteur au repos (durée + Lancer +
+  remise à zéro + pastilles 2:00/1:30/1:00/0:45/0:30, toujours PAS de 2:30) ; pendant le
+  décompte, bandeau collant d'environ 77 px (« Repos · exercice », gros chiffres, +30 s, Pause).
+  Cartes d'exercice en 64 px fermées, ouvertes avec bord accent. Grille série : N° · Reps ·
+  Poids · **case de validation 52 × 52** (champs de 52 px, clavier numérique/décimal, Entrée sur
+  les reps passe au poids, série faite = champs en pointillés). **« + série » / « − série »** :
+  le − retire la DERNIÈRE série non cochée, jamais une série faite (on ne supprime plus une
+  série du milieu, rare). RIR en pastilles de 44 px, « Repos N s » / « Maintien N s » en bouton,
+  progression derrière un bouton icône. Brouillon, substitution, records, plateau, RIR,
+  `withMeta` (durée + RPE) et forme de la séance enregistrée : inchangés.
+- **La pastille flottante du minuteur est supprimée** (remplacée par le bandeau collant).
+- **Mesuré dans l'aperçu (375 px)** sur le carnet : texte sous 12 px 74 % → 0, contraste sous
+  4,5:1 60 % → 0, cibles sous 44 px 42/42 → 0. Testé : cocher une série → bandeau collant ;
+  passage sur Nutrition → barre avec décompte, retour par la barre, le décompte continue ;
+  +30 s ; Pause ; « − série » (s'arrête aux séries faites) ; ouvrir l'exercice suivant pendant le
+  repos ; validation (forme `{id,date,type,start,exercices}` identique, brouillon effacé, barre
+  disparue) ; réouverture en modification. Installé ; **le réveil natif et la notification n'ont
+  pas pu être écoutés depuis l'ordinateur** : à vérifier à la prochaine séance.
+
 ## Minuteur de repos calé sur l'heure réelle (25/10/2026, apps/perso v3.109.3)
 
 Remonté par Yoann pendant U1 : le chrono du carnet prenait du retard sur celui de la

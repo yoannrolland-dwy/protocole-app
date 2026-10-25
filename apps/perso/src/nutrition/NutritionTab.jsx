@@ -205,7 +205,7 @@ function UndoBar({ undo, onUndo }) {
   return (
     <div role="status" style={{
       position: "fixed", left: 12, right: 12, zIndex: 40,
-      bottom: "calc(62px + 12px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))",
+      bottom: "calc(62px + 12px + var(--session-bar-h, 0px) + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))",
       display: "flex", alignItems: "center", gap: 10, padding: "6px 6px 6px 14px",
       background: T.c.raised, border: `1px solid ${T.c.accent}`, borderRadius: 14,
       boxShadow: "0 8px 24px rgba(0,0,0,.5)", fontFamily: T.f.body,

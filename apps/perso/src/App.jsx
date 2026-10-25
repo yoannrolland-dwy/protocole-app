@@ -28,6 +28,7 @@ import { PerformanceTab } from "./screens/perf/PerformanceTab.jsx";
 import { CorpsTab, CORPS_SUBS } from "./screens/CorpsTab.jsx";
 import { TabBar, TABS } from "./components/TabBar.jsx";
 import { AppHeader } from "./components/AppHeader.jsx";
+import { SessionBar } from "./components/SessionBar.jsx";
 
 /* ============================================================
    PROTOCOLE — console perso de suivi (Yoann) · PWA
@@ -501,6 +502,9 @@ export default function App({ silent = false } = {}) {
           </>
         )}
       </main>
+
+      {/* Séance en cours (U3 étape 3) : rappel + minuteur partagé hors de l'onglet Séance. */}
+      {!loading && tab !== "train" && !showSettings && <SessionBar onOpen={() => goTo("train")} />}
 
       {/* Navigation */}
       <TabBar tab={tab} dimmed={showSettings} onSelect={goTo} />

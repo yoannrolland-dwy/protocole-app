@@ -1,6 +1,10 @@
-// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) : code déplacé tel quel.
+// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; refait en design system v2 à
+// l'étape 3 d'U3 (25/10/2026) : cases de série et champs de 52 px, « − série » à la place du
+// × collé à la case, minuteur partagé (lib/restTimer.js) qui continue hors de l'onglet et se
+// fixe en haut du carnet SEULEMENT pendant le décompte (choix de Yoann — en juillet, une
+// pastille épinglée en permanence gênait le défilement).
 import { useState, useEffect, useMemo, useRef } from "react";
-import { CheckCircle2, Circle, Play, Pause, RotateCcw, Timer, X, Repeat } from "lucide-react";
+import { Check, Play, Pause, RotateCcw, Timer, Repeat, Plus, Minus, TrendingUp } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { store, getSync } from "../../store.js";
 import { exerciseSessions, setLabel, beats, recordToBeat, progressiveOverloadSuggestion } from "@rawcare/core/training";
@@ -8,9 +12,30 @@ import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { TEMPLATES, DEFAULT_WEIGHTS, hsrForWeek, hsrParse, parseSecs, exoSeriesCount } from "@rawcare/core/session/templates";
 import { lastPerf, perfHistory, lastExerciseSets, medianTarget } from "@rawcare/core/session/perf";
 import { EXERCISE_LIBRARY } from "@rawcare/core/session/exercises";
-import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "../../timerNotify.js";
-import { C, fmt, round, Card, Label, Body, Btn, inputStyle, TextInput, Stepper, Field, DateField } from "../../ui.jsx";
+import { fmt, round, today } from "../../ui.jsx";
+import { T } from "../../design/tokens.js";
+import { Panel, Eyebrow, Button, IconButton, Chip, NumberField } from "../../design/primitives.jsx";
 import { mmss } from "../../lib/helpers.js";
+import { restTimer, useRestTimer } from "../../lib/restTimer.js";
+
+const mono = { fontFamily: T.f.num, fontVariantNumeric: "tabular-nums" };
+const WARN = T.c.warn;
+
+// Champ d'une série : 52 px, gros chiffres, clavier numérique, unité discrète à droite.
+function SetField({ value, onChange, unit, inputMode, placeholder, label, inputRef, onEnter, done }) {
+  return (
+    <div style={{ position: "relative", minWidth: 0 }}>
+      <input ref={inputRef} type="text" inputMode={inputMode} enterKeyHint={onEnter ? "next" : "done"} value={value}
+        placeholder={placeholder} aria-label={label} className="p-field"
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => onChange(e.target.value.replace(",", "."))}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onEnter ? onEnter() : e.currentTarget.blur(); } }}
+        style={{ textAlign: "center", fontSize: 20, paddingRight: 30, paddingLeft: 8,
+          ...(done ? { background: "transparent", borderStyle: "dashed" } : {}) }} />
+      <span aria-hidden="true" style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: T.c.muted, pointerEvents: "none" }}>{unit}</span>
+    </div>
+  );
+}
 
 /* ============================================================
    CARNET DE MUSCU — série par série
@@ -86,8 +111,8 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   // carnet d'exercices comme Upper/Lower) les capturent — sans ça, le passage de Basket en
   // "muscu" aurait fait perdre ces deux champs déjà lus par le Coach IA et "Dernières
   // séances", jusque-là propres aux séances non-muscu (voir TrainTab).
-  const [duration, setDuration] = useState(() => savedDraft?.duration ?? initial?.duration ?? 60);
-  const [rpe, setRpe] = useState(() => savedDraft?.rpe ?? initial?.rpe ?? 7);
+  const [duration, setDuration] = useState(() => String(savedDraft?.duration ?? initial?.duration ?? 60));
+  const [rpe, setRpe] = useState(() => String(savedDraft?.rpe ?? initial?.rpe ?? 7));
   const [exos, setExos] = useState(() => savedDraft?.exos ?? buildExos());
   const [open, setOpen] = useState(0);
   const [hist, setHist] = useState(null);
@@ -96,102 +121,34 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   // Lower ne sont jamais modifiés, le remplacement se logue sous son propre nom.
   const [subOpen, setSubOpen] = useState(null);
 
-  // ---- timer (repos + maintien) ----
-  const [tSecs, setTSecs] = useState(120);
-  const [tRem, setTRem] = useState(120);
-  const [tRun, setTRun] = useState(false);
+  // ---- minuteur (repos + maintien), partagé avec la barre « Séance en cours » ----
+  const timer = useRestTimer();
   const [lastTimerByExo, setLastTimerByExo] = useState({});
-  const tRef = useRef();
-  const audioRef = useRef();
-  const prevRem = useRef(120);
-  const ensureAudio = () => {
-    try {
-      if (!audioRef.current) audioRef.current = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioRef.current.state === "suspended") audioRef.current.resume();
-    } catch { /* audio indispo */ }
-  };
-  // Volume et durée divisés par deux (04/08/2026, demande explicite, même changement que
-  // l'alarme native) : gain de crête 0,35 -> 0,175, espacement et durée des 3 impulsions
-  // réduits de moitié (~0,57 s -> ~0,29 s au total).
-  const beep = () => {
-    try {
-      const ctx = audioRef.current;
-      if (ctx) {
-        const now = ctx.currentTime;
-        [0, 0.1, 0.2].forEach((t) => {
-          const o = ctx.createOscillator(); const g = ctx.createGain();
-          o.type = "sine"; o.frequency.value = 880;
-          o.connect(g); g.connect(ctx.destination);
-          g.gain.setValueAtTime(0.0001, now + t);
-          g.gain.exponentialRampToValueAtTime(0.175, now + t + 0.01);
-          g.gain.exponentialRampToValueAtTime(0.0001, now + t + 0.08);
-          o.start(now + t); o.stop(now + t + 0.085);
-        });
-      }
-    } catch { /* ignore */ }
-    try { navigator.vibrate?.([200, 90, 200]); } catch { /* ignore */ }
-  };
-  // Décompte calé sur l'heure de fin, pas sur le nombre de tics : Android ralentit les
-  // `setInterval` quand l'app passe en arrière-plan, et l'ancien `r - 1` prenait du retard
-  // sur la notification (25/10/2026). Recalcul immédiat au retour au premier plan.
-  useEffect(() => {
-    if (!tRun) return;
-    const end = Date.now() + tRem * 1000; // tRem lu au lancement / à la reprise seulement
-    const tick = () => {
-      const r = Math.max(0, Math.ceil((end - Date.now()) / 1000));
-      setTRem(r);
-      if (r === 0) { clearInterval(tRef.current); setTRun(false); }
-    };
-    tRef.current = setInterval(tick, 1000);
-    document.addEventListener("visibilitychange", tick);
-    return () => { clearInterval(tRef.current); document.removeEventListener("visibilitychange", tick); };
-  }, [tRun]);
-  useEffect(() => {
-    // Sur l'app native, la notification système sonne déjà (plus fort, écran verrouillé
-    // compris) : le bip Web Audio ferait doublon et brouillerait ce qu'on entend vraiment.
-    // Sur la PWA, sans notification système, il reste la seule alarme disponible.
-    if (prevRem.current > 0 && tRem === 0) { if (!Capacitor.isNativePlatform()) beep(); hideRestCountdown(); }
-    prevRem.current = tRem;
-  }, [tRem]);
-  // Filet de sécurité : pas d'alarme fantôme si on quitte le carnet minuteur en route.
-  useEffect(() => () => { clearInterval(tRef.current); cancelRestAlarm(); }, []);
+  // Au premier affichage d'une séance neuve, le minuteur se règle sur le repos du premier
+  // exercice — sauf s'il tourne déjà (on revient sur l'onglet pendant un repos).
+  useEffect(() => { if (!timer.running && timer.remaining === timer.secs) restTimer.set(exos[0]?.rest ?? 120); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Écrit le brouillon à chaque changement (série cochée, poids/reps modifiés, minuteur
   // réglé...) — pas seulement à la validation finale. `type`/`date`/`initial` sont stables
   // pour la durée de vie de ce composant (remonté via `key` par TrainTab si l'un d'eux
-  // change vraiment), sauf `date` qui peut changer en cours de séance (DateField) : inclus
-  // pour que le brouillon reste rattaché à la bonne date.
+  // change vraiment), sauf `date` qui peut changer en cours de séance : incluse pour que le
+  // brouillon reste rattaché à la bonne date.
   useEffect(() => {
-    store.set("trainingDraft", { type, date, editingId: initial?.id ?? null, start, duration, rpe, exos });
+    store.set("trainingDraft", { type, date, editingId: initial?.id ?? null, start, duration: Number(duration) || 0, rpe: Number(rpe) || 0, exos });
   }, [type, date, initial, start, duration, rpe, exos]);
 
   // Les notifications système doublent le décompte JS : elles seules sont fiables
   // écran verrouillé. `openName` sert à afficher l'exercice concerné dans la notif.
   const openName = () => (open >= 0 ? exos[open]?.nom ?? "" : "");
-  const fireTimer = (s) => {
-    ensureAudio(); clearInterval(tRef.current);
-    setTSecs(s); setTRem(s); setTRun(true);
-    scheduleRestAlarm(s, openName());
-  };
-  const setTimer = (s) => {
-    clearInterval(tRef.current); setTRun(false); setTSecs(s); setTRem(s);
-    cancelRestAlarm();
-  };
-  const toggleRun = () => {
-    ensureAudio();
-    setTRun((r) => {
-      const next = !r;
-      if (next) scheduleRestAlarm(tRem, openName()); else cancelRestAlarm();
-      return next;
-    });
-  };
   const recordLast = (ei, s) => setLastTimerByExo((p) => ({ ...p, [ei]: s }));
-  // changement d'exercice → minuteur réinitialisé sur le dernier temps utilisé pour cet exercice, ou son repos par défaut
+  // Changement d'exercice → minuteur réglé sur le dernier temps utilisé pour cet exercice, ou
+  // son repos par défaut. Plus jamais pendant un décompte (U3, 25/10/2026) : ouvrir l'exercice
+  // suivant pendant le repos coupait le minuteur ET le réveil natif.
   const openExo = (ei) => {
     const next = open === ei ? -1 : ei;
     setOpen(next);
     setSubOpen(null);
-    if (next !== -1 && next !== open) setTimer(lastTimerByExo[next] ?? exos[next].rest);
+    if (next !== -1 && next !== open && !timer.running) restTimer.set(lastTimerByExo[next] ?? exos[next].rest);
   };
 
   // ---- mutateurs ----
@@ -200,7 +157,7 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
     setExos((p) => p.map((e, i) => i !== ei ? e : { ...e, series: e.series.map((s, j) => j !== si ? s : { ...s, fait: !s.fait }) }));
     // coche = fin de série → relance le minuteur sur le dernier temps utilisé pour cet exercice (fin de série uniquement, pas décoche)
     if (!exos[ei].series[si].fait) {
-      fireTimer(lastTimerByExo[ei] ?? exos[ei].rest);
+      restTimer.start(lastTimerByExo[ei] ?? exos[ei].rest, exos[ei].nom);
       // Haptique (T5, 04/10/2026) : impulsion brève au cochage, natif seulement — jamais
       // bloquant, une erreur du plugin est ignorée.
       if (Capacitor.isNativePlatform()) Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
@@ -212,7 +169,20 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
     const proto = sameLeg[sameLeg.length - 1] || {};
     return { ...e, series: [...e.series, { poids: proto.poids ?? "", val: proto.val ?? medianTarget(e.target), fait: false, leg }] };
   }));
-  const rmSet = (ei, si) => setExos((p) => p.map((e, i) => i !== ei ? e : { ...e, series: e.series.filter((_, j) => j !== si) }));
+  // « − série » (U3, choix de Yoann) remplace le × collé à la case de validation : retire la
+  // DERNIÈRE série non cochée de la jambe/liste — jamais une série déjà faite.
+  const lastRemovable = (e, leg) => {
+    for (let j = e.series.length - 1; j >= 0; j--) {
+      const s = e.series[j];
+      if ((leg == null || s.leg === leg) && !s.fait) return j;
+    }
+    return -1;
+  };
+  const rmLastSet = (ei, leg) => setExos((p) => p.map((e, i) => {
+    if (i !== ei) return e;
+    const j = lastRemovable(e, leg);
+    return j < 0 ? e : { ...e, series: e.series.filter((_, k) => k !== j) };
+  }));
   // T4 : RIR par exercice (0/1/2/3+ → 0/1/2/3), re-tap = désélection (optionnel, jamais imposé).
   const setRir = (ei, v) => setExos((p) => p.map((e, i) => i !== ei ? e : { ...e, rir: e.rir === v ? null : v }));
 
@@ -254,10 +224,11 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
 
   const validate = () => {
     store.set("trainingDraft", null);
+    restTimer.stop();
     onSave({
       id: initial?.id ?? `${date}-${type}-${Date.now()}`,
       date, type, start,
-      ...(template.withMeta ? { duration: round(duration), rpe } : {}),
+      ...(template.withMeta ? { duration: round(Number(duration) || 0), rpe: Number(rpe) || 0 } : {}),
       exercices: exos.map((e) => ({
         nom: e.nom, mode: e.mode, perLeg: e.perLeg, origine: e.origine,
         // T4 : reps en réserve par exercice, optionnel — clé absente si non renseigné (additif).
@@ -268,9 +239,10 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
       })).filter((e) => e.series.length),
     });
   };
+  const cancel = () => { store.set("trainingDraft", null); restTimer.stop(); onCancel(); };
 
   const doneCount = exos.filter((e) => e.series.some((s) => s.fait)).length;
-  const GRID = "30px 1fr 1fr 26px 18px";
+  const GRID = "28px minmax(0, 1fr) minmax(0, 1fr) 52px";
 
   // ---- records (V4) ----
   // Référence à battre = meilleure série de TOUT l'historique hors séance en cours (une
@@ -304,6 +276,9 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
     return out;
   };
 
+  // Entrée sur les reps → champ poids de la même série.
+  const poidsRefs = useRef({});
+
   const renderRows = (e, ei, legFilter) => {
     // Douleur hors base aujourd'hui : le record est calculé et enregistré normalement, il
     // n'est simplement pas mis en avant (voir painOutOfBase dans training.js).
@@ -312,56 +287,104 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
     .map((s, si) => ({ s, si }))
     .filter(({ s }) => legFilter == null || s.leg === legFilter)
     .map(({ s, si }, n) => (
-      <div key={si} style={{ display: "grid", gridTemplateColumns: GRID, gap: 7, alignItems: "center" }}>
-        <span style={{ fontFamily: C.mono, fontSize: 13, color: recs.has(si) ? C.accent : C.muted, fontWeight: 700 }}>
-          {n + 1}{recs.has(si) && <span style={{ fontSize: 11 }}>★</span>}
+      <div key={si} style={{ display: "grid", gridTemplateColumns: GRID, gap: 8, alignItems: "center" }}>
+        <span style={{ ...mono, fontSize: 15, textAlign: "center", color: recs.has(si) ? T.c.accent : T.c.text2, fontWeight: 700 }}>
+          {n + 1}{recs.has(si) && <span style={{ fontSize: 12 }}>★</span>}
         </span>
-        <TextInput value={s.val} inputMode="numeric" placeholder={e.mode === "temps" ? "sec" : e.target}
-          onChange={(ev) => upd(ei, si, "val", ev.target.value)} style={{ padding: "7px 8px" }} />
-        <TextInput value={s.poids} inputMode="decimal" placeholder="kg"
-          onChange={(ev) => upd(ei, si, "poids", ev.target.value.replace(",", "."))} style={{ padding: "7px 8px" }} />
-        <button onClick={() => toggle(ei, si)} style={{
-          background: "none", border: "none", cursor: "pointer", padding: 0,
-          color: s.fait ? C.accent : C.dim, display: "flex", justifyContent: "center",
-        }}>{s.fait ? <CheckCircle2 size={18} /> : <Circle size={18} />}</button>
-        <button onClick={() => rmSet(ei, si)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: C.dim }}>
-          <X size={13} />
-        </button>
+        <SetField value={s.val} inputMode="numeric" placeholder={e.mode === "temps" ? "sec" : e.target}
+          unit={e.mode === "temps" ? "s" : "reps"} label={`Série ${n + 1}, ${e.mode === "temps" ? "secondes" : "répétitions"}`}
+          done={s.fait} onChange={(v) => upd(ei, si, "val", v)} onEnter={() => poidsRefs.current[`${ei}-${si}`]?.focus()} />
+        <SetField value={s.poids} inputMode="decimal" placeholder="kg" unit="kg" label={`Série ${n + 1}, poids`}
+          done={s.fait} inputRef={(el) => { poidsRefs.current[`${ei}-${si}`] = el; }}
+          onChange={(v) => upd(ei, si, "poids", v)} />
+        <button type="button" className="p-tap" onClick={() => toggle(ei, si)} aria-pressed={s.fait}
+          aria-label={s.fait ? `Série ${n + 1} faite, décocher` : `Valider la série ${n + 1}`}
+          style={{
+            width: 52, height: 52, borderRadius: 10, display: "grid", placeItems: "center",
+            background: s.fait ? T.c.accent : "transparent", color: s.fait ? T.c.onAccent : T.c.text2,
+            border: `2px solid ${s.fait ? T.c.accent : T.c.line}`,
+          }}><Check size={24} strokeWidth={3} aria-hidden="true" /></button>
       </div>
     ));
   };
 
+  const setButtons = (e, ei, leg) => (
+    <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+      <Button variant="plain" style={{ flex: 1 }} onClick={() => addSet(ei, leg)}>
+        <Plus size={18} aria-hidden="true" />Série{leg ? ` ${leg}` : ""}
+      </Button>
+      <Button variant="plain" style={{ flex: 1 }} disabled={lastRemovable(e, leg) < 0} onClick={() => rmLastSet(ei, leg)}
+        aria-label={`Retirer la dernière série${leg ? ` ${leg === "G" ? "gauche" : "droite"}` : ""} non cochée`}>
+        <Minus size={18} aria-hidden="true" />Série{leg ? ` ${leg}` : ""}
+      </Button>
+    </div>
+  );
+
+  // Bandeau du minuteur : à sa place (défile avec la page) au repos, fixé en haut du carnet
+  // pendant le décompte seulement, avec gros chiffres, Pause et +30 s.
+  const timerBand = timer.running ? (
+    <div style={{
+      position: "sticky", top: -14, zIndex: 6, margin: "0 -16px", padding: "8px 16px",
+      display: "flex", alignItems: "center", gap: 8, background: T.c.accentRow, borderBottom: `1px solid ${T.c.accentLine}`,
+    }} role="timer" aria-live="off">
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="p-label" style={{ color: T.c.accent, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Repos{timer.label ? ` · ${timer.label}` : ""}</div>
+        <div style={{ ...mono, fontSize: 40, fontWeight: 800, lineHeight: 1.05, color: T.c.accent }}>{mmss(timer.remaining)}</div>
+      </div>
+      <Button variant="plain" onClick={() => restTimer.add(30)} aria-label="Ajouter 30 secondes">+30 s</Button>
+      <IconButton label="Mettre le minuteur en pause" tone="accent" size={52} onClick={() => restTimer.toggle()}>
+        <Pause size={22} aria-hidden="true" />
+      </IconButton>
+    </div>
+  ) : null;
+
+  const field = (label, input) => (
+    <div style={{ display: "grid", gap: 6, minWidth: 0 }}><Eyebrow>{label}</Eyebrow>{input}</div>
+  );
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {/* En-tête séance + timer */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 12, borderBottom: `1.5px solid ${C.divider}` }}>
-        <div>
-          <div style={{ fontSize: 16, color: C.text, fontWeight: 800, textTransform: "uppercase" }}>
-            {type}{initial && <span style={{ color: C.accent, fontSize: 11, textTransform: "none", marginLeft: 6 }}>(modification)</span>}
-          </div>
-          <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>débuté {start} · {doneCount}/{exos.length} exos</div>
-        </div>
-        <div onClick={toggleRun} style={{
-          background: C.card, border: `1.5px solid ${tRun ? C.accent : C.border}`, borderRadius: 8,
-          padding: "6px 12px", textAlign: "center", cursor: "pointer", minWidth: 74,
-        }}>
-          <div style={{ fontFamily: C.mono, fontSize: 19, fontWeight: 800, color: tRun ? C.accent : C.text2 }}>{mmss(tRem)}</div>
-          <div style={{ fontSize: 8.5, color: C.muted, letterSpacing: 1, fontWeight: 700 }}>REPOS</div>
-        </div>
+    <div style={{ display: "grid", gap: 12, fontFamily: T.f.body, color: T.c.text }}>
+      {timerBand}
+
+      {/* En-tête séance */}
+      <div>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
+          {type}{initial && <span style={{ color: T.c.accent, fontSize: 14, fontWeight: 600, marginLeft: 8 }}>modification</span>}
+        </h2>
+        <div className="p-sec" style={{ marginTop: 2 }}>débuté {start} · {doneCount}/{exos.length} exos</div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <DateField value={date} onChange={onDate} />
-        <Field label="Début">
-          <input type="time" value={start} onChange={(e) => setStart(e.target.value)} style={inputStyle(false)} />
-        </Field>
+        {field("Date", <input type="date" className="p-field" value={date} max={today()}
+          onChange={(e) => e.target.value && onDate(e.target.value)} aria-label="Date de la séance" style={{ fontFamily: T.f.num }} />)}
+        {field("Début", <input type="time" className="p-field" value={start} onChange={(e) => setStart(e.target.value)} aria-label="Heure de début" />)}
       </div>
 
       {template.withMeta && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <Field label="Durée (min)"><Stepper value={duration} set={setDuration} step={5} min={0} int /></Field>
-          <Field label="RPE"><Stepper value={rpe} set={setRpe} step={1} min={1} max={10} int /></Field>
+          {field("Durée", <NumberField value={duration} onChange={setDuration} unit="min" inputMode="numeric" label="Durée en minutes" />)}
+          {field("RPE", <NumberField value={rpe} onChange={setRpe} inputMode="numeric" label="RPE sur 10" />)}
         </div>
+      )}
+
+      {/* Minuteur au repos : à sa place, avec les durées (PAS de 2:30, retiré exprès). */}
+      {!timer.running && (
+        <Panel>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Timer size={20} color={T.c.text2} aria-hidden="true" />
+            <span style={{ ...mono, fontSize: 28, fontWeight: 700, flex: 1 }}>{mmss(timer.remaining)}</span>
+            <IconButton label="Remettre le minuteur à zéro" onClick={() => restTimer.set(timer.secs)}><RotateCcw size={20} aria-hidden="true" /></IconButton>
+            <Button variant="primary" onClick={() => restTimer.toggle(openName())}><Play size={18} aria-hidden="true" />Lancer</Button>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {[120, 90, 60, 45, 30].map((s) => (
+              <Chip key={s} on={timer.secs === s} onClick={() => { restTimer.set(s); if (open !== -1) recordLast(open, s); }}
+                style={{ flex: 1, justifyContent: "center", padding: 0 }}>
+                <span style={mono}>{mmss(s)}</span>
+              </Chip>
+            ))}
+          </div>
+        </Panel>
       )}
 
       {/* Exercices */}
@@ -369,39 +392,35 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
         const isOpen = open === ei;
         const done = e.series.filter((s) => s.fait).length;
         return (
-          <div key={ei} style={{
-            background: C.card, border: `1.5px solid ${isOpen ? C.border : C.borderDim}`,
-            borderRadius: 10, padding: isOpen ? 14 : "12px 14px", opacity: isOpen ? 1 : 0.85,
-          }}>
-            <div onClick={() => openExo(ei)} style={{ cursor: "pointer" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                <span style={{ fontSize: isOpen ? 14 : 13, color: C.text, fontWeight: isOpen ? 800 : 700 }}>
-                  {e.nom}{e.opt && <span style={{ fontSize: 10, color: C.dim, marginLeft: 4 }}>(option)</span>}
+          <Panel key={ei} tone={isOpen ? "key" : undefined} style={{ gap: 10, padding: isOpen ? 16 : 0 }}>
+            <button type="button" className="p-tap" onClick={() => openExo(ei)} aria-expanded={isOpen} style={{
+              display: "grid", gap: 4, width: "100%", minHeight: 64, padding: isOpen ? 0 : "12px 16px",
+              background: "none", border: "none", textAlign: "left", color: T.c.text, fontFamily: "inherit",
+            }}>
+              <span style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                <span style={{ fontSize: isOpen ? 18 : 16, fontWeight: 700, lineHeight: 1.25 }}>
+                  {e.nom}{e.opt && <span style={{ fontSize: 13, color: T.c.muted, fontWeight: 500, marginLeft: 6 }}>(option)</span>}
                 </span>
-                <span style={{ fontSize: 11, color: C.muted, fontWeight: 700, whiteSpace: "nowrap" }}>{e.scheme}</span>
-              </div>
-              <div style={{ fontSize: 11, color: C.accent, marginTop: 3, fontWeight: 700 }}>
+                <span style={{ ...mono, fontSize: 13, color: T.c.text2, whiteSpace: "nowrap" }}>{e.scheme}</span>
+              </span>
+              <span style={{ fontSize: 14, color: T.c.accent, fontWeight: 600 }}>
                 {e.last
-                  ? `dernière fois : ${e.last.poids || "—"} kg × ${e.last.val || "—"}${e.mode === "temps" ? " s" : ""}`
-                  : e.def != null ? `défaut : ${e.def} kg` : "première fois"}
-                {done > 0 && <span style={{ color: C.muted }}> · {done} série{done > 1 ? "s" : ""} ✓</span>}
-              </div>
-            </div>
+                  ? `Dernière fois ${e.last.poids || "—"} kg × ${e.last.val || "—"}${e.mode === "temps" ? " s" : ""}`
+                  : e.def != null ? `Défaut ${e.def} kg` : "Première fois"}
+                {done > 0 && <span style={{ color: T.c.text2, fontWeight: 500 }}> · {done} série{done > 1 ? "s" : ""} ✓</span>}
+              </span>
+            </button>
 
             {isOpen && (
               <>
-                {e.consigne && <Body style={{ fontSize: 10.5, color: C.dim, marginTop: 6 }}>{e.consigne}</Body>}
+                {e.consigne && <div className="p-sec">{e.consigne}</div>}
                 {/* Le record à battre est affiché comme un fait, pas comme un objectif à
                     forcer — et il disparaît les jours où un tendon est hors base. */}
                 {!painRed && refRecords[e.nom] && (
-                  <Body style={{ fontSize: 10.5, color: C.muted, marginTop: 6, fontFamily: C.mono }}>
-                    ★ record : {setLabel(refRecords[e.nom], e.mode)}
-                  </Body>
+                  <div style={{ ...mono, fontSize: 13, color: T.c.text2 }}>★ record {setLabel(refRecords[e.nom], e.mode)}</div>
                 )}
                 {!painRed && plateauByExo[e.nom] && (
-                  <Body style={{ fontSize: 10.5, color: "#e8a33d", marginTop: 6, fontFamily: C.mono }}>
-                    ⏸ plateau depuis {plateauByExo[e.nom].sessions} séances
-                  </Body>
+                  <div style={{ ...mono, fontSize: 13, color: WARN }}>⏸ plateau depuis {plateauByExo[e.nom].sessions} séances</div>
                 )}
 
                 {/* Substitution (bibliothèque d'exercices, 01/09/2026) : "cette machine est
@@ -420,132 +439,99 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
                   if (original) candidates.unshift({ ...original, isOriginal: true });
                   if (!candidates.length) return null;
                   return subOpen === ei ? (
-                    <div style={{ marginTop: 8, background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: 10 }}>
-                      <Label style={{ marginBottom: 6 }}>Remplacer par</Label>
+                    <div style={{ background: T.c.field, border: `1px solid ${T.c.line}`, borderRadius: 12, padding: 12, display: "grid", gap: 2 }}>
+                      <Eyebrow>Remplacer par</Eyebrow>
                       {candidates.map((c) => (
-                        <div key={c.n} onClick={() => substitute(ei, c)} style={{ padding: "7px 2px", borderBottom: `1px solid ${C.divider}`, cursor: "pointer" }}>
-                          <div style={{ fontSize: 12, color: C.text, fontWeight: 600 }}>{c.n}{c.isOriginal && <span style={{ color: C.accent }}> · exercice d'origine</span>}</div>
-                          {c.c && <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{c.c}</div>}
-                        </div>
+                        <button key={c.n} type="button" className="p-tap" onClick={() => substitute(ei, c)} style={{
+                          minHeight: 52, padding: "8px 2px", background: "none", border: "none", borderBottom: `1px solid ${T.c.lineSoft}`,
+                          textAlign: "left", color: T.c.text, fontFamily: "inherit",
+                        }}>
+                          <div style={{ fontSize: 15, fontWeight: 600 }}>{c.n}{c.isOriginal && <span style={{ color: T.c.accent }}> · exercice d'origine</span>}</div>
+                          {c.c && <div className="p-muted" style={{ marginTop: 2 }}>{c.c}</div>}
+                        </button>
                       ))}
-                      <Btn variant="ghost" onClick={() => setSubOpen(null)} style={{ width: "100%", marginTop: 8, padding: "6px 0", fontSize: 10.5 }}>Annuler</Btn>
+                      <Button variant="plain" block onClick={() => setSubOpen(null)} style={{ marginTop: 8 }}>Annuler</Button>
                     </div>
                   ) : (
-                    <div onClick={() => setSubOpen(ei)} style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 8, cursor: "pointer" }}>
-                      <Repeat size={11} color={C.muted} />
-                      <span style={{ fontSize: 10.5, color: C.muted, textDecoration: "underline" }}>Remplacer cet exercice</span>
-                    </div>
+                    <button type="button" className="p-tap" onClick={() => setSubOpen(ei)} style={{
+                      display: "flex", alignItems: "center", gap: 8, minHeight: 44, padding: 0,
+                      background: "none", border: "none", color: T.c.text2, fontSize: 14, fontFamily: "inherit", textDecoration: "underline",
+                    }}>
+                      <Repeat size={16} aria-hidden="true" />Remplacer cet exercice
+                    </button>
                   );
                 })()}
 
-                <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 7, fontSize: 9,
-                  color: C.muted, textTransform: "uppercase", letterSpacing: 0.5, margin: "10px 0 6px", fontWeight: 700 }}>
-                  <span>Sér</span><span>{e.mode === "temps" ? "Sec" : "Reps"}</span><span>Poids</span><span /><span />
+                <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 8, marginTop: 2 }}>
+                  <span className="p-label" style={{ textAlign: "center" }}>N°</span>
+                  <span className="p-label" style={{ textAlign: "center" }}>{e.mode === "temps" ? "Sec" : "Reps"}</span>
+                  <span className="p-label" style={{ textAlign: "center" }}>Poids</span>
+                  <span className="p-label" style={{ textAlign: "center" }}>Fait</span>
                 </div>
 
                 {e.perLeg ? ["G", "D"].map((leg) => (
-                  <div key={leg} style={{ marginBottom: 8 }}>
-                    <Label style={{ color: C.accent, marginBottom: 5 }}>{leg === "G" ? "Gauche" : "Droite"}</Label>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{renderRows(e, ei, leg)}</div>
-                    <div onClick={() => addSet(ei, leg)} style={{ textAlign: "center", marginTop: 8, fontSize: 11,
-                      color: C.accent, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, cursor: "pointer" }}>
-                      + série {leg}
-                    </div>
+                  <div key={leg} style={{ display: "grid", gap: 8 }}>
+                    <Eyebrow style={{ color: T.c.accent }}>{leg === "G" ? "Gauche" : "Droite"}</Eyebrow>
+                    {renderRows(e, ei, leg)}
+                    {setButtons(e, ei, leg)}
                   </div>
                 )) : (
-                  <>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{renderRows(e, ei, null)}</div>
-                    <div onClick={() => addSet(ei, null)} style={{ textAlign: "center", marginTop: 10, fontSize: 11,
-                      color: C.accent, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, cursor: "pointer" }}>
-                      + ajouter une série
-                    </div>
-                  </>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {renderRows(e, ei, null)}
+                    {setButtons(e, ei, null)}
+                  </div>
                 )}
 
                 {/* Reps en réserve (T4, 04/10/2026) : un choix par EXERCICE, pas par série ;
                     optionnel — rien de présélectionné, re-tap pour effacer. Pas en mode temps. */}
                 {e.mode !== "temps" && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 9, color: C.muted, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700, marginRight: 2 }}>Reps en réserve</span>
-                    {[0, 1, 2, 3].map((v) => {
-                      const on = e.rir === v;
-                      return (
-                        <button key={v} onClick={() => setRir(ei, v)} style={{
-                          minWidth: 30, height: 26, padding: "0 8px", borderRadius: 6, cursor: "pointer", fontFamily: C.mono, fontSize: 11, fontWeight: 800,
-                          background: on ? C.accent : C.bg, color: on ? "#000" : C.muted, border: `1.5px solid ${on ? C.accent : C.border}`,
-                        }}>{v === 3 ? "3+" : v}</button>
-                      );
-                    })}
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <Eyebrow>Reps en réserve</Eyebrow>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {[0, 1, 2, 3].map((v) => (
+                        <Chip key={v} on={e.rir === v} onClick={() => setRir(ei, v)} style={{ flex: 1, justifyContent: "center" }}>
+                          <span style={mono}>{v === 3 ? "3+" : v}</span>
+                        </Chip>
+                      ))}
+                    </div>
                   </div>
                 )}
 
-                <div style={{ display: "flex", gap: 12, marginTop: 12, alignItems: "center" }}>
-                  <button onClick={() => { const s = e.mode === "temps" ? parseSecs(e.target) : e.rest; fireTimer(s); recordLast(ei, s); }}
-                    style={{ background: "none", border: "none", color: C.accent, fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
-                    <Timer size={12} style={{ display: "inline", marginRight: 4 }} />
-                    {e.mode === "temps" ? `maintien ${parseSecs(e.target)} s` : `repos ${e.rest} s`}
-                  </button>
-                  <button onClick={() => setHist(hist === e.nom ? null : e.nom)}
-                    style={{ background: "none", border: "none", color: C.muted, fontSize: 11, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
-                    progression
-                  </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Button variant="outline" style={{ flex: 1 }}
+                    onClick={() => { const s = e.mode === "temps" ? parseSecs(e.target) : e.rest; restTimer.start(s, e.nom); recordLast(ei, s); }}>
+                    <Timer size={18} aria-hidden="true" />
+                    {e.mode === "temps" ? `Maintien ${parseSecs(e.target)} s` : `Repos ${e.rest} s`}
+                  </Button>
+                  <IconButton label={hist === e.nom ? "Masquer la progression" : "Voir la progression"} aria-pressed={hist === e.nom} size={52}
+                    onClick={() => setHist(hist === e.nom ? null : e.nom)}>
+                    <TrendingUp size={20} aria-hidden="true" />
+                  </IconButton>
                 </div>
 
                 {hist === e.nom && (
-                  <div style={{ background: C.bg, borderRadius: 6, padding: 10, marginTop: 8 }}>
+                  <div style={{ background: T.c.field, borderRadius: 10, padding: 12, display: "grid", gap: 4 }}>
                     {perfHistory(training, e.nom).length
                       ? perfHistory(training, e.nom).map((hh, k) => (
-                          <div key={k} style={{ display: "flex", justifyContent: "space-between", fontFamily: C.mono, fontSize: 11, color: C.text2, padding: "2px 0" }}>
+                          <div key={k} style={{ ...mono, display: "flex", justifyContent: "space-between", fontSize: 13, color: T.c.text2 }}>
                             <span>{fmt(hh.date)}</span>
                             <span>{hh.poids || "—"} kg × {hh.val || "—"}{hh.mode === "temps" ? " s" : ""}</span>
                           </div>
                         ))
-                      : <Body style={{ fontSize: 11, color: C.dim }}>aucun historique</Body>}
+                      : <div className="p-sec">Aucun historique</div>}
                   </div>
                 )}
               </>
             )}
-          </div>
+          </Panel>
         );
       })}
 
-      {/* Réglage du minuteur */}
-      <Card>
-        <Label style={{ marginBottom: 8 }}>Minuteur</Label>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
-          {[120, 90, 60, 45, 30].map((s) => (
-            <button key={s} onClick={() => { setTimer(s); if (open !== -1) recordLast(open, s); }} style={{
-              padding: "6px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
-              background: tSecs === s ? C.accentRow : C.card, fontFamily: C.mono,
-              color: tSecs === s ? C.accent : C.muted, border: `1.5px solid ${tSecs === s ? C.accent : C.border}`,
-            }}>{mmss(s)}</button>
-          ))}
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Btn variant="primary" onClick={toggleRun} style={{ flex: 1 }}>
-            {tRun ? <><Pause size={14} style={{ display: "inline", marginRight: 4 }} />Pause</> : <><Play size={14} style={{ display: "inline", marginRight: 4 }} />Lancer</>}
-          </Btn>
-          <Btn variant="plain" onClick={() => setTimer(tSecs)}><RotateCcw size={14} /></Btn>
-        </div>
-        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>Bip + vibration en fin de décompte.</Body>
-      </Card>
-
-      {/* Pastille flottante pendant le décompte */}
-      {tRun && (
-        <button onClick={toggleRun} style={{
-          position: "fixed", right: 12, bottom: "calc(76px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))", zIndex: 40,
-          display: "flex", alignItems: "center", gap: 7,
-          background: C.accent, color: "#000", border: "none", borderRadius: 999,
-          padding: "9px 14px", fontFamily: C.mono, fontSize: 14, fontWeight: 800,
-          boxShadow: "0 4px 14px rgba(0,0,0,.5)", cursor: "pointer",
-        }}><Pause size={14} />{mmss(tRem)}</button>
-      )}
-
-      <div style={{ display: "flex", gap: 8 }}>
-        <Btn variant="primary" onClick={validate} style={{ flex: 1 }}>
-          <CheckCircle2 size={14} style={{ display: "inline", marginRight: 4 }} />{initial ? "Enregistrer les modifications" : "Valider la séance"}
-        </Btn>
-        <Btn variant="ghost" onClick={() => { store.set("trainingDraft", null); onCancel(); }}>Annuler</Btn>
+      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+        <Button variant="primary" style={{ flex: 1 }} onClick={validate}>
+          <Check size={20} aria-hidden="true" />{initial ? "Enregistrer les modifications" : "Valider la séance"}
+        </Button>
+        <Button variant="plain" onClick={cancel}>Annuler</Button>
       </div>
     </div>
   );
