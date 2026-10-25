@@ -3667,6 +3667,24 @@ décompte** (la pastille épinglée en permanence de juillet gênait le défilem
   0 texte sous 12 px, 0 sous 4,5:1, 0 cible sous 44 px. Testé : suppression armée puis désarmée
   seule après 3 s (rien d'effacé), puis 2e tap → séance supprimée.
 
+## Chantier U — U3 étape 7 : onglet Analyse en v2, cartes de référence déplacées (25/10/2026, v3.117.0)
+
+- **Analyse** (`PerformanceTab`, `TdeeCard`, `CoachIA`) passe sur `design/compat.jsx` (même méthode
+  qu'aux étapes 5-6). Ordre : Coach IA, moyenne kcal + protéines par semaine, dépense estimée.
+  Titre « TDEE » retiré (l'en-tête dit « Analyse »). « Note du jour » devient un bouton de 48 px
+  (c'était une ligne cliquable de 20 px).
+- **Cartes de référence déplacées, contenu inchangé** (arborescence A, U1) — nouveau
+  `screens/perf/ReferenceCards.jsx` : `PlanCard` (planning idéal) en bas de l'onglet **Séance**,
+  sous le volume ; `PeriCard` (fiche péri-training repliable + protocoles basket) en bas de
+  **Nutrition**, au-dessus de « Dupliquer cette journée ». L'en-tête de la fiche péri-training
+  devient un bouton de 48 px. Toujours affichage seul, jamais lus par le recommandeur ni le coach.
+- **`TDEE_RELIABILITY_COLOR`** (`lib/helpers.js`, TdeeCard seul) : couleurs v2 (« faible »
+  3,5:1 → 6,2:1).
+- **Mesuré dans l'aperçu (375 px)** : Analyse (note du jour ouverte), Séance et Nutrition à
+  0 texte sous 12 px, 0 sous 4,5:1, 0 cible sous 44 px. Piège d'aperçu : la capture d'écran montrait
+  le graphique kcal sans ses barres alors qu'elles sont dans le DOM (8 barres citron) — l'aperçu ne
+  dessinait plus qu'une image toutes les 300 ms ; vérifié sur le téléphone, barres présentes.
+
 ## Minuteur de repos calé sur l'heure réelle (25/10/2026, apps/perso v3.109.3)
 
 Remonté par Yoann pendant U1 : le chrono du carnet prenait du retard sur celui de la

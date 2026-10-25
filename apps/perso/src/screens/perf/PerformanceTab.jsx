@@ -1,4 +1,6 @@
-// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) : code déplacé tel quel.
+// Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; onglet Analyse en v2 à l'étape 7 d'U3
+// (design/compat.jsx). Planning idéal → onglet Séance, péri-training et protocoles basket →
+// Nutrition (arborescence A, U1) : voir ReferenceCards.jsx.
 import { useState } from "react";
 import { ResponsiveContainer, Line, Bar, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Cell } from "recharts";
 import { ChevronRight, ChevronDown, Zap } from "lucide-react";
@@ -6,7 +8,7 @@ import { getSync } from "../../store.js";
 import { realDeficit, tdeeTrend, tdeeOverWindow } from "@rawcare/core/tdee";
 import { PERI, BASKET_PROTOCOLS } from "@rawcare/core/session/templates";
 import { PHASES, targetsForDate, kcalFromMacros, tdeeNow, weeklyKcalTrend, weeklyProteinTrend, buildKcalByDate, recompWindows } from "@rawcare/core/targets";
-import { C, today, fmt, Card, Label, Body, Empty, Pills, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../../ui.jsx";
+import { C, today, fmt, Card, Label, Body, Empty, Pills, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../../design/compat.jsx";
 import { PROT_LINE } from "../../lib/helpers.js";
 import { TdeeCard } from "./TdeeCard.jsx";
 import { WEEKLY_PLAN } from "../../lib/plan.js";
@@ -18,9 +20,6 @@ import { CoachIA } from "../dashboard/CoachIA.jsx";
    TAB — PERFORMANCE
    ============================================================ */
 export function PerformanceTab({ macros, targets, training, weight, phase, coach, todayNote, saveNote, saveJournal }) {
-  const [showPeri, setShowPeri] = useState(false);
-  const [basketProto, setBasketProto] = useState("soir21h");
-  const [planVariant, setPlanVariant] = useState("sansMatch");
 
   // Dépense énergétique adaptative (V7). Calculée à chaque montage de l'onglet — le journal
   // Repas et ses corrections vivent dans un autre onglet (un seul monté à la fois), donc un
@@ -55,14 +54,13 @@ export function PerformanceTab({ macros, targets, training, weight, phase, coach
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader title="TDEE" />
       {coach && <CoachIA coach={coach} todayNote={todayNote} saveNote={saveNote} saveJournal={saveJournal} />}
 
       {/* Moyenne hebdo kcal, 7 jours glissants */}
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
           <Label>Moyenne kcal · semaine (lun-dim)</Label>
-          <span style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono }}>cible ~{kcalTargetToday} kcal · <span style={{ color: PROT_LINE }}>{atToday.protein} g prot.</span></span>
+          <span style={{ fontSize: 13, color: C.muted, fontFamily: C.mono }}>cible ~{kcalTargetToday} kcal · <span style={{ color: PROT_LINE }}>{atToday.protein} g prot.</span></span>
         </div>
         {weeksWithData.length ? (
           <div style={{ height: 130 }}>
@@ -85,7 +83,7 @@ export function PerformanceTab({ macros, targets, training, weight, phase, coach
             </ResponsiveContainer>
           </div>
         ) : <Empty>Aucune donnée.</Empty>}
-        <Body style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>
+        <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>
           Barres : kcal, moyenne des jours réellement loggés (axe gauche). Courbe : protéines g/j, jours terminés seulement (axe droit).
         </Body>
       </Card>
@@ -93,68 +91,6 @@ export function PerformanceTab({ macros, targets, training, weight, phase, coach
       {/* Dépense énergétique adaptative (V7) */}
       <TdeeCard result={tdeeToday} deficitReel={deficitReel} trend={tdeeHistory} windows={tdeeWindows} recomp={recomp} />
 
-      {/* Planning hebdomadaire idéal — référence affichée, jamais appliquée automatiquement */}
-      <Card>
-        <Label style={{ marginBottom: 8 }}>Planning idéal</Label>
-        <Pills
-          options={[{ key: "sansMatch", label: "Sans match" }, { key: "avecMatch", label: "Avec match" }]}
-          value={planVariant} onChange={setPlanVariant} small
-        />
-        <div style={{ marginTop: 10 }}>
-          {WEEKLY_PLAN[planVariant].map((d) => (
-            <div key={d.jour} style={{ display: "flex", gap: 10, padding: "6px 0", borderBottom: `1px solid ${C.divider}` }}>
-              <div style={{ width: 66, flexShrink: 0, fontSize: 10.5, color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }}>{d.jour}</div>
-              <div style={{ fontSize: 11.5, color: C.text2, lineHeight: 1.4 }}>{d.texte}</div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Péri-training */}
-      <Card>
-        <div onClick={() => setShowPeri((s) => !s)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <Zap size={13} color={C.accent} />
-            <Label style={{ fontSize: 10 }}>Fiche péri-training</Label>
-          </div>
-          {showPeri ? <ChevronDown size={15} color={C.muted} /> : <ChevronRight size={15} color={C.muted} />}
-        </div>
-        {showPeri && (
-          <div style={{ marginTop: 12 }}>
-            {PERI.map((row, i) => (
-              <div key={i} style={{ paddingBottom: 10, marginBottom: 10, borderBottom: i < PERI.length - 1 ? `1px solid ${C.divider}` : "none" }}>
-                <div style={{ fontSize: 12, color: C.accent, fontWeight: 700 }}>{row.t}</div>
-                <Body style={{ fontSize: 11, marginTop: 3 }}>{row.d}</Body>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Protocoles basket détaillés (avant/pendant/après selon l'horaire) */}
-      <Card>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-          <Zap size={13} color={C.accent} />
-          <Label style={{ fontSize: 10 }}>Protocoles basket</Label>
-        </div>
-        <Pills
-          options={Object.entries(BASKET_PROTOCOLS).map(([k, v]) => ({ key: k, label: v.title }))}
-          value={basketProto} onChange={setBasketProto} small
-        />
-        <Body style={{ fontSize: 10.5, color: C.dim, marginTop: 6 }}>{BASKET_PROTOCOLS[basketProto].sub}</Body>
-        <div style={{ marginTop: 10 }}>
-          {BASKET_PROTOCOLS[basketProto].blocks.map((b, i) => (
-            <div key={i} style={{ marginBottom: 10 }}>
-              <Label style={{ color: C.accent, marginBottom: 4 }}>{b.h}</Label>
-              {b.items.map((it, j) => (
-                <div key={j} style={{ fontSize: 11.5, color: C.text2, lineHeight: 1.5, paddingLeft: 10, position: "relative" }}>
-                  <span style={{ position: "absolute", left: 0, color: C.dim }}>–</span>{it}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </Card>
     </div>
   );
 }

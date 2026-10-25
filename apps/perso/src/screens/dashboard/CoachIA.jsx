@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Sparkles, ChevronRight, ChevronDown } from "lucide-react";
 import { splitCarnet } from "@rawcare/core/coach/prompt";
-import { C, Card, Label, Body, Btn, inputStyle } from "../../ui.jsx";
+import { C, Card, Label, Body, Btn, inputStyle } from "../../design/compat.jsx";
 import { costCents, callClaude } from "../../claudeApi.js";
 
 /* ============================================================
@@ -86,33 +86,33 @@ export function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <Sparkles size={13} color={C.accent} />
-          <Label style={{ fontSize: 10 }}>Coach IA</Label>
+          <Label style={{ fontSize: 12 }}>Coach IA</Label>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          <Btn variant="outline" onClick={() => run("jour")} disabled={state === "loading"} style={{ padding: "6px 10px", fontSize: 11 }}>
+          <Btn variant="outline" onClick={() => run("jour")} disabled={state === "loading"} style={{ padding: "6px 10px", fontSize: 13 }}>
             {state === "loading" && kind === "jour" ? "Analyse…" : "Analyser"}
           </Btn>
-          <Btn variant="outline" onClick={() => run("bilan")} disabled={state === "loading"} style={{ padding: "6px 10px", fontSize: 11 }}>
+          <Btn variant="outline" onClick={() => run("bilan")} disabled={state === "loading"} style={{ padding: "6px 10px", fontSize: 13 }}>
             {state === "loading" && kind === "bilan" ? "Analyse…" : "Bilan 3 mois"}
           </Btn>
         </div>
       </div>
 
       {state === "loading" && progress && (
-        <Body style={{ fontSize: 10.5, color: C.muted, fontFamily: C.mono, marginBottom: 6 }}>{progress}</Body>
+        <Body style={{ fontSize: 13, color: C.muted, fontFamily: C.mono, marginBottom: 6 }}>{progress}</Body>
       )}
 
-      <div onClick={() => setOpenNote((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer", marginBottom: openNote ? 8 : 0 }}>
-        {openNote ? <ChevronDown size={13} color={C.muted} /> : <ChevronRight size={13} color={C.muted} />}
-        <span style={{ fontSize: 11, color: C.muted }}>
+      <button type="button" className="p-tap" onClick={() => setOpenNote((o) => !o)} aria-expanded={openNote} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", minHeight: 48, padding: 0, background: "none", border: "none", fontFamily: "inherit", marginBottom: openNote ? 8 : 0 }}>
+        {openNote ? <ChevronDown size={18} color={C.text2} aria-hidden="true" /> : <ChevronRight size={18} color={C.text2} aria-hidden="true" />}
+        <span style={{ fontSize: 14, color: C.text2 }}>
           Note du jour{note ? <span style={{ color: C.accent }}> · remplie</span> : " (contexte)"}
         </span>
-      </div>
+      </button>
       {openNote && (
         <div style={{ marginBottom: 10 }}>
           <textarea rows={2} value={note} placeholder="ex. j'ai bu de l'alcool hier soir, insomnie de 2h, cheville qui tire…"
             onChange={(e) => setNote(e.target.value)} onBlur={() => saveNote(note)} style={ta} />
-          <Body style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>
+          <Body style={{ fontSize: 12, color: C.dim, marginTop: 4 }}>
             Contexte hors données chiffrées (alcool, blessure, stress…), pris en compte dans l'analyse d'aujourd'hui.
           </Body>
         </div>
@@ -129,16 +129,16 @@ export function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
       {state === "done" && <Body style={{ whiteSpace: "pre-wrap" }}>{text}</Body>}
       {state === "done" && meta?.usage && (
         <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${C.divider}`, display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ fontFamily: C.mono, fontSize: 10, color: C.dim }}>
+          <span style={{ fontFamily: C.mono, fontSize: 12, color: C.dim }}>
             {(meta.usage.input_tokens ?? 0).toLocaleString("fr-FR")} tok entrée · {(meta.usage.output_tokens ?? 0).toLocaleString("fr-FR")} tok sortie
             {meta.fellBack && <span style={{ color: C.accent }}> · {meta.model}</span>}
           </span>
-          <span style={{ fontFamily: C.mono, fontSize: 11, color: C.accent, fontWeight: 700 }}>
+          <span style={{ fontFamily: C.mono, fontSize: 13, color: C.accent, fontWeight: 700 }}>
             ≈ {meta.cents < 1 ? meta.cents.toFixed(2) : meta.cents.toFixed(1)} ¢
           </span>
         </div>
       )}
-      {state === "idle" && <Body style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>« Analyser » : tes 14 derniers jours (poids, macros, eau, séances, sommeil, douleur genou), au jour le jour et sur la semaine glissante. « Bilan 3 mois » : corrélations calculées sur 90 jours (records, sommeil vs énergie, escalade vs genou, fibres vs stagnation, sèche). Nécessite ta clé API (Réglages).</Body>}
+      {state === "idle" && <Body style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>« Analyser » : tes 14 derniers jours (poids, macros, eau, séances, sommeil, douleur genou), au jour le jour et sur la semaine glissante. « Bilan 3 mois » : corrélations calculées sur 90 jours (records, sommeil vs énergie, escalade vs genou, fibres vs stagnation, sèche). Nécessite ta clé API (Réglages).</Body>}
     </Card>
   );
 }

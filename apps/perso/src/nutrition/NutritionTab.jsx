@@ -21,6 +21,7 @@ import {
   copySourceCandidates, copyEntries, deriveMacroLog, suggestions,
 } from "./foodStore.js";
 import FoodSearch from "./FoodSearch.jsx";
+import { PeriCard } from "../screens/perf/ReferenceCards.jsx";
 
 // Cibles PROTOCOLE (protein/carbs/fat/fiber) → noms internes du module (prot/gluc/lip/fib).
 const TARGET_KEY = { prot: "protein", gluc: "carbs", lip: "fat", fib: "fiber" };
@@ -576,6 +577,9 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
           </Button>
         )}
       </Panel>
+
+      {/* Péri-training + protocoles basket (déplacés depuis l'onglet Analyse, U3 étape 7) */}
+      <PeriCard />
 
       <div className="p-muted" style={{ textAlign: "center", padding: "0 0 8px" }}>
         Calories et macros alimentent aussi la dépense estimée de l'onglet Analyse.

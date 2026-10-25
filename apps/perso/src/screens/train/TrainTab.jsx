@@ -12,6 +12,7 @@ import { restTimer } from "../../lib/restTimer.js";
 import { ProgressScreen } from "./ProgressScreen.jsx";
 import { GeneField } from "./GeneField.jsx";
 import { VolumeCard } from "./VolumeCard.jsx";
+import { PlanCard } from "../perf/ReferenceCards.jsx";
 
 export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType, onStartConsumed }) {
   // Séance dont la suppression est « armée » (1er tap sur la corbeille), voir Dernières séances.
@@ -176,6 +177,9 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
           hors gainage — même calcul que `volume_hebdo_series` envoyé au Coach IA. Zone cible
           10-20 séries/sem. sur les groupes prioritaires (pecs, épaules), compte neutre ailleurs. */}
       <VolumeCard training={training} />
+
+      {/* Planning idéal (déplacé depuis l'onglet Analyse, U3 étape 7) */}
+      <PlanCard />
 
       {/* Semaine HSR */}
       <Card>

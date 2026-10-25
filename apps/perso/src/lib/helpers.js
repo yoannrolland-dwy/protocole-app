@@ -66,7 +66,8 @@ export const trendColor = (key) => (key === "up" ? COLORS.accent : key === "down
 // Couleur par palier de fiabilité — mêmes seuils visuels que la douleur (accent = bon,
 // ambre = à nuancer, danger = à prendre avec de grosses pincettes). "Faible" n'utilise pas
 // le rouge : ce n'est pas une alerte, juste une estimation à ne pas trop croire.
-export const TDEE_RELIABILITY_COLOR = { fiable: C.accent, moyenne: "#e8a33d", faible: C.muted };
+// Couleurs v2 (U3 étape 7) : le muted v1 de « faible » n'atteignait que 3,5:1. Utilisé par TdeeCard seul.
+export const TDEE_RELIABILITY_COLOR = { fiable: COLORS.accent, moyenne: COLORS.warn, faible: COLORS.muted };
 // Libellés affichés (05/10/2026) : « confiance élevée / moyenne / faible » — la répétition
 // « fiabilité fiable » gênait à la lecture. Clés internes (`reliability`) inchangées.
 export const TDEE_RELIABILITY_LABEL = { fiable: "élevée", moyenne: "moyenne", faible: "faible" };
