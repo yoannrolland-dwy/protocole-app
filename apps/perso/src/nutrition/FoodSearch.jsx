@@ -640,7 +640,7 @@ export default function FoodSearch({
   meal, mealLabel, date, log, pins, muted, portions, recipes, overrides,
   onAdd, onTogglePin, onMute, onSavePortion, onRemovePortion, onCreateRecipe, onRemoveRecipe, onUpdateRecipe,
   onSaveOverride, onClearOverride,
-  apiKey, model, remaining, onLogDishes,
+  ai, remaining, onLogDishes,
   onClose, startFree = false,
 }) {
   const [q, setQ] = useState("");
@@ -732,10 +732,10 @@ export default function FoodSearch({
           <FreeEntry onAdd={onAdd} onBack={() => setFree(false)}
             backLabel={startFree ? "Macro rapide" : "Saisie libre"} />
         ) : resto ? (
-          <RestaurantMenu apiKey={apiKey} model={model} remaining={remaining} meal={meal}
+          <RestaurantMenu ai={ai} remaining={remaining} meal={meal}
             onLogDishes={onLogDishes} onBack={() => setResto(false)} />
         ) : photoMode ? (
-          <PhotoDish apiKey={apiKey} model={model} onAdd={onAdd} onBack={() => setPhotoMode(false)} />
+          <PhotoDish ai={ai} onAdd={onAdd} onBack={() => setPhotoMode(false)} />
         ) : sel ? (
           <QtyPanel food={sel} initialQ={sel.lastQ ?? sel.defaultQ}
             portions={portionsFor(portions, sel.ref)} onSavePortion={onSavePortion} onRemovePortion={onRemovePortion}

@@ -3803,6 +3803,60 @@ pour tenir en 12 sp : « / 3210 » (sans « kcal »), « Nuit 5h17 » (au lieu d
 21:37 » (sans les secondes). Vérifié sur le téléphone par capture d'écran, avec les vraies données
 et avec le cas le plus long (« 88 Excellent », calories au-dessus de la cible).
 
+## Fournisseur IA au choix : Anthropic direct ou LiteLLM (26/10/2026, apps/perso v3.122.0)
+
+Demande de Yoann : basculer d'un fournisseur à l'autre en choisissant le modèle, via son serveur
+LiteLLM (hébergé sur Oracle, `https://141.253.109.120`, certificat Let's Encrypt d'adresse IP à
+durée courte, à renouvellement automatique côté serveur). Choix tranchés par question : **un seul
+modèle pour toute l'IA**, **Anthropic direct gardé à côté** (bascule en un tap si le serveur tombe).
+
+- **Réglages › « IA · fournisseur et modèle »** : sélecteur Anthropic direct / LiteLLM (le bouton en
+  citron est le fournisseur actif). En LiteLLM : adresse, clé, modèle, et « Charger les modèles du
+  serveur » (`GET /v1/models`, choix d'un tap, saisie libre possible).
+- **Clés** : `aiProvider`, `litellmUrl`, `litellmModel` dans `DATA_KEYS` ; `litellmKey` **hors export**
+  comme `apiKey`. App.jsx construit un seul objet `ai = { provider, apiKey, model, baseUrl }` passé au
+  Coach IA (analyse et bilan), à la Carte resto et à la Photo d'un plat (`lib/ai.js` : `aiMissing`,
+  `fmtCost`).
+- **`callClaude`** (`packages/core/src/coach/claudeApi.js`) : même requête au format Anthropic,
+  envoyée à `<serveur>/v1/messages` avec `Authorization: Bearer` quand `provider === "litellm"`.
+  **Sur l'app native, LiteLLM passe par `CapacitorHttp`** : le serveur ne répond pas à la vérification
+  CORS (404 sur OPTIONS, testé), que le client natif ne fait pas. Anthropic direct inchangé (fetch).
+  Nom « fournisseur/modèle » ramené au nom Anthropic (`baseModel`) pour le niveau de réflexion
+  (`SUPPORTS_EFFORT`) et les tarifs. **Secours Haiku seulement pour un Claude** (`fallbackFor` :
+  `anthropic/claude-haiku-4-5` via LiteLLM, aucun pour un autre fournisseur). **Coût** (`callCents`) :
+  nos tarifs pour un Claude connu, sinon l'en-tête `x-litellm-response-cost` du serveur, sinon
+  « coût inconnu » (jamais une estimation fausse). `callClaude` renvoie désormais `cents` ; `transport`
+  et `retryDelays` injectables pour les tests (5 tests ajoutés, 122 au total). apps/public : appels
+  inchangés (paramètres additifs, Anthropic par défaut).
+- **Carte resto** : la lecture d'un lien (`web_fetch`) n'existe que chez Claude ; avec un autre modèle
+  le champ lien est désactivé (« Lien indisponible avec ce modèle »).
+- **Testé sur le téléphone avec le vrai serveur** : liste des modèles (22, tous des Claude), réponse
+  simple avec `anthropic/claude-haiku-4-5` (coût renvoyé par le serveur). **Non vérifié** : niveau de
+  réflexion et lecture de lien à travers LiteLLM — Sonnet 5, Sonnet 5.5 et Haiku 5.5 renvoyaient tous
+  un 429 « rate limit » d'Anthropic au moment du test (limite de la clé Anthropic du serveur), seul
+  Haiku 4.5 passait. **Haiku 4.5 ne sait pas utiliser `web_fetch`** (400 « does not support
+  programmatic tool calling ») : vrai aussi en Anthropic direct, donc la Carte resto par lien ne
+  marche pas avec ce modèle, quel que soit le fournisseur.
+- **Passage à Claude Opus 5.5 pour toute l'IA (26/10/2026, v3.122.1)**, demande de Yoann : tarif
+  `claude-opus-5-5` ajouté à `PRICING` (4 $ / 20 $ par MTok), et `maxTokens` porté à **16 000** pour
+  les quatre usages (analyse 6 000, bilan 8 000, Carte resto 14 000, **Photo d'un plat 1 024**) : sur
+  Opus 5.5 la réflexion est toujours active et consomme ce même budget, 1 024 aurait coupé le JSON de
+  la photo. Simple plafond, seuls les tokens produits sont facturés. Réglages du téléphone basculés sur
+  « Anthropic direct » + `claude-opus-5-5` (via `cdp.mjs`, relu après redémarrage à froid) : le serveur
+  LiteLLM renvoyait des 429 sur tout sauf Haiku 4.5. Coût attendu ~2× Sonnet 5.5 (~9 ¢ l'analyse du
+  jour). Non testé par un vrai appel Opus à ce stade.
+
+## Habituels sous les repas : une ligne fine qui défile (26/10/2026, apps/perso v3.123.0)
+
+Retour de Yoann : les 3 habituels en grosses pastilles de 44 px (souvent sur 2 lignes) prenaient trop de
+place sous chaque repas. Quatre versions montrées en démo (artifact « Habituels sous les repas ») ;
+**proposition A retenue** : une seule ligne qui défile horizontalement, fondu à droite
+(`.p-strip` dans `design/theme.css`), pastilles **dessinées en 32 px** sur fond relief, sans bordure,
+mais **bouton de 44 px de haut** (`.p-pill` / `.p-pill__face`) pour garder la cible tactile minimale.
+« Comme hier » est dans la même ligne. Geste inchangé : un tap ajoute à la dernière quantité, « Annuler »
+pendant 5 s. Vérifié dans l'aperçu à 360 px : une ligne de 44 px, contenu plus large que l'écran qui
+défile sans déborder la page, ajout puis annulation corrects.
+
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 
 Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la

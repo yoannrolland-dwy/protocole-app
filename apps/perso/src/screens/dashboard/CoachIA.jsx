@@ -3,7 +3,8 @@ import { useState } from "react";
 import { Sparkles, ChevronRight, ChevronDown } from "lucide-react";
 import { splitCarnet } from "@rawcare/core/coach/prompt";
 import { C, Card, Label, Body, Btn, inputStyle } from "../../design/compat.jsx";
-import { costCents, callClaude } from "../../claudeApi.js";
+import { callClaude } from "../../claudeApi.js";
+import { aiMissing, fmtCost } from "../../lib/ai.js";
 
 /* ============================================================
    COACH IA
@@ -26,17 +27,20 @@ export function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
   const [kind, setKind] = useState("jour");
 
   const run = async (which = "jour") => {
-    if (!coach.apiKey) {
-      setErr("Ajoute ta clé API Anthropic dans Réglages pour activer l'analyse.");
+    const missing = aiMissing(coach.ai);
+    if (missing) {
+      setErr(missing);
       setState("error"); return;
     }
     if (which === "jour") saveNote(note);
     setState("loading"); setErr(""); setProgress(""); setMeta(null); setKind(which);
     try {
       const { system, user } = which === "bilan" ? coach.buildBilan() : coach.buildPrompt(note);
-      const askedModel = coach.model || "claude-sonnet-5-5";
-      const { data, usedModel } = await callClaude({
-        apiKey: coach.apiKey,
+      const askedModel = coach.ai.model || "claude-sonnet-5-5";
+      const { data, usedModel, cents } = await callClaude({
+        provider: coach.ai.provider,
+        baseUrl: coach.ai.baseUrl,
+        apiKey: coach.ai.apiKey,
         model: askedModel,
         system,
         user,
@@ -47,7 +51,9 @@ export function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
         // de Sonnet 4.6 en « high » pour une fraction du coût. Le bilan (moins de données en
         // entrée, mais 600 mots demandés au lieu de 500) garde une marge un peu plus large.
         effort: "medium",
-        maxTokens: which === "bilan" ? 8000 : 6000,
+        // 16000 (26/10/2026, passage à Opus 5.5) : sa réflexion, toujours active, consomme ce même
+        // budget avant le texte visible. Simple plafond : seuls les tokens produits sont facturés.
+        maxTokens: 16000,
         onRetry: setProgress,
       });
       setProgress("");
@@ -57,7 +63,7 @@ export function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
       let out = raw, journal = null;
       if (which === "jour") ({ advice: out, journal } = splitCarnet(raw));
       if (journal) saveJournal(journal);
-      setMeta({ model: usedModel, fellBack: usedModel !== askedModel, usage: data.usage, cents: costCents(usedModel, data.usage), carnet: !!journal });
+      setMeta({ model: usedModel, fellBack: usedModel !== askedModel, usage: data.usage, cents, carnet: !!journal });
       if (!out) {
         console.warn("CoachIA — réponse vide, réponse brute :", data);
         const hasThinking = (data.content || []).some((b) => b.type === "thinking" || b.type === "redacted_thinking");
@@ -134,7 +140,7 @@ export function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
             {meta.fellBack && <span style={{ color: C.accent }}> · {meta.model}</span>}
           </span>
           <span style={{ fontFamily: C.mono, fontSize: 13, color: C.accent, fontWeight: 700 }}>
-            ≈ {meta.cents < 1 ? meta.cents.toFixed(2) : meta.cents.toFixed(1)} ¢
+            {fmtCost(meta.cents)}
           </span>
         </div>
       )}

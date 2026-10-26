@@ -98,6 +98,11 @@ export default function App({ silent = false } = {}) {
   const [palierTick, setPalierTick] = useState(0);
   const [apiKey, setApiKeyState] = useState("");
   const [model, setModelState] = useState("claude-sonnet-5-5");
+  // Fournisseur IA (26/10/2026) : "anthropic" (direct, défaut) ou "litellm" (serveur de Yoann).
+  const [aiProvider, setAiProviderState] = useState("anthropic");
+  const [litellmUrl, setLitellmUrlState] = useState("");
+  const [litellmKey, setLitellmKeyState] = useState("");
+  const [litellmModel, setLitellmModelState] = useState("");
   const [coachProfile, setCoachProfileState] = useState("");
   const [coachJournal, setCoachJournalState] = useState("");
   const [lastAutoBackup, setLastAutoBackup] = useState(null);
@@ -152,6 +157,10 @@ export default function App({ silent = false } = {}) {
       setBasketScheduleState(purgedSchedule);
       setApiKeyState(await store.get("apiKey", ""));
       setModelState(await store.get("model", "claude-sonnet-5-5"));
+      setAiProviderState(await store.get("aiProvider", "anthropic"));
+      setLitellmUrlState(await store.get("litellmUrl", ""));
+      setLitellmKeyState(await store.get("litellmKey", ""));
+      setLitellmModelState(await store.get("litellmModel", ""));
       // Profil : amorcé une seule fois avec les règles auparavant codées en dur, pour que
       // rien ne soit perdu au passage. `null` = jamais initialisé ; une chaîne vide est un
       // choix délibéré de l'utilisateur et n'est donc jamais réamorcée.
@@ -421,6 +430,14 @@ export default function App({ silent = false } = {}) {
   const setBasketSchedule = (v) => { setBasketScheduleState(v); store.set("basketSchedule", v); };
   const setApiKey = (v) => { setApiKeyState(v); store.set("apiKey", v); };
   const setModel = (v) => { setModelState(v); store.set("model", v); };
+  const setAiProvider = (v) => { setAiProviderState(v); store.set("aiProvider", v); };
+  const setLitellmUrl = (v) => { setLitellmUrlState(v); store.set("litellmUrl", v); };
+  const setLitellmKey = (v) => { setLitellmKeyState(v); store.set("litellmKey", v); };
+  const setLitellmModel = (v) => { setLitellmModelState(v); store.set("litellmModel", v); };
+  // Un seul objet pour toute l'IA de l'app (Coach, Carte resto, Photo d'un plat).
+  const ai = aiProvider === "litellm"
+    ? { provider: "litellm", baseUrl: litellmUrl, apiKey: litellmKey, model: litellmModel }
+    : { provider: "anthropic", apiKey, model };
   const setCoachProfile = (v) => { setCoachProfileState(v); store.set("coachProfile", v); };
   const setCoachJournal = (v) => { setCoachJournalState(v); store.set("coachJournal", v); };
 
@@ -467,7 +484,7 @@ export default function App({ silent = false } = {}) {
       const facts = computeBilanFacts({ training, weight, macros, sleep, rhr, steps, knee, targets, tdeeResult, kcalTargetToday, todayDate: today() });
       return buildBilanPrompt({ facts, phase, targets, profile: coachProfile, notes });
     },
-    apiKey, model,
+    ai,
   };
 
   // Retour en haut au changement d'onglet (07/08/2026, retour de Yoann) : `<main>` est un
@@ -497,7 +514,7 @@ export default function App({ silent = false } = {}) {
       {/* Contenu */}
       <main ref={mainRef} style={{ flex: 1, overflowY: "auto", padding: "14px 16px 24px" }}>
         {loading ? <Empty>Chargement…</Empty> : showSettings ? (
-          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
+          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, aiProvider, setAiProvider, litellmUrl, setLitellmUrl, litellmKey, setLitellmKey, litellmModel, setLitellmModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
             {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, lastCloudBackup, basketSchedule, planFor: planForDate(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier, saveKnee: save.knee, onStart: startSession }} setTab={goTo} openSettings={() => setShowSettings(true)} />}
@@ -511,7 +528,7 @@ export default function App({ silent = false } = {}) {
             )}
             {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, startType }} onStartConsumed={() => setStartType(null)} />}
             {tab === "perf" && <PerformanceTab {...{ macros, targets, training, weight, phase, coach, todayNote, saveNote, saveJournal }} />}
-            {tab === "macro" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} apiKey={apiKey} model={model} />}
+            {tab === "macro" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} ai={ai} />}
           </>
         )}
       </main>

@@ -219,7 +219,7 @@ function UndoBar({ undo, onUndo }) {
   );
 }
 
-export default function NutritionTab({ targetsFor, macros, save, training, apiKey, model }) {
+export default function NutritionTab({ targetsFor, macros, save, training, ai }) {
   const [date, setDate] = useState(today());
   const [openMeal, setOpenMeal] = useState(null);
   // Distinct de openMeal : "Macro rapide" ouvre la même feuille mais directement sur la
@@ -557,19 +557,23 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
 
             {!panelOpen && (
               <>
+                {/* Une seule ligne fine qui défile (26/10/2026, proposition A choisie par Yoann sur
+                    démo) : les grosses pastilles de 44 px sur deux lignes prenaient trop de place. */}
                 {(habits.length > 0 || (entries.length === 0 && yEntries.length > 0)) && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  <div className="p-strip" role="group" aria-label={`Aliments habituels · ${meal.label}`} style={{ marginBlock: -6 }}>
                     {entries.length === 0 && yEntries.length > 0 && (
-                      <Chip onClick={() => { setYesterdayMeal(meal.key); setCopyMeal(null); }}>
-                        <History size={16} color={T.c.accent} aria-hidden="true" />Comme hier
-                      </Chip>
+                      <button type="button" className="p-tap p-pill" onClick={() => { setYesterdayMeal(meal.key); setCopyMeal(null); }}>
+                        <span className="p-pill__face"><History size={14} color={T.c.accent} aria-hidden="true" />Comme hier</span>
+                      </button>
                     )}
                     {habits.map((s) => (
-                      <Chip key={s.ref} onClick={() => addHabit(meal.key, s)} aria-label={`Ajouter ${s.name}, ${s.lastQ ?? 100} grammes`}>
-                        <Plus size={16} color={T.c.accent} aria-hidden="true" />
-                        <span style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
-                        <span style={{ ...mono, fontSize: 13, color: T.c.text2 }}>{s.lastQ ?? 100} g</span>
-                      </Chip>
+                      <button type="button" key={s.ref} className="p-tap p-pill" onClick={() => addHabit(meal.key, s)} aria-label={`Ajouter ${s.name}, ${s.lastQ ?? 100} grammes`}>
+                        <span className="p-pill__face">
+                          <Plus size={14} color={T.c.accent} aria-hidden="true" />
+                          <span style={{ maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
+                          <span style={{ ...mono, fontSize: 12, color: T.c.text2 }}>{s.lastQ ?? 100} g</span>
+                        </span>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -628,8 +632,7 @@ export default function NutritionTab({ targetsFor, macros, save, training, apiKe
           onCreateRecipe={food.addRecipe}
           onRemoveRecipe={food.removeRecipe}
           onUpdateRecipe={food.updateRecipe}
-          apiKey={apiKey}
-          model={model}
+          ai={ai}
           remaining={remainingResto}
           onLogDishes={logRestoDishes}
           onClose={closeSearch}

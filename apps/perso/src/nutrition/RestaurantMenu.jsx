@@ -29,7 +29,8 @@
 import React, { useState, useRef } from "react";
 import { ChevronLeft, Sparkles, Plus, Check, Camera, Image, X, Link } from "lucide-react";
 import { C, Btn, Label, Body, inputStyle } from "../design/compat.jsx";
-import { callClaude, costCents } from "../claudeApi.js";
+import { callClaude, isClaudeModel } from "../claudeApi.js";
+import { aiMissing, fmtCost } from "../lib/ai.js";
 import { fileToImagePayload } from "@rawcare/core/nutrition/imageUtils";
 
 // Messages clairs pour chaque `error_code` que peut renvoyer un bloc `web_fetch_tool_result`
@@ -165,7 +166,7 @@ function SuggestionCard({ s, dishesByName, onLog, logged }) {
 const CAT_LABEL = { entree: "Entrées", plat: "Plats", dessert: "Desserts", autre: "Autres" };
 const CAT_ORDER = ["entree", "plat", "dessert", "autre"];
 
-export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDishes, onBack }) {
+export default function RestaurantMenu({ ai, remaining, meal, onLogDishes, onBack }) {
   const [menuText, setMenuText] = useState("");
   const [menuUrl, setMenuUrl] = useState("");
   const [photos, setPhotos] = useState([]); // [{id, dataUrl, base64, mediaType}]
@@ -193,21 +194,26 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
   };
   const removePhoto = (id) => setPhotos((prev) => prev.filter((p) => p.id !== id));
 
-  const hasInput = menuText.trim().length > 0 || photos.length > 0 || menuUrl.trim().length > 0;
+  // Lire une page web (outil web_fetch) n'existe que chez Claude : avec un autre modèle via
+  // LiteLLM (26/10/2026), le champ lien est désactivé et ignoré.
+  const canFetch = isClaudeModel(ai?.provider, ai?.model);
+  const urlIn = canFetch ? menuUrl : "";
+  const hasInput = menuText.trim().length > 0 || photos.length > 0 || urlIn.trim().length > 0;
 
   const run = async () => {
-    if (!apiKey) { setErr("Ajoute ta clé API Anthropic dans Réglages pour activer cette fonction."); setState("error"); return; }
+    const missing = aiMissing(ai);
+    if (missing) { setErr(missing); setState("error"); return; }
     if (!hasInput) return;
     setState("loading"); setErr(""); setProgress(""); setResult(null); setMeta(null); setLoggedKeys(new Set());
     try {
       const hasPhotos = photos.length > 0;
-      const hasUrl = menuUrl.trim().length > 0;
-      const text = buildUserText(menuText, remaining, hasPhotos, menuUrl);
+      const hasUrl = urlIn.trim().length > 0;
+      const text = buildUserText(menuText, remaining, hasPhotos, urlIn);
       const user = hasPhotos
         ? [...photos.map((p) => ({ type: "image", source: { type: "base64", media_type: p.mediaType, data: p.base64 } })),
            { type: "text", text }]
         : text;
-      const askedModel = model || "claude-sonnet-5";
+      const askedModel = ai.model || "claude-sonnet-5";
       // web_fetch : outil serveur, aucun header beta requis, ne lit qu'une URL déjà présente
       // dans le message (celle qu'on vient d'y écrire) — cf. commentaire d'en-tête du fichier.
       // `max_content_tokens` : 5000 → 20000 le 07/09/2026 (une page de carte resto classique,
@@ -226,9 +232,9 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
       // réflexion du modèle consomme CE MÊME budget avant le texte visible, et une carte
       // fournie (30+ plats, plusieurs menus à trier/dédupliquer) demande une réflexion non
       // négligeable avant même la première ligne du JSON.
-      const { data, usedModel } = await callClaude({
-        apiKey, model: askedModel, system: SYSTEM_PROMPT, user, tools,
-        effort: "medium", maxTokens: 14000, onRetry: setProgress,
+      const { data, usedModel, cents } = await callClaude({
+        provider: ai.provider, baseUrl: ai.baseUrl, apiKey: ai.apiKey, model: askedModel, system: SYSTEM_PROMPT, user, tools,
+        effort: "medium", maxTokens: 16000, onRetry: setProgress, // 16000 : Opus 5.5 (26/10/2026)
       });
       setProgress("");
       // Échec net de lecture du lien (page bloquée/inaccessible/type non supporté) : jusqu'ici
@@ -248,7 +254,7 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
         setState("error");
         return;
       }
-      setMeta({ model: usedModel, fellBack: usedModel !== askedModel, usage: data.usage, cents: costCents(usedModel, data.usage), fetchErr });
+      setMeta({ model: usedModel, fellBack: usedModel !== askedModel, usage: data.usage, cents, fetchErr });
       setResult({ plats: parsed.plats || [], suggestions: parsed.suggestions || [] });
       setState("done");
     } catch (e) {
@@ -344,8 +350,9 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
 
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
           <Link size={12} color={C.muted} style={{ flexShrink: 0 }} />
-          <input type="url" inputMode="url" value={menuUrl} onChange={(e) => setMenuUrl(e.target.value)}
-            placeholder="Ou colle un lien vers le menu (site du resto)"
+          <input type="url" inputMode="url" value={urlIn} onChange={(e) => setMenuUrl(e.target.value)} disabled={!canFetch}
+            aria-label="Lien vers le menu"
+            placeholder={canFetch ? "Ou colle un lien vers le menu (site du resto)" : "Lien indisponible avec ce modèle"}
             style={{ ...inputStyle(false), fontSize: 12, fontWeight: 400, width: "100%" }} />
         </div>
 
@@ -393,7 +400,7 @@ export default function RestaurantMenu({ apiKey, model, remaining, meal, onLogDi
 
             {meta && (
               <Body style={{ fontSize: 12, color: C.dim, textAlign: "center" }}>
-                {meta.model}{meta.fellBack ? " (bascule)" : ""} · {meta.cents.toFixed(1)}¢
+                {meta.model}{meta.fellBack ? " (bascule)" : ""} · {fmtCost(meta.cents)}
               </Body>
             )}
           </>

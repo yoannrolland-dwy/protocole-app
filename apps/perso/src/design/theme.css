@@ -63,6 +63,24 @@
 .p-iconbtn--danger { color: var(--c-danger); border-color: var(--c-danger-line); }
 .p-iconbtn[aria-pressed="true"] { color: var(--c-accent); border-color: var(--c-accent); }
 
+/* Ligne d'habituels sous un repas (26/10/2026, proposition A) : une seule ligne qui défile, fondu à
+   droite. La pastille se dessine en 32 px, mais le bouton garde 44 px de haut (cible tactile). */
+.p-strip {
+  display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
+  -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent);
+}
+.p-strip::-webkit-scrollbar { display: none; }
+.p-pill {
+  flex-shrink: 0; display: inline-flex; align-items: center; min-height: 44px; padding: 0;
+  border: none; background: transparent; color: var(--c-text); font-family: inherit;
+}
+.p-pill__face {
+  display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 10px; border-radius: var(--r-pill);
+  background: var(--c-raised); font-size: 13px; font-weight: 600; white-space: nowrap;
+}
+.p-pill:focus-visible { outline: none; }
+.p-pill:focus-visible .p-pill__face { outline: 3px solid var(--c-accent); outline-offset: 2px; }
+
 /* Ligne à cocher (« Comme hier ») : toute la ligne est la cible, pas seulement la case. */
 .p-check {
   display: flex; align-items: center; gap: var(--s-3); width: 100%; min-height: 52px;

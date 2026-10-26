@@ -9,16 +9,30 @@ import { PHASES, kcalFromMacros } from "@rawcare/core/targets";
 import { C, today, fmt, Card, Label, Body, Btn, inputStyle, TextInput, Stepper, Field, Pills, ScreenHeader } from "../../design/compat.jsx";
 import { BasketScheduleCard } from "./BasketScheduleCard.jsx";
 import { APP_VERSION } from "../../version.js";
+import { listLiteLLMModels } from "@rawcare/core/coach/claudeApi";
 
 /* ============================================================
    RÉGLAGES
    ============================================================ */
-export function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, healthSync, onHealthSync,
+export function SettingsPanel({ apiKey, setApiKey, model, setModel,
+                         aiProvider, setAiProvider, litellmUrl, setLitellmUrl, litellmKey, setLitellmKey, litellmModel, setLitellmModel, onClose, healthSync, onHealthSync,
                          coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, saveTargets, buildBriefing,
                          lastAutoBackup, lastCloudBackup, onCloudBackupDone, phase, setPhase,
                          basketSchedule, setBasketSchedule }) {
   const [k, setK] = useState(apiKey);
   const [m, setM] = useState(model);
+  const [lUrl, setLUrl] = useState(litellmUrl);
+  const [lKey, setLKey] = useState(litellmKey);
+  const [lModel, setLModel] = useState(litellmModel);
+  const [lModels, setLModels] = useState(null);   // liste renvoyée par le serveur, null = pas chargée
+  const [lMsg, setLMsg] = useState("");
+  const loadModels = async () => {
+    setLMsg("Chargement…");
+    try {
+      const ids = await listLiteLLMModels({ baseUrl: lUrl.trim(), apiKey: lKey.trim() });
+      setLModels(ids); setLMsg(ids.length ? "" : "Le serveur ne liste aucun modèle.");
+    } catch (e) { setLModels(null); setLMsg(`Impossible de lire la liste : ${e.message}`); }
+  };
   const [msg, setMsg] = useState("");
   const [prof, setProf] = useState(coachProfile);
   const [jour, setJour] = useState(coachJournal);
@@ -219,17 +233,53 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel, onClose, hea
         </Card>
       )}
 
+      {/* Fournisseur IA (26/10/2026) : Anthropic direct ou serveur LiteLLM. Le modèle choisi sert
+          à toute l'IA de l'app (Coach, Bilan, Carte resto, Photo d'un plat). */}
       <Card>
-        <Label style={{ marginBottom: 8 }}>Coach IA · clé API Anthropic</Label>
-        <TextInput type="password" value={k} onChange={(e) => setK(e.target.value)} placeholder="sk-ant-..." style={{ marginBottom: 10 }} />
-        <Label style={{ marginBottom: 6 }}>Modèle</Label>
-        <TextInput value={m} onChange={(e) => setM(e.target.value)} placeholder="claude-sonnet-5-5" style={{ marginBottom: 12 }} />
-        <Btn variant="primary" onClick={() => { setApiKey(k.trim()); setModel(m.trim() || "claude-sonnet-5-5"); setMsg("Réglages enregistrés."); }} style={{ width: "100%" }}>
-          Enregistrer
-        </Btn>
-        <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>
-          Clé stockée uniquement sur cet appareil, envoyée directement à l'API Anthropic. Chaque analyse consomme des crédits.
-        </Body>
+        <Label style={{ marginBottom: 8 }}>IA · fournisseur et modèle</Label>
+        <Pills options={[{ key: "anthropic", label: "Anthropic direct" }, { key: "litellm", label: "LiteLLM" }]}
+          value={aiProvider} onChange={(v) => { setAiProvider(v); setMsg(""); }} small />
+        <div style={{ height: 12 }} />
+        {aiProvider === "litellm" ? (
+          <>
+            <Label style={{ marginBottom: 6 }}>Adresse du serveur</Label>
+            <TextInput type="url" inputMode="url" value={lUrl} onChange={(e) => setLUrl(e.target.value)} placeholder="https://…" style={{ marginBottom: 10 }} />
+            <Label style={{ marginBottom: 6 }}>Clé LiteLLM</Label>
+            <TextInput type="password" value={lKey} onChange={(e) => setLKey(e.target.value)} placeholder="sk-..." style={{ marginBottom: 10 }} />
+            <Label style={{ marginBottom: 6 }}>Modèle</Label>
+            <TextInput value={lModel} onChange={(e) => setLModel(e.target.value)} placeholder="anthropic/claude-sonnet-5-5" style={{ marginBottom: 8 }} />
+            <Btn variant="plain" onClick={loadModels} disabled={!lUrl.trim() || !lKey.trim()} style={{ width: "100%", marginBottom: 8 }}>
+              Charger les modèles du serveur
+            </Btn>
+            {lMsg && <Body style={{ fontSize: 13, color: C.text2, marginBottom: 8 }}>{lMsg}</Body>}
+            {lModels?.length > 0 && (
+              <div role="group" aria-label="Modèles du serveur" style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                {lModels.map((id) => (
+                  <button key={id} type="button" className="p-tap p-chip" aria-pressed={lModel === id} onClick={() => setLModel(id)}>{id}</button>
+                ))}
+              </div>
+            )}
+            <Btn variant="primary" onClick={() => { setLitellmUrl(lUrl.trim()); setLitellmKey(lKey.trim()); setLitellmModel(lModel.trim()); setMsg("Réglages enregistrés."); }} style={{ width: "100%" }}>
+              Enregistrer
+            </Btn>
+            <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>
+              Clé stockée uniquement sur cet appareil, envoyée à ton serveur LiteLLM. La lecture d'un lien dans Carte resto n'existe qu'avec un modèle Claude.
+            </Body>
+          </>
+        ) : (
+          <>
+            <Label style={{ marginBottom: 6 }}>Clé API Anthropic</Label>
+            <TextInput type="password" value={k} onChange={(e) => setK(e.target.value)} placeholder="sk-ant-..." style={{ marginBottom: 10 }} />
+            <Label style={{ marginBottom: 6 }}>Modèle</Label>
+            <TextInput value={m} onChange={(e) => setM(e.target.value)} placeholder="claude-sonnet-5-5" style={{ marginBottom: 12 }} />
+            <Btn variant="primary" onClick={() => { setApiKey(k.trim()); setModel(m.trim() || "claude-sonnet-5-5"); setMsg("Réglages enregistrés."); }} style={{ width: "100%" }}>
+              Enregistrer
+            </Btn>
+            <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>
+              Clé stockée uniquement sur cet appareil, envoyée directement à l'API Anthropic. Chaque analyse consomme des crédits.
+            </Body>
+          </>
+        )}
       </Card>
 
       <Card>

@@ -16,7 +16,8 @@
 import React, { useState, useRef } from "react";
 import { ChevronLeft, Sparkles, Plus, Camera, Image, X } from "lucide-react";
 import { C, Btn, Label, Body, inputStyle } from "../design/compat.jsx";
-import { callClaude, costCents } from "../claudeApi.js";
+import { callClaude } from "../claudeApi.js";
+import { aiMissing, fmtCost } from "../lib/ai.js";
 import { fileToImagePayload } from "@rawcare/core/nutrition/imageUtils";
 import { newQuickRef } from "./foodStore.js";
 
@@ -59,7 +60,7 @@ function buildUserText(note) {
     : "Estime les macros de ce plat à partir de la ou des photos ci-jointes.";
 }
 
-export default function PhotoDish({ apiKey, model, onAdd, onBack }) {
+export default function PhotoDish({ ai, onAdd, onBack }) {
   const [photos, setPhotos] = useState([]); // [{id, dataUrl, base64, mediaType}]
   const [photoErr, setPhotoErr] = useState("");
   const fileInputRef = useRef(null);
@@ -87,7 +88,8 @@ export default function PhotoDish({ apiKey, model, onAdd, onBack }) {
   const removePhoto = (id) => setPhotos((prev) => prev.filter((p) => p.id !== id));
 
   const run = async () => {
-    if (!apiKey) { setErr("Ajoute ta clé API Anthropic dans Réglages pour activer cette fonction."); setState("error"); return; }
+    const missing = aiMissing(ai);
+    if (missing) { setErr(missing); setState("error"); return; }
     if (!photos.length) return;
     setState("loading"); setErr(""); setProgress(""); setResult(null); setMeta(null); setAdded(false);
     try {
@@ -95,10 +97,11 @@ export default function PhotoDish({ apiKey, model, onAdd, onBack }) {
         ...photos.map((p) => ({ type: "image", source: { type: "base64", media_type: p.mediaType, data: p.base64 } })),
         { type: "text", text: buildUserText(note) },
       ];
-      const askedModel = model || "claude-sonnet-5";
-      const { data, usedModel } = await callClaude({
-        apiKey, model: askedModel, system: SYSTEM_PROMPT, user,
-        effort: "medium", maxTokens: 1024, onRetry: setProgress,
+      const askedModel = ai.model || "claude-sonnet-5";
+      const { data, usedModel, cents } = await callClaude({
+        provider: ai.provider, baseUrl: ai.baseUrl, apiKey: ai.apiKey, model: askedModel, system: SYSTEM_PROMPT, user,
+        // 1024 → 16000 (26/10/2026) : avec Opus 5.5 la réflexion toujours active aurait coupé le JSON.
+        effort: "medium", maxTokens: 16000, onRetry: setProgress,
       });
       setProgress("");
       const raw = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
@@ -113,7 +116,7 @@ export default function PhotoDish({ apiKey, model, onAdd, onBack }) {
         setState("error");
         return;
       }
-      setMeta({ model: usedModel, fellBack: usedModel !== askedModel, usage: data.usage, cents: costCents(usedModel, data.usage) });
+      setMeta({ model: usedModel, fellBack: usedModel !== askedModel, usage: data.usage, cents });
       setResult(parsed);
       setState("done");
     } catch (e) {
@@ -224,7 +227,7 @@ export default function PhotoDish({ apiKey, model, onAdd, onBack }) {
           </Btn>
           {meta && (
             <Body style={{ fontSize: 12, color: C.dim, textAlign: "center", marginTop: 8 }}>
-              {meta.model}{meta.fellBack ? " (bascule)" : ""} · {meta.cents.toFixed(1)}¢
+              {meta.model}{meta.fellBack ? " (bascule)" : ""} · {fmtCost(meta.cents)}
             </Body>
           )}
         </div>
