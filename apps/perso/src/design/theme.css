@@ -22,6 +22,10 @@
 
 /* ---------- surfaces ---------- */
 .p-card { background: var(--c-card); border: 1px solid var(--c-line-soft); border-radius: var(--r-lg); padding: var(--s-4); }
+/* Une carte en grille ne s'élargit jamais au-delà de son conteneur (27/10/2026) : sans ça, une rangée
+   trop large (police d'Android agrandie) élargissait la carte, puis tout l'écran (défilement
+   horizontal). Une carte qui définit ses propres colonnes en ligne garde les siennes. */
+.p-card { grid-template-columns: minmax(0, 1fr); min-width: 0; }
 .p-card--key { border-color: var(--c-accent-line); }
 .p-card--danger { background: var(--c-danger-bg); border-color: var(--c-danger-line); }
 

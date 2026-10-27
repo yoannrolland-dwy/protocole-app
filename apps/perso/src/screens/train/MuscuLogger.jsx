@@ -308,15 +308,21 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
     ));
   };
 
+  // « + Série / − Série » plus discrets (27/10/2026, retour de Yoann : trop gros) : 44 px de haut
+  // (cible tactile minimale) au lieu de 52, texte 14 px, simple contour, largeur du contenu.
+  const setBtnStyle = {
+    display: "inline-flex", alignItems: "center", gap: 6, minHeight: 44, padding: "0 14px", borderRadius: 10,
+    background: "transparent", border: `1px solid ${T.c.line}`, color: T.c.text2, fontSize: 14, fontWeight: 600, fontFamily: "inherit",
+  };
   const setButtons = (e, ei, leg) => (
-    <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-      <Button variant="plain" style={{ flex: 1 }} onClick={() => addSet(ei, leg)}>
-        <Plus size={18} aria-hidden="true" />Série{leg ? ` ${leg}` : ""}
-      </Button>
-      <Button variant="plain" style={{ flex: 1 }} disabled={lastRemovable(e, leg) < 0} onClick={() => rmLastSet(ei, leg)}
+    <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+      <button type="button" className="p-tap" style={setBtnStyle} onClick={() => addSet(ei, leg)}>
+        <Plus size={16} aria-hidden="true" />Série{leg ? ` ${leg}` : ""}
+      </button>
+      <button type="button" className="p-tap" style={setBtnStyle} disabled={lastRemovable(e, leg) < 0} onClick={() => rmLastSet(ei, leg)}
         aria-label={`Retirer la dernière série${leg ? ` ${leg === "G" ? "gauche" : "droite"}` : ""} non cochée`}>
-        <Minus size={18} aria-hidden="true" />Série{leg ? ` ${leg}` : ""}
-      </Button>
+        <Minus size={16} aria-hidden="true" />Série{leg ? ` ${leg}` : ""}
+      </button>
     </div>
   );
 
@@ -343,7 +349,9 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   );
 
   return (
-    <div style={{ display: "grid", gap: 12, fontFamily: T.f.body, color: T.c.text }}>
+    // `minmax(0, 1fr)` (27/10/2026) : une ligne trop large reste dans sa carte au lieu d'élargir tout
+    // le carnet (défilement horizontal constaté avec la police d'Android agrandie).
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12, fontFamily: T.f.body, color: T.c.text }}>
       {timerBand}
 
       {/* En-tête séance */}
@@ -354,14 +362,14 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
         <div className="p-sec" style={{ marginTop: 2 }}>débuté {start} · {doneCount}/{exos.length} exos</div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
         {field("Date", <input type="date" className="p-field" value={date} max={today()}
           onChange={(e) => e.target.value && onDate(e.target.value)} aria-label="Date de la séance" style={{ fontFamily: T.f.num }} />)}
         {field("Début", <input type="time" className="p-field" value={start} onChange={(e) => setStart(e.target.value)} aria-label="Heure de début" />)}
       </div>
 
       {template.withMeta && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
           {field("Durée", <NumberField value={duration} onChange={setDuration} unit="min" inputMode="numeric" label="Durée en minutes" />)}
           {field("RPE", <NumberField value={rpe} onChange={setRpe} inputMode="numeric" label="RPE sur 10" />)}
         </div>
@@ -371,15 +379,16 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
       {!timer.running && (
         <Panel>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Timer size={20} color={T.c.text2} aria-hidden="true" />
-            <span style={{ ...mono, fontSize: 28, fontWeight: 700, flex: 1 }}>{mmss(timer.remaining)}</span>
+            <span style={{ ...mono, fontSize: 28, fontWeight: 700, flex: 1, minWidth: 0 }}>{mmss(timer.remaining)}</span>
             <IconButton label="Remettre le minuteur à zéro" onClick={() => restTimer.set(timer.secs)}><RotateCcw size={20} aria-hidden="true" /></IconButton>
             <Button variant="primary" onClick={() => restTimer.toggle(openName())}><Play size={18} aria-hidden="true" />Lancer</Button>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             {[120, 90, 60, 45, 30].map((s) => (
               <Chip key={s} on={timer.secs === s} onClick={() => { restTimer.set(s); if (open !== -1) recordLast(open, s); }}
-                style={{ flex: 1, justifyContent: "center", padding: 0 }}>
+                // minWidth 0 (27/10/2026) : sans ça, 5 × 48 px ne rétrécissaient pas et, avec la
+                // police d'Android agrandie, élargissaient tout le carnet (défilement horizontal).
+                style={{ flex: 1, minWidth: 0, justifyContent: "center", padding: 0 }}>
                 <span style={mono}>{mmss(s)}</span>
               </Chip>
             ))}

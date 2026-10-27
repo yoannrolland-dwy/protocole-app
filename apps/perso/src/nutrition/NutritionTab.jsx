@@ -413,7 +413,9 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
     : diff < 0 ? `Il y a ${-diff} jours` : `Dans ${diff} jours`;
 
   return (
-    <div style={{ display: "grid", gap: 12, fontFamily: T.f.body, color: T.c.text }}
+    // `minmax(0, 1fr)` (27/10/2026) : une ligne trop large ne peut plus élargir tout l'écran
+    // (défilement horizontal constaté avec la police d'Android agrandie).
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12, fontFamily: T.f.body, color: T.c.text }}
       onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
 
       {/* Barre du jour collante. Hors aujourd'hui elle passe en CITRON PLEIN, texte noir, avec le
@@ -499,14 +501,15 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Droplet size={18} color={waterColor} aria-hidden="true" style={{ flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 0, display: "grid", gap: 5 }}>
-            <span style={{ ...mono, fontSize: 15, fontWeight: 700, whiteSpace: "nowrap", color: waterColor === COLORS.accent ? T.c.text : waterColor }}>
-              {(water / 1000).toFixed(2)}<span style={{ fontSize: 13, color: T.c.text2 }}> / {(waterTgt / 1000).toFixed(1)} L</span>
+            {/* La cible passe sous la valeur quand la place manque (police agrandie, 27/10/2026). */}
+            <span style={{ ...mono, fontSize: 15, fontWeight: 700, color: waterColor === COLORS.accent ? T.c.text : waterColor }}>
+              {(water / 1000).toFixed(2)}<span style={{ fontSize: 13, color: T.c.text2, whiteSpace: "nowrap" }}> / {(waterTgt / 1000).toFixed(1)} L</span>
             </span>
             <Bar pct={(water / waterTgt) * 100} color={waterColor} h={4} />
           </div>
           {[[250, "+250"], [500, "+500"], [-250, "−250"]].map(([ml, l]) => (
             <button key={ml} type="button" className="p-tap" onClick={() => addWater(ml)} aria-label={ml > 0 ? `Ajouter ${ml} ml d'eau` : "Retirer 250 ml d'eau"}
-              style={{ minWidth: 52, height: 44, padding: "0 8px", borderRadius: 10, border: `1px solid ${T.c.line}`, background: T.c.raised,
+              style={{ minWidth: 44, height: 44, padding: "0 6px", borderRadius: 10, border: `1px solid ${T.c.line}`, background: T.c.raised,
                 color: T.c.text, fontFamily: T.f.num, fontSize: 14, fontWeight: 700, flexShrink: 0 }}>{l}</button>
           ))}
         </div>

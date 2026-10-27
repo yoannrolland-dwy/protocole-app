@@ -263,7 +263,7 @@ function FreeEntry({ onAdd, onBack, backLabel = "Saisie libre" }) {
           : "Macros de la portion réellement mangée, pas pour 100 g."}
       </div>
       <TextField value={name} onChange={setName} placeholder="Nom (optionnel — ex. Skyr vanille 150 g)" label="Nom" enterKeyHint="next" onEnter={() => refs.current[0]?.focus()} />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
         {FIELDS.map(([k, l], i) => (
           <div key={k} style={{ display: "grid", gap: 6, minWidth: 0 }}>
             <Eyebrow>{l} (g)</Eyebrow>
@@ -601,7 +601,7 @@ function OverridePanel({ food, shown, override, onSave, onClear, onCancel }) {
   return (
     <div style={{ background: C.bg, border: `1.5px solid ${C.accent}`, borderRadius: 8, padding: 12 }}>
       <Label style={{ marginBottom: 4 }}>Corriger · valeurs pour 100 g</Label>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 6 }}>
         {MACROS.map((m) => (
           <div key={m}>
             <div style={{ fontSize: 12, color: C.muted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 3, textAlign: "center" }}>

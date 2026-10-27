@@ -12,7 +12,8 @@ export const CORPS_SUBS = [
 
 export function CorpsTab({ sub, onSub, children }) {
   return (
-    <div style={{ display: "grid", gap: 14 }}>
+    // `minmax(0, 1fr)` (27/10/2026) : un sous-écran trop large ne peut plus élargir la page.
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 14 }}>
       <div role="tablist" aria-label="Corps" style={{
         display: "flex", gap: 4, padding: 4, borderRadius: 14,
         background: T.c.card, border: `1px solid ${T.c.lineSoft}`, fontFamily: T.f.body,

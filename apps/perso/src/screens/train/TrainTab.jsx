@@ -111,7 +111,7 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {/* Choix du type */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
         {TYPES.map((type) => {
           const sel = open === type;
           return (

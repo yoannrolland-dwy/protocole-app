@@ -3857,6 +3857,30 @@ mais **bouton de 44 px de haut** (`.p-pill` / `.p-pill__face`) pour garder la ci
 pendant 5 s. Vérifié dans l'aperçu à 360 px : une ligne de 44 px, contenu plus large que l'écran qui
 défile sans déborder la page, ajout puis annulation corrects.
 
+## Défilement horizontal corrigé, boutons de série plus discrets (27/10/2026, apps/perso v3.123.1)
+
+Retour de Yoann : l'écran des séances obligeait à défiler horizontalement, et « + Série / − Série »
+étaient trop gros.
+- **Cause** : dans une grille à une colonne (`display: grid` sans colonnes définies, ou `1fr`), la
+  colonne vaut au minimum la largeur minimale de son contenu le plus large. Une seule rangée qui ne
+  rétrécit pas (les 5 pastilles de temps de repos à 48 px, la ligne du minuteur, la rangée de l'eau,
+  les deux champs Heures/Minutes du sommeil avec leurs −/+) élargit alors la carte, puis tout l'écran.
+- **Correctifs** : règle `.p-card { grid-template-columns: minmax(0, 1fr); min-width: 0 }`
+  (`design/theme.css`) pour toutes les cartes ; colonne `minmax(0, 1fr)` sur les racines du carnet,
+  de Nutrition, du Bord et de Corps ; toutes les grilles `"1fr 1fr"` / `repeat(5, 1fr)` passées en
+  `minmax(0, 1fr)` ; pastilles de repos en `minWidth: 0` ; icône décorative du minuteur au repos
+  retirée ; eau : cible « / 2.0 L » qui passe sous la valeur si besoin, boutons 44 px ; sommeil :
+  Heures et Minutes l'une sous l'autre. **À retenir pour tout nouvel écran : une grille ou une
+  colonne flexible prend `minmax(0, 1fr)`, jamais `1fr` seul.**
+- **« + Série / − Série »** : boutons de 44 px de haut, texte 14 px, simple contour, largeur du
+  contenu (au lieu de deux boutons pleine largeur de 52 px).
+- **Vérifié** : aperçu à 312 px puis 288 px (simulation d'une police agrandie), 23 écrans et états
+  (9 types de carnet avec minuteur en marche, Nutrition et ses sous-écrans, Corps ×4, Analyse,
+  Réglages) sans débordement ; sur le téléphone (360 px, police Android à 100 %), 8 écrans et les
+  9 carnets avec chaque exercice ouvert (73 états) sans débordement. Le cas exact vu par Yoann sur
+  l'ancienne version n'a pas été reproduit sur le téléphone (non mesuré avant l'installation) : la
+  cause corrigée est celle trouvée par la simulation.
+
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 
 Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la

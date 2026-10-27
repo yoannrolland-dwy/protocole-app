@@ -109,7 +109,7 @@ export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targe
   const top = suggestions[0];
 
   return (
-    <div style={{ display: "grid", gap: 12, fontFamily: T.f.body, color: T.c.text }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12, fontFamily: T.f.body, color: T.c.text }}>
       {/* Sauvegarde externe périmée : le rappel doit être là où l'app s'ouvre, pas seulement
           enterré dans les Réglages — c'est lui qui fait que la sauvegarde a lieu. */}
       {isBackupStale(lastCloudBackup) && (
@@ -126,7 +126,7 @@ export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targe
       )}
 
       {/* Énergie + Poids : ce que Yoann regarde en premier le matin (moments d'usage U1). */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
         <Tile big label="Énergie" onClick={() => setTab("sleep")}
           value={energy.status === "ok" ? energy.total : "—"} unit={energy.status === "ok" ? "/100" : ""}
           // Couleur portée par le libellé, pas par le chiffre, et la MÊME que dans Corps › Énergie

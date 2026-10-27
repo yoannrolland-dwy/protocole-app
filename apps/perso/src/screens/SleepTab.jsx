@@ -114,7 +114,7 @@ export function SleepTab({ sleep, rhr, steps, naps, save }) {
         )}
       </Card>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
         <div style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
           <Label>Durée moy. 7j</Label>
           <div style={{ fontFamily: C.mono, fontSize: 20, fontWeight: 800, color: C.text, marginTop: 3 }}>{avg7 != null ? fmtHM(avg7) : "—"}</div>
@@ -131,7 +131,9 @@ export function SleepTab({ sleep, rhr, steps, naps, save }) {
           <SyncedBanner onCorrect={() => setForceManual(true)} />
         ) : (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {/* Heures et minutes l'une sous l'autre (27/10/2026) : côte à côte, leurs −/+ de 52 px ne
+                tenaient plus sur une ligne avec la police d'Android agrandie. */}
+            <div style={{ display: "grid", gap: 10 }}>
               <Field label="Heures"><Stepper value={h} set={setH} step={1} min={0} max={16} int /></Field>
               <Field label="Minutes"><Stepper value={min} set={setMin} step={5} min={0} max={59} int /></Field>
             </div>
