@@ -3888,6 +3888,30 @@ Réglage de quantité d'un aliment (`QtyPanel`, `FoodSearch.jsx`) : la pastille 
 une seule ligne à 360 px (les 6 passaient sur deux lignes). 30 g reste possible au clavier ou en
 portion nommée. `apps/public` non touché.
 
+## Widget : barres de progression, police en gras, tap vers le bon écran (27/10/2026, apps/perso v3.124.0)
+
+Demande de Yoann : un widget « à l'image de l'app ». Il a choisi barres, polices et tap vers le bon
+écran ; il a gardé la disposition à 6 tuiles (pas celle du Bord).
+- **Barres** sous Calories, Pas et Eau (`ProgressBar` 3 dp, `drawable/widget_progress.xml` : fond
+  `#22221f`, remplissage citron). Le JS envoie `bar` (0-100) et `barColor` (`progressColor`, donc
+  citron en cours, orange/rouge au-delà pour les calories, bleu une fois la cible atteinte pour pas
+  et eau) ; le Kotlin teinte la barre (`setColorStateList(..., "setProgressTintList")`, Android 12+
+  seulement, sinon citron). Vérifié sur le téléphone en citron ; les autres couleurs n'ont pas été
+  vues (aucune cible atteinte au moment du test).
+- **Polices** : **le lanceur Samsung ignore les polices fournies par l'app** (`@font/…` dans le
+  layout du widget, testé sur le téléphone : affichage en Roboto). Choix de Yoann : polices système
+  proches plutôt que du texte dessiné en image. Chiffres et notes en `monospace` (chiffres en gras),
+  libellés en `sans-serif` gras avec interlettrage, « ÉNERGIE » avec son accent. Ne pas retenter
+  `@font` dans le widget.
+- **Tap sur une tuile** : Poids → Corps › Poids, Énergie → Corps › Énergie, Pas → Corps › Pas,
+  Calories et Eau → Nutrition ; le fond du widget ouvre l'app normalement, Sync inchangé. Un
+  `PendingIntent` par tuile (`TILE_TABS`, extra `open_tab`, code de requête distinct) ;
+  `MainActivity.onNewIntent` garde l'intent (app en `singleTask`) ; `WidgetBridge.consumeOpenTab`
+  le lit puis l'efface ; `App.jsx` l'applique via `goTo` au lancement et à chaque retour au premier
+  plan. Vérifié sur le téléphone, app ouverte (Pas) et app fermée par Android (Calories). Après un
+  « Forcer l'arrêt », Android annule ces liens jusqu'à la prochaine mise à jour du widget (ouvrir
+  l'app une fois suffit).
+
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 
 Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la

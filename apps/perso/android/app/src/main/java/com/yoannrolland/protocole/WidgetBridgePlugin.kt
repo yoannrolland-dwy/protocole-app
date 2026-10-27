@@ -22,6 +22,7 @@ class WidgetBridgePlugin : Plugin() {
     companion object {
         const val PREFS = "widget_dashboard"
         const val EXTRA_SILENT_SYNC = "silent_sync"
+        const val EXTRA_OPEN_TAB = "open_tab"
         // "sync" n'a pas de tuile de valeur affichée (seulement une note, l'heure de la
         // dernière synchro) : sa clé "value" est stockée mais jamais lue. "energie" (ex-
         // "sommeil", 05/09/2026) : score d'énergie en valeur, durée de sommeil réelle en note.
@@ -42,6 +43,9 @@ class WidgetBridgePlugin : Plugin() {
                 // dépassement ne reste pas affichée le lendemain.
                 editor.putString("${key}_color", tile.getString("color", ""))
                 editor.putString("${key}_labelColor", tile.getString("labelColor", ""))
+                // Barre de progression (27/10/2026) : 0-100 et couleur, absentes = barre vide.
+                editor.putInt("${key}_bar", tile.getInteger("bar", 0) ?: 0)
+                editor.putString("${key}_barColor", tile.getString("barColor", ""))
             }
         }
         editor.apply()
@@ -58,6 +62,16 @@ class WidgetBridgePlugin : Plugin() {
     fun isSilentSync(call: PluginCall) {
         val silent = activity?.intent?.getBooleanExtra(EXTRA_SILENT_SYNC, false) ?: false
         call.resolve(JSObject().put("silent", silent))
+    }
+
+    /** Écran demandé par un tap sur une tuile du widget ("weight", "macro"…), ou "" si aucun.
+     *  L'extra est effacé après lecture : revenir dans l'app plus tard ne rouvre pas cet écran. */
+    @PluginMethod
+    fun consumeOpenTab(call: PluginCall) {
+        val intent = activity?.intent
+        val tab = intent?.getStringExtra(EXTRA_OPEN_TAB) ?: ""
+        intent?.removeExtra(EXTRA_OPEN_TAB)
+        call.resolve(JSObject().put("tab", tab))
     }
 
     /** Appelé par le JS une fois la synchro (et la mise à jour du widget) terminées : arrête

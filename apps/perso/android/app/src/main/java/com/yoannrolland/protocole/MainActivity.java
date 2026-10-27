@@ -1,5 +1,6 @@
 package com.yoannrolland.protocole;
 
+import android.content.Intent;
 import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
 
@@ -14,5 +15,13 @@ public class MainActivity extends BridgeActivity {
         // Pont vers le widget d'écran d'accueil (voir WidgetBridgePlugin.kt)
         registerPlugin(WidgetBridgePlugin.class);
         super.onCreate(savedInstanceState);
+    }
+
+    // L'app est en singleTask : un tap sur une tuile du widget quand elle tourne déjà arrive ici,
+    // pas dans onCreate. On garde ce nouvel intent pour que WidgetBridge.consumeOpenTab le lise.
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
     }
 }

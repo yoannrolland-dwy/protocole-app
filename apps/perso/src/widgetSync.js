@@ -10,11 +10,24 @@ const WidgetBridge = registerPlugin("WidgetBridge");
 
 /**
  * snapshot attendu : { poids, pas, calories, eau, energie, sync } — chacun
- * { value: string, note: string, color?: "#rrggbb" }. color = couleur du chiffre (absente ou
- * "" = blanc) ; energie porte labelColor = couleur du libellé après le score (« 88 Excellent »). "sync" n'affiche pas sa valeur (juste l'icône Sync),
+ * { value: string, note: string, color?: "#rrggbb", bar?: 0-100, barColor?: "#rrggbb" }.
+ * color = couleur du chiffre (absente ou "" = blanc) ; bar/barColor = barre de progression
+ * (pas, calories, eau seulement) ; energie porte labelColor = couleur du libellé après le score (« 88 Excellent »). "sync" n'affiche pas sa valeur (juste l'icône Sync),
  * seule sa note (horodatage de dernière synchro) est utilisée. "energie" (ex-"sommeil",
  * 05/09/2026) affiche le score d'énergie en valeur et la durée de sommeil réelle en note.
  */
+/** Écran demandé par un tap sur une tuile du widget (clé de `goTo` : "weight", "macro"…), ou ""
+ *  si l'app a été ouverte autrement. Lu une seule fois : l'extra est effacé côté natif. */
+export async function consumeWidgetTab() {
+  if (!Capacitor.isNativePlatform()) return "";
+  try {
+    const { tab } = await WidgetBridge.consumeOpenTab();
+    return tab || "";
+  } catch {
+    return "";
+  }
+}
+
 export async function updateDashboardWidget(snapshot) {
   if (!Capacitor.isNativePlatform()) return;
   try {

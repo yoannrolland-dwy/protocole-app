@@ -31,6 +31,9 @@
                 android:textSize="12sp"
                 android:maxLines="1"
                 android:ellipsize="end"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif"
+                android:letterSpacing="0.06"
                 android:textColor="#bdbdb4" />
 
             <TextView
@@ -76,6 +79,9 @@
                 android:textSize="12sp"
                 android:maxLines="1"
                 android:ellipsize="end"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif"
+                android:letterSpacing="0.06"
                 android:textColor="#bdbdb4" />
 
             <TextView
@@ -90,6 +96,16 @@
                 android:textStyle="bold"
                 android:fontFamily="monospace"
                 android:textColor="#f5f5f0" />
+
+            <ProgressBar
+                android:id="@+id/tile_calories_bar"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="3dp"
+                android:layout_marginTop="2dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_progress" />
 
             <TextView
                 android:id="@+id/tile_calories_note"
@@ -117,10 +133,13 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="ENERGIE"
+                android:text="ÉNERGIE"
                 android:textSize="12sp"
                 android:maxLines="1"
                 android:ellipsize="end"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif"
+                android:letterSpacing="0.06"
                 android:textColor="#bdbdb4" />
 
             <TextView
@@ -173,6 +192,9 @@
                 android:textSize="12sp"
                 android:maxLines="1"
                 android:ellipsize="end"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif"
+                android:letterSpacing="0.06"
                 android:textColor="#bdbdb4" />
 
             <TextView
@@ -187,6 +209,16 @@
                 android:textStyle="bold"
                 android:fontFamily="monospace"
                 android:textColor="#f5f5f0" />
+
+            <ProgressBar
+                android:id="@+id/tile_pas_bar"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="3dp"
+                android:layout_marginTop="2dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_progress" />
 
             <TextView
                 android:id="@+id/tile_pas_note"
@@ -218,6 +250,9 @@
                 android:textSize="12sp"
                 android:maxLines="1"
                 android:ellipsize="end"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif"
+                android:letterSpacing="0.06"
                 android:textColor="#bdbdb4" />
 
             <TextView
@@ -232,6 +267,16 @@
                 android:textStyle="bold"
                 android:fontFamily="monospace"
                 android:textColor="#f5f5f0" />
+
+            <ProgressBar
+                android:id="@+id/tile_eau_bar"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="3dp"
+                android:layout_marginTop="2dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_progress" />
 
             <TextView
                 android:id="@+id/tile_eau_note"
@@ -263,6 +308,9 @@
                 android:textSize="12sp"
                 android:maxLines="1"
                 android:ellipsize="end"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif"
+                android:letterSpacing="0.06"
                 android:textColor="#bdbdb4" />
 
             <LinearLayout

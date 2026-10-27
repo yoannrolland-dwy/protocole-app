@@ -8,7 +8,9 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.res.ColorStateList
 import android.graphics.Color
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.text.SpannableString
@@ -19,8 +21,8 @@ import android.widget.RemoteViews
 
 /**
  * Widget d'écran d'accueil : 5 tuiles du tableau de bord (Poids, Calories, Énergie,
- * Pas, Eau) en lecture seule, plus un bouton Sync. Tap sur une tuile de donnée ou sur
- * le fond du widget = ouvre l'app normalement. Le bouton Sync, lui, lance
+ * Pas, Eau) en lecture seule, plus un bouton Sync. Tap sur une tuile de donnée = ouvre l'app
+ * sur l'écran correspondant (TILE_TABS) ; tap sur le fond = ouvre l'app normalement. Le bouton Sync, lui, lance
  * SilentSyncActivity (invisible) qui exécute la synchro Health Connect sans jamais
  * afficher l'UI, pendant que l'icône tourne ici (startSpin/stopSpin). Les valeurs
  * viennent des SharedPreferences écrites par WidgetBridgePlugin (le JS calcule et
@@ -95,6 +97,28 @@ class DashboardWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(noteId, prefs.getString("${key}_note", ""))
         }
 
+        // Barre de progression (27/10/2026) : remplissage 0-100 et couleur calculés par le JS
+        // (progressColor, comme les barres de l'app). La teinte n'est modifiable depuis un widget
+        // qu'à partir d'Android 12 ; avant, la barre reste citron (widget_progress.xml).
+        private fun fillBar(views: RemoteViews, barId: Int, prefs: SharedPreferences, key: String) {
+            views.setProgressBar(barId, 100, prefs.getInt("${key}_bar", 0).coerceIn(0, 100), false)
+            val color = parse(prefs.getString("${key}_barColor", ""))
+            if (color != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                views.setColorStateList(barId, "setProgressTintList", ColorStateList.valueOf(color))
+            }
+        }
+
+        // Tap sur une tuile (27/10/2026) : ouvre l'app sur l'écran correspondant. L'écran voyage
+        // dans l'extra EXTRA_OPEN_TAB, lu puis effacé par le JS (WidgetBridge.consumeOpenTab).
+        // Un code de requête par tuile, sinon Android réutiliserait le même PendingIntent et ses extras.
+        private val TILE_TABS = listOf(
+            Triple(R.id.tile_poids, "weight", 10),
+            Triple(R.id.tile_calories, "macro", 11),
+            Triple(R.id.tile_energie, "sleep", 12),
+            Triple(R.id.tile_pas, "steps", 13),
+            Triple(R.id.tile_eau, "macro", 14),
+        )
+
         private fun buildViews(context: Context, prefs: SharedPreferences, syncAngle: Float): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.widget_dashboard)
 
@@ -103,6 +127,9 @@ class DashboardWidgetProvider : AppWidgetProvider() {
             fillTile(views, R.id.tile_calories_value, R.id.tile_calories_note, prefs, "calories")
             fillTile(views, R.id.tile_eau_value, R.id.tile_eau_note, prefs, "eau")
             fillTile(views, R.id.tile_energie_value, R.id.tile_energie_note, prefs, "energie")
+            fillBar(views, R.id.tile_pas_bar, prefs, "pas")
+            fillBar(views, R.id.tile_calories_bar, prefs, "calories")
+            fillBar(views, R.id.tile_eau_bar, prefs, "eau")
             views.setTextViewText(R.id.tile_sync_note, prefs.getString("sync_note", ""))
             views.setFloat(R.id.tile_sync_icon, "setRotation", syncAngle)
 
@@ -113,6 +140,19 @@ class DashboardWidgetProvider : AppWidgetProvider() {
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
                 )
                 views.setOnClickPendingIntent(R.id.widget_root, pending)
+            }
+            for ((tileId, tab, requestCode) in TILE_TABS) {
+                val tabIntent = Intent(context, MainActivity::class.java).apply {
+                    action = Intent.ACTION_MAIN
+                    addCategory(Intent.CATEGORY_LAUNCHER)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    putExtra(WidgetBridgePlugin.EXTRA_OPEN_TAB, tab)
+                }
+                val tabPending = PendingIntent.getActivity(
+                    context, requestCode, tabIntent,
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                )
+                views.setOnClickPendingIntent(tileId, tabPending)
             }
 
             // Bouton Sync : lance l'activité invisible plutôt que l'app normale, sans

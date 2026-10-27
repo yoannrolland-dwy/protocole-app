@@ -10,7 +10,7 @@ import { recommendTargets, palierWeekOf, loggedRateLastDays } from "@rawcare/cor
 import { nextSessions } from "@rawcare/core/nextSession";
 import { buildCoachPrompt, buildCoachBriefing, buildBilanPrompt, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
 import { syncHealthConnect } from "./healthSync.js";
-import { updateDashboardWidget } from "./widgetSync.js";
+import { updateDashboardWidget, consumeWidgetTab } from "./widgetSync.js";
 import { runAutoBackup } from "./autoBackup.js";
 import { C, today, shiftDateKey, fmt, round, longDate, byDate, upsert, lastN, fmtHM } from "./ui.jsx";
 import { Empty } from "./design/compat.jsx"; // « Chargement… » en gris lisible v2
@@ -300,9 +300,14 @@ export default function App({ silent = false } = {}) {
   // Resynchro à chaque retour au premier plan (pas seulement au lancement à froid)
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
-    const handle = CapacitorApp.addListener("resume", () => { runHealthSync(); doAutoBackup(); setPalierTick((t) => t + 1); });
+    const handle = CapacitorApp.addListener("resume", () => { runHealthSync(); doAutoBackup(); setPalierTick((t) => t + 1); openWidgetTab(); });
     return () => { handle.then((h) => h.remove()); };
   }, []);
+
+  // Tap sur une tuile du widget (27/10/2026) : l'app s'ouvre sur l'écran de la tuile. Lu au
+  // lancement (app fermée) et à chaque retour au premier plan (app déjà ouverte).
+  const openWidgetTab = () => consumeWidgetTab().then((t) => { if (t) goTo(t); });
+  useEffect(() => { if (!silent) openWidgetTab(); }, []);
 
   // Widget d'écran d'accueil (Android) : 5 valeurs des tuiles du tableau de bord
   // (Poids, Calories, Énergie, Pas, Eau), reformatées pour l'affichage natif — la 6e
@@ -330,14 +335,20 @@ export default function App({ silent = false } = {}) {
     // blanc tant que la cible n'est pas atteinte (citron = « en cours »), puis prend la couleur
     // de `progressColor` ; pour l'énergie, seul le libellé est coloré (`scoreColor`). "" = blanc.
     const valColor = (c) => (c === COLORS.accent ? "" : c);
+    // Barre de progression (27/10/2026) : comme les barres de l'app, citron en cours, puis la
+    // couleur de dépassement (orange/rouge) ou de cible atteinte (bleu).
+    const bar = (v, tgt, kind) => ({
+      bar: v != null && tgt > 0 ? Math.round(Math.min(v / tgt, 1) * 100) : 0,
+      barColor: progressColor(v, tgt, kind),
+    });
     updateDashboardWidget({
       poids: { value: wLast ? `${wLast.kg} kg` : "—", note: wLast ? fmt(wLast.date) : "—" },
       pas: { value: stepsToday.toLocaleString("fr-FR"), note: `/ ${STEPS_TARGET.toLocaleString("fr-FR")}`,
-        color: valColor(progressColor(stepsToday, STEPS_TARGET, "goal")) },
+        color: valColor(progressColor(stepsToday, STEPS_TARGET, "goal")), ...bar(stepsToday, STEPS_TARGET, "goal") },
       calories: { value: kcalToday != null ? `${kcalToday}` : "—", note: `/ ${kcalTgt}`,
-        color: valColor(progressColor(kcalToday, kcalTgt, "limit")) },
+        color: valColor(progressColor(kcalToday, kcalTgt, "limit")), ...bar(kcalToday, kcalTgt, "limit") },
       eau: { value: `${(waterToday / 1000).toFixed(2)} L`, note: `/ ${(waterTgt / 1000).toFixed(1)} L`,
-        color: valColor(progressColor(waterToday, waterTgt, "goal")) },
+        color: valColor(progressColor(waterToday, waterTgt, "goal")), ...bar(waterToday, waterTgt, "goal") },
       energie: {
         value: energyDash.status === "ok" ? `${energyDash.total} ${scoreLabel(energyDash.total)}` : "—",
         note: lastNightDash ? `Nuit ${fmtHM(lastNightDash.hours)}` : "—",
