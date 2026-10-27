@@ -514,7 +514,7 @@ function QtyPanel({ food, initialQ, portions, onSavePortion, onRemovePortion, on
         )}
 
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {[30, 50, 100, 150, 200, 250].map((v) => (
+          {[50, 100, 150, 200, 250].map((v) => (
             <Chip key={v} on={q === v} onClick={() => setQ(v)}><span style={mono}>{v}</span></Chip>
           ))}
         </div>

@@ -3881,6 +3881,13 @@ Retour de Yoann : l'écran des séances obligeait à défiler horizontalement, e
   l'ancienne version n'a pas été reproduit sur le téléphone (non mesuré avant l'installation) : la
   cause corrigée est celle trouvée par la simulation.
 
+## Quantités rapides sans le 30 g (27/10/2026, apps/perso v3.123.2)
+
+Réglage de quantité d'un aliment (`QtyPanel`, `FoodSearch.jsx`) : la pastille **30** est retirée
+(« ne sert pas à grand chose ») ; restent 50 · 100 · 150 · 200 · 250, qui tiennent désormais sur
+une seule ligne à 360 px (les 6 passaient sur deux lignes). 30 g reste possible au clavier ou en
+portion nommée. `apps/public` non touché.
+
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 
 Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la
