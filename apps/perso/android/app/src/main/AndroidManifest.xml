@@ -79,6 +79,11 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Widget (28/10/2026) : relit les pas toutes les 30 min sans ouvrir l'app
+         (WidgetStepsRefresher.kt). Android 14+ exige cette permission pour lire Health Connect
+         hors de l'app ; l'utilisateur l'accorde depuis Réglages → Health Connect. -->
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
+
     <!-- M7 (03/08/2026) : @capgo/capacitor-health déclare ces 4 permissions Health Connect
          inconditionnellement dans son propre manifeste, qu'on les demande ou non à
          l'exécution. Depuis la bascule M6, l'app ne lit (ni n'écrit) plus jamais nutrition

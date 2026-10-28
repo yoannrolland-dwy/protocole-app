@@ -10,5 +10,5 @@
     android:targetCellHeight="2"
     android:resizeMode="vertical|horizontal"
     android:widgetCategory="home_screen"
-    android:updatePeriodMillis="0"
+    android:updatePeriodMillis="1800000"
     android:description="@string/widget_dashboard_description" />

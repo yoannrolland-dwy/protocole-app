@@ -1,6 +1,9 @@
 package com.yoannrolland.protocole
 
+import androidx.activity.result.ActivityResult
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.PermissionController
+import com.getcapacitor.annotation.ActivityCallback
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.HydrationRecord
 import androidx.health.connect.client.records.HeartRateRecord
@@ -439,6 +442,41 @@ class HealthNutritionPlugin : Plugin() {
                 call.reject("Vérification des permissions impossible : ${e.message}")
             }
         }
+    }
+
+    /** Widget (28/10/2026) : ce Health Connect sait-il lire en arrière-plan, et est-ce accordé ? */
+    @PluginMethod
+    fun backgroundReadStatus(call: PluginCall) {
+        val hc = WidgetStepsRefresher.client(context) ?: run {
+            call.resolve(JSObject().put("supported", false).put("granted", false))
+            return
+        }
+        scope.launch {
+            try {
+                val supported = WidgetStepsRefresher.backgroundSupported(hc)
+                val granted = hc.permissionController.getGrantedPermissions()
+                call.resolve(JSObject().put("supported", supported).put("granted",
+                    supported && granted.containsAll(setOf(WidgetStepsRefresher.STEPS_PERMISSION, WidgetStepsRefresher.BACKGROUND_PERMISSION))))
+            } catch (e: Exception) {
+                call.reject("Vérification impossible : ${e.message}")
+            }
+        }
+    }
+
+    /** Ouvre l'écran Health Connect pour accorder l'accès en arrière-plan (pas du widget). */
+    @PluginMethod
+    fun requestBackgroundRead(call: PluginCall) {
+        val intent = PermissionController.createRequestPermissionResultContract()
+            .createIntent(context, setOf(WidgetStepsRefresher.STEPS_PERMISSION, WidgetStepsRefresher.BACKGROUND_PERMISSION))
+        startActivityForResult(call, intent, "onBackgroundReadResult")
+    }
+
+    @ActivityCallback
+    fun onBackgroundReadResult(call: PluginCall?, result: ActivityResult) {
+        if (call == null) return
+        val granted = PermissionController.createRequestPermissionResultContract()
+            .parseResult(result.resultCode, result.data)
+        call.resolve(JSObject().put("granted", granted.contains(WidgetStepsRefresher.BACKGROUND_PERMISSION)))
     }
 
     /**

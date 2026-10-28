@@ -18,6 +18,10 @@ import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.text.style.TypefaceSpan
 import android.widget.RemoteViews
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Widget d'écran d'accueil : 5 tuiles du tableau de bord (Poids, Calories, Énergie,
@@ -173,7 +177,21 @@ class DashboardWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    // Réveil toutes les 30 min (updatePeriodMillis) : on redessine tout de suite avec les valeurs
+    // connues, puis on relit les pas dans Health Connect (WidgetStepsRefresher, 28/10/2026).
+    // goAsync() laisse ~10 s au récepteur ; au-delà, on abandonne sans rien écrire.
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         updateAll(context, appWidgetManager, appWidgetIds)
+        val pending = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val wrote = withTimeoutOrNull(8_000) { WidgetStepsRefresher.refresh(context) } == true
+                if (wrote) updateAll(context, appWidgetManager, widgetIds(context))
+            } catch (e: Exception) {
+                // Health Connect indisponible ou refus : le widget garde les dernières valeurs.
+            } finally {
+                pending.finish()
+            }
+        }
     }
 }

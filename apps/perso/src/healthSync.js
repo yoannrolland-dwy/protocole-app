@@ -156,3 +156,18 @@ export async function syncHealthConnect() {
 
   return { status: "ok", stepsByDate, sleepByDate, weightByDate, weightTimeByDate, rhrByDate, napsByDate };
 }
+
+// Widget (28/10/2026) : le widget relit lui-même les pas toutes les 30 min (WidgetStepsRefresher.kt),
+// ce qui exige l'accès Health Connect « en arrière-plan ». `supported` faux = ce Health Connect ne
+// le propose pas ; le widget reste alors mis à jour seulement par l'app.
+export async function widgetBackgroundStatus() {
+  if (!Capacitor.isNativePlatform()) return { supported: false, granted: false };
+  try { return await HealthNutrition.backgroundReadStatus(); }
+  catch { return { supported: false, granted: false }; }
+}
+
+export async function requestWidgetBackground() {
+  if (!Capacitor.isNativePlatform()) return { granted: false };
+  try { return await HealthNutrition.requestBackgroundRead(); }
+  catch { return { granted: false }; }
+}

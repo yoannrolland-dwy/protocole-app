@@ -1,6 +1,6 @@
 // Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; rendu v2 à l'étape 8 d'U3 via
 // design/compat.jsx (mêmes primitives, valeurs v2), polices écrites en dur remontées à 12-13 px.
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Download, Upload, X, Copy } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { exportData, importData } from "../../store.js";
@@ -10,6 +10,7 @@ import { C, today, fmt, Card, Label, Body, Btn, inputStyle, TextInput, Stepper, 
 import { BasketScheduleCard } from "./BasketScheduleCard.jsx";
 import { APP_VERSION } from "../../version.js";
 import { listLiteLLMModels } from "@rawcare/core/coach/claudeApi";
+import { widgetBackgroundStatus, requestWidgetBackground } from "../../healthSync.js";
 
 /* ============================================================
    RÉGLAGES
@@ -21,6 +22,9 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
                          basketSchedule, setBasketSchedule }) {
   const [k, setK] = useState(apiKey);
   const [m, setM] = useState(model);
+  // Accès Health Connect en arrière-plan pour le widget (28/10/2026), relu à chaque ouverture.
+  const [widgetBg, setWidgetBg] = useState(null);
+  useEffect(() => { widgetBackgroundStatus().then(setWidgetBg); }, []);
   const [lUrl, setLUrl] = useState(litellmUrl);
   const [lKey, setLKey] = useState(litellmKey);
   const [lModel, setLModel] = useState(litellmModel);
@@ -230,6 +234,27 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
           <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>
             Synchronise automatiquement au lancement et à chaque retour au premier plan. Écrase toujours la valeur locale du jour concerné.
           </Body>
+          {/* Widget (28/10/2026) : sans cet accès, le widget ne change que quand l'app tourne. */}
+          {widgetBg?.supported && (
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+              <Label style={{ marginBottom: 6 }}>Widget · pas en arrière-plan</Label>
+              {widgetBg.granted ? (
+                <Body style={{ fontSize: 13, color: C.text2 }}>
+                  Activé : le widget relit tes pas toutes les 30 min environ, sans ouvrir l'app.
+                </Body>
+              ) : (
+                <>
+                  <Body style={{ fontSize: 13, color: C.text2, marginBottom: 10 }}>
+                    Pour que le widget mette à jour tes pas tout seul (toutes les 30 min environ), autorise l'accès en arrière-plan dans Health Connect.
+                  </Body>
+                  <Btn variant="primary" style={{ width: "100%" }}
+                    onClick={async () => { await requestWidgetBackground(); setWidgetBg(await widgetBackgroundStatus()); }}>
+                    Autoriser l'accès en arrière-plan
+                  </Btn>
+                </>
+              )}
+            </div>
+          )}
         </Card>
       )}
 

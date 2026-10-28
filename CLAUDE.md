@@ -3912,6 +3912,32 @@ Demande de Yoann : un widget « à l'image de l'app ». Il a choisi barres, poli
   « Forcer l'arrêt », Android annule ces liens jusqu'à la prochaine mise à jour du widget (ouvrir
   l'app une fois suffit).
 
+## Widget : pas relus toutes les 30 min sans ouvrir l'app (28/10/2026, apps/perso v3.125.0)
+
+Retour de Yoann : il devait appuyer sur Sync pour que les pas du widget bougent. Cause : le widget
+avait `updatePeriodMillis="0"` et aucune tâche de fond, donc il ne changeait que quand l'app tournait
+(ouverture, retour au premier plan, Sync). Choix de Yoann : relecture toutes les 30 min.
+- **`updatePeriodMillis="1800000"`** (30 min, le minimum Android) : `DashboardWidgetProvider.onUpdate`
+  redessine aussitôt, puis `goAsync()` + coroutine (8 s max) appelle **`WidgetStepsRefresher.refresh`**
+  (nouveau, Kotlin) : lit les `StepsRecord` du jour (un jour de marge avant minuit), **même règle que
+  `stepsByLocalDay`** (date locale du milieu, somme par source, source la plus haute), écrit
+  `pas_value`/`pas_color`/`pas_bar`/`pas_barColor`/`sync_note` dans les préférences du widget, mêmes
+  couleurs que l'instantané JS. **Pas seulement** : calories/eau (journal de l'app) et énergie (calcul
+  JS) restent mis à jour par l'app, pour ne jamais avoir deux calculs. Aucune nouvelle dépendance.
+- **Permission `READ_HEALTH_DATA_IN_BACKGROUND`** (manifeste ; obligatoire depuis Android 14 pour lire
+  Health Connect hors de l'app). Accordée depuis **Réglages › Health Connect › « Widget · pas en
+  arrière-plan »** (bouton qui ouvre l'écran Health Connect via
+  `PermissionController.createRequestPermissionResultContract`, méthodes `backgroundReadStatus` /
+  `requestBackgroundRead` de `HealthNutritionPlugin`). Sans elle, `refresh` ne fait rien.
+- **Limite inchangée** : Health Connect reçoit les pas de Samsung Health par paquets, le widget peut
+  donc rester un peu en retard sur la montre. Android peut aussi décaler un réveil en veille profonde.
+- **Vérifié sur le téléphone** : permission accordée par Yoann, réveil automatique à 18h47 (prévu
+  17h54 + 30 min, fenêtre Android jusqu'à +50 min) avec l'écran d'accueil au premier plan et l'app
+  fermée → « MAJ 18:47 », pas identiques à l'app. Android interdit de forcer le réveil depuis adb
+  (`APPWIDGET_UPDATE` protégé) : pour retester, attendre le réveil (`dumpsys alarm`, tag
+  `APPWIDGET_UPDATE`). Barre arrondie comme le JS (`Math.round`) après un écart 82 / 83 % vu au test.
+  Intervalle 15 min (alarme exacte) proposé et refusé par Yoann : on garde 30 min.
+
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 
 Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la
