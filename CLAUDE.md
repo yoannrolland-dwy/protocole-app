@@ -5702,3 +5702,10 @@ puis le relire).
   Les valeurs fausses déjà stockées (24 et 25/10) sont corrigées à la synchro suivante (fenêtre 14 j).
 - **Test** `steps.test.mjs` (112 tests au total) avec les **enregistrements réels** relevés ce jour-là.
   Non testable dans l'aperçu (natif) : à vérifier sur le téléphone après install.
+
+## Nutrition : « Dupliquer cette journée » ouvre le jour cible (29/10/2026, apps/perso v3.135.1)
+
+Après « Copier » dans le panneau « Dupliquer cette journée », Nutrition affiche directement le jour
+de destination (barre du jour en citron s'il n'est pas aujourd'hui) et remonte en haut de l'écran.
+Avant, on restait sur le jour d'origine, en bas de page. Rien ne change dans ce qui est copié.
+Vérifié dans l'aperçu (copie vers le 31/10 → « Dans 2 jours · sam. 31 oct. », haut de page).

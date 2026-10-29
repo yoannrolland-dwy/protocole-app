@@ -377,6 +377,9 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
       copyEntries(dayEntries.filter((e) => e.meal === mealKey), { date: targetDate, meal: mealKey }));
     if (toAdd.length) food.addMany(toAdd);
     setDuplicating(false);
+    // Après la copie, on affiche le jour cible, en haut de l'écran (demande du 29/10/2026).
+    setDate(targetDate);
+    document.querySelector("main")?.scrollTo(0, 0);
   };
 
   // Le changement de jour au doigt (03/08/2026) a été retiré le 29/10/2026 à la demande de
