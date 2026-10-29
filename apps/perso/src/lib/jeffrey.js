@@ -82,6 +82,8 @@ export const PHRASES = {
   personaReset: ["Personnalité d'origine rétablie, Monsieur."],
   cardHello: ["Bonjour Monsieur. Je vous fais le point de la matinée ?", "Bien le bonjour, Monsieur. Un point sur la journée ?"],
   cardTalk: ["Un mot, Monsieur ?", "Je suis là, Monsieur."],
+  actionDone: ["Fait, Monsieur.", "C'est fait, Monsieur.", "Voilà qui est fait, Monsieur."],
+  actionCancelled: ["Bien, Monsieur, je n'en fais rien."],
 
   // --- Notifications
   backupReminderTitle: ["Jeffrey"],

@@ -8,12 +8,13 @@ import { TEMPLATES } from "@rawcare/core/session/templates";
 import { streamClaude } from "@rawcare/core/coach/claudeApi";
 import {
   jeffreyAsk, readReply, effortFor, validateSessionChoice, continuationIfSilent, withMemory,
+  isActionTool, validateAction, appendNote,
 } from "@rawcare/core/coach/jeffrey";
 import { T } from "../../design/tokens.js";
 import { Panel, Eyebrow, Button, IconButton, Chip } from "../../design/primitives.jsx";
 import { today } from "../../ui.jsx";
 import { aiMissing, fmtCost, recordSpend } from "../../lib/ai.js";
-import { sayStable, sayError } from "../../lib/jeffrey.js";
+import { say, sayStable, sayError } from "../../lib/jeffrey.js";
 import { streamTransportFor } from "../../lib/jeffreyHttp.js";
 
 const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -40,10 +41,34 @@ function SessionCard({ choice, onStart }) {
   );
 }
 
-function Message({ entry, onStart }) {
+// Action proposée par Jeffrey (J2) : rien n'est écrit sans un tap. Genou sans « retour à la
+// base » connu : la carte pose la question au lieu d'un simple Confirmer.
+function ActionCard({ action, onDecide }) {
+  const box = { border: `1px solid ${T.c.line}`, borderRadius: 12, padding: 12, display: "grid", gap: 8, background: T.c.field };
+  if (action.status === "done") return <div style={{ ...box, color: T.c.text2, fontSize: 14 }}>✓ {action.label} — <span style={{ color: T.c.accent }}>{action.doneText}</span></div>;
+  if (action.status === "cancelled") return <div style={{ ...box, color: T.c.muted, fontSize: 14 }}>{action.label} — {action.doneText}</div>;
+  const askBase = action.kind === "genou" && action.baseline == null;
+  return (
+    <div style={box}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: T.c.text }}>{action.label}</div>
+      {askBase && <div style={{ fontSize: 14, color: T.c.text2 }}>Retour à la douleur de base sous 24 h ?</div>}
+      <div style={{ display: "grid", gridTemplateColumns: askBase ? "minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)" : "minmax(0,1fr) minmax(0,1fr)", gap: 8 }}>
+        {askBase ? (
+          <>
+            <Button variant="primary" onClick={() => onDecide(action, true, true)}>Oui</Button>
+            <Button variant="outline" onClick={() => onDecide(action, true, false)}>Non</Button>
+          </>
+        ) : <Button variant="primary" onClick={() => onDecide(action, true)}>Confirmer</Button>}
+        <Button variant="plain" onClick={() => onDecide(action, false)}>Annuler</Button>
+      </div>
+    </div>
+  );
+}
+
+function Message({ entry, onStart, onDecide }) {
   if (entry.hidden) return null;
   // Réponse muette relancée (continuationIfSilent) : rien à montrer, son coût est dans le total.
-  if (entry.role === "assistant" && !entry.text && !entry.choices?.length) return null;
+  if (entry.role === "assistant" && !entry.text && !entry.choices?.length && !entry.actions?.length) return null;
   if (entry.role === "user") {
     return (
       <div style={{ justifySelf: "end", maxWidth: "85%", background: T.c.raised, borderRadius: "14px 14px 4px 14px", padding: "10px 12px", fontSize: 15, color: T.c.text, whiteSpace: "pre-wrap", lineHeight: 1.45 }}>
@@ -55,6 +80,7 @@ function Message({ entry, onStart }) {
     <div style={{ display: "grid", gap: 8, maxWidth: "100%" }}>
       {entry.text && <div style={{ fontSize: 15, color: T.c.text, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{entry.text}</div>}
       {(entry.choices || []).map((c) => <SessionCard key={c.id} choice={c} onStart={onStart} />)}
+      {(entry.actions || []).map((a) => <ActionCard key={a.id} action={a} onDecide={(act, ok, base) => onDecide(entry.id, act, ok, base)} />)}
       {entry.meta && <div className="p-num" style={{ fontSize: 12, color: T.c.muted }}>{fmtCost(entry.meta.cents)}</div>}
     </div>
   );
@@ -63,7 +89,7 @@ function Message({ entry, onStart }) {
 // `memory` (J1.3) : { date, entries } d'un jour passé pas encore versé au carnet, ou null ;
 // `onMemoryDone(date)` quand Jeffrey a réécrit son carnet avec. `initialAsk` : demande lancée à
 // l'ouverture (« point » depuis la carte du tableau de bord), une seule fois.
-export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, saveJournal, onStart, memory, onMemoryDone, initialAsk }) {
+export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, saveJournal, onStart, memory, onMemoryDone, initialAsk, onAction }) {
   const [draft, setDraft] = useState("");
   const [live, setLive] = useState(null); // { text, progress } pendant une réponse
   const [err, setErr] = useState("");
@@ -111,7 +137,14 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
         const tools = message.content.filter((b) => b.type === "tool_use");
         const toolResults = {};
         const choices = [];
+        const actions = [];
         for (const t of tools) {
+          if (isActionTool(t.name)) {
+            const v = validateAction(t.name, t.input);
+            toolResults[t.id] = v.ok ? "Proposée à Monsieur, en attente de sa confirmation : rien n'est fait pour l'instant." : `Refusée par l'application : ${v.reason}.`;
+            if (v.ok) actions.push({ id: t.id, ...v.action, status: "pending" });
+            continue;
+          }
           if (t.name === "choisir_seance") {
             const v = validateSessionChoice(t.input, req.allowed);
             toolResults[t.id] = v.ok ? "Proposée à Monsieur, avec un bouton pour la démarrer." : `Refusée par l'application : ${v.reason}. Ne la proposez pas.`;
@@ -120,7 +153,7 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
         }
         const quick = tools.find((t) => t.name === "proposer_reponses");
         history = [...history, {
-          id: newId(), role: "assistant", at: hhmm(), content: message.content, text, choices,
+          id: newId(), role: "assistant", at: hhmm(), content: message.content, text, choices, actions,
           quick: quick ? { id: quick.id, options: (quick.input?.options || []).slice(0, 4).map(String) } : null,
           toolResults, meta: { cents, model: usedModel },
         }];
@@ -155,6 +188,28 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
     run(next, entry.mode || "chat");
   };
 
+  // Confirmation ou annulation d'une action (J2). La note du jour s'écrit ici (elle est aussi
+  // dans ce composant) ; l'eau et le genou par App (`onAction`), avec l'écriture de l'écran.
+  const decide = (entryId, action, ok, baseline) => {
+    if (action.status !== "pending") return;
+    let done = action;
+    if (ok) {
+      const act = action.kind === "genou" && action.baseline == null ? { ...action, baseline } : action;
+      if (act.kind === "note") { const n = appendNote(note, act.text); setNote(n); saveNote(n); }
+      else onAction?.(act);
+      const label = act.kind === "genou" ? `Genou ${act.pain}/10, ${act.baseline ? "revenu à la base" : "pas revenu à la base"}` : act.label;
+      done = { ...act, label, status: "done", doneText: say("actionDone") };
+    } else {
+      done = { ...action, status: "cancelled", doneText: say("actionCancelled") };
+    }
+    const result = ok ? `Monsieur a confirmé : c'est fait (${done.label}).` : "Monsieur a annulé : rien n'a été fait.";
+    setDay(today(), entries.map((e) => (e.id !== entryId ? e : {
+      ...e,
+      actions: e.actions.map((a) => (a.id === action.id ? done : a)),
+      toolResults: { ...e.toolResults, [action.id]: result },
+    })));
+  };
+
   const sendDraft = () => {
     const t = draft.trim();
     if (!t || busy) return;
@@ -177,7 +232,7 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
       {entries.length === 0 && !busy && <div style={{ fontSize: 15, color: T.c.text2 }}>{sayStable("chatHello")}</div>}
 
       <div style={{ display: "grid", gap: 14 }}>
-        {entries.map((e) => <Message key={e.id} entry={e} onStart={onStart} />)}
+        {entries.map((e) => <Message key={e.id} entry={e} onStart={onStart} onDecide={decide} />)}
         {busy && (
           <div style={{ fontSize: 15, color: live.text ? T.c.text : T.c.muted, whiteSpace: "pre-wrap", lineHeight: 1.5 }} aria-live="polite">
             {live.text || sayStable("chatThinking")}

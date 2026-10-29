@@ -4068,6 +4068,35 @@ Détail et vérifications dans `ROADMAP.md` (J1.3 livré).
   texte du Coach change donc : captures datées mises à jour (seul ajout : ces champs). Installé
   et vérifié sur le téléphone (bulle et carte du Bord présentes).
 
+## Jeffrey — J2a : actions confirmées d'un tap (eau, genou, note) (29/10/2026, apps/perso v3.130.0)
+
+Premier lot de J2 (spec dans `ROADMAP.md`). J2b (reprendre un repas d'hier, ajouter un aliment
+habituel) reste à faire ; « démarrer une séance » existe déjà depuis J1.2 (`choisir_seance`).
+- **Trois outils** (`JEFFREY_ACTION_TOOLS`, `packages/core/src/coach/jeffrey.js`) : `ajouter_eau
+  {ml}`, `noter_genou {douleur, retour_base?}`, `ecrire_note {texte}`, ajoutés aux outils de
+  `buildJeffreyRequest`. `validateAction(name, input)` borne chaque appel (eau 50-2 000 ml, douleur
+  0-10 entière, note non vide, coupée à 300 caractères) et refuse le reste : un appel refusé ne
+  montre aucune carte, et Jeffrey reçoit la raison. Une douleur à 0 vaut « revenu à la base » (même règle que la saisie
+  du Bord). Consigne ajoutée à `CHAT_RULES` : une action est proposée, jamais annoncée comme faite,
+  et jamais un chiffre que Monsieur n'a pas donné.
+- **Écritures = celles des écrans**, en fonctions pures testées : `applyWater` (même `upsert`
+  `{date, water, source: "manual"}` que les boutons +250/+500 de Nutrition, jamais sous 0),
+  `applyKnee` (même ligne que `KneeQuickLog`), `appendNote` (ajoute à la note du jour avec « ; »,
+  sans l'écraser).
+- **Cartes dans la conversation** (`ActionCard`, `JeffreyChat.jsx`) : une par appel, « Confirmer /
+  Annuler » ; pour le genou sans réponse sur la base, « Oui / Non / Annuler » (la question
+  Silbernagel est posée sur la carte). **Rien n'est écrit sans le tap.** Après le tap, aucun appel
+  à l'IA : la carte affiche une phrase fixe (`actionDone` / `actionCancelled`, recueil
+  `lib/jeffrey.js`) et le `tool_result` de l'appel passe de « en attente » à « Monsieur a
+  confirmé : c'est fait (…) » ou « Monsieur a annulé : rien n'a été fait. ». Jeffrey l'apprend au
+  message suivant. La note s'écrit dans `JeffreyChat` (qui tient déjà la note du jour) ; l'eau et le
+  genou passent par `onAction` (App.jsx → `save.macros` / `save.knee`).
+- Tests : `jeffrey.test.mjs` (validation, bornes, écritures) — 140 au total. Vérifié dans l'aperçu
+  avec une réponse d'IA simulée en flux : 3 cartes, eau confirmée → `macroLog` à 500 ml, genou
+  « Oui » → `kneeLog` `{pain 3, baseline true}`, note annulée → rien d'écrit, puis note confirmée
+  au tour suivant → `noteLog` ; les trois résultats bien renvoyés dans la requête suivante. Aucune
+  erreur console. Installé et **essayé par Yoann sur le téléphone avec le vrai serveur : « tests ok »**.
+
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 
 Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la

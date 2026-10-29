@@ -8,6 +8,7 @@
 // puis personnalité (éditable), puis données du moment. Les règles priment sur la personnalité.
 
 import { splitCarnet, CARNET_MARK, CARNET_MAX_CHARS } from "./prompt.js";
+import { upsert } from "../dateUtils.js";
 
 /** Personnalité d'amorçage (clé `jeffreyPersona`, éditable dans les Réglages). */
 export const JEFFREY_PERSONA = `Vous êtes Jeffrey, le majordome de Monsieur. Vous le vouvoyez toujours et l'appelez « Monsieur ». Langage châtié, phrases courtes et élégantes, flegme britannique. Vous avez le sens de l'humour : traits d'esprit, understatement, pince-sans-rire, une vraie blague quand l'occasion s'y prête. Taquin, volontiers cynique, et ce en toute circonstance, mais toujours avec une bienveillance évidente derrière la pique : on doit sentir que vous êtes de son côté. Ne répétez pas la même plaisanterie d'un message à l'autre. Vous ne flattez pas et ne dramatisez pas : vous constatez, vous conseillez, vous laissez Monsieur décider.`;
@@ -25,7 +26,8 @@ const CHAT_RULES = `CONVERSATION :
 - Appuyez-vous sur les DONNÉES DU MOMENT fournies par l'application. Une donnée absente se dit absente, ne l'inventez jamais. "heure" est l'heure exacte : un total du jour en cours n'est jamais jugé contre une cible de journée complète.
 - Séances : pour proposer ou confirmer une séance, utilisez l'outil choisir_seance, et UNIQUEMENT avec une séance de SEANCES_AUTORISEES (aujourd'hui ou demain). Vous pouvez nuancer le choix du recommandeur selon ce que Monsieur vous dit (fatigue ressentie, temps disponible, envie) ; jamais proposer une séance hors de cette liste.
 - Quand quelques réponses courtes aideraient Monsieur à vous répondre, utilisez l'outil proposer_reponses (2 à 4 réponses de 24 caractères au plus).
-- Appelez les outils après votre texte, jamais à sa place : votre réponse écrite doit se suffire.`;
+- Appelez les outils après votre texte, jamais à sa place : votre réponse écrite doit se suffire.
+- Actions (ajouter_eau, noter_genou, ecrire_note) : proposez-les quand Monsieur vous donne l'information (« j'ai bu un demi-litre », « genou à 2 »). Elles ne sont faites qu'après sa confirmation d'un tap : ne dites jamais que c'est fait, dites que vous le lui proposez. Jamais un chiffre qu'il n'a pas donné.`;
 
 /** Outils de la conversation (J1). Les actions qui écrivent des données arrivent en J2. */
 export const JEFFREY_TOOLS = [
@@ -52,6 +54,65 @@ export const JEFFREY_TOOLS = [
     },
   },
 ];
+
+// --- Actions confirmées (J2, 29/10/2026) ------------------------------------------------------
+// Jeffrey PROPOSE une action ; l'app l'affiche en carte « Confirmer / Annuler » et n'écrit rien
+// sans un tap. L'écriture est exactement celle de l'écran correspondant (fonctions ci-dessous,
+// testées contre l'écran). Après la confirmation, pas de nouvel appel : la réponse locale est une
+// phrase fixe, et Jeffrey apprend le résultat au message suivant (tool_result).
+export const JEFFREY_ACTION_TOOLS = [
+  {
+    name: "ajouter_eau",
+    description: "Propose d'ajouter de l'eau bue aujourd'hui (Monsieur confirme d'un tap). Uniquement si Monsieur dit avoir bu.",
+    input_schema: { type: "object", properties: { ml: { type: "integer", description: "Quantité bue, en millilitres (50 à 2000)." } }, required: ["ml"] },
+  },
+  {
+    name: "noter_genou",
+    description: "Propose d'enregistrer la douleur du genou d'aujourd'hui (0 à 10), donnée par Monsieur lui-même. Ne déduisez jamais un chiffre qu'il n'a pas dit. retour_base : la douleur est-elle revenue à son niveau de base sous 24 h ? À omettre si Monsieur ne l'a pas dit, l'application lui demandera.",
+    input_schema: { type: "object", properties: { douleur: { type: "integer" }, retour_base: { type: "boolean" } }, required: ["douleur"] },
+  },
+  {
+    name: "ecrire_note",
+    description: "Propose d'ajouter une phrase à la note du jour (contexte hors chiffres : alcool, insomnie, stress, petite blessure…), avec les mots de Monsieur.",
+    input_schema: { type: "object", properties: { texte: { type: "string" } }, required: ["texte"] },
+  },
+];
+const ACTION_NAMES = new Set(JEFFREY_ACTION_TOOLS.map((t) => t.name));
+export const isActionTool = (name) => ACTION_NAMES.has(name);
+
+/** Vérifie un appel d'outil d'action → { ok, action } ou { ok: false, reason }. `action` porte
+ *  `kind`, les valeurs normalisées et `label` (ce que la carte affiche). */
+export function validateAction(name, input) {
+  if (name === "ajouter_eau") {
+    const ml = Math.round(Number(input?.ml));
+    if (!Number.isFinite(ml) || ml < 50 || ml > 2000) return { ok: false, reason: "quantité d'eau hors de 50 à 2000 ml" };
+    return { ok: true, action: { kind: "eau", ml, label: `Ajouter ${ml} ml d'eau` } };
+  }
+  if (name === "noter_genou") {
+    const pain = Number(input?.douleur);
+    if (!Number.isInteger(pain) || pain < 0 || pain > 10) return { ok: false, reason: "douleur hors de 0 à 10" };
+    // 0 = pas de douleur, donc à la base (même règle que la saisie rapide du tableau de bord).
+    const baseline = pain === 0 ? true : typeof input?.retour_base === "boolean" ? input.retour_base : null;
+    const label = `Genou ${pain}/10${baseline == null ? "" : baseline ? ", revenu à la base" : ", pas revenu à la base"}`;
+    return { ok: true, action: { kind: "genou", pain, baseline, label } };
+  }
+  if (name === "ecrire_note") {
+    const text = String(input?.texte || "").trim().slice(0, 300);
+    if (!text) return { ok: false, reason: "note vide" };
+    return { ok: true, action: { kind: "note", text, label: `Note du jour : « ${text} »` } };
+  }
+  return { ok: false, reason: `action inconnue : ${name}` };
+}
+
+/** Eau : même écriture que les boutons +250/+500 de Nutrition. */
+export const applyWater = (macros, date, ml) => {
+  const next = Math.max(0, ((macros || []).find((m) => m.date === date)?.water ?? 0) + ml);
+  return upsert(macros || [], { date, water: next, source: "manual" });
+};
+/** Genou : même écriture que la saisie rapide du tableau de bord et l'onglet Genou. */
+export const applyKnee = (knee, date, pain, baseline) => upsert(knee || [], { date, pain, baseline });
+/** Note du jour : la phrase s'ajoute à ce qui est déjà écrit, sans rien effacer. */
+export const appendNote = (existing, text) => ((existing || "").trim() ? `${existing.trim()} ; ${text}` : text);
 
 /** Séances que Jeffrey a le droit de proposer, d'après `nextSessions` : celles que le
  *  recommandeur affiche et celles qu'il juge seulement moins prioritaires. Jamais une séance
@@ -220,5 +281,5 @@ export function buildJeffreyRequest({ coach, persona, nextSession, history, heur
     blocks.splice(blocks.length - 1, 0, { type: "text", text: `heure : ${heure}` });
     blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cache_control: cache };
   }
-  return { system, messages, tools: JEFFREY_TOOLS, allowed };
+  return { system, messages, tools: [...JEFFREY_TOOLS, ...JEFFREY_ACTION_TOOLS], allowed };
 }

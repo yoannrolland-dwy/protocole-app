@@ -11,7 +11,36 @@ import {
   allowedSessions, validateSessionChoice, toApiMessages, buildJeffreyRequest, JEFFREY_TOOLS,
   continuationIfSilent, replyText, readReply, effortFor, jeffreyAsk,
   pendingMemoryDate, memoryTranscript, withMemory,
+  validateAction, applyWater, applyKnee, appendNote, isActionTool,
 } from "../src/coach/jeffrey.js";
+import { upsert } from "../src/dateUtils.js";
+
+test("actions J2 : validation, et même écriture que l'écran correspondant", () => {
+  // Eau : bornes, arrondi, libellé.
+  assert.deepEqual(validateAction("ajouter_eau", { ml: 500 }), { ok: true, action: { kind: "eau", ml: 500, label: "Ajouter 500 ml d'eau" } });
+  assert.equal(validateAction("ajouter_eau", { ml: 5000 }).ok, false);
+  assert.equal(validateAction("ajouter_eau", { ml: "x" }).ok, false);
+  // Genou : 0 = à la base d'office ; sans retour_base, l'app demandera (null) ; hors bornes refusé.
+  assert.equal(validateAction("noter_genou", { douleur: 0 }).action.baseline, true);
+  assert.equal(validateAction("noter_genou", { douleur: 3 }).action.baseline, null);
+  assert.equal(validateAction("noter_genou", { douleur: 3, retour_base: false }).action.label, "Genou 3/10, pas revenu à la base");
+  assert.equal(validateAction("noter_genou", { douleur: 11 }).ok, false);
+  assert.equal(validateAction("noter_genou", { douleur: 2.5 }).ok, false);
+  // Note : vide refusée, tronquée à 300.
+  assert.equal(validateAction("ecrire_note", { texte: "  " }).ok, false);
+  assert.equal(validateAction("ecrire_note", { texte: "x".repeat(400) }).action.text.length, 300);
+  assert.equal(validateAction("supprimer_tout", {}).ok, false);
+  assert.ok(isActionTool("noter_genou") && !isActionTool("choisir_seance"));
+  // Écritures : identiques à celles des écrans (Nutrition : upsert de l'eau cumulée en "manual" ;
+  // Genou : upsert { date, pain, baseline }).
+  const macros = [{ date: "2026-10-04", protein: 100, water: 750, source: "foodlog" }];
+  assert.deepEqual(applyWater(macros, "2026-10-04", 500), upsert(macros, { date: "2026-10-04", water: 1250, source: "manual" }));
+  assert.deepEqual(applyWater([], "2026-10-04", 250), [{ date: "2026-10-04", water: 250, source: "manual" }]);
+  const knee = [{ date: "2026-10-03", pain: 2, baseline: true }];
+  assert.deepEqual(applyKnee(knee, "2026-10-04", 3, false), upsert(knee, { date: "2026-10-04", pain: 3, baseline: false }));
+  assert.equal(appendNote("", "Deux bières hier"), "Deux bières hier");
+  assert.equal(appendNote("Insomnie", "Deux bières hier"), "Insomnie ; Deux bières hier");
+});
 
 test("mémoire : le dernier jour passé non versé au carnet, transcription sans les messages cachés", () => {
   const log = {
@@ -217,7 +246,7 @@ test("requête de Jeffrey : règles avant la personnalité, cache sur 3 points, 
   assert.deepEqual(lastUser.map((b) => b.text), ["heure : 09:00", "Que me conseillez-vous ?"]);
   const cached = [...r.system, ...r.messages.flatMap((m) => m.content)].filter((b) => b.cache_control);
   assert.equal(cached.length, 3);
-  assert.deepEqual(r.tools, JEFFREY_TOOLS);
+  assert.deepEqual(r.tools.map((t) => t.name), [...JEFFREY_TOOLS.map((t) => t.name), "ajouter_eau", "noter_genou", "ecrire_note"]);
   assert.ok(r.allowed.aujourdhui.includes("Basket"));
 });
 

@@ -9,7 +9,7 @@ import { PHASES, DEFAULT_TARGETS, targetsForDate, kcalFromMacros, kcalOfEntry, t
 import { recommendTargets, palierWeekOf, loggedRateLastDays } from "@rawcare/core/palier";
 import { nextSessions } from "@rawcare/core/nextSession";
 import { buildCoachPrompt, buildCoachBriefing, buildBilanPrompt, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
-import { buildJeffreyRequest, JEFFREY_PERSONA, pendingMemoryDate } from "@rawcare/core/coach/jeffrey";
+import { buildJeffreyRequest, JEFFREY_PERSONA, pendingMemoryDate, applyWater, applyKnee } from "@rawcare/core/coach/jeffrey";
 import { JeffreyBubble } from "./components/JeffreyBubble.jsx";
 import { JeffreyOverlay } from "./components/JeffreyOverlay.jsx";
 import { syncHealthConnect } from "./healthSync.js";
@@ -543,6 +543,11 @@ export default function App({ silent = false } = {}) {
     onStart: (t) => { setChatOpen(null); startSession(t); },
     memory: memDate ? { date: memDate, entries: jeffreyLog[memDate] } : null,
     onMemoryDone: setJeffreyMemoryDate,
+    // Actions confirmées (J2) : même écriture que l'écran correspondant (fonctions de core testées).
+    onAction: (a) => {
+      if (a.kind === "eau") save.macros(applyWater(macros, today(), a.ml));
+      if (a.kind === "genou") save.knee(applyKnee(knee, today(), a.pain, a.baseline));
+    },
   };
   // Bulle : partout sauf dans Analyse (la conversation y est), les Réglages et un carnet ouvert.
   const bubbleOn = !loading && !showSettings && !chatOpen && tab !== "perf" && !(tab === "train" && getSync("trainingDraft", null)?.type);

@@ -34,7 +34,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | J0 | Jeffrey — test jetable : l'app peut-elle préparer le brief seule, écran éteint et app fermée ? | petit | ✅ 29/10/2026 (piste A validée avec un réveil système) |
 | JT | Jeffrey — textes de l'app et notifications dans sa voix (textes fixes, sans IA) | petit | ✅ 29/10/2026 (v3.126.0) |
 | J1 | Jeffrey — la conversation, en 3 lots installés : J1.1 relais Android + cœur testé ; J1.2 conversation dans Analyse ; J1.3 bulle partout + carte Bord + mémoire | gros | J1.1 ✅ 29/10/2026 (v3.127.0) ; J1.2 ✅ 29/10/2026 (v3.128.0) ; J1.3 ✅ 29/10/2026 (v3.129.0) |
-| J2 | Jeffrey — actions proposées, confirmées d'un tap (eau, genou, note, séance, repas, habituel) | moyen | à faire |
+| J2 | Jeffrey — actions proposées, confirmées d'un tap (eau, genou, note, séance, repas, habituel) | moyen | en cours (J2a ✅ 29/10/2026, J2b à faire) |
 | J4 | Jeffrey — brief du matin en notification : attend la nuit, météo, réponse dans la notification | gros | à faire |
 | J3 | Jeffrey — la voix : micro (dictée) + réponse lue à voix haute, voix réglable | moyen | à faire |
 
@@ -1340,6 +1340,15 @@ ajouter un aliment habituel à sa dernière quantité. Chaque appel d'outil → 
 « Confirmer / Annuler » dans le fil ; le résultat est renvoyé au modèle (`tool_result`) pour qu'il
 enchaîne. Annuler n'écrit rien. Tests : chaque outil produit exactement la même écriture que
 l'écran correspondant.
+
+**J2a livré le 29/10/2026 (v3.130.0)** : eau, genou, note du jour. Outils `ajouter_eau`,
+`noter_genou`, `ecrire_note` ; validation bornée côté app (`validateAction`) ; écritures en
+fonctions pures testées, identiques à celles des écrans (`applyWater`, `applyKnee`, `appendNote`) ;
+carte « Confirmer / Annuler » (genou sans réponse sur la base : « Oui / Non / Annuler ») ; après
+le tap, phrase fixe et `tool_result` mis à jour, aucun nouvel appel à l'IA. « Démarrer une séance »
+était déjà couvert par `choisir_seance` (J1.2). **Reste J2b** : reprendre un repas d'hier
+(`copyEntries`) et ajouter un aliment habituel — à écrire dans `foodLog` ET à dériver dans
+`macroLog` depuis App, l'onglet Nutrition (qui fait la dérivation M6) n'étant pas forcément monté.
 
 ### J4 — Le brief du matin en notification
 
