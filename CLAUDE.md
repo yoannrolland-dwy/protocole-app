@@ -3938,6 +3938,38 @@ avait `updatePeriodMillis="0"` et aucune tâche de fond, donc il ne changeait qu
   `APPWIDGET_UPDATE`). Barre arrondie comme le JS (`Math.round`) après un écart 82 / 83 % vu au test.
   Intervalle 15 min (alarme exacte) proposé et refusé par Yoann : on garde 30 min.
 
+## Chantier J — Jeffrey : lot JT, l'app parle dans sa voix (29/10/2026, apps/perso v3.126.0)
+
+Spec, décisions et ordre du chantier (J0 → JT → J1 → J2 → J4 → J3) dans `ROADMAP.md`, « Chantier J ».
+**J0** (test jetable, 29/10/2026) : un réveil `setAlarmClock` relance l'app fermée et une WebView
+sans écran à l'origine `https://localhost` lit le localStorage et appelle l'API en 1 s ;
+**WorkManager est retenu par Samsung app fermée, ne pas s'en servir pour le brief**. Code de test
+retiré, résultat détaillé dans `ROADMAP.md`.
+
+- **`src/lib/jeffrey.js`** : recueil `PHRASES` (clé → variantes), `say(key, vars)` (variante au
+  hasard, pour une confirmation calculée une fois), `sayStable(key, vars)` (même variante toute la
+  journée, pour ce qui est recalculé à chaque rendu : écrans vides, statuts), `sayError(err)` (une
+  erreur déjà dite par Jeffrey passe telle quelle, un message technique est précédé de « Je crains
+  un contretemps, Monsieur : »). **Textes fixes, aucun appel à l'IA.** Vouvoiement, « Monsieur »,
+  flegme et humour ; les faits et chiffres ne changent pas, les libellés (boutons, champs) non plus.
+- **Branchés** (60 remplacements, 19 fichiers) : écrans vides (Corps, Séance, Nutrition, Analyse,
+  recherche d'aliment, Carte resto, planning basket), confirmations (bandeau « Annuler » de
+  Nutrition : « Skyr · 150 g. Votre estomac a été prévenu, Monsieur. », ce qui vient d'être fait
+  en tête car la barre coupe la fin), messages des Réglages (sauvegarde, restauration, Health
+  Connect — le message « accès refusé » ne cite plus nutrition/hydratation, retirées en M7), erreurs
+  de l'IA (Coach IA, Carte resto, Photo d'un plat, clé ou réglages LiteLLM manquants).
+- **Notifications** : rappel de sauvegarde (titre « Jeffrey ») ; fin de repos (`RestAlarmReceiver.kt`,
+  4 titres courts tirés au hasard : « Repos terminé, Monsieur. », « À vous, Monsieur. »…) ; décompte
+  (« Repos en cours, Monsieur »). Le canal « Test J0 » resté sur le téléphone est supprimé au
+  prochain lancement du minuteur.
+- **Pour tout nouveau message** : l'ajouter à `PHRASES` plutôt qu'écrire le texte dans l'écran.
+  Test `apps/perso/test/jeffrey.test.mjs` : chaque phrase dit « Monsieur », aucune ne tutoie
+  (bornes de mot qui connaissent les accents), trous remplis, variante stable sur la journée — 126
+  tests au total.
+- **Vérifié** : aperçu (écrans vides de 6 onglets, bandeau d'ajout d'un habituel, aucune erreur
+  console) ; téléphone (v3.126.0, Réglages « À jour, Monsieur · dernière synchro 11:37:44 »). Les
+  notifications de repos n'ont pas été vues sonner : à la prochaine séance.
+
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 
 Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la

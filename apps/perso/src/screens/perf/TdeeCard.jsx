@@ -80,7 +80,7 @@ export function TdeeCard({ result, deficitReel, trend, windows, recomp }) {
       <Card>
         <Label style={{ marginBottom: 6 }}>Dépense estimée</Label>
         <Body style={{ fontSize: 13, color: C.dim }}>
-          Pas encore assez de données ({result.reason}). Il faut au moins {MIN_TDEE_DAYS} jours
+          Pas encore assez de données, Monsieur ({result.reason}). Il me faut au moins {MIN_TDEE_DAYS} jours
           de pesées et d'apports enregistrés, avec au moins 70 % des jours loggés.
         </Body>
         <RecompZone recomp={recomp} />

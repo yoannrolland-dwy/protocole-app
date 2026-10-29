@@ -7,6 +7,7 @@ import { PHASES, weightTrend7 } from "@rawcare/core/targets";
 import { C, today, fmt, round, upsert, lastN, Card, Label, Big, Empty, Btn, Stepper, Field, DateField, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../design/compat.jsx";
 import { phaseTarget, recompTrendColor } from "../lib/helpers.js";
 import { SyncedBanner } from "../components/SyncedBanner.jsx";
+import { sayStable } from "../lib/jeffrey.js";
 
 /* ============================================================
    TAB — POIDS
@@ -51,7 +52,7 @@ export function WeightTab({ weight, targets, save, phase }) {
               </LineChart>
             </ResponsiveContainer>
           </div>
-        ) : <Empty>Aucune pesée enregistrée.</Empty>}
+        ) : <Empty>{sayStable("noWeight")}</Empty>}
       </Card>
 
       <Card>
@@ -78,7 +79,7 @@ export function WeightTab({ weight, targets, save, phase }) {
             <span style={{ color: C.text2 }}>{fmt(w.date)}{w.time ? <span style={{ color: C.dim, fontSize: 13 }}> · {w.time}</span> : null}</span>
             <span style={{ color: C.text, fontWeight: 700 }}>{w.kg}</span>
           </div>
-        )) : <Empty>Aucune donnée.</Empty>}
+        )) : <Empty>{sayStable("noData")}</Empty>}
       </Card>
     </div>
   );

@@ -11,6 +11,7 @@ import { BasketScheduleCard } from "./BasketScheduleCard.jsx";
 import { APP_VERSION } from "../../version.js";
 import { listLiteLLMModels } from "@rawcare/core/coach/claudeApi";
 import { widgetBackgroundStatus, requestWidgetBackground } from "../../healthSync.js";
+import { say, sayStable } from "../../lib/jeffrey.js";
 
 /* ============================================================
    RÉGLAGES
@@ -35,7 +36,7 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
     try {
       const ids = await listLiteLLMModels({ baseUrl: lUrl.trim(), apiKey: lKey.trim() });
       setLModels(ids); setLMsg(ids.length ? "" : "Le serveur ne liste aucun modèle.");
-    } catch (e) { setLModels(null); setLMsg(`Impossible de lire la liste : ${e.message}`); }
+    } catch (e) { setLModels(null); setLMsg(say("modelsFailed", { x: e.message })); }
   };
   const [msg, setMsg] = useState("");
   const [prof, setProf] = useState(coachProfile);
@@ -50,7 +51,7 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
     try {
       await navigator.clipboard.writeText(txt);
       setBriefing("");
-      setMsg("Contexte copié — colle-le dans une conversation Claude.");
+      setMsg(say("contextCopied"));
     } catch {
       setBriefing(txt);
       setMsg("");
@@ -73,10 +74,10 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
         // arrivée sur Drive — on date une intention aboutie, pas une réception.
         await Share.share({ title: name, files: [uri] });
         onCloudBackupDone?.();
-        setMsg("Sauvegarde envoyée — vérifie qu'elle est bien arrivée à destination.");
+        setMsg(say("backupSent"));
       } catch (e) {
         const txt = String(e?.message || e);
-        setMsg(/cancel/i.test(txt) ? "Sauvegarde annulée — rien n'a été envoyé." : `Sauvegarde impossible : ${txt}`);
+        setMsg(/cancel/i.test(txt) ? say("backupCancelled") : say("backupFailed", { x: txt }));
       }
       return;
     }
@@ -93,8 +94,8 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
     const file = e.target.files?.[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      try { importData(JSON.parse(reader.result)); setMsg("Données importées. Rechargement…"); setTimeout(() => window.location.reload(), 800); }
-      catch { setMsg("Fichier invalide."); }
+      try { importData(JSON.parse(reader.result)); setMsg(say("imported")); setTimeout(() => window.location.reload(), 800); }
+      catch { setMsg(say("invalidFile")); }
     };
     reader.readAsText(file);
   };
@@ -221,12 +222,12 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
         <Card>
           <Label style={{ marginBottom: 8 }}>Health Connect · pas, sommeil & macros</Label>
           <Body style={{ fontSize: 12, color: C.text2, marginBottom: 10 }}>
-            {healthSync.status === "running" && "Synchronisation en cours…"}
-            {healthSync.status === "ok" && `À jour · dernière synchro ${new Date(healthSync.at).toLocaleTimeString("fr-FR")}`}
-            {healthSync.status === "unavailable" && "Health Connect indisponible sur cet appareil."}
-            {healthSync.status === "denied" && "Accès refusé — autorise pas, sommeil, nutrition et hydratation dans Health Connect."}
-            {healthSync.status === "error" && `Erreur : ${healthSync.message}`}
-            {healthSync.status === "idle" && "Pas encore synchronisé."}
+            {healthSync.status === "running" && sayStable("hcRunning")}
+            {healthSync.status === "ok" && sayStable("hcOk", { t: new Date(healthSync.at).toLocaleTimeString("fr-FR") })}
+            {healthSync.status === "unavailable" && sayStable("hcUnavailable")}
+            {healthSync.status === "denied" && sayStable("hcDenied")}
+            {healthSync.status === "error" && sayStable("hcError", { x: healthSync.message })}
+            {healthSync.status === "idle" && sayStable("hcIdle")}
           </Body>
           <Btn variant="outline" onClick={onHealthSync} style={{ width: "100%" }} disabled={healthSync.status === "running"}>
             Synchroniser maintenant
@@ -284,7 +285,7 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
                 ))}
               </div>
             )}
-            <Btn variant="primary" onClick={() => { setLitellmUrl(lUrl.trim()); setLitellmKey(lKey.trim()); setLitellmModel(lModel.trim()); setMsg("Réglages enregistrés."); }} style={{ width: "100%" }}>
+            <Btn variant="primary" onClick={() => { setLitellmUrl(lUrl.trim()); setLitellmKey(lKey.trim()); setLitellmModel(lModel.trim()); setMsg(say("settingsSaved")); }} style={{ width: "100%" }}>
               Enregistrer
             </Btn>
             <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>
@@ -297,7 +298,7 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
             <TextInput type="password" value={k} onChange={(e) => setK(e.target.value)} placeholder="sk-ant-..." style={{ marginBottom: 10 }} />
             <Label style={{ marginBottom: 6 }}>Modèle</Label>
             <TextInput value={m} onChange={(e) => setM(e.target.value)} placeholder="claude-sonnet-5-5" style={{ marginBottom: 12 }} />
-            <Btn variant="primary" onClick={() => { setApiKey(k.trim()); setModel(m.trim() || "claude-sonnet-5-5"); setMsg("Réglages enregistrés."); }} style={{ width: "100%" }}>
+            <Btn variant="primary" onClick={() => { setApiKey(k.trim()); setModel(m.trim() || "claude-sonnet-5-5"); setMsg(say("settingsSaved")); }} style={{ width: "100%" }}>
               Enregistrer
             </Btn>
             <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>

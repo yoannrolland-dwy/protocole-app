@@ -32,7 +32,8 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | U3 | Refonte IHM — écran par écran (un commit + une install par écran) | gros | ✅ 25/10/2026 (8 étapes, v3.111.0 → v3.118.0) |
 | U4 | Refonte IHM — audit final avant/après + mise à jour CLAUDE.md | petit | ✅ 25/10/2026 (v3.118.1) |
 | J0 | Jeffrey — test jetable : l'app peut-elle préparer le brief seule, écran éteint et app fermée ? | petit | ✅ 29/10/2026 (piste A validée avec un réveil système) |
-| J1 | Jeffrey — la conversation : Analyse + bulle partout + compte rendu sur Bord, choix de séance vérifié, mémoire | gros | à faire |
+| JT | Jeffrey — textes de l'app et notifications dans sa voix (textes fixes, sans IA) | petit | ✅ 29/10/2026 (v3.126.0) |
+| J1 | Jeffrey — la conversation, en 3 lots installés : J1.1 relais Android + cœur testé ; J1.2 conversation dans Analyse ; J1.3 bulle partout + carte Bord + mémoire | gros | à faire |
 | J2 | Jeffrey — actions proposées, confirmées d'un tap (eau, genou, note, séance, repas, habituel) | moyen | à faire |
 | J4 | Jeffrey — brief du matin en notification : attend la nuit, météo, réponse dans la notification | gros | à faire |
 | J3 | Jeffrey — la voix : micro (dictée) + réponse lue à voix haute, voix réglable | moyen | à faire |
@@ -1051,7 +1052,8 @@ chaque matin qui arrive tout seul (date, météo, programme du jour, recommandat
 pose des questions et à qui l'on répond, à qui l'on peut écrire ou parler à tout moment, et qui
 agit dans l'app. Le tout avec la clé et le modèle des Réglages. Cadré par questions le 29/10/2026.
 
-**Ordre retenu** : J0 → J1 → J2 → J4 → J3. J4 (notification) a besoin de J2 pour enregistrer les
+**Ordre retenu** : J0 → JT → J1 (J1.1, J1.2, J1.3) → J2 → J4 → J3 (JT ajouté et J1 découpé le
+29/10/2026, choix de Yoann : les textes d'abord, petit lot sans IA ni coût). J4 (notification) a besoin de J2 pour enregistrer les
 réponses (genou, note) ; J3 (voix) se branche sur la conversation de J1. Réarrangeable sauf J0 en
 premier et J1 avant tout le reste.
 
@@ -1236,8 +1238,19 @@ plan) : piste A validée, mais pas avec le déclencheur prévu.**
   `DATA_KEYS`), `jeffreyPersona` (`DATA_KEYS`). Compteur de coût du mois affiché dans les
   Réglages (`aiSpend`, `{ month, cents }`, `DATA_KEYS`).
 - Note du jour conservée (Jeffrey peut aussi l'écrire via une action en J2).
-- **À trancher au début de J1** : la carte « compte rendu » en tête de Bord passe au-dessus
-  d'Énergie et Poids (ordre choisi en U2) ou juste sous eux ?
+- **Carte « compte rendu » sur Bord (tranché le 29/10/2026)** : tout en haut, au-dessus
+  d'Énergie et Poids, **jusqu'à midi** ; l'après-midi elle passe sous les tuiles, repliée en
+  une ligne (un tap la déplie ou ouvre la conversation).
+- **Réponse au fil de l'eau (tranché le 29/10/2026) : relais Android maison.** Un plugin Kotlin
+  fait la requête vers LiteLLM et lit la réponse en flux (événements SSE de `/v1/messages`
+  avec `stream: true`), puis la renvoie morceau par morceau à la page. Le même relais sert au
+  brief en arrière-plan (J4), via l'interface JS de la WebView sans écran. Rien à changer sur
+  le serveur Oracle.
+- **Découpage** : J1.1 relais + `jeffrey.js` + tests (rien de visible, sauf un essai réel sur le
+  serveur) ; J1.2 conversation dans Analyse (remplace la carte Coach IA) ; J1.3 bulle partout,
+  carte sur Bord, mémoire dans le carnet, compteur de coût. Une installation par lot.
+- **À vérifier au début de J1.1** : le serveur LiteLLM répond-il enfin sur Opus 5.5 / Sonnet
+  5.5 ? Le 26/10, tout sauf Haiku 4.5 renvoyait un refus « trop de requêtes ».
 - Tests : validation du choix de séance (hors liste → ignoré), règles de ton présentes dans le
   `system`, capture datée du prompt.
 

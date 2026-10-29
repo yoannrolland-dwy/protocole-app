@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { weeklyVolumeByGroup, VOLUME_TARGET } from "@rawcare/core/volume";
 import { C, Card, Label, Body } from "../../design/compat.jsx";
+import { sayStable } from "../../lib/jeffrey.js";
 
 // Carte « Volume · 7 jours » (onglet Séances, chantier T2). Lecture seule, dérivée de
 // `trainingLog` — aucune donnée nouvelle. Les groupes prioritaires affichent leur position
@@ -33,7 +34,7 @@ export function VolumeCard({ training }) {
           </span>
         </div>
       ))}
-      {!any && <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>Aucune série de musculation cochée sur les 7 derniers jours.</Body>}
+      {!any && <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>{sayStable("noVolume")}</Body>}
     </Card>
   );
 }

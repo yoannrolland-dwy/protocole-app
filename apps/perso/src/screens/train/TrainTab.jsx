@@ -13,6 +13,7 @@ import { ProgressScreen } from "./ProgressScreen.jsx";
 import { GeneField } from "./GeneField.jsx";
 import { VolumeCard } from "./VolumeCard.jsx";
 import { PlanCard } from "../perf/ReferenceCards.jsx";
+import { sayStable } from "../../lib/jeffrey.js";
 
 export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType, onStartConsumed }) {
   // Séance dont la suppression est « armée » (1er tap sur la corbeille), voir Dernières séances.
@@ -162,7 +163,7 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <Label style={{ letterSpacing: 1.5 }}>Progression par exercice</Label>
-            {!exoCount && <Body style={{ marginTop: 3 }}>Aucune séance de muscu enregistrée pour l'instant.</Body>}
+            {!exoCount && <Body style={{ marginTop: 3 }}>{sayStable("noMuscu")}</Body>}
           </div>
           <ChevronRight size={15} color={C.accent} />
         </div>
@@ -238,7 +239,7 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
             </button>
           </div>
           );
-        }) : <Empty>Aucune séance enregistrée.</Empty>}
+        }) : <Empty>{sayStable("noSession")}</Empty>}
       </Card>
     </div>
   );

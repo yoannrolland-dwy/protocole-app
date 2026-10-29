@@ -5,6 +5,7 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tool
 import { Plus, Trash2 } from "lucide-react";
 import { HSR_TABLE, hsrForWeek } from "@rawcare/core/session/templates";
 import { C, today, fmt, upsert, lastN, daysBetween, Card, Label, Body, Empty, Btn, DateField, Pills, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../design/compat.jsx";
+import { sayStable } from "../lib/jeffrey.js";
 
 /* ============================================================
    TAB — DOULEURS (genou — le coude a été retiré le 05/09/2026)
@@ -94,7 +95,7 @@ export function PainTab({ knee, save, hsrWeek }) {
               </LineChart>
             </ResponsiveContainer>
           </div>
-        ) : <Empty>Aucun relevé.</Empty>}
+        ) : <Empty>{sayStable("noKnee")}</Empty>}
       </Card>
 
       {alert && (

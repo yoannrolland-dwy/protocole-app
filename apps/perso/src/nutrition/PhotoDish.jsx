@@ -20,6 +20,7 @@ import { callClaude } from "../claudeApi.js";
 import { aiMissing, fmtCost } from "../lib/ai.js";
 import { fileToImagePayload } from "@rawcare/core/nutrition/imageUtils";
 import { newQuickRef } from "./foodStore.js";
+import { say, sayError, sayStable } from "../lib/jeffrey.js";
 
 const MAX_PHOTOS = 3;
 
@@ -82,7 +83,7 @@ export default function PhotoDish({ ai, onAdd, onBack }) {
       const converted = await Promise.all(files.map((f) => fileToImagePayload(f)));
       setPhotos((prev) => [...prev, ...converted.map((p, i) => ({ id: `${Date.now()}-${i}`, ...p }))].slice(0, MAX_PHOTOS));
     } catch {
-      setPhotoErr("Une photo n'a pas pu être lue — réessaie.");
+      setPhotoErr(say("photoUnread"));
     }
   };
   const removePhoto = (id) => setPhotos((prev) => prev.filter((p) => p.id !== id));
@@ -109,10 +110,10 @@ export default function PhotoDish({ ai, onAdd, onBack }) {
       try { parsed = extractJson(raw); }
       catch {
         console.warn("Photo d'un plat — JSON illisible :", raw);
-        setErr("Réponse illisible. Réessaie."); setState("error"); return;
+        setErr(say("aiUnreadable")); setState("error"); return;
       }
       if (!parsed.lisible) {
-        setErr("Photo(s) illisible(s) — plat non identifié. Réessaie avec une autre photo, plus proche ou mieux éclairée.");
+        setErr(say("photoUnknown"));
         setState("error");
         return;
       }
@@ -209,7 +210,7 @@ export default function PhotoDish({ ai, onAdd, onBack }) {
         {state === "loading" ? (progress || "Analyse…") : "Estimer ce plat"}
       </Btn>
 
-      {state === "error" && <Body style={{ fontSize: 13, color: C.danger }}>{err}</Body>}
+      {state === "error" && <Body style={{ fontSize: 13, color: C.danger }}>{sayError(err)}</Body>}
 
       {result && (
         <div style={{ background: C.card, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: 12 }}>

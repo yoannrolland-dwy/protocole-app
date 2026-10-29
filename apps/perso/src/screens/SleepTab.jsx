@@ -7,6 +7,7 @@ import { computeEnergyScore, computeSleepScore, scoreLabel } from "@rawcare/core
 import { C, today, fmt, round, upsert, lastN, fmtHM, Card, Label, Body, Empty, Btn, Stepper, Field, DateField, Pills, chartAxis, tooltipStyle, tooltipItemStyle } from "../design/compat.jsx";
 import { scoreColor, avg } from "../lib/helpers.js";
 import { SyncedBanner } from "../components/SyncedBanner.jsx";
+import { sayStable } from "../lib/jeffrey.js";
 
 /** Carte "Score d'énergie" (05/09/2026) — reconstruction façon Samsung Health depuis FC
  * repos/sommeil/pas (Health Connect, natif seulement). Détail des 4 modules toujours
@@ -23,7 +24,7 @@ function EnergyScoreCard({ energy }) {
       </div>
       {energy.status !== "ok" && (
         <Body style={{ fontSize: 13, color: C.dim, marginBottom: 8 }}>
-          Pas assez de données pour un score complet — détail des modules ci-dessous.
+          {sayStable("energyPartial")}
         </Body>
       )}
       {energy.modules.map((m) => (
@@ -105,7 +106,7 @@ export function SleepTab({ sleep, rhr, steps, naps, save }) {
               background: i === last7.length - 1 ? C.accent : C.border,
               height: `${Math.max(8, (s.hours / maxH) * 100)}%`,
             }} />
-          )) : <Body style={{ fontSize: 13, color: C.dim }}>Aucune nuit enregistrée.</Body>}
+          )) : <Body style={{ fontSize: 13, color: C.dim }}>{sayStable("noNight")}</Body>}
         </div>
         {todayNap && (
           <Body style={{ fontSize: 13, color: C.accent, marginTop: 10 }}>
@@ -171,7 +172,7 @@ export function SleepTab({ sleep, rhr, steps, naps, save }) {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        ) : <Empty>Aucune donnée.</Empty>}
+        ) : <Empty>{sayStable("noData")}</Empty>}
       </Card>
 
       {/* Score de sommeil dans le temps (13/09/2026, demande explicite) : durée seule ne dit
@@ -194,7 +195,7 @@ export function SleepTab({ sleep, rhr, steps, naps, save }) {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        ) : <Empty>Aucune donnée.</Empty>}
+        ) : <Empty>{sayStable("noData")}</Empty>}
       </Card>
 
       {/* Répartition par palier (13/09/2026) : vue d'ensemble rapide sur la période, sans
@@ -211,7 +212,7 @@ export function SleepTab({ sleep, rhr, steps, naps, save }) {
               </div>
             ))}
           </div>
-        ) : <Empty>Aucune donnée.</Empty>}
+        ) : <Empty>{sayStable("noData")}</Empty>}
       </Card>
     </div>
   );

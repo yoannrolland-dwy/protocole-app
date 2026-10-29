@@ -5,6 +5,7 @@ import { splitCarnet } from "@rawcare/core/coach/prompt";
 import { C, Card, Label, Body, Btn, inputStyle } from "../../design/compat.jsx";
 import { callClaude } from "../../claudeApi.js";
 import { aiMissing, fmtCost } from "../../lib/ai.js";
+import { say, sayError, sayStable } from "../../lib/jeffrey.js";
 
 /* ============================================================
    COACH IA
@@ -70,9 +71,9 @@ export function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
         setErr(
           data.stop_reason === "max_tokens"
             ? (hasThinking
-                ? "Le modèle a épuisé son budget en réflexion interne avant de répondre. Réessaie (limite déjà augmentée) ; si ça persiste, signale-le-moi."
-                : "Réponse coupée avant la fin (budget de tokens atteint). Réessaie.")
-            : `Réponse vide (stop_reason: ${data.stop_reason || "inconnu"}). Signale ce message pour diagnostic.`
+                ? say("aiThinkingBudget")
+                : say("aiCut"))
+            : say("aiEmpty", { x: data.stop_reason || "inconnu" })
         );
         setState("error");
         return;
@@ -127,8 +128,8 @@ export function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
       {state === "error" && (
         <div style={{ fontSize: 12, color: C.danger, lineHeight: 1.5 }}>
           {/rate limit|429/i.test(err)
-            ? <>Limite de débit atteinte. Attends ~1 min puis <button onClick={run} style={{ background: "none", border: "none", color: C.danger, textDecoration: "underline", cursor: "pointer", padding: 0, font: "inherit" }}>réessaie</button>.</>
-            : <>{err}</>}
+            ? <>{sayStable("aiRateLimit")} <button onClick={run} style={{ background: "none", border: "none", color: C.danger, textDecoration: "underline", cursor: "pointer", padding: 0, font: "inherit" }}>réessayez</button>.</>
+            : <>{sayError(err)}</>}
         </div>
       )}
       {state === "done" && kind === "bilan" && <Label style={{ marginBottom: 6 }}>Bilan — 90 derniers jours</Label>}
@@ -144,7 +145,7 @@ export function CoachIA({ coach, todayNote, saveNote, saveJournal }) {
           </span>
         </div>
       )}
-      {state === "idle" && <Body style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>« Analyser » : tes 14 derniers jours (poids, macros, eau, séances, sommeil, douleur genou), au jour le jour et sur la semaine glissante. « Bilan 3 mois » : corrélations calculées sur 90 jours (records, sommeil vs énergie, escalade vs genou, fibres vs stagnation, sèche). Nécessite ta clé API (Réglages).</Body>}
+      {state === "idle" && <Body style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>« Analyser » : vos 14 derniers jours (poids, macros, eau, séances, sommeil, douleur genou), au jour le jour et sur la semaine glissante. « Bilan 3 mois » : corrélations calculées sur 90 jours (records, sommeil vs énergie, escalade vs genou, fibres vs stagnation, sèche). Il me faut votre clé API (Réglages), Monsieur.</Body>}
     </Card>
   );
 }

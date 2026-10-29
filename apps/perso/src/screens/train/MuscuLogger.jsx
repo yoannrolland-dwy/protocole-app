@@ -17,6 +17,7 @@ import { T } from "../../design/tokens.js";
 import { Panel, Eyebrow, Button, IconButton, Chip, NumberField } from "../../design/primitives.jsx";
 import { mmss } from "../../lib/helpers.js";
 import { restTimer, useRestTimer } from "../../lib/restTimer.js";
+import { sayStable } from "../../lib/jeffrey.js";
 
 const mono = { fontFamily: T.f.num, fontVariantNumeric: "tabular-nums" };
 const WARN = T.c.warn;
@@ -527,7 +528,7 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
                             <span>{hh.poids || "—"} kg × {hh.val || "—"}{hh.mode === "temps" ? " s" : ""}</span>
                           </div>
                         ))
-                      : <div className="p-sec">Aucun historique</div>}
+                      : <div className="p-sec">{sayStable("firstTime")}</div>}
                   </div>
                 )}
               </>

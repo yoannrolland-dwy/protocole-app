@@ -16,6 +16,7 @@ import { WEEKLY_PLAN } from "../../lib/plan.js";
 // Coach IA (U3 étape 4, 25/10/2026) : quitte le tableau de bord pour l'onglet Analyse
 // (décision 4 du chantier U). Style v1 jusqu'à l'étape 7 (Analyse).
 import { CoachIA } from "../dashboard/CoachIA.jsx";
+import { sayStable } from "../../lib/jeffrey.js";
 
 /* ============================================================
    TAB — PERFORMANCE
@@ -85,7 +86,7 @@ export function PerformanceTab({ macros, targets, training, weight, phase, coach
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-        ) : <Empty>Aucune donnée.</Empty>}
+        ) : <Empty>{sayStable("noData")}</Empty>}
       </Card>
 
       {/* Dépense énergétique adaptative (V7) */}

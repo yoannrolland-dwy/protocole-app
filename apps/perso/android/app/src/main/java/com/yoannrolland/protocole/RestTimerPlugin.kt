@@ -50,6 +50,8 @@ class RestTimerPlugin : Plugin() {
         /** Partagé avec RestAlarmReceiver, qui n'a pas d'instance de Plugin. */
         fun ensureChannels(context: Context) {
             val nm = context.getSystemService(NotificationManager::class.java) ?: return
+            // Canal du test J0 (29/10/2026, code retiré) resté sur le téléphone : on l'efface.
+            nm.deleteNotificationChannel("j0")
 
             if (nm.getNotificationChannel(CHANNEL_ALARM) == null) {
                 nm.createNotificationChannel(
@@ -142,8 +144,8 @@ class RestTimerPlugin : Plugin() {
 
         val n = NotificationCompat.Builder(context, CHANNEL_COUNTDOWN)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("Repos en cours")
-            .setContentText(if (exercise.isEmpty()) "Série suivante à la fin du décompte" else exercise)
+            .setContentTitle("Repos en cours, Monsieur")
+            .setContentText(if (exercise.isEmpty()) "Je vous préviens à la fin du décompte." else exercise)
             // Chronomètre décroissant animé par le système : pas de mise à jour à faire.
             .setUsesChronometer(true)
             .setChronometerCountDown(true)

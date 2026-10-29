@@ -27,6 +27,7 @@ import { suggestions, searchBoost, MACROS, newQuickRef, portionsFor, compileReci
 import { scanBarcode } from "@rawcare/core/nutrition/scan";
 import RestaurantMenu from "./RestaurantMenu.jsx";
 import PhotoDish from "./PhotoDish.jsx";
+import { sayStable } from "../lib/jeffrey.js";
 
 const OFF_DEBOUNCE_MS = 700;
 
@@ -90,7 +91,7 @@ function OffSection({ offState, offResults, onPick }) {
         </Body>
       )}
       {offState === "done" && offResults.length === 0 && (
-        <Body style={{ fontSize: 13, color: C.dim, padding: "6px 0" }}>Aucun produit trouvé.</Body>
+        <Body style={{ fontSize: 13, color: C.dim, padding: "6px 0" }}>{sayStable("noProduct")}</Body>
       )}
       {offResults.map((f) => <Row key={f.ref} food={f} onClick={() => onPick(f)} />)}
     </>
@@ -343,7 +344,7 @@ function IngredientPicker({ onAdd, onCancel, log, pins, muted }) {
       {showSugg && sugg.length > 0 && (
         <Label style={{ marginTop: 4, marginBottom: 2 }}>Vos aliments habituels</Label>
       )}
-      {showEmpty && <Empty>Aucun résultat dans CIQUAL.</Empty>}
+      {showEmpty && <Empty>{sayStable("noCiqual")}</Empty>}
       {(showSugg ? sugg : results).map((f) => (
         <button type="button" className="p-tap" key={f.ref} onClick={() => { setPick(f); setGrams(100); }} style={{
           display: "block", width: "100%", minHeight: 56, padding: "8px 2px", background: "none", border: "none",
@@ -819,7 +820,7 @@ export default function FoodSearch({
             </Eyebrow>
 
             {list.length === 0 ? (
-              <Empty>{showSugg ? "Rien encore. Cherchez un aliment." : "Aucun résultat dans CIQUAL."}</Empty>
+              <Empty>{showSugg ? sayStable("searchHint") : sayStable("noCiqual")}</Empty>
             ) : (
               list.map((f) => (
                 <Row key={f.ref + f.name} food={f} pinned={f.pinned}

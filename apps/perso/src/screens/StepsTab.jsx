@@ -7,6 +7,7 @@ import { C, today, fmt, upsert, lastN, Card, Label, Empty, Btn, Stepper, Field, 
 import { avg, STEPS_TARGET } from "../lib/helpers.js";
 import { progressColor } from "../lib/progress.js";
 import { SyncedBanner } from "../components/SyncedBanner.jsx";
+import { sayStable } from "../lib/jeffrey.js";
 
 export function StepsTab({ steps, save }) {
   const [date, setDate] = useState(today());
@@ -79,7 +80,7 @@ export function StepsTab({ steps, save }) {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        ) : <Empty>Aucune donnée.</Empty>}
+        ) : <Empty>{sayStable("noData")}</Empty>}
       </Card>
     </div>
   );

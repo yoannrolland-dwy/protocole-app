@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { C, today, fmt, Card, Label, Body, Btn, inputStyle } from "../../design/compat.jsx";
+import { sayStable } from "../../lib/jeffrey.js";
 
 // Planning Basket fixe (01/09/2026) : jours de semaine récurrents (entraînement hebdo,
 // 0=dimanche...6=samedi comme Date#getDay()) + dates de matchs ponctuelles (calendrier de
@@ -64,7 +65,7 @@ export function BasketScheduleCard({ basketSchedule, setBasketSchedule }) {
         <Btn variant="primary" disabled={!newDate} onClick={addMatch} style={{ padding: "0 16px" }}>Ajouter</Btn>
       </div>
       {matchDates.length === 0 ? (
-        <Body style={{ fontSize: 13, color: C.dim }}>Aucune date de match enregistrée.</Body>
+        <Body style={{ fontSize: 13, color: C.dim }}>{sayStable("noMatch")}</Body>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {shown.map((d) => (

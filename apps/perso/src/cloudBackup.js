@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { today, shiftDateKey } from "./ui.jsx";
+import { say } from "./lib/jeffrey.js";
 
 // Sauvegarde HORS du téléphone (étape V2, 03/08/2026).
 //
@@ -71,8 +72,8 @@ export async function scheduleBackupReminder(lastDate) {
     await LocalNotifications.schedule({
       notifications: [{
         id: NOTIF_ID,
-        title: "Sauvegarde PROTOCOLE",
-        body: "Aucune sauvegarde hors du téléphone depuis une semaine. Réglages → Sauvegarder hors du téléphone.",
+        title: say("backupReminderTitle"),
+        body: say("backupReminder"),
         schedule: { at, repeats: true, every: "week", allowWhileIdle: true },
       }],
     });

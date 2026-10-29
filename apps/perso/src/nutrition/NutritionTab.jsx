@@ -23,6 +23,7 @@ import {
 } from "./foodStore.js";
 import FoodSearch from "./FoodSearch.jsx";
 import { PeriCard } from "../screens/perf/ReferenceCards.jsx";
+import { say, sayStable } from "../lib/jeffrey.js";
 
 // Cibles PROTOCOLE (protein/carbs/fat/fiber) → noms internes du module (prot/gluc/lip/fib).
 const TARGET_KEY = { prot: "protein", gluc: "carbs", lip: "fat", fib: "fiber" };
@@ -107,7 +108,7 @@ function CopyPanel({ candidates, onPick, onClose }) {
     <div style={{ display: "grid", gap: 4 }}>
       <Eyebrow>Copier depuis le…</Eyebrow>
       {candidates.length === 0 ? (
-        <div className="p-sec" style={{ padding: "8px 0" }}>Aucun autre jour avec ce repas rempli.</div>
+        <div className="p-sec" style={{ padding: "8px 0" }}>{sayStable("noOtherDay")}</div>
       ) : candidates.map((c) => (
         <button key={c.date} type="button" className="p-tap" onClick={() => onPick(c.date)} style={{
           display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, minHeight: 52,
@@ -315,7 +316,7 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
     const q = s.lastQ ?? 100;
     const entry = makeEntry({ date, meal: mealKey, food: s, q });
     food.add(entry);
-    offerUndo([entry.id], `${s.name} · ${q} g ajouté`);
+    offerUndo([entry.id], say("added", { x: `${s.name} · ${q} g` }));
   };
 
   // Carte resto : le reste de macros envoyé à l'IA et la date d'enregistrement sont ceux
@@ -356,14 +357,14 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
     const copies = copyEntries(entries, { date, meal: mealKey });
     food.addMany(copies);
     setCopyMeal(null);
-    offerUndo(copies.map((e) => e.id), `${copies.length} aliment${copies.length > 1 ? "s" : ""} copié${copies.length > 1 ? "s" : ""}`);
+    offerUndo(copies.map((e) => e.id), say("copied", { x: `${copies.length} aliment${copies.length > 1 ? "s" : ""} copié${copies.length > 1 ? "s" : ""}` }));
   };
 
   const addFromYesterday = (mealKey, chosen) => {
     const copies = copyEntries(chosen, { date, meal: mealKey });
     food.addMany(copies);
     setYesterdayMeal(null);
-    offerUndo(copies.map((e) => e.id), `${copies.length} aliment${copies.length > 1 ? "s" : ""} repris d'hier`);
+    offerUndo(copies.map((e) => e.id), say("fromYesterday", { x: `${copies.length} aliment${copies.length > 1 ? "s" : ""} repris d'hier` }));
   };
 
   const duplicateTo = (mealKeys, targetDate) => {
@@ -597,7 +598,7 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
         );
       })}
 
-      {dayEntries.length === 0 && <div className="p-sec" style={{ textAlign: "center", padding: "8px 0" }}>Aucun aliment enregistré ce jour.</div>}
+      {dayEntries.length === 0 && <div className="p-sec" style={{ textAlign: "center", padding: "8px 0" }}>{sayStable("noFoodDay")}</div>}
 
       <Panel>
         {duplicating ? (

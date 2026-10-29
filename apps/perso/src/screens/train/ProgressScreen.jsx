@@ -6,6 +6,7 @@ import { ChevronRight, X } from "lucide-react";
 import { splitExerciseList, exerciseSessions, exerciseTrend, isTimeMode, setLabel, painOutOfBase, progressiveOverloadSuggestion } from "@rawcare/core/training";
 import { C, today, fmt, Card, Label, Body, Empty, Btn, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../../design/compat.jsx";
 import { trendColor } from "../../lib/helpers.js";
+import { sayStable } from "../../lib/jeffrey.js";
 
 function ExerciseDetail({ training, knee, nom, onBack }) {
   const sessions = useMemo(() => exerciseSessions(training, nom), [training, nom]);
@@ -157,8 +158,8 @@ export function ProgressScreen({ training, knee, onBack }) {
             </button>
           );
         }) : <Empty>{stale.length
-          ? "Aucun exercice fait ces 60 derniers jours."
-          : "Aucun exercice enregistré pour l'instant — valide une séance de muscu et il apparaîtra ici."}</Empty>}
+          ? sayStable("noRecentExercise")
+          : sayStable("noExercise")}</Empty>}
       </Card>
       {stale.length > 0 && (
         <Card style={{ padding: "6px 14px" }}>

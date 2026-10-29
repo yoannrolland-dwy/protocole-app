@@ -32,6 +32,7 @@ import { C, Btn, Label, Body, inputStyle } from "../design/compat.jsx";
 import { callClaude, isClaudeModel } from "../claudeApi.js";
 import { aiMissing, fmtCost } from "../lib/ai.js";
 import { fileToImagePayload } from "@rawcare/core/nutrition/imageUtils";
+import { say, sayError, sayStable } from "../lib/jeffrey.js";
 
 // Messages clairs pour chaque `error_code` que peut renvoyer un bloc `web_fetch_tool_result`
 // en échec (doc Anthropic, outil web_fetch) — jusqu'ici ce bloc était totalement ignoré
@@ -45,9 +46,9 @@ const FETCH_ERROR_MESSAGES = {
   url_not_allowed: "Page bloquée à la lecture (restriction du site).",
   url_too_long: "Lien trop long.",
   invalid_tool_input: "Lien invalide.",
-  too_many_requests: "Trop de requêtes vers ce site pour l'instant — réessaie plus tard.",
+  too_many_requests: "Trop de requêtes vers ce site pour l'instant — réessayez plus tard.",
   max_uses_exceeded: "Limite de lecture atteinte pour cette analyse.",
-  unavailable: "Erreur interne du service de lecture — réessaie.",
+  unavailable: "Erreur interne du service de lecture — réessayez.",
 };
 
 // Repère un échec de lecture du lien dans la réponse (bloc `web_fetch_tool_result` avec
@@ -189,7 +190,7 @@ export default function RestaurantMenu({ ai, remaining, meal, onLogDishes, onBac
       const converted = await Promise.all(files.map((f) => fileToImagePayload(f)));
       setPhotos((prev) => [...prev, ...converted.map((p, i) => ({ id: `${Date.now()}-${i}`, ...p }))].slice(0, MAX_PHOTOS));
     } catch {
-      setPhotoErr("Une photo n'a pas pu être lue — réessaie.");
+      setPhotoErr(say("photoUnread"));
     }
   };
   const removePhoto = (id) => setPhotos((prev) => prev.filter((p) => p.id !== id));
@@ -249,8 +250,8 @@ export default function RestaurantMenu({ ai, remaining, meal, onLogDishes, onBac
         // commentaire sur `maxTokens` ci-dessus) — motif précis plutôt qu'un "illisible"
         // générique, pour distinguer ce cas d'une vraie réponse mal formée.
         setErr(fetchErr ? `Lien illisible : ${fetchErr}`
-          : data.stop_reason === "max_tokens" ? "Réponse coupée (carte trop fournie pour le budget actuel) — réessaie."
-          : "Réponse illisible. Réessaie, ou simplifie le texte/la photo.");
+          : data.stop_reason === "max_tokens" ? say("menuCut")
+          : say("menuUnreadable"));
         setState("error");
         return;
       }
@@ -368,7 +369,7 @@ export default function RestaurantMenu({ ai, remaining, meal, onLogDishes, onBac
         {state === "loading" ? (progress || "Analyse…") : "Analyser la carte"}
       </Btn>
 
-        {state === "error" && <Body style={{ fontSize: 13, color: C.danger }}>{err}</Body>}
+        {state === "error" && <Body style={{ fontSize: 13, color: C.danger }}>{sayError(err)}</Body>}
 
         {result && (
           <>
@@ -394,7 +395,7 @@ export default function RestaurantMenu({ ai, remaining, meal, onLogDishes, onBac
 
             {result.plats.length === 0 && (
               <Body style={{ fontSize: 13, color: meta?.fetchErr ? C.danger : C.dim }}>
-                {meta?.fetchErr ? `Lecture du lien échouée : ${meta.fetchErr} Essaie une photo à la place.` : "Aucun plat reconnu."}
+                {meta?.fetchErr ? sayStable("linkFailed", { x: meta.fetchErr }) : sayStable("noDish")}
               </Body>
             )}
 

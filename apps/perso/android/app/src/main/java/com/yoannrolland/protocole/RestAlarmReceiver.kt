@@ -22,6 +22,14 @@ import androidx.core.app.NotificationManagerCompat
  * flux ALARME, via MediaPlayer — indépendamment de tout pipeline de notification. C'est le seul
  * mécanisme constaté fiable téléphone en mode silencieux (voir RestTimerPlugin.kt).
  */
+/** Fin de repos dans la voix de Jeffrey (lot JT, 29/10/2026) : très court, lu entre deux séries. */
+private val END_TITLES = listOf(
+    "Repos terminé, Monsieur.",
+    "À vous, Monsieur.",
+    "La barre vous attend, Monsieur.",
+    "Fin de la récréation, Monsieur.",
+)
+
 class RestAlarmReceiver : BroadcastReceiver() {
 
     /**
@@ -128,8 +136,9 @@ class RestAlarmReceiver : BroadcastReceiver() {
             }
             val n = NotificationCompat.Builder(context, RestTimerPlugin.CHANNEL_ALARM)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-                .setContentTitle("Repos terminé")
-                .setContentText(if (exercise.isEmpty()) "Série suivante." else "$exercise — série suivante.")
+                // Jeffrey (lot JT) : titre court, lu entre deux séries ; une variante au hasard.
+                .setContentTitle(END_TITLES.random())
+                .setContentText(if (exercise.isEmpty()) "Série suivante, Monsieur." else "$exercise — série suivante.")
                 .setAutoCancel(true)
                 .setSilent(true) // le son est déjà joué explicitement ci-dessus, pas de doublon
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
