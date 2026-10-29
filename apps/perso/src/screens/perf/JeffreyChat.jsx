@@ -51,7 +51,13 @@ function ActionCard({ action, onDecide }) {
   return (
     <div style={box}>
       <div style={{ fontSize: 15, fontWeight: 600, color: T.c.text }}>{action.label}</div>
-      {askBase && <div style={{ fontSize: 14, color: T.c.text2 }}>Retour à la douleur de base sous 24 h ?</div>}
+      {action.kind === "repas" && (
+        <div style={{ fontSize: 13, color: T.c.text2, display: "grid", gap: 2 }}>
+          {action.items.map((it, i) => <div key={i}>{it.name} · <span style={{ fontFamily: T.f.num }}>{it.q} g</span></div>)}
+          {action.already > 0 && <div style={{ color: T.c.muted }}>Les {action.already} aliment{action.already > 1 ? "s" : ""} déjà noté{action.already > 1 ? "s" : ""} aujourd'hui restent.</div>}
+        </div>
+      )}
+      {askBase &&<div style={{ fontSize: 14, color: T.c.text2 }}>Retour à la douleur de base sous 24 h ?</div>}
       <div style={{ display: "grid", gridTemplateColumns: askBase ? "minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)" : "minmax(0,1fr) minmax(0,1fr)", gap: 8 }}>
         {askBase ? (
           <>
@@ -89,7 +95,7 @@ function Message({ entry, onStart, onDecide }) {
 // `memory` (J1.3) : { date, entries } d'un jour passé pas encore versé au carnet, ou null ;
 // `onMemoryDone(date)` quand Jeffrey a réécrit son carnet avec. `initialAsk` : demande lancée à
 // l'ouverture (« point » depuis la carte du tableau de bord), une seule fois.
-export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, saveJournal, onStart, memory, onMemoryDone, initialAsk, onAction }) {
+export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, saveJournal, onStart, memory, onMemoryDone, initialAsk, onAction, foodContext }) {
   const [draft, setDraft] = useState("");
   const [live, setLive] = useState(null); // { text, progress } pendant une réponse
   const [err, setErr] = useState("");
@@ -142,7 +148,7 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
         const actions = [];
         for (const t of tools) {
           if (isActionTool(t.name)) {
-            const v = validateAction(t.name, t.input);
+            const v = validateAction(t.name, t.input, foodContext?.() || {});
             toolResults[t.id] = v.ok ? "Proposée à Monsieur, en attente de sa confirmation : rien n'est fait pour l'instant." : `Refusée par l'application : ${v.reason}.`;
             if (v.ok) actions.push({ id: t.id, ...v.action, status: "pending" });
             continue;

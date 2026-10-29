@@ -8,7 +8,8 @@
 // puis personnalité (éditable), puis données du moment. Les règles priment sur la personnalité.
 
 import { splitCarnet, CARNET_MARK, CARNET_MAX_CHARS } from "./prompt.js";
-import { upsert } from "../dateUtils.js";
+import { upsert, shiftDateKey } from "../dateUtils.js";
+import { MEALS, suggestions, copyEntries, makeEntry, resolveLog, totals, amounts } from "../nutrition/foodStore.js";
 
 /** Personnalité d'amorçage (clé `jeffreyPersona`, éditable dans les Réglages). */
 export const JEFFREY_PERSONA = `Vous êtes Jeffrey, le majordome de Monsieur. Vous le vouvoyez toujours et l'appelez « Monsieur ». Langage châtié, phrases courtes et élégantes, flegme britannique. Vous avez le sens de l'humour : traits d'esprit, understatement, pince-sans-rire, une vraie blague quand l'occasion s'y prête. Taquin, volontiers cynique, et ce en toute circonstance, mais toujours avec une bienveillance évidente derrière la pique : on doit sentir que vous êtes de son côté. Ne répétez pas la même plaisanterie d'un message à l'autre. Vous ne flattez pas et ne dramatisez pas : vous constatez, vous conseillez, vous laissez Monsieur décider.`;
@@ -27,7 +28,7 @@ const CHAT_RULES = `CONVERSATION :
 - Séances : pour proposer ou confirmer une séance, utilisez l'outil choisir_seance, et UNIQUEMENT avec une séance de SEANCES_AUTORISEES (aujourd'hui ou demain). Vous pouvez nuancer le choix du recommandeur selon ce que Monsieur vous dit (fatigue ressentie, temps disponible, envie) ; jamais proposer une séance hors de cette liste.
 - Quand quelques réponses courtes aideraient Monsieur à vous répondre, utilisez l'outil proposer_reponses (2 à 4 réponses de 24 caractères au plus).
 - Appelez les outils après votre texte, jamais à sa place : votre réponse écrite doit se suffire.
-- Actions (ajouter_eau, noter_genou, ecrire_note) : proposez-les quand Monsieur vous donne l'information (« j'ai bu un demi-litre », « genou à 2 »). Elles ne sont faites qu'après sa confirmation d'un tap : ne dites jamais que c'est fait, dites que vous le lui proposez. Jamais un chiffre qu'il n'a pas donné.
+- Actions (ajouter_eau, noter_genou, ecrire_note, reprendre_repas, ajouter_habituel) : proposez-les quand Monsieur vous donne l'information ou le demande (« j'ai bu un demi-litre », « genou à 2 », « comme hier au petit-déj », « ajoute mon skyr au goûter »). Un habituel s'ajoute toujours à la quantité de la dernière fois : si Monsieur en veut une autre, dites-lui qu'il l'ajustera dans Nutrition. Si l'application refuse une action, dites-le simplement, sans inventer d'aliment ni de quantité. Elles ne sont faites qu'après sa confirmation d'un tap : ne dites jamais que c'est fait, dites que vous le lui proposez. Jamais un chiffre qu'il n'a pas donné.
 - Les DONNÉES DU MOMENT sont relues à chaque message de Monsieur : elles comptent DÉJÀ toutes les actions qu'il a confirmées (voir le résultat de vos outils). Ne rajoutez jamais une action confirmée à un chiffre de ces données, et ne revenez pas sur un total juste.`;
 
 /** Outils de la conversation (J1). Les actions qui écrivent des données arrivent en J2. */
@@ -77,13 +78,79 @@ export const JEFFREY_ACTION_TOOLS = [
     description: "Propose d'ajouter une phrase à la note du jour (contexte hors chiffres : alcool, insomnie, stress, petite blessure…), avec les mots de Monsieur.",
     input_schema: { type: "object", properties: { texte: { type: "string" } }, required: ["texte"] },
   },
+  {
+    name: "reprendre_repas",
+    description: "Propose de copier le repas d'HIER dans le même repas d'aujourd'hui (tous ses aliments, mêmes quantités). Uniquement si Monsieur le demande (« comme hier au petit-déj »).",
+    input_schema: { type: "object", properties: { repas: { type: "string", enum: MEALS.map((m) => m.key), description: "autre = Extra" } }, required: ["repas"] },
+  },
+  {
+    name: "ajouter_habituel",
+    description: "Propose d'ajouter à un repas d'aujourd'hui un aliment que Monsieur mange déjà à ce repas, à la quantité de la dernière fois (jamais une autre). aliment : le nom tel que Monsieur l'a dit (« skyr »). Si l'application ne le trouve pas parmi ses habituels de ce repas, elle vous le dira : ne l'inventez pas.",
+    input_schema: { type: "object", properties: { aliment: { type: "string" }, repas: { type: "string", enum: MEALS.map((m) => m.key), description: "autre = Extra" } }, required: ["aliment", "repas"] },
+  },
 ];
 const ACTION_NAMES = new Set(JEFFREY_ACTION_TOOLS.map((t) => t.name));
 export const isActionTool = (name) => ACTION_NAMES.has(name);
 
+const mealOf = (key) => MEALS.find((m) => m.key === key);
+const theMeal = (key) => (key === "autre" ? "l'Extra" : `le ${mealOf(key).label.toLowerCase()}`);
+const atMeal = (key) => (key === "autre" ? "en Extra" : `au ${mealOf(key).label.toLowerCase()}`);
+const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+/** J2b : repris d'hier (même repas) ou habituel de ce repas, à sa dernière quantité. Le contexte
+ *  `ctx` = { foodLog (brut, per100 d'origine), overrides, pins, muted, today }. */
+function validateFood(name, input, ctx) {
+  const meal = input?.repas;
+  if (!mealOf(meal)) return { ok: false, reason: `repas inconnu : ${meal}` };
+  const log = ctx.foodLog || [];
+  const date = ctx.today;
+  if (name === "reprendre_repas") {
+    const from = shiftDateKey(date, -1);
+    const src = log.filter((e) => e.date === from && e.meal === meal);
+    if (!src.length) return { ok: false, reason: `rien n'est noté ${atMeal(meal)} d'hier` };
+    const kcal = totals(resolveLog(src, ctx.overrides)).kcal;
+    const already = log.filter((e) => e.date === date && e.meal === meal).length;
+    return { ok: true, action: {
+      kind: "repas", meal, from, entryIds: src.map((e) => e.id), items: src.map((e) => ({ name: e.name, q: e.q })), kcal, already,
+      label: `Reprendre ${theMeal(meal)} d'hier : ${src.length} aliment${src.length > 1 ? "s" : ""}, ${kcal} kcal`,
+    } };
+  }
+  const asked = norm(input?.aliment);
+  if (!asked) return { ok: false, reason: "nom d'aliment vide" };
+  const habits = suggestions(log, { meal, pins: ctx.pins, muted: ctx.muted, date });
+  const words = asked.split(" ");
+  const match = habits.filter((h) => words.every((w) => norm(h.name).includes(w)));
+  const exact = match.filter((h) => norm(h.name) === asked);
+  const pick = exact.length === 1 ? exact[0] : match.length === 1 ? match[0] : null;
+  if (!match.length) {
+    const known = habits.slice(0, 8).map((h) => h.name).join(", ");
+    return { ok: false, reason: `aucun aliment habituel « ${input.aliment} » ${atMeal(meal)}${known ? ` (ses habituels à ce repas : ${known})` : " (aucun habituel à ce repas)"}` };
+  }
+  if (!pick) return { ok: false, reason: `plusieurs habituels correspondent ${atMeal(meal)} : ${match.slice(0, 5).map((h) => h.name).join(", ")} — demandez à Monsieur lequel` };
+  const food = { ref: pick.ref, name: pick.name, per100: pick.per100 };
+  const kcal = amounts(resolveLog([{ ...food, q: pick.lastQ }], ctx.overrides)[0]).kcal;
+  return { ok: true, action: {
+    kind: "habituel", meal, food, q: pick.lastQ, kcal,
+    label: `Ajouter ${pick.name} · ${pick.lastQ} g ${atMeal(meal)}${kcal != null ? ` (${kcal} kcal)` : ""}`,
+  } };
+}
+
+/** Lignes de journal à écrire pour une action repas/habituel confirmée (`log` brut). Mêmes
+ *  écritures que « Comme hier » / « Copier un repas » (copyEntries) et le tap sur un habituel. */
+export function foodEntriesFor(action, log, date) {
+  if (action.kind === "repas") {
+    const ids = new Set(action.entryIds);
+    return copyEntries((log || []).filter((e) => ids.has(e.id)), { date, meal: action.meal });
+  }
+  if (action.kind === "habituel") return [makeEntry({ date, meal: action.meal, food: action.food, q: action.q })];
+  return [];
+}
+
 /** Vérifie un appel d'outil d'action → { ok, action } ou { ok: false, reason }. `action` porte
- *  `kind`, les valeurs normalisées et `label` (ce que la carte affiche). */
-export function validateAction(name, input) {
+ *  `kind`, les valeurs normalisées et `label` (ce que la carte affiche). `ctx` sert aux actions
+ *  du journal alimentaire (J2b). */
+export function validateAction(name, input, ctx = {}) {
+  if (name === "reprendre_repas" || name === "ajouter_habituel") return validateFood(name, input, ctx);
   if (name === "ajouter_eau") {
     const ml = Math.round(Number(input?.ml));
     if (!Number.isFinite(ml) || ml < 50 || ml > 2000) return { ok: false, reason: "quantité d'eau hors de 50 à 2000 ml" };

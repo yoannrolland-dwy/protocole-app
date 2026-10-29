@@ -4113,6 +4113,35 @@ habituel) reste à faire ; « démarrer une séance » existe déjà depuis J1.2
   des outils sont déclarés ; absent → requête identique. Test « régression 29/10 » — 142 tests.
   Pas encore vu en conditions réelles (une réponse muette ne se provoque pas à la demande).
 
+## Chantier J — Jeffrey : J2b, repas d'hier et aliment habituel (29/10/2026, apps/perso v3.131.0)
+
+Second lot de J2 : **J2 est complet**. Choix de Yoann avant de coder : un habituel s'ajoute toujours à
+la quantité de la dernière fois ; on reprend le même repas d'hier ; carte en tout ou rien ; Jeffrey
+donne seulement le nom de l'aliment (aucune liste d'habituels envoyée, coût nul).
+- **Deux outils** (`JEFFREY_ACTION_TOOLS`) : `reprendre_repas {repas}` et `ajouter_habituel {aliment,
+  repas}` (`repas` = clé de `MEALS`, `autre` = Extra). `validateAction(name, input, ctx)` reçoit le
+  journal lu au moment de la réponse (`foodContext()` d'App : `foodLog` brut, corrections V6, épinglés,
+  masqués, date du jour) :
+  - repris : refus si rien au même repas d'hier ; sinon `{ entryIds, items, kcal, already }`, carte
+    avec la liste des aliments et « les N aliments déjà notés aujourd'hui restent » ;
+  - habituel : cherché parmi `suggestions(log, { meal })` (même filtre strict par repas que Nutrition),
+    par les mots du nom sans accents ; aucun → refus avec les habituels de ce repas, plusieurs →
+    refus « demandez à Monsieur lequel », sauf nom exact. Quantité = `lastQ`, **la dernière de cet
+    aliment tous repas confondus, comme le tap sur un habituel dans Nutrition**. kcal affiché avec la
+    correction V6, ligne écrite avec le `per100` d'origine.
+- **Écriture** (`foodEntriesFor`, testée) : `copyEntries` pour un repas, `makeEntry` pour un
+  habituel — n'ajoute que des lignes, jamais rien d'effacé. `onAction` (App) écrit `foodLog`, dérive
+  les macros du jour (`deriveMacroLog(resolveLog(...))`, eau préservée par `upsert`) car Nutrition
+  n'est pas forcément ouvert, puis émet **`FOOD_LOG_EVENT`** : `useFoodLog` relit alors `foodLog`.
+  Sans cet événement, un onglet Nutrition ouvert sous la bulle aurait écrasé les lignes de Jeffrey à
+  sa prochaine écriture.
+- `CHAT_RULES` : les deux outils, quantité imposée (« il l'ajustera dans Nutrition »), une action
+  refusée se dit sans inventer d'aliment.
+- Tests : `jeffrey.test.mjs` (repris, refus, habituel, ambiguïté, inconnu, filtre par repas,
+  correction V6) — 143 au total. Aperçu, réponse simulée, bulle ouverte au-dessus de Nutrition :
+  2 cartes (« pomme » refusée sans carte), confirmées → 3 lignes, 288 kcal, eau 750 intacte ; puis
+  « Macro rapide » dans Nutrition → les 3 lignes de Jeffrey restent, 388 kcal. Installé et **essayé par Yoann sur le téléphone avec le vrai serveur : « c'est bon »**.
+
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 
 Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la

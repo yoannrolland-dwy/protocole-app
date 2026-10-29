@@ -34,7 +34,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | J0 | Jeffrey — test jetable : l'app peut-elle préparer le brief seule, écran éteint et app fermée ? | petit | ✅ 29/10/2026 (piste A validée avec un réveil système) |
 | JT | Jeffrey — textes de l'app et notifications dans sa voix (textes fixes, sans IA) | petit | ✅ 29/10/2026 (v3.126.0) |
 | J1 | Jeffrey — la conversation, en 3 lots installés : J1.1 relais Android + cœur testé ; J1.2 conversation dans Analyse ; J1.3 bulle partout + carte Bord + mémoire | gros | J1.1 ✅ 29/10/2026 (v3.127.0) ; J1.2 ✅ 29/10/2026 (v3.128.0) ; J1.3 ✅ 29/10/2026 (v3.129.0) |
-| J2 | Jeffrey — actions proposées, confirmées d'un tap (eau, genou, note, séance, repas, habituel) | moyen | en cours (J2a ✅ 29/10/2026, J2b à faire) |
+| J2 | Jeffrey — actions proposées, confirmées d'un tap (eau, genou, note, séance, repas, habituel) | moyen | ✅ 29/10/2026 (J2a + J2b) |
 | J4 | Jeffrey — brief du matin en notification : attend la nuit, météo, réponse dans la notification | gros | à faire |
 | J3 | Jeffrey — la voix : micro (dictée) + réponse lue à voix haute, voix réglable | moyen | à faire |
 
@@ -1351,6 +1351,11 @@ le tap, phrase fixe et `tool_result` mis à jour, aucun nouvel appel à l'IA. «
 `macroLog` depuis App, l'onglet Nutrition (qui fait la dérivation M6) n'étant pas forcément monté.
 Correctif v3.130.1 : Jeffrey recomptait une eau déjà ajoutée (aucune double écriture). Ses données comptent déjà les actions confirmées : c'est désormais dit dans ses règles et en tête des données, et le résultat d'une eau confirmée donne le nouveau total.
 Correctif v3.130.2 : la relance d'une réponse sans texte part avec les outils interdits (`tool_choice: none`), donc toujours une réponse écrite.
+
+**J2b livré le 29/10/2026 (v3.131.0)** : `reprendre_repas` (même repas d'hier → aujourd'hui) et
+`ajouter_habituel` (nom donné par Jeffrey, retrouvé parmi les habituels de ce repas, dernière
+quantité). Carte en tout ou rien. Journal écrit par App avec macros du jour dérivées, et événement
+`FOOD_LOG_EVENT` pour qu'un onglet Nutrition ouvert relise le journal. **J2 terminé.**
 
 ### J4 — Le brief du matin en notification
 

@@ -9,7 +9,8 @@ import { PHASES, DEFAULT_TARGETS, targetsForDate, kcalFromMacros, kcalOfEntry, t
 import { recommendTargets, palierWeekOf, loggedRateLastDays } from "@rawcare/core/palier";
 import { nextSessions } from "@rawcare/core/nextSession";
 import { buildCoachPrompt, buildCoachBriefing, buildBilanPrompt, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
-import { buildJeffreyRequest, JEFFREY_PERSONA, pendingMemoryDate, applyWater, applyKnee } from "@rawcare/core/coach/jeffrey";
+import { buildJeffreyRequest, JEFFREY_PERSONA, pendingMemoryDate, applyWater, applyKnee, foodEntriesFor } from "@rawcare/core/coach/jeffrey";
+import { deriveMacroLog, resolveLog, FOOD_LOG_EVENT } from "./nutrition/foodStore.js";
 import { JeffreyBubble } from "./components/JeffreyBubble.jsx";
 import { JeffreyOverlay } from "./components/JeffreyOverlay.jsx";
 import { syncHealthConnect } from "./healthSync.js";
@@ -553,8 +554,28 @@ export default function App({ silent = false } = {}) {
         return { before, after: next.find((m) => m.date === today()).water };
       }
       if (a.kind === "genou") save.knee(applyKnee(knee, today(), a.pain, a.baseline));
+      // Repas repris / habituel (J2b) : lignes ajoutées au journal (jamais rien d'effacé), puis
+      // macros du jour dérivées comme le fait Nutrition (eau préservée par upsert), car l'onglet
+      // n'est pas forcément ouvert ; s'il l'est, l'événement lui fait relire le journal.
+      if (a.kind === "repas" || a.kind === "habituel") {
+        const raw = getSync("foodLog", []);
+        const date = today();
+        const added = foodEntriesFor(a, raw, date);
+        if (!added.length) return null;
+        const next = [...raw, ...added];
+        store.set("foodLog", next);
+        const derived = deriveMacroLog(resolveLog(next, getSync("foodOverrides", {}))).find((d) => d.date === date);
+        if (derived) save.macros(upsert(macros, derived));
+        window.dispatchEvent(new Event(FOOD_LOG_EVENT));
+      }
       return null;
     },
+    // Journal alimentaire lu au moment de la réponse (J2b) : Jeffrey ne propose qu'un repas ou un
+    // habituel qui existe vraiment.
+    foodContext: () => ({
+      foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}),
+      pins: getSync("foodPins", []), muted: getSync("foodMuted", []), today: today(),
+    }),
   };
   // Bulle : partout sauf dans Analyse (la conversation y est), les Réglages et un carnet ouvert.
   const bubbleOn = !loading && !showSettings && !chatOpen && tab !== "perf" && !(tab === "train" && getSync("trainingDraft", null)?.type);

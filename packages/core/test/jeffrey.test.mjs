@@ -12,7 +12,7 @@ import {
   continuationIfSilent, replyText, readReply, effortFor, jeffreyAsk,
   pendingMemoryDate, memoryTranscript, withMemory,
   validateAction, applyWater, applyKnee, appendNote, isActionTool,
-  confirmedResult, CANCELLED_RESULT, jeffreyDataBlock,
+  confirmedResult, CANCELLED_RESULT, jeffreyDataBlock, foodEntriesFor, JEFFREY_ACTION_TOOLS,
 } from "../src/coach/jeffrey.js";
 import { upsert } from "../src/dateUtils.js";
 
@@ -247,7 +247,7 @@ test("requête de Jeffrey : règles avant la personnalité, cache sur 3 points, 
   assert.deepEqual(lastUser.map((b) => b.text), ["heure : 09:00", "Que me conseillez-vous ?"]);
   const cached = [...r.system, ...r.messages.flatMap((m) => m.content)].filter((b) => b.cache_control);
   assert.equal(cached.length, 3);
-  assert.deepEqual(r.tools.map((t) => t.name), [...JEFFREY_TOOLS.map((t) => t.name), "ajouter_eau", "noter_genou", "ecrire_note"]);
+  assert.deepEqual(r.tools.map((t) => t.name), [...JEFFREY_TOOLS.map((t) => t.name), "ajouter_eau", "noter_genou", "ecrire_note", "reprendre_repas", "ajouter_habituel"]);
   assert.ok(r.allowed.aujourdhui.includes("Basket"));
 });
 
@@ -285,4 +285,45 @@ test("régression 29/10 : la relance d'une réponse muette interdit les outils ;
   assert.deepEqual(tr.calls[0].tools, tools);
   assert.equal("tool_choice" in tr.calls[1], false);
   assert.equal("tool_choice" in tr.calls[2], false); // jamais sans outils déclarés
+});
+
+test("J2b : reprendre le repas d'hier et ajouter un habituel, mêmes écritures que Nutrition", () => {
+  const skyr = { kcal: 60, prot: 10, gluc: 4, lip: 0, fib: 0 };
+  const log = [
+    { id: "a", date: "2026-10-28", meal: "petitdej", ref: "off:1", name: "Skyr nature", q: 150, per100: skyr },
+    { id: "b", date: "2026-10-28", meal: "petitdej", ref: "ciqual:2", name: "Banane, pulpe, crue", q: 120, per100: { kcal: 90, prot: 1, gluc: 20, lip: 0.3, fib: 2 } },
+    { id: "c", date: "2026-10-27", meal: "gouter", ref: "off:1", name: "Skyr nature", q: 200, per100: skyr },
+    { id: "d", date: "2026-10-26", meal: "gouter", ref: "off:3", name: "Skyr vanille", q: 100, per100: skyr },
+    { id: "e", date: "2026-10-29", meal: "petitdej", ref: "off:4", name: "Café", q: 200, per100: { kcal: 1, prot: 0, gluc: 0, lip: 0, fib: 0 } },
+  ];
+  const ctx = { foodLog: log, overrides: {}, pins: [], muted: [], today: "2026-10-29" };
+  assert.deepEqual(JEFFREY_ACTION_TOOLS.map((t) => t.name).slice(-2), ["reprendre_repas", "ajouter_habituel"]);
+
+  // Repas d'hier : tous ses aliments, mêmes quantités, vers aujourd'hui ; rien n'est effacé.
+  const r = validateAction("reprendre_repas", { repas: "petitdej" }, ctx);
+  assert.equal(r.ok, true);
+  assert.equal(r.action.label, "Reprendre le petit-déjeuner d'hier : 2 aliments, 198 kcal");
+  assert.equal(r.action.already, 1);
+  const added = foodEntriesFor(r.action, log, "2026-10-29");
+  assert.deepEqual(added.map((e) => [e.date, e.meal, e.ref, e.q]), [["2026-10-29", "petitdej", "off:1", 150], ["2026-10-29", "petitdej", "ciqual:2", 120]]);
+  assert.ok(added.every((e) => !["a", "b"].includes(e.id)));
+  assert.match(validateAction("reprendre_repas", { repas: "diner" }, ctx).reason, /rien n'est noté au dîner d'hier/);
+  assert.equal(validateAction("reprendre_repas", { repas: "brunch" }, ctx).ok, false);
+
+  // Habituel : trouvé par le nom à CE repas, dernière quantité (comme le tap dans Nutrition).
+  const h = validateAction("ajouter_habituel", { aliment: "skyr nature", repas: "gouter" }, ctx);
+  assert.equal(h.ok, true);
+  assert.equal(h.action.food.ref, "off:1");
+  assert.equal(h.action.label, "Ajouter Skyr nature · 150 g au goûter (90 kcal)");
+  const [line] = foodEntriesFor(h.action, log, "2026-10-29");
+  assert.deepEqual([line.date, line.meal, line.ref, line.q, line.per100], ["2026-10-29", "gouter", "off:1", 150, skyr]);
+  // Plusieurs correspondances → refus avec la liste ; inconnu → refus avec les habituels.
+  assert.match(validateAction("ajouter_habituel", { aliment: "skyr", repas: "gouter" }, ctx).reason, /plusieurs habituels.*Skyr nature.*Skyr vanille/);
+  assert.match(validateAction("ajouter_habituel", { aliment: "Pomme", repas: "petitdej" }, ctx).reason, /aucun aliment habituel « Pomme ».*Skyr nature/);
+  // Jamais mangé à ce repas → pas un habituel de ce repas (même filtre que Nutrition).
+  assert.equal(validateAction("ajouter_habituel", { aliment: "banane", repas: "gouter" }, ctx).ok, false);
+  // Correction V6 : le kcal affiché la suit, la ligne écrite garde le per100 d'origine.
+  const hc = validateAction("ajouter_habituel", { aliment: "skyr nature", repas: "gouter" }, { ...ctx, overrides: { "off:1": { kcal: 80 } } });
+  assert.equal(hc.action.kcal, 120);
+  assert.deepEqual(foodEntriesFor(hc.action, log, "2026-10-29")[0].per100, skyr);
 });

@@ -12,6 +12,10 @@ import { resolveLog } from "@rawcare/core/nutrition/foodStore";
 
 export * from "@rawcare/core/nutrition/foodStore";
 
+// Jeffrey (J2b) écrit dans le journal hors de l'onglet Nutrition : l'événement fait relire
+// `foodLog` à un onglet déjà ouvert, qui sinon écraserait ces lignes à sa prochaine écriture.
+export const FOOD_LOG_EVENT = "protocole:foodLog";
+
 // --- Hook de persistance ------------------------------------------------------
 
 export function useFoodLog() {
@@ -37,6 +41,12 @@ export function useFoodLog() {
       setOverrides(await store.get("foodOverrides", {}));
       setReady(true);
     })();
+  }, []);
+
+  useEffect(() => {
+    const reload = async () => setLog(await store.get("foodLog", []));
+    window.addEventListener(FOOD_LOG_EVENT, reload);
+    return () => window.removeEventListener(FOOD_LOG_EVENT, reload);
   }, []);
 
   const write = (next) => { setLog(next); store.set("foodLog", next); };
