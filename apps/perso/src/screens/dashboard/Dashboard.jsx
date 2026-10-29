@@ -51,7 +51,7 @@ function Tile({ label, value, unit, note, extra, bar, barColor, onClick, big = f
   );
 }
 
-export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, setTab, lastCloudBackup, openSettings, basketSchedule, planFor, palier, onApplyPalier, saveKnee, onStart, jeffreyEntries, onOpenJeffrey }) {
+export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, setTab, lastCloudBackup, openSettings, basketSchedule, planFor, palier, onApplyPalier, saveKnee, onStart, jeffreyEntries, onOpenJeffrey, briefWaiting, onBriefNow }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast && tgtW != null ? round(wLast.kg - tgtW) : null;
@@ -128,7 +128,7 @@ export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targe
       )}
 
       {/* Jeffrey (J1.3) : tout en haut jusqu'à midi (choix de Yoann), replié sous les tuiles ensuite. */}
-      {onOpenJeffrey && jeffreyMorning && <JeffreyCard entries={jeffreyEntries} morning onOpen={onOpenJeffrey} />}
+      {onOpenJeffrey && jeffreyMorning && <JeffreyCard entries={jeffreyEntries} morning onOpen={onOpenJeffrey} waiting={briefWaiting} onBriefNow={onBriefNow} />}
 
       {/* Énergie + Poids : ce que Yoann regarde en premier le matin (moments d'usage U1). */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>

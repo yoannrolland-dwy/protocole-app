@@ -5,29 +5,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, ChevronRight, ChevronDown } from "lucide-react";
 import { TEMPLATES } from "@rawcare/core/session/templates";
-import { streamClaude } from "@rawcare/core/coach/claudeApi";
 import {
-  jeffreyAsk, readReply, effortFor, validateSessionChoice, continuationIfSilent, withMemory,
-  isActionTool, validateAction, appendNote, confirmedResult, CANCELLED_RESULT,
+  jeffreyAsk, withMemory, appendNote, confirmedResult, CANCELLED_RESULT,
 } from "@rawcare/core/coach/jeffrey";
 import { T } from "../../design/tokens.js";
 import { Panel, Eyebrow, Button, IconButton, Chip } from "../../design/primitives.jsx";
 import { today } from "../../ui.jsx";
-import { aiMissing, fmtCost, recordSpend } from "../../lib/ai.js";
+import { aiMissing, fmtCost } from "../../lib/ai.js";
 import { say, sayStable, sayError } from "../../lib/jeffrey.js";
 import { streamTransportFor } from "../../lib/jeffreyHttp.js";
-
-const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-const hhmm = () => new Date().toTimeString().slice(0, 5);
-
-/** La réflexion n'est renvoyée à l'API que pour la dernière réponse (voir toApiMessages) :
- *  inutile de la garder dans le stockage pour les réponses plus anciennes. */
-const withoutOldThinking = (entries) => {
-  const last = entries.map((e) => e.role).lastIndexOf("assistant");
-  return entries.map((e, i) => (e.role === "assistant" && i !== last && e.content?.some((b) => b.type === "thinking" || b.type === "redacted_thinking"))
-    ? { ...e, content: e.content.filter((b) => b.type !== "thinking" && b.type !== "redacted_thinking") }
-    : e);
-};
+import { jeffreyTurn, newId, hhmm } from "../../lib/jeffreyTurn.js";
 
 function SessionCard({ choice, onStart }) {
   const canStart = choice.jour === "aujourdhui" && TEMPLATES[choice.type];
@@ -123,57 +110,20 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
     const date = today();
     setErr("");
     setLive({ text: "", progress: "" });
+    const apply = ({ history: h, journal, memDate }) => {
+      if (journal) { saveJournal(journal); if (memDate) onMemoryDone?.(memDate); }
+      setDay(date, h);
+    };
     try {
-      for (let pass = 0; pass < 2; pass++) {
-        const req = coach.jeffreyRequest(history, note);
-        const { message, usedModel, cents } = await streamClaude({
-          provider: ai.provider, baseUrl: ai.baseUrl, apiKey: ai.apiKey, model: ai.model,
-          system: req.system, messages: req.messages, tools: req.tools,
-          // Relance d'une réponse muette : outils interdits, sinon elle peut rester muette (29/10).
-          toolChoice: pass > 0 ? { type: "none" } : undefined,
-          effort: effortFor(mode), maxTokens: 16000, streamTransport: streamTransportFor(ai),
-          onText: (_, all) => setLive((l) => ({ ...(l || {}), text: readReply([{ type: "text", text: all }]).text })),
-          onRetry: (p) => setLive((l) => ({ ...(l || {}), progress: p })),
-        });
-        recordSpend(cents);
-        const { text, journal } = readReply(message.content);
-        if (journal) {
-          saveJournal(journal);
-          const memDate = [...history].reverse().find((e) => e.role === "user" && e.memoryFor)?.memoryFor;
-          if (memDate) onMemoryDone?.(memDate);
-        }
-        const tools = message.content.filter((b) => b.type === "tool_use");
-        const toolResults = {};
-        const choices = [];
-        const actions = [];
-        for (const t of tools) {
-          if (isActionTool(t.name)) {
-            const v = validateAction(t.name, t.input, foodContext?.() || {});
-            toolResults[t.id] = v.ok ? "Proposée à Monsieur, en attente de sa confirmation : rien n'est fait pour l'instant." : `Refusée par l'application : ${v.reason}.`;
-            if (v.ok) actions.push({ id: t.id, ...v.action, status: "pending" });
-            continue;
-          }
-          if (t.name === "choisir_seance") {
-            const v = validateSessionChoice(t.input, req.allowed);
-            toolResults[t.id] = v.ok ? "Proposée à Monsieur, avec un bouton pour la démarrer." : `Refusée par l'application : ${v.reason}. Ne la proposez pas.`;
-            if (v.ok) choices.push({ id: t.id, ...v });
-          }
-        }
-        const quick = tools.find((t) => t.name === "proposer_reponses");
-        history = [...history, {
-          id: newId(), role: "assistant", at: hhmm(), content: message.content, text, choices, actions,
-          quick: quick ? { id: quick.id, options: (quick.input?.options || []).slice(0, 4).map(String) } : null,
-          toolResults, meta: { cents, model: usedModel },
-        }];
-        const cont = pass === 0 ? continuationIfSilent(message) : null;
-        if (!cont) break;
-        history = [...history, { ...cont, id: newId(), at: hhmm(), hidden: true }];
-        setLive({ text: "", progress: "" });
-      }
-      setDay(date, withoutOldThinking(history));
+      apply(await jeffreyTurn({
+        history, mode, coach, ai, note, foodContext, transport: streamTransportFor(ai),
+        onText: (text) => setLive((l) => ({ ...(l || {}), text })),
+        onRetry: (p) => setLive((l) => ({ ...(l || {}), progress: p })),
+        onPass: () => setLive({ text: "", progress: "" }),
+      }));
     } catch (e) {
       console.error("Jeffrey", e);
-      setDay(date, withoutOldThinking(history));
+      if (e.partial) apply(e.partial);
       setErr(e?.message || "cause inconnue");
     } finally {
       setLive(null);

@@ -7,13 +7,13 @@ import { computeEnergyScore, scoreLabel } from "@rawcare/core/energy";
 import { computeBilanFacts } from "@rawcare/core/bilan";
 import { PHASES, DEFAULT_TARGETS, targetsForDate, kcalFromMacros, kcalOfEntry, tdeeNow, buildKcalByDate, weightTrend7, recompWindows } from "@rawcare/core/targets";
 import { recommendTargets, palierWeekOf, loggedRateLastDays } from "@rawcare/core/palier";
-import { nextSessions } from "@rawcare/core/nextSession";
-import { buildCoachPrompt, buildCoachBriefing, buildBilanPrompt, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
-import { buildJeffreyRequest, JEFFREY_PERSONA, pendingMemoryDate, applyWater, applyKnee, foodEntriesFor } from "@rawcare/core/coach/jeffrey";
+import { buildCoachBriefing, buildBilanPrompt, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
+import { JEFFREY_PERSONA, pendingMemoryDate, applyWater, applyKnee, foodEntriesFor } from "@rawcare/core/coach/jeffrey";
 import { deriveMacroLog, resolveLog, FOOD_LOG_EVENT } from "./nutrition/foodStore.js";
 import { JeffreyBubble } from "./components/JeffreyBubble.jsx";
 import { JeffreyOverlay } from "./components/JeffreyOverlay.jsx";
 import { syncHealthConnect } from "./healthSync.js";
+import { mergeSteps, mergeSleep, mergeWeight, mergeRhr, mergeNaps } from "@rawcare/core/healthMerge";
 import { updateDashboardWidget, consumeWidgetTab } from "./widgetSync.js";
 import { runAutoBackup } from "./autoBackup.js";
 import { C, today, shiftDateKey, fmt, round, longDate, byDate, upsert, lastN, fmtHM } from "./ui.jsx";
@@ -23,7 +23,14 @@ import { isSilentSync, finishSilentSync } from "./silentSync.js";
 import { STEPS_TARGET, scoreColor } from "./lib/helpers.js";
 import { progressColor } from "./lib/progress.js";
 import { COLORS } from "./design/tokens.js";
-import { familiesForToday, isMatchWeek, isPostMatchDay, planForDate } from "./lib/plan.js";
+import { isMatchWeek, isPostMatchDay, planForDate } from "./lib/plan.js";
+import { makeCoach } from "./lib/coachInputs.js";
+import { BRIEF, briefMissing, nextBriefAlarm } from "@rawcare/core/coach/brief";
+import { readBriefState, writeBriefState, runBrief, missingText } from "./lib/brief.js";
+import { scheduleBrief, cancelBriefNotification } from "./lib/briefNative.js";
+import { streamTransportFor } from "./lib/jeffreyHttp.js";
+import { aiMissing } from "./lib/ai.js";
+import { say } from "./lib/jeffrey.js";
 import { SettingsPanel } from "./screens/settings/SettingsPanel.jsx";
 import { Dashboard } from "./screens/dashboard/Dashboard.jsx";
 import { WeightTab } from "./screens/WeightTab.jsx";
@@ -117,6 +124,12 @@ export default function App({ silent = false } = {}) {
   // conversation ouverte par-dessus l'écran ({ initialAsk } ou null).
   const [jeffreyMemoryDate, setJeffreyMemoryDateState] = useState(null);
   const [chatOpen, setChatOpen] = useState(null);
+  // Brief du matin dans l'app (J4.1) : phrase d'attente de la carte du Bord, et horloge qui
+  // relance la vérification (un créneau passe 10 h sans aucune nouvelle donnée).
+  const [briefWaiting, setBriefWaiting] = useState(null);
+  const [briefTick, setBriefTick] = useState(0);
+  const [briefNow, setBriefNow] = useState(false);
+  const briefRunning = useRef(false);
   const [lastAutoBackup, setLastAutoBackup] = useState(null);
   const [lastCloudBackup, setLastCloudBackup] = useState(null);
 
@@ -212,67 +225,18 @@ export default function App({ silent = false } = {}) {
       setHealthSync({ status: result.status, message: result.message || result.reason, at: new Date().toISOString() });
       return;
     }
-    if (Object.keys(result.stepsByDate).length) {
-      setSteps((prev) => {
-        let next = prev;
-        Object.entries(result.stepsByDate).forEach(([date, count]) => { next = upsert(next, { date, count, source: "healthconnect" }); });
-        store.set("stepsLog", next);
-        return next;
-      });
-    }
-    if (Object.keys(result.sleepByDate).length) {
-      setSleep((prev) => {
-        let next = prev;
-        // quality n'est présent que les nuits où Health Connect a le détail par phase
-        // (voir HealthNutritionPlugin.readSleep) — absent, on ne touche pas à une note
-        // saisie à la main pour ce jour-là.
-        Object.entries(result.sleepByDate).forEach(([date, d]) => {
-          next = upsert(next, { date, hours: round(d.hours, 2), ...(d.quality != null ? { quality: d.quality } : {}), source: "healthconnect" });
-        });
-        store.set("sleepLog", next);
-        return next;
-      });
-    }
-    // Nutrition/eau : plus lues depuis Health Connect (bascule M6, 02/08/2026) — foodLog
-    // est l'unique écrivain de macroLog désormais, voir la dérivation dans NutritionTab.jsx.
-    if (Object.keys(result.weightByDate || {}).length || Object.keys(result.weightTimeByDate || {}).length) {
-      setWeight((prev) => {
-        let next = prev;
-        // `time` (08/10/2026, heure de pesée) : "HH:MM" local, posé seulement quand Health Connect
-        // la fournit — une pesée manuelle n'en a pas. Affichée dans l'historique du poids.
-        Object.entries(result.weightByDate || {}).forEach(([date, kg]) => {
-          const time = result.weightTimeByDate?.[date];
-          next = upsert(next, { date, kg, source: "healthconnect", ...(time ? { time } : {}) });
-        });
-        // Rattrapage de l'heure seule (90 j) sur les pesées déjà présentes hors fenêtre de synchro.
-        Object.entries(result.weightTimeByDate || {}).forEach(([date, time]) => {
-          if (result.weightByDate?.[date] != null) return;
-          const cur = next.find((w) => w.date === date);
-          if (cur && !cur.time) next = upsert(next, { ...cur, time });
-        });
-        store.set("weightLog", next);
-        return next;
-      });
-    }
-    // FC repos (05/09/2026, score d'énergie) — pas de note "source" ici : contrairement au
-    // poids/sommeil/pas, il n'existe aucune saisie manuelle de la FC repos dans l'app, donc
-    // pas de conflit "manuel vs synchronisé" à arbitrer.
-    if (Object.keys(result.rhrByDate || {}).length) {
-      setRhr((prev) => {
-        let next = prev;
-        Object.entries(result.rhrByDate).forEach(([date, bpm]) => { next = upsert(next, { date, bpm }); });
-        store.set("rhrLog", next);
-        return next;
-      });
-    }
-    if (Object.keys(result.napsByDate || {}).length) {
-      setNaps((prev) => {
-        let next = prev;
-        Object.entries(result.napsByDate).forEach(([date, minutes]) => { next = upsert(next, { date, minutes }); });
-        store.set("napLog", next);
-        return next;
-      });
-    }
+    // Fusion : packages/core/src/healthMerge.js (même règle que le brief du matin, J4.1).
+    // Nutrition/eau : plus lues depuis Health Connect (bascule M6, 02/08/2026). FC repos et
+    // siestes : aucune saisie manuelle, donc pas de champ « source » à arbitrer.
+    const merge = (has, set, key, fn) => {
+      if (!has) return;
+      set((prev) => { const next = fn(prev); store.set(key, next); return next; });
+    };
+    merge(Object.keys(result.stepsByDate).length, setSteps, "stepsLog", (p) => mergeSteps(p, result.stepsByDate));
+    merge(Object.keys(result.sleepByDate).length, setSleep, "sleepLog", (p) => mergeSleep(p, result.sleepByDate));
+    merge(Object.keys(result.weightByDate || {}).length || Object.keys(result.weightTimeByDate || {}).length, setWeight, "weightLog", (p) => mergeWeight(p, result.weightByDate, result.weightTimeByDate));
+    merge(Object.keys(result.rhrByDate || {}).length, setRhr, "rhrLog", (p) => mergeRhr(p, result.rhrByDate));
+    merge(Object.keys(result.napsByDate || {}).length, setNaps, "napLog", (p) => mergeNaps(p, result.napsByDate));
     setHealthSync({ status: "ok", at: new Date().toISOString() });
   };
 
@@ -322,13 +286,15 @@ export default function App({ silent = false } = {}) {
   // Resynchro à chaque retour au premier plan (pas seulement au lancement à froid)
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
-    const handle = CapacitorApp.addListener("resume", () => { runHealthSync(); doAutoBackup(); setPalierTick((t) => t + 1); openWidgetTab(); });
+    // La page du brief (J4.1) a pu écrire dans la conversation pendant que l'app dormait : relue.
+    const handle = CapacitorApp.addListener("resume", () => { runHealthSync(); doAutoBackup(); setPalierTick((t) => t + 1); openWidgetTab(); setJeffreyLog(getSync("jeffreyLog", {})); setBriefTick((t) => t + 1); });
     return () => { handle.then((h) => h.remove()); };
   }, []);
 
   // Tap sur une tuile du widget (27/10/2026) : l'app s'ouvre sur l'écran de la tuile. Lu au
   // lancement (app fermée) et à chaque retour au premier plan (app déjà ouverte).
-  const openWidgetTab = () => consumeWidgetTab().then((t) => { if (t) goTo(t); });
+  // « jeffrey » : tap sur la notification du brief (BriefRunner.kt) → la conversation.
+  const openWidgetTab = () => consumeWidgetTab().then((t) => { if (t === "jeffrey") setChatOpen({}); else if (t) goTo(t); });
   useEffect(() => { if (!silent) openWidgetTab(); }, []);
 
   // Widget d'écran d'accueil (Android) : 5 valeurs des tuiles du tableau de bord
@@ -497,18 +463,10 @@ export default function App({ silent = false } = {}) {
   // Assemble le "sac de données" pour @rawcare/core/coach/prompt. `foodLog`/`foodOverrides`
   // sont lus fraîchement (getSync, jamais mis en cache) au moment précis de l'appel — un
   // repas ajouté dans l'onglet Repas pendant la session en cours doit être vu immédiatement.
+  const coachFromState = makeCoach({ weight, sleep, training, knee, macros, notes, steps, rhr, naps, targets, phase, basketSchedule, targetHistory, palierWeekly, coachProfile, coachJournal, jeffreyPersona });
   const coach = {
-    buildPrompt: (note, { profile = coachProfile, journal = coachJournal } = {}) =>
-      buildCoachPrompt({
-        weight, sleep, training, knee, macros, notes, steps, targets, phase,
-        foodLog: getSync("foodLog", []), foodOverrides: getSync("foodOverrides", {}),
-        profile, journal, basketSchedule, weeklyPlan: familiesForToday(basketSchedule),
-        matchWeek: isMatchWeek(basketSchedule), postMatch: isPostMatchDay(basketSchedule), targetHistory, palier: palierWeekly,
-        // Recommandeur temporel (S2) : même verdict Aujourd'hui/Demain que la carte du Dashboard.
-        nextSession: nextSessions({ now: new Date(), base: { training, knee, sleep, targets, basketSchedule,
-          energy: computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps }) }, planFor: planForDate(basketSchedule) }),
-        energy: computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps }),
-      }, note),
+    // Requête du coach et de Jeffrey : lib/coachInputs.js (partagée avec le brief du matin, J4.1).
+    ...coachFromState,
     buildBriefing: () =>
       buildCoachBriefing({
         weight, sleep, training, knee, macros, notes, steps, targets, phase,
@@ -526,13 +484,6 @@ export default function App({ silent = false } = {}) {
       const kcalTargetToday = Math.round(kcalFromMacros(atToday.protein, atToday.carbs, atToday.fat, atToday.fiber));
       const facts = computeBilanFacts({ training, weight, macros, sleep, rhr, steps, knee, targets, tdeeResult, kcalTargetToday, todayDate: today() });
       return buildBilanPrompt({ facts, phase, targets, profile: coachProfile, notes });
-    },
-    // Jeffrey (J1.2) : requête de la conversation, mêmes faits que le Coach IA et même verdict
-    // du recommandeur que la carte « Prochaine séance ».
-    jeffreyRequest: (history, note) => {
-      const energy = computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps });
-      const nextSession = nextSessions({ now: new Date(), base: { training, knee, sleep, targets, basketSchedule, energy }, planFor: planForDate(basketSchedule) });
-      return buildJeffreyRequest({ coach: coach.buildPrompt(note), persona: jeffreyPersona, nextSession, history, heure: new Date().toTimeString().slice(0, 5) });
     },
     ai,
   };
@@ -577,6 +528,42 @@ export default function App({ silent = false } = {}) {
       pins: getSync("foodPins", []), muted: getSync("foodMuted", []), today: today(),
     }),
   };
+  // Brief du matin dans l'app (J4.1, choix de Yoann) : ouverte le matin avant que le brief parte,
+  // l'app prend la main (plus aucune notification ce jour-là), la carte du Bord dit ce qui manque,
+  // et Jeffrey écrit le brief dans la conversation dès que nuit, pesée et genou sont là (ou à 10 h,
+  // ou sur « Le brief tout de suite »). Mêmes règles et même requête que la page sans écran.
+  useEffect(() => {
+    const id = setInterval(() => setBriefTick((t) => t + 1), 5 * 60000);
+    return () => clearInterval(id);
+  }, []);
+  useEffect(() => {
+    if (loading || silent || healthSync.status === "running" || healthSync.at == null) return;
+    const now = new Date();
+    const date = today();
+    const st = readBriefState();
+    const done = st.doneDate === date;
+    scheduleBrief(nextBriefAlarm(now, { doneToday: done }).getTime());
+    const h = now.getHours() + now.getMinutes() / 60;
+    if (done || h < BRIEF.start[0] + BRIEF.start[1] / 60 || h >= 12) { setBriefWaiting(null); return; }
+    if (st.appDate !== date) { writeBriefState({ appDate: date }); cancelBriefNotification(); }
+    const missing = briefMissing({ today: date, sleep, weight, knee });
+    if (missing.length && h < BRIEF.deadline[0] && !briefNow) { setBriefWaiting(missingText(missing)); return; }
+    if (briefRunning.current || aiMissing(ai)) return;
+    briefRunning.current = true;
+    setBriefWaiting(say("briefPreparing"));
+    runBrief({
+      data: { weight, sleep, training, knee, macros, notes, steps, rhr, naps, targets, phase, basketSchedule, targetHistory, palierWeekly, coachProfile, coachJournal, jeffreyPersona },
+      ai, transport: streamTransportFor(ai), missing,
+    }).catch((e) => console.error("brief", e)).finally(() => {
+      setJeffreyLog(getSync("jeffreyLog", {}));
+      setCoachJournalState(getSync("coachJournal", ""));
+      setJeffreyMemoryDateState(getSync("jeffreyMemoryDate", null));
+      setBriefWaiting(null);
+      scheduleBrief(nextBriefAlarm(new Date(), { doneToday: readBriefState().doneDate === today() }).getTime());
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, healthSync.at, healthSync.status, sleep, weight, knee, briefTick, briefNow]);
+
   // Bulle : partout sauf dans Analyse (la conversation y est), les Réglages et un carnet ouvert.
   const bubbleOn = !loading && !showSettings && !chatOpen && tab !== "perf" && !(tab === "train" && getSync("trainingDraft", null)?.type);
 
@@ -611,7 +598,7 @@ export default function App({ silent = false } = {}) {
           <SettingsPanel {...{ apiKey, setApiKey, model, setModel, aiProvider, setAiProvider, litellmUrl, setLitellmUrl, litellmKey, setLitellmKey, litellmModel, setLitellmModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, jeffreyPersona, setJeffreyPersona, targets, lastAutoBackup, lastCloudBackup, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, lastCloudBackup, basketSchedule, planFor: planForDate(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier, saveKnee: save.knee, onStart: startSession, jeffreyEntries: jeffreyLog[today()] || [], onOpenJeffrey: (initialAsk) => setChatOpen({ initialAsk }) }} setTab={goTo} openSettings={() => setShowSettings(true)} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, lastCloudBackup, basketSchedule, planFor: planForDate(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier, saveKnee: save.knee, onStart: startSession, jeffreyEntries: jeffreyLog[today()] || [], onOpenJeffrey: (initialAsk) => setChatOpen({ initialAsk }), briefWaiting, onBriefNow: briefWaiting && !briefRunning.current ? () => setBriefNow(true) : null }} setTab={goTo} openSettings={() => setShowSettings(true)} />}
             {tab === "corps" && (
               <CorpsTab sub={corpsSub} onSub={setCorpsSub}>
                 {corpsSub === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}

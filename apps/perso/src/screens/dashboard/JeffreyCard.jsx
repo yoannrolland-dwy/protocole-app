@@ -9,7 +9,10 @@ import { sayStable } from "../../lib/jeffrey.js";
 
 const lastWords = (entries) => [...(entries || [])].reverse().find((e) => e.role === "assistant" && !e.hidden && e.text)?.text || null;
 
-export function JeffreyCard({ entries, morning, onOpen }) {
+// Brief du matin (J4.1) : tant qu'il attend la nuit, la pesée ou le genou, `waiting` porte la
+// phrase « J'ai votre nuit ; il me manque… » ; `onBriefNow` le lance sans attendre (absent pendant
+// qu'il s'écrit).
+export function JeffreyCard({ entries, morning, onOpen, waiting, onBriefNow }) {
   const last = lastWords(entries);
 
   if (!morning) {
@@ -32,6 +35,11 @@ export function JeffreyCard({ entries, morning, onOpen }) {
         <>
           <div style={{ fontSize: 15, color: T.c.text, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden", whiteSpace: "pre-wrap" }}>{last}</div>
           <Button variant="outline" block onClick={() => onOpen()}>Continuer la conversation</Button>
+        </>
+      ) : waiting ? (
+        <>
+          <div style={{ fontSize: 15, color: T.c.text2, lineHeight: 1.5 }}>{waiting}</div>
+          {onBriefNow && <Button variant="outline" block onClick={onBriefNow}>Le brief tout de suite</Button>}
         </>
       ) : (
         <>

@@ -4142,6 +4142,63 @@ donne seulement le nom de l'aliment (aucune liste d'habituels envoyée, coût nu
   2 cartes (« pomme » refusée sans carte), confirmées → 3 lignes, 288 kcal, eau 750 intacte ; puis
   « Macro rapide » dans Nutrition → les 3 lignes de Jeffrey restent, 388 kcal. Installé et **essayé par Yoann sur le téléphone avec le vrai serveur : « c'est bon »**.
 
+## Chantier J — Jeffrey : J4.1, le brief du matin (29/10/2026, apps/perso v3.132.0)
+
+Premier des trois lots de J4 (choix de Yoann : J4.1 brief → J4.2 météo → J4.3 réponses dans la
+notification). Premier réveil à **5 h 17** (son choix), puis toutes les 20 min ; relance sonore
+à 9 h ; brief à 10 h au plus tard ; tous les jours ; si l'app est ouverte avant, le brief s'écrit
+dans l'app et aucune notification ne part ce jour-là.
+- **Cœur pur et testé** : `packages/core/src/coach/brief.js` (`BRIEF`, `briefMissing`,
+  `briefDecision` → skip/wait/update/remind/brief, `nextBriefAlarm`, `briefRetry` : 5 min, repli
+  sans IA au 3e échec) ; `jeffreyAsk("brief", { dateLabel, missing, reminders })` (150 mots, nuit
+  par la qualité seule, séance via `choisir_seance`, questions via `proposer_reponses`, réflexion
+  courte `low`) ; `packages/core/src/healthMerge.js` (fusion Health Connect, **extraite de
+  `runHealthSync`, App l'utilise désormais**). Tests `brief.test.mjs` — 149 au total.
+- **Partagé app / page sans écran** (rien n'est assemblé deux fois) : `lib/coachInputs.js`
+  (`makeCoach(données)` → `buildPrompt`, `jeffreyRequest`, `nextSession` ; **extrait d'App**),
+  `lib/jeffreyTurn.js` (un tour de Jeffrey ; **extrait de `JeffreyChat.run`**, qui l'utilise),
+  `lib/brief.js` (`loadData` avec les mêmes défauts que l'app, `aiFromSettings`, phrases d'attente,
+  `runBrief`, `saveFallback`, marqueurs du jour **`jeffreyBrief` = { doneDate, appDate,
+  remindedDate, tries } hors `DATA_KEYS`**).
+- **Page sans écran** : `apps/perso/brief.html` + `src/briefPage.js` (2e entrée Vite). Health
+  Connect fusionné **en mémoire seulement** ; décision ; brief via le relais HTTP du pont ; rend
+  `{ notify: { kind, text, alert } | null, nextAt }`.
+- **Natif** : `HealthReads.kt` (nuit, pesée, FC repos **déplacées depuis HealthNutritionPlugin**,
+  calculs inchangés ; le plugin délègue), `BriefRunner.kt` (`BriefRunner` : lecture HC, WebView
+  jamais affichée à `https://localhost/brief.html` servie depuis `assets/public`, pont
+  `BriefBridge` {health, http, preparing, finish}, délai 55 s ; notification **canal « Jeffrey »,
+  id 5050**, mise à jour sur place, silencieuse sauf relance de 9 h et brief, tap → conversation
+  via `open_tab=jeffrey` ; `BriefScheduler` : `setExactAndAllowWhileIdle` (pas d'icône de réveil,
+  `USE_EXACT_ALARM` déjà déclaré), réglage `enabled` dans les préférences `jeffrey_brief`),
+  `BriefAlarmReceiver.kt` (réveil, non exporté ; `BriefBootReceiver` remet le réveil après
+  redémarrage ou mise à jour, permission `RECEIVE_BOOT_COMPLETED`), `BriefPlugin.kt` (« Brief » :
+  schedule, cancelNotification, setEnabled, isEnabled, testIn).
+- **App** : programme le réveil au lancement ; entre 5 h 17 et midi, prend la main (`appDate`,
+  notification retirée), la carte du Bord dit ce qui manque (« Le brief tout de suite » pour ne
+  pas attendre) et Jeffrey écrit le brief dès que tout est là ou à 10 h ; au retour au premier
+  plan, la conversation est relue (la page a pu écrire). Réglages : « Jeffrey · brief du matin »
+  (Activé / Désactivé, « Essayer dans 10 secondes » = un vrai brief, quelques centimes).
+- **Vérifié dans l'aperçu** avec un faux pont et des réponses simulées : brief écrit et marqué
+  fait (nuit et pesée de Health Connect dans les données, demande « brief » sans manque, réflexion
+  courte, prochain réveil demain 5 h 17) ; second réveil → rien ; serveur en erreur → nouvel essai
+  dans 5 min, notification silencieuse ; 3e échec → brief sans IA ; app ouverte à 7 h 30 → prise
+  de main puis brief écrit dès le genou noté ; conversation inchangée après le remaniement.
+- **Essai réel sur le téléphone (29/10, app tuée, LiteLLM + Opus 5.5)** : 1er essai, réveil et page
+  OK mais **aucune réponse du serveur** — l'économie d'énergie coupe le réseau des apps en
+  arrière-plan (`blocked=BATTERY_SAVER|APP_BACKGROUND` dans `dumpsys netpolicy`). Corrigé par
+  **`BriefService.kt`** : service au premier plan `shortService` (permission `FOREGROUND_SERVICE`),
+  démarré par le pont `preparing` juste avant l'appel à l'IA, arrêté à `finish` ; Android
+  l'autorise grâce au réveil exact (« Background started FGS: Allowed … ALARM_MANAGER_WHILE_IDLE »).
+  2e essai : réveil à la seconde, brief écrit et notification sonore en **16 s au total**, prochain
+  réveil demain 5 h 17. Coût de ce 2e essai : 10,5 ¢, car Opus avait d'abord répondu par des outils
+  seuls, d'où la relance écrite (5,3 + 5,2 ¢). **Corrigé à la demande de Yoann : le brief s'écrit
+  sans outils** (`jeffreyTurn` envoie `tool_choice: none` dès le premier passage en mode brief ; la
+  consigne du brief dit la séance dans le texte, prise dans SEANCES_AUTORISEES ; pas de carte
+  « Démarrer » ni de réponses rapides, elles reviendront avec J4.3). 3e essai : **un seul appel,
+  8 s**, 10,8 ¢ parce que la conversation du jour était longue (deux briefs d'essai et nos tests) ;
+  un vrai brief commence une journée vide, environ 7 ¢ attendus (mesure J1 du premier message).
+  Test `apps/perso/test/jeffreyTurn.test.mjs` — 151 au total.
+
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 
 Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la

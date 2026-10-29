@@ -16,6 +16,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(WidgetBridgePlugin.class);
         // Relais HTTP en flux vers LiteLLM pour Jeffrey (voir JeffreyHttpPlugin.kt)
         registerPlugin(JeffreyHttpPlugin.class);
+        // Brief du matin : réveils et notification Jeffrey (voir BriefPlugin.kt, BriefRunner.kt)
+        registerPlugin(BriefPlugin.class);
         super.onCreate(savedInstanceState);
     }
 

@@ -14,6 +14,37 @@ import { fmtCost, monthSpend } from "../../lib/ai.js";
 import { widgetBackgroundStatus, requestWidgetBackground } from "../../healthSync.js";
 import { say, sayStable } from "../../lib/jeffrey.js";
 import { JEFFREY_PERSONA } from "@rawcare/core/coach/jeffrey";
+import { briefEnabled, setBriefEnabled, testBrief } from "../../lib/briefNative.js";
+import { writeBriefState } from "../../lib/brief.js";
+
+// Brief du matin (J4.1), app native seulement (réveils et notification). « Essayer » efface les
+// marqueurs du jour et lance un VRAI brief dans 10 secondes (quelques centimes) : l'app peut être
+// fermée entre-temps pour voir la notification arriver.
+function BriefCard() {
+  const [on, setOn] = useState(true);
+  const [msg, setMsg] = useState("");
+  useEffect(() => { briefEnabled().then(setOn); }, []);
+  if (!Capacitor.isNativePlatform()) return null;
+  return (
+    <Card>
+      <Label style={{ marginBottom: 8 }}>Jeffrey · brief du matin</Label>
+      <Body style={{ fontSize: 13, color: C.dim, marginBottom: 8 }}>
+        À partir de 5 h 17, Jeffrey attend la nuit, la pesée et le genou du jour, puis envoie le brief
+        en notification (10 h au plus tard, relance à 9 h). Si l'app est ouverte avant, il l'écrit
+        dans la conversation et n'envoie rien.
+      </Body>
+      <Pills options={[{ key: true, label: "Activé" }, { key: false, label: "Désactivé" }]} value={on}
+        onChange={(v) => { setOn(v); setBriefEnabled(v); setMsg(""); }} />
+      {on && (
+        <Btn variant="outline" style={{ width: "100%", marginTop: 8 }}
+          onClick={() => { writeBriefState({ doneDate: null, appDate: null, remindedDate: null, tries: null }); testBrief(10); setMsg(say("briefTest")); }}>
+          Essayer dans 10 secondes
+        </Btn>
+      )}
+      {msg && <Body style={{ fontSize: 13, color: C.text2, marginTop: 6 }}>{msg}</Body>}
+    </Card>
+  );
+}
 
 /* ============================================================
    RÉGLAGES
@@ -168,6 +199,8 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
         </Body>
         <Field label="Eau (mL)"><Stepper value={targets.water ?? 0} set={(v) => saveTargets({ ...targets, water: v })} step={100} min={0} int /></Field>
       </Card>
+
+      <BriefCard />
 
       <Card>
         <Label style={{ marginBottom: 8 }}>Jeffrey · personnalité</Label>

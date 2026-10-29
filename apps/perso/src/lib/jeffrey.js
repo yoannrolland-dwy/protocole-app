@@ -85,6 +85,14 @@ export const PHRASES = {
   actionDone: ["Fait, Monsieur.", "C'est fait, Monsieur.", "Voilà qui est fait, Monsieur."],
   actionCancelled: ["Bien, Monsieur, je n'en fais rien."],
 
+  // --- Brief du matin (J4.1) : {x} = « J'ai votre nuit ; il me manque votre pesée et votre genou. »
+  briefWaiting: ["Bonjour Monsieur. {x}", "Bien le bonjour, Monsieur. {x}"],
+  briefRemind: ["Monsieur, {x} Le brief partira à 10 h, avec ou sans.", "Je me permets d'insister, Monsieur : {x} Le brief part à 10 h quoi qu'il arrive."],
+  briefPreparing: ["Je prépare votre brief, Monsieur."],
+  briefRetry: ["Un contretemps, Monsieur. Nouvel essai dans cinq minutes."],
+  briefFallback: ["Mon cerveau est en grève ce matin, Monsieur ; voici l'essentiel."],
+  briefTest: ["Dans dix secondes, Monsieur. Fermez l'app si vous voulez voir la notification arriver."],
+
   // --- Notifications
   backupReminderTitle: ["Jeffrey"],
   backupReminder: ["Monsieur, voilà une semaine que vos données n'ont pas quitté ce téléphone. Réglages → Sauvegarder hors du téléphone."],

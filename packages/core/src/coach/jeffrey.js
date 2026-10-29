@@ -267,7 +267,7 @@ export function withMemory(entry, date, entries) {
 
 /** Message envoyé pour une demande. `text` est affiché dans la conversation ; `apiText` (s'il
  *  diffère) est ce que reçoit le modèle — il reste dans l'historique pour que le cache tienne. */
-export function jeffreyAsk(mode, { text, bilanUser } = {}) {
+export function jeffreyAsk(mode, { text, bilanUser, missing, reminders, dateLabel } = {}) {
   if (mode === "point") {
     const t = text || "Faites-moi le point, Jeffrey.";
     return { role: "user", text: t, apiText: `${t}\n\n${POINT_INSTR}`, mode };
@@ -275,6 +275,18 @@ export function jeffreyAsk(mode, { text, bilanUser } = {}) {
   if (mode === "bilan") {
     const t = text || "Le bilan des trois derniers mois, je vous prie.";
     return { role: "user", text: t, mode, apiText: `${t}\n\n(Demande de l'application : BILAN 3 MOIS. Les données ci-dessous ont été calculées sur 90 jours. Rédigez-le dans votre voix, vouvoiement, 400 mots au plus, texte simple sans titres ni gras ; les consignes de forme écrites ci-dessous au tutoiement sont remplacées par celles-ci. Interprétez, ne recalculez pas ; un champ null veut dire pas assez de recul.)\n\n${bilanUser || ""}` };
+  }
+  if (mode === "brief") {
+    // J4 : brief du matin, lu d'abord sur l'écran verrouillé. `missing` = ce qui manque encore
+    // (« nuit », « pesée », « genou ») quand il part à 10 h ; `reminders` = rappels calculés par
+    // l'app (sauvegarde en retard…). Réflexion courte (effortFor) : il doit tenir dans la minute
+    // dont dispose un réveil en arrière-plan.
+    const t = text || "Le brief du matin, Jeffrey.";
+    const manque = missing?.length
+      ? `Il manque encore : ${missing.join(", ")}. Dites-le en une phrase et n'inventez jamais la valeur absente.`
+      : "La nuit, la pesée et le genou du jour sont là.";
+    const rappels = reminders?.length ? ` Rappels possibles : ${reminders.join(" ; ")}.` : "";
+    return { role: "user", text: t, mode, apiText: `${t}\n\n(Demande de l'application : BRIEF DU MATIN du ${dateLabel || "jour"}. ${manque}${rappels} Dans cet ordre, 150 mots au plus, texte simple : une salutation datée ; la nuit (score de qualité, jamais la durée seule) ; l'énergie ; la pesée et la tendance 7 j ; le planning du jour et la séance que vous proposez, prise dans SEANCES_AUTORISEES ; une ou deux questions (le genou s'il n'est pas noté, le ressenti) ; un rappel seulement s'il est utile (palier de la semaine, sauvegarde). La première phrase est courte : c'est elle qu'on lit sur l'écran verrouillé. Texte seul, sans outil : le brief est lu dans une notification.)` };
   }
   return { role: "user", text, mode: "chat" };
 }

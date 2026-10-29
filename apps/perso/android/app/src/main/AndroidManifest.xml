@@ -55,6 +55,26 @@
                 android:resource="@xml/dashboard_widget_info" />
         </receiver>
 
+        <!-- Brief du matin de Jeffrey (J4.1) : réveil exact → page sans écran (BriefRunner.kt).
+             Le second récepteur remet le réveil après un redémarrage ou une mise à jour. -->
+        <receiver
+            android:name=".BriefAlarmReceiver"
+            android:exported="false" />
+        <!-- Pendant l'appel à l'IA seulement : rend le réseau quand l'économie d'énergie le coupe
+             aux apps en arrière-plan (essai réel du 29/10/2026, voir BriefService.kt). -->
+        <service
+            android:name=".BriefService"
+            android:exported="false"
+            android:foregroundServiceType="shortService" />
+        <receiver
+            android:name=".BriefBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -78,6 +98,9 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Brief du matin (J4.1) : remettre le réveil après un redémarrage du téléphone. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
     <!-- Widget (28/10/2026) : relit les pas toutes les 30 min sans ouvrir l'app
          (WidgetStepsRefresher.kt). Android 14+ exige cette permission pour lire Health Connect
