@@ -78,7 +78,8 @@ export const DATA_KEYS = [
   // Jeffrey (chantier J, J1.2, 29/10/2026) : conversations par jour (30 j glissants) et sa
   // personnalité, éditable dans les Réglages.
   "jeffreyLog", "jeffreyPersona",
-  // Voix de Jeffrey (J3) : { voice, rate, pitch }.
+  // Voix de Jeffrey : { speed, url } depuis le 29/10/2026 (serveur Oracle ; avant : { voice, rate,
+  // pitch } de la voix Android, ignorés). Sa clé `voiceKey` reste hors export, comme les autres.
   "jeffreyVoice",
   // Coût de l'IA du mois en cours (J1.3) : { month: "AAAA-MM", cents }.
   "aiSpend",

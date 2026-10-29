@@ -559,8 +559,9 @@ export default function App({ silent = false } = {}) {
       data: { weight, sleep, training, knee, macros, notes, steps, rhr, naps, targets, phase, basketSchedule, targetHistory, palierWeekly, coachProfile, coachJournal, jeffreyPersona },
       ai, transport: streamTransportFor(ai), missing,
     }).then(async (text) => {
-      // Voix (J3) : brief lu à voix haute seulement pendant une séance, casque branché.
-      if (text && getSync("trainingDraft", null)?.type && await headsetConnected()) speak(text);
+      // Voix (29/10/2026) : l'audio du brief est préparé tout de suite et gardé sur le téléphone ;
+      // lu à voix haute seulement pendant une séance, casque branché.
+      if (text) speak(text, { play: !!getSync("trainingDraft", null)?.type && await headsetConnected() });
     }).catch((e) => console.error("brief", e)).finally(() => {
       setJeffreyLog(getSync("jeffreyLog", {}));
       setCoachJournalState(getSync("coachJournal", ""));

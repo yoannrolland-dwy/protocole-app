@@ -12,16 +12,20 @@ import { aiMissing } from "./lib/ai.js";
 import { say } from "./lib/jeffrey.js";
 import { makeCoach } from "./lib/coachInputs.js";
 import { getSync } from "./store.js";
+import { voiceServer, speechPlan } from "./lib/voiceConfig.js";
 import { loadData, aiFromSettings, readBriefState, writeBriefState, missingText, runBrief, saveFallback } from "./lib/brief.js";
 
 const bridge = window.BriefBridge;
 
-// Voix (J3) : ce que Jeffrey dit de lui-même n'est lu à voix haute que pendant une séance (carnet
-// ouvert) ET casque branché — Kotlin vérifie le casque. Réglages de voix lus sans plugin (pas de
-// pont Capacitor dans cette page).
-const speakIfSession = () => (getSync("trainingDraft", null)?.type
-  ? { voice: null, rate: 1, pitch: 1, ...(getSync("jeffreyVoice", {}) || {}) }
-  : undefined);
+// Voix (29/10/2026) : Kotlin prépare l'audio du brief (serveur Oracle) juste après la
+// notification et le garde sur le téléphone, pour l'écouter chez soi ou en chemin sans attendre ni
+// réseau. Lu tout de suite seulement pendant une séance (carnet ouvert) ET casque branché — Kotlin
+// vérifie le casque. Réglages lus sans plugin (pas de pont Capacitor dans cette page).
+const voiceFor = (text) => {
+  const server = voiceServer();
+  const plan = speechPlan(text);
+  return server && plan ? { ...server, ...plan, play: !!getSync("trainingDraft", null)?.type } : undefined;
+};
 const finish = (result) => {
   if (bridge) bridge.finish(JSON.stringify(result));
   else console.log("brief", result);
@@ -76,14 +80,17 @@ async function main() {
   // C'est l'heure du brief.
   const tomorrow = nextBriefAlarm(now, { doneToday: true }).getTime();
   const ai = aiFromSettings();
-  const fallback = () => finish({ notify: { kind: "brief", text: saveFallback(makeCoach(data).nextSession(), missing), alert: true }, nextAt: tomorrow });
+  const fallback = () => {
+    const text = saveFallback(makeCoach(data).nextSession(), missing);
+    return finish({ notify: { kind: "brief", text, alert: true, voice: voiceFor(text) }, nextAt: tomorrow });
+  };
   if (aiMissing(ai)) return fallback();
   const tries = (state.tries?.date === date ? state.tries.n : 0) + 1;
   writeBriefState({ tries: { date, n: tries } });
   bridge?.preparing(say("briefPreparing"));
   try {
     const text = await runBrief({ data, ai, transport: bridgeTransport, missing });
-    return finish({ notify: { kind: "brief", text, alert: true, speak: speakIfSession() }, nextAt: tomorrow });
+    return finish({ notify: { kind: "brief", text, alert: true, voice: voiceFor(text) }, nextAt: tomorrow });
   } catch (e) {
     console.error("brief", e);
     const r = briefRetry(now, tries);

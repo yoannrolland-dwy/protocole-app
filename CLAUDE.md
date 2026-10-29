@@ -5709,3 +5709,65 @@ Après « Copier » dans le panneau « Dupliquer cette journée », Nutrition af
 de destination (barre du jour en citron s'il n'est pas aujourd'hui) et remonte en haut de l'écran.
 Avant, on restait sur le jour d'origine, en bas de page. Rien ne change dans ce qui est copié.
 Vérifié dans l'aperçu (copie vers le 31/10 → « Dans 2 jours · sam. 31 oct. », haut de page).
+
+## Jeffrey : la voix vient du serveur Oracle (29/10/2026, apps/perso v3.136.0)
+
+La synthèse d'Android (J3) est remplacée par **Pocket TTS français** (Kyutai, poids CC-BY-4.0,
+attribution dans Réglages › Jeffrey · voix), servi par la VM Oracle via LiteLLM :
+`POST {url}/v1/audio/speech`, modèle `protocole/jeffrey`, voix `jeffrey`, `response_format: "pcm"`
+(PCM 16 bits, 24 kHz, mono, en flux), `speed: 1.0`. La configuration du serveur est gérée dans une
+autre session (`/Users/yrolland/Documents/GitHub/LiteLLM_Oracle/protocole-voice/`, voir
+`INTEGRATION_CLAUDE.md` et `RAPPORT_DEPLOIEMENT.md`). La dictée reste celle d'Android.
+Choix de Yoann : sans réseau, **il se tait** (pas de voix de secours) ; voix **dès la première
+phrase** ; brief **préparé à l'avance** ; **une seule vitesse** dans les Réglages.
+
+- **Natif `JeffreySpeech`** (`JeffreyVoice.kt`) :
+  - une session à la fois, une seule synthèse active ;
+  - les phrases partent l'une après l'autre, le son de la suivante s'empile dans le tampon pendant
+    que la précédente se joue ;
+  - `AudioTrack` en flux (usage « assistant » : casque sinon haut-parleur, musique baissée) ;
+  - vitesse de lecture (1,20) par `PlaybackParams`, hauteur 1 : **le serveur produit toujours à
+    1,00**, ne jamais lui demander 1,2 ;
+  - octet isolé gardé entre deux blocs réseau ;
+  - attente au démarrage adaptative (300 ms, +200 après une session avec coupure, −50 sinon,
+    1,5 s au plus) ;
+  - arrêt = `disconnect()` de la requête + vidage du lecteur + attente du fil ;
+  - une seule reprise, sur 429 seulement (`Retry-After` plafonné à 5 s) ;
+  - une préparation sans lecture n'interrompt jamais une voix en cours ;
+  - journal `JeffreySpeech` : premier octet, premier son, coupures, durée. **Jamais la clé.**
+- **Cache** (`filesDir/jeffrey-voice/<clé>.pcm`, 60 Mo au plus, les plus anciens supprimés) :
+  - seul un son entièrement reçu est gardé (fichier `.part` effacé sinon) ;
+  - la clé de cache = texte normalisé + modèle + voix + `SPEECH_VERSION`.
+- **Texte** (`packages/core/src/coach/speechText.js`, testé) :
+  - découpage en phrases au fil de l'eau (20 caractères au moins, 240 au plus), rien après `---` ;
+  - mise en forme retirée ;
+  - nombres, heures, notes (`3/10`), dates, unités, signes et ordinaux en toutes lettres.
+- **JS** :
+  - `lib/voiceConfig.js` (sans plugin, lu aussi par la page du brief) ;
+  - `lib/voice.js` : `speak(text, { play, cache })`, `createSpeechStream()`, `voiceReady()`,
+    `stopSpeaking()`.
+- **Clés** :
+  - `jeffreyVoice` = `{ speed, url }` (DATA_KEYS ; url vide = adresse LiteLLM ; les anciens
+    `{ voice, rate, pitch }` sont ignorés) ;
+  - **`voiceKey` hors DATA_KEYS**, jamais exportée. Posée sur le téléphone depuis le fichier privé
+    par un script CDP qui ne l'affiche pas.
+- **Conversation** : question dictée → la voix part dès la première phrase complète, pendant que le
+  reste s'écrit. Bouton « Écouter » sur chaque réponse (cache). Voix indisponible → ligne discrète
+  `voiceDown`, la réponse reste écrite.
+- **Brief** :
+  - app fermée : `briefPage` rend `notify.voice` ; `BriefRunner` poste la notification PUIS prépare
+    l'audio (service au premier plan gardé le temps de la synthèse) ;
+  - app ouverte : `speak(text, { play })` ;
+  - lu tout de suite seulement en séance avec un casque, sinon « Écouter » le joue depuis le cache,
+    sans attendre ni réseau. Yoann l'écoute chez lui ou sur le chemin de la salle.
+- **Mesuré sur le S25 (Wi-Fi, 29/10)** :
+
+  | Essai | Premier son | Coupures | Durée du son |
+  |---|---|---|---|
+  | Phrase courte | 0,76 s (premier octet 0,58 s) | 0 | 6,8 s |
+  | Réponse de 5 phrases (~90 mots) | 0,61 s | 0 | 33,3 s, soit 28 s à ×1,20 |
+  | Reprise juste après un arrêt | 0,86 s | 1 | — |
+  | Lecture depuis le cache | 0,02 s | 0 | — |
+
+  Arrêt en pleine parole vérifié. **Non mesuré** : réseau mobile, Bluetooth, brief réel app fermée,
+  et le délai complet d'une question dictée (la réflexion du LLM, 7-11 s, se mesure à part).

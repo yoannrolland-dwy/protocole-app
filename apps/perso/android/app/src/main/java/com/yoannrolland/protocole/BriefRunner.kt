@@ -91,14 +91,21 @@ object BriefRunner {
                         BriefScheduler.schedule(context, System.currentTimeMillis() + 20 * 60_000)
                     }
                     web.destroy()
-                    // Voix (J3) : séance en cours (la page le dit) ET casque branché → Jeffrey lit le
-                    // brief. Le service au premier plan garde l'app en vie jusqu'à la fin de la lecture.
-                    val speech = runCatching { speechOf(context, json) }.getOrNull()
-                    if (speech != null) {
-                        val (text, s) = speech
+                    // Voix (29/10/2026) : le brief est préparé en audio juste après sa notification
+                    // (serveur Oracle), gardé sur le téléphone pour être écouté sans attendre ni
+                    // réseau. Lu tout de suite seulement en séance (la page le dit), casque branché.
+                    // Le service au premier plan garde l'app (et le réseau) le temps de la synthèse.
+                    val voice = runCatching { voiceOf(json) }.getOrNull()
+                    if (voice != null) {
                         handler.postDelayed({ stop() }, 150_000)
-                        JeffreyTts.speak(context, text, if (s.isNull("voice")) null else s.optString("voice").ifEmpty { null },
-                            s.optDouble("rate", 1.0).toFloat(), s.optDouble("pitch", 1.0).toFloat()) { handler.post { stop() } }
+                        val arr = voice.getJSONArray("chunks")
+                        val chunks = (0 until arr.length()).map { arr.getString(it) }
+                        val play = voice.optBoolean("play") && Headset.connected(context) != null
+                        JeffreySpeech.begin(
+                            context, "brief-${System.currentTimeMillis()}",
+                            JeffreySpeech.Config(voice.getString("url").trimEnd('/'), voice.getString("key"), voice.optDouble("speed", 1.2).toFloat()),
+                            play, voice.optString("cacheKey").ifEmpty { null }, chunks, true,
+                        ) { handler.post { stop() } }
                     } else stop()
                     done()
                 }
@@ -136,12 +143,11 @@ object BriefRunner {
         else -> "application/octet-stream"
     }
 
-    private fun speechOf(context: Context, json: String): Pair<String, JSONObject>? {
-        val n = JSONObject(json).optJSONObject("notify") ?: return null
-        val s = n.optJSONObject("speak") ?: return null
-        val text = n.optString("text")
-        if (text.isBlank() || Headset.connected(context) == null) return null
-        return text to s
+    /** Voix du brief préparée par la page : { url, key, speed, chunks, cacheKey, play } ou null. */
+    private fun voiceOf(json: String): JSONObject? {
+        val v = JSONObject(json).optJSONObject("notify")?.optJSONObject("voice") ?: return null
+        if (v.optString("url").isBlank() || v.optString("key").isBlank() || (v.optJSONArray("chunks")?.length() ?: 0) == 0) return null
+        return v
     }
 
     /** Ce que la page rend : { notify: { kind, text, alert } | null, nextAt } ou { error, nextAt }. */

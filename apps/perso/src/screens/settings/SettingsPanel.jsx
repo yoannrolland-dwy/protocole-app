@@ -17,7 +17,8 @@ import { say, sayStable } from "../../lib/jeffrey.js";
 import { JEFFREY_PERSONA } from "@rawcare/core/coach/jeffrey";
 import { briefEnabled, setBriefEnabled, testBrief } from "../../lib/briefNative.js";
 import { writeBriefState } from "../../lib/brief.js";
-import { voiceSettings, saveVoiceSettings, listVoices, speak, stopSpeaking } from "../../lib/voice.js";
+import { voiceSettings, saveVoiceSettings, voiceKey, saveVoiceKey, speak, stopSpeaking } from "../../lib/voice.js";
+import { getSync } from "../../store.js";
 
 // Brief du matin (J4.1), app native seulement (réveils et notification). « Essayer » efface les
 // marqueurs du jour et lance un VRAI brief dans 10 secondes (quelques centimes) : l'app peut être
@@ -48,39 +49,54 @@ function BriefCard() {
   );
 }
 
-// Voix de Jeffrey (J3), app native seulement : voix françaises installées sur le téléphone
-// (synthèse d'Android, gratuite et hors ligne), vitesse et hauteur, bouton pour l'entendre.
-const VOICE_TEST = "Bonjour Monsieur. Votre séance vous attend, et je me permets de vous rappeler le genou.";
+// Voix de Jeffrey (29/10/2026), app native seulement : Pocket TTS sur le serveur Oracle, via
+// LiteLLM. Adresse (vide = celle de LiteLLM), clé dédiée à la voix (jamais exportée), vitesse de
+// lecture (le serveur produit à 1,00, le téléphone accélère sans changer la hauteur). « Tester »
+// joue une phrase sans cache et affiche le délai mesuré jusqu'au premier son.
+const VOICE_TEST = "Bonjour Monsieur. Votre séance est prévue à 18h30, et je me permets de vous rappeler le genou : 3/10 hier.";
 function VoiceCard() {
   const [v, setV] = useState(voiceSettings);
-  const [voices, setVoices] = useState(null);
-  useEffect(() => { listVoices().then(setVoices); }, []);
+  const [key, setKey] = useState(voiceKey);
+  const [msg, setMsg] = useState("");
+  const [testing, setTesting] = useState(false);
   if (!Capacitor.isNativePlatform()) return null;
   const set = (patch) => { const next = { ...v, ...patch }; setV(next); saveVoiceSettings(next); };
+  const test = async () => {
+    setTesting(true);
+    setMsg("");
+    const r = await speak(VOICE_TEST, { cache: false });
+    setTesting(false);
+    if (r.skipped) setMsg(say("voiceMissing"));
+    else if (r.ok) setMsg(`Premier son après ${(r.firstAudioMs / 1000).toFixed(1).replace(".", ",")} s · ${r.underruns ? `${r.underruns} coupure${r.underruns > 1 ? "s" : ""}` : "aucune coupure"}.`);
+    else if (!r.cancelled) setMsg(say("voiceDown"));
+  };
   return (
     <Card>
       <Label style={{ marginBottom: 8 }}>Jeffrey · voix</Label>
       <Body style={{ fontSize: 13, color: C.dim, marginBottom: 8 }}>
-        Voix françaises installées sur le téléphone. Aucune n'est un vrai majordome anglais : la
-        personnalité est dans ses mots. Une question posée au micro reçoit sa réponse à voix haute.
+        Sa voix vient du serveur, en flux : une question posée au micro reçoit sa réponse à voix
+        haute dès la première phrase. Sans réseau, il répond par écrit. Le brief du matin est
+        préparé en audio dès qu'il est écrit et se réécoute sans réseau.
       </Body>
-      <Field label="Voix">
-        <select className="p-field" value={v.voice || ""} onChange={(e) => set({ voice: e.target.value || null })}>
-          <option value="">Voix par défaut du téléphone</option>
-          {(voices || []).map((o) => (
-            <option key={o.name} value={o.name}>{o.label}{o.local ? "" : " (réseau)"}</option>
-          ))}
-        </select>
+      <Field label="Serveur">
+        <TextInput value={v.url} onChange={(e) => set({ url: e.target.value.trim() })}
+          placeholder={getSync("litellmUrl", "") || "https://…"} style={{ marginBottom: 10 }} />
       </Field>
-      {voices && voices.length === 0 && (
-        <Body style={{ fontSize: 13, color: C.text2, marginTop: 6 }}>Aucune voix française trouvée, Monsieur.</Body>
-      )}
-      <Field label="Vitesse"><Stepper value={v.rate} set={(x) => set({ rate: x })} step={0.1} min={0.5} max={2} /></Field>
-      <Field label="Hauteur"><Stepper value={v.pitch} set={(x) => set({ pitch: x })} step={0.1} min={0.5} max={2} /></Field>
+      <Field label="Clé de la voix">
+        <TextInput type="password" value={key} onChange={(e) => { setKey(e.target.value.trim()); saveVoiceKey(e.target.value.trim()); }}
+          placeholder="sk-..." style={{ marginBottom: 10 }} />
+      </Field>
+      <Field label="Vitesse de lecture">
+        <Stepper value={v.speed} set={(x) => set({ speed: Math.round(Math.min(1.6, Math.max(0.8, x)) * 100) / 100 })} step={0.05} min={0.8} max={1.6} />
+      </Field>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 8, marginTop: 8 }}>
-        <Btn variant="outline" onClick={() => speak(VOICE_TEST, v)}>Tester</Btn>
+        <Btn variant="outline" disabled={testing} onClick={test}>{testing ? "Écoute…" : "Tester"}</Btn>
         <Btn variant="plain" onClick={() => stopSpeaking()}>Arrêter</Btn>
       </div>
+      {msg && <Body style={{ fontSize: 13, color: C.text2, marginTop: 8 }}>{msg}</Body>}
+      <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>
+        Voix : Pocket TTS de Kyutai, poids français sous licence CC-BY-4.0.
+      </Body>
     </Card>
   );
 }

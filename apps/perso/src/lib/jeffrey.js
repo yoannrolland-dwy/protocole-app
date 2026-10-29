@@ -93,6 +93,10 @@ export const PHRASES = {
   briefFallback: ["Mon cerveau est en grève ce matin, Monsieur ; voici l'essentiel."],
   briefTest: ["Dans dix secondes, Monsieur. Fermez l'app si vous voulez voir la notification arriver."],
 
+  // --- Voix (serveur Oracle, 29/10/2026) : sans réseau ou sans serveur, il se tait et le dit.
+  voiceDown: ["Ma voix ne passe pas pour l'instant, Monsieur : je m'en tiens à l'écrit.", "Je suis enroué, Monsieur ; la réponse reste écrite."],
+  voiceMissing: ["Il me faut l'adresse du serveur et la clé de la voix, Monsieur."],
+
   // --- Notifications
   backupReminderTitle: ["Jeffrey"],
   backupReminder: ["Monsieur, voilà une semaine que vos données n'ont pas quitté ce téléphone. Réglages → Sauvegarder hors du téléphone."],
