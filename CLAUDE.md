@@ -3970,6 +3970,40 @@ retiré, résultat détaillé dans `ROADMAP.md`.
   console) ; téléphone (v3.126.0, Réglages « À jour, Monsieur · dernière synchro 11:37:44 »). Les
   notifications de repos n'ont pas été vues sonner : à la prochaine séance.
 
+## Chantier J — Jeffrey : J1.1, cœur de la conversation et relais Android (29/10/2026, apps/perso v3.127.0)
+
+Rien de visible dans l'app : c'est la fondation de la conversation (J1.2). Détail des mesures dans
+`ROADMAP.md` (J1.1 livré).
+- **`packages/core/src/coach/stream.js`** : `createSSEParser` (événements SSE, morceaux coupés
+  n'importe où) et `createMessageAccumulator` (reconstruit texte, `tool_use` avec son JSON,
+  réflexion **avec sa signature**, `stop_reason`, `usage` ; un événement `error` lève).
+- **`claudeApi.js`** : `streamClaude` (même politique de reprise que `callClaude`, mais **jamais
+  après le début du flux**, pour ne pas dupliquer un texte affiché), `fetchStreamTransport`,
+  `messagesEndpoint`. `costCents` compte l'écriture dans le cache à 125 % (lecture 10 %).
+- **`prompt.js`** : `buildCoachPrompt` renvoie en plus `facts` (system, temps réel, résumé,
+  progression, autres séances, notes, carnet) — **system/user inchangés**, captures datées vertes.
+- **`packages/core/src/coach/jeffrey.js`** : `JEFFREY_PERSONA` (amorçage), `JEFFREY_RULES` (les deux
+  règles qui priment + petit dormeur), `JEFFREY_TOOLS` (`choisir_seance`, `proposer_reponses`),
+  `allowedSessions(nextSession)` (suggestions + « moins prioritaires », jamais une séance écartée),
+  `validateSessionChoice`, `toApiMessages` (`tool_result` obligatoire après un outil, réflexion
+  gardée seulement au dernier tour), `buildJeffreyRequest` (system en 3 blocs : rôle + contexte du
+  coach + règles + consignes → personnalité → données ; **3 points de cache** ; l'heure va dans le
+  dernier message, jamais dans les données), `continuationIfSilent` (réponse sans texte → relance
+  écrite), `replyText`.
+- **Natif** : `JeffreyHttpPlugin.kt` (relais HTTP en flux : relit le SSE, émet `jeffreyStream`
+  par événement, résout avec le nombre d'événements ; `cancel`), enregistré dans `MainActivity` ;
+  `src/lib/jeffreyHttp.js` (`nativeStreamTransport`, `streamTransportFor(ai)` : relais pour
+  LiteLLM sur l'app native, `fetch` sinon).
+- **`capacitor.config.json` : `loggingBehavior: "none"`** — en version de développement, Capacitor
+  écrivait les arguments des appels de plugin dans le journal Android, **clé LiteLLM comprise**.
+  Ne pas remettre ce réglage.
+- **Coût mesuré (Opus 5.5 via LiteLLM)** : 1er message ≈ 6,9 ¢, suivants ≈ 2,2 ¢ grâce au cache,
+  relance d'une réponse muette ≈ 1,8 ¢. Premier mot après 7-11 s (réflexion).
+- **Tests** : `packages/core/test/jeffrey.test.mjs` (flux découpé, reprise, coupure en plein flux,
+  coût avec cache, séances autorisées, refus hors liste, historique, requête, filet) — 137 au total.
+- **Piège d'essai** : écran en veille = réseau de l'app coupé et inspection figée ; garder le
+  téléphone déverrouillé pendant un essai réel.
+
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 
 Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la

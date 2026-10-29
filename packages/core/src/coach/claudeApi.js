@@ -6,6 +6,7 @@
 
 import { Capacitor, CapacitorHttp } from "@capacitor/core";
 import { today } from "../dateUtils.js";
+import { createSSEParser, createMessageAccumulator } from "./stream.js";
 
 // Tarifs Anthropic en $ par million de tokens (relevés le 29/07/2026). `intro` est un
 // tarif de lancement à durée limitée : au-delà de `introUntil` on repasse au tarif normal,
@@ -23,15 +24,16 @@ export const PRICING = {
 };
 export const PRICING_FALLBACK = { in: 3, out: 15 }; // modèle inconnu : on estime au tarif Sonnet
 
-// Coût en centimes de dollar. `cache_read` est facturé ~10 % du tarif d'entrée ; on le
-// compte séparément pour que l'affichage reste juste si on active le cache un jour.
+// Coût en centimes de dollar. Cache de l'API (utilisé par Jeffrey depuis J1.1, 29/10/2026) :
+// une lecture coûte 10 % du tarif d'entrée, une écriture (durée 5 min) 125 %.
 export const costCents = (model, usage) => {
   const p = PRICING[model] || PRICING_FALLBACK;
   const rate = p.intro && today() <= p.introUntil ? p.intro : { in: p.in, out: p.out };
   const cached = usage?.cache_read_input_tokens || 0;
-  const fresh = (usage?.input_tokens || 0) + (usage?.cache_creation_input_tokens || 0);
+  const written = usage?.cache_creation_input_tokens || 0;
+  const fresh = usage?.input_tokens || 0;
   const out = usage?.output_tokens || 0;
-  return ((fresh * rate.in + cached * rate.in * 0.1 + out * rate.out) / 1e6) * 100;
+  return ((fresh * rate.in + written * rate.in * 1.25 + cached * rate.in * 0.1 + out * rate.out) / 1e6) * 100;
 };
 
 // Haiku 4.5 REJETTE output_config.effort (paramètre réservé aux modèles récents) : on ne
@@ -173,4 +175,102 @@ export async function callClaude({ apiKey, model, system, user, effort, maxToken
     }
   }
   throw new Error("Échec inattendu"); // inatteignable, garde-fou
+}
+
+// --- Réponse en flux (chantier J, J1.1, 29/10/2026) ----------------------------------------
+// Pour la conversation avec Jeffrey : le texte s'affiche au fil de l'eau au lieu d'attendre la
+// réponse complète (Opus réfléchit avant d'écrire, l'attente se voyait). Même format de requête
+// que callClaude, avec `stream: true`, un historique de messages et un `system` en blocs (pour
+// le cache). Le transport est injecté : `fetchStreamTransport` (navigateur, Anthropic direct)
+// par défaut ; l'app native passe son relais Android pour LiteLLM (le serveur ne répond pas au
+// CORS et CapacitorHttp ne lit pas un flux).
+
+/** Une requête en flux : { url, headers, body, onEvent } → { ok, status, data?, header }.
+ *  `onEvent(nom, données)` est appelé pour chaque événement SSE d'une réponse 2xx. */
+export async function fetchStreamTransport({ url, headers, body, onEvent }) {
+  const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+  if (!res.ok || !res.body) {
+    let data = null;
+    try { data = await res.json(); } catch { /* corps non JSON */ }
+    return { ok: false, status: res.status, data, header: (k) => res.headers.get(k) };
+  }
+  const parser = createSSEParser(onEvent);
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    parser.push(dec.decode(value, { stream: true }));
+  }
+  parser.end();
+  return { ok: true, status: res.status, header: (k) => res.headers.get(k) };
+}
+
+/** URL et en-têtes d'une requête Messages selon le fournisseur (mêmes que defaultTransport). */
+export function messagesEndpoint({ provider, baseUrl, apiKey }) {
+  if (provider === "litellm") {
+    return {
+      url: `${trimUrl(baseUrl)}/v1/messages`,
+      headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, "anthropic-version": "2023-06-01" },
+    };
+  }
+  return {
+    url: "https://api.anthropic.com/v1/messages",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+  };
+}
+
+/**
+ * Un appel en flux, avec la même politique de reprise que callClaude, mais seulement tant que
+ * rien n'est arrivé : une erreur au milieu de la réponse ne se rejoue pas (le texte déjà affiché
+ * serait dupliqué). `onText(delta, texteComplet)` à chaque morceau visible.
+ * Retourne { message, usedModel, cents } — `message` a la forme d'une réponse non-flux.
+ */
+export async function streamClaude({ apiKey, model, system, messages, effort, maxTokens, tools, onText, onRetry, provider = "anthropic", baseUrl, streamTransport = fetchStreamTransport, retryDelays = [1200, 4000] }) {
+  const attempt = async (m) => {
+    const body = { model: m, max_tokens: maxTokens, system, messages, stream: true };
+    if (effort && SUPPORTS_EFFORT.has(baseModel(m))) body.output_config = { effort };
+    if (tools) body.tools = tools;
+    const acc = createMessageAccumulator({ onText });
+    const { url, headers } = messagesEndpoint({ provider, baseUrl, apiKey });
+    let res;
+    try {
+      res = await streamTransport({ url, headers, body, onEvent: (n, d) => acc.push(n, d) });
+    } catch (e) {
+      if (acc.started()) e.retryable = false; // déjà en cours d'affichage : pas de reprise
+      throw e;
+    }
+    if (!res.ok) {
+      const err = new Error(res.data?.error?.message || `HTTP ${res.status}`);
+      err.status = res.status;
+      err.retryable = res.status === 429 || res.status >= 500;
+      throw err;
+    }
+    const message = acc.message();
+    return { message, usedModel: m, cents: callCents(m, message.usage, res.header?.("x-litellm-response-cost")) };
+  };
+
+  const fallback = fallbackFor(provider, model);
+  for (let i = 0; i <= retryDelays.length; i++) {
+    try {
+      return await attempt(model);
+    } catch (e) {
+      const transient = e.retryable !== false && (e.retryable || e.status == null);
+      if (!transient || i === retryDelays.length) {
+        if (transient && fallback && model !== fallback) {
+          onRetry?.(`Modèle saturé — bascule sur ${fallback}…`);
+          return await attempt(fallback);
+        }
+        throw e;
+      }
+      onRetry?.(`Réessai ${i + 1}/${retryDelays.length}…`);
+      await sleepMs(retryDelays[i]);
+    }
+  }
+  throw new Error("Échec inattendu");
 }

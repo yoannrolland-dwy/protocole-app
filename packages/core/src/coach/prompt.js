@@ -419,7 +419,9 @@ Sois direct, concret, chiffré, sans préambule ni rappel du contexte, sans reci
 
 Puis, APRÈS ta conclusion, écris la ligne \`${CARNET_MARK}\` seule, et en dessous la version mise à jour du carnet de bord. Règles du carnet : c'est un ÉTAT, pas un journal — tu réécris la version complète à chaque fois, tu élagues ce qui est résolu ou périmé, tu gardes ce qui est en cours. ${CARNET_MAX_CHARS} caractères maximum. Y faire figurer : où en est la progression (chiffrée), ce que tu as demandé de changer et si ça a été appliqué, ce qui a marché ou pas, les points de vigilance en cours. Pas de conseils dedans, pas de redite de la réponse ci-dessus.`;
 
-  return { system, user };
+  // `facts` (chantier J, J1.1) : les mêmes données, sans les consignes de sortie de l'analyse,
+  // pour la conversation avec Jeffrey (`coach/jeffrey.js`). Additif : system/user inchangés.
+  return { system, user, facts: { system, realtime, summary, exoProgress: exoProgressData, autresSeances, notesTxt, journal: (journal || "").trim() } };
 }
 
 /**

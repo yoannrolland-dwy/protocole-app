@@ -2,6 +2,7 @@
   "appId": "com.yoannrolland.protocole",
   "appName": "Protocole",
   "webDir": "dist",
+  "loggingBehavior": "none",
   "plugins": {
     "SystemBars": {
       "insetsHandling": "css",

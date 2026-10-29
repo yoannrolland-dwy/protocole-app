@@ -33,7 +33,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | U4 | Refonte IHM — audit final avant/après + mise à jour CLAUDE.md | petit | ✅ 25/10/2026 (v3.118.1) |
 | J0 | Jeffrey — test jetable : l'app peut-elle préparer le brief seule, écran éteint et app fermée ? | petit | ✅ 29/10/2026 (piste A validée avec un réveil système) |
 | JT | Jeffrey — textes de l'app et notifications dans sa voix (textes fixes, sans IA) | petit | ✅ 29/10/2026 (v3.126.0) |
-| J1 | Jeffrey — la conversation, en 3 lots installés : J1.1 relais Android + cœur testé ; J1.2 conversation dans Analyse ; J1.3 bulle partout + carte Bord + mémoire | gros | à faire |
+| J1 | Jeffrey — la conversation, en 3 lots installés : J1.1 relais Android + cœur testé ; J1.2 conversation dans Analyse ; J1.3 bulle partout + carte Bord + mémoire | gros | J1.1 ✅ 29/10/2026 (v3.127.0) ; J1.2, J1.3 à faire |
 | J2 | Jeffrey — actions proposées, confirmées d'un tap (eau, genou, note, séance, repas, habituel) | moyen | à faire |
 | J4 | Jeffrey — brief du matin en notification : attend la nuit, météo, réponse dans la notification | gros | à faire |
 | J3 | Jeffrey — la voix : micro (dictée) + réponse lue à voix haute, voix réglable | moyen | à faire |
@@ -1253,6 +1253,31 @@ plan) : piste A validée, mais pas avec le déclencheur prévu.**
   5.5 ? Le 26/10, tout sauf Haiku 4.5 renvoyait un refus « trop de requêtes ».
 - Tests : validation du choix de séance (hors liste → ignoré), règles de ton présentes dans le
   `system`, capture datée du prompt.
+
+**J1.1 livré (29/10/2026, v3.127.0) — essai réel sur le téléphone avec le serveur LiteLLM,
+Opus 5.5, vraies données :**
+- Le serveur répond de nouveau sur Opus 5.5 (1,1 s) et Sonnet 5.5 (1,9 s), plus seulement Haiku.
+- Chaîne complète validée : requête de Jeffrey → relais Android → LiteLLM → flux SSE relu. Premier
+  mot après **7 à 11 s** (réflexion d'Opus), réponse complète en **11 à 16 s**. Outils appelés
+  correctement (`choisir_seance` dans la liste autorisée, `proposer_reponses`). Deuxième tour avec
+  `tool_result` et réflexion signée renvoyée : accepté par l'API.
+- **Cache** : premier message ~9 600 tokens écrits (**≈ 6,9 ¢**), messages suivants **≈ 9 500 lus,
+  ~600 écrits : ≈ 2,2 ¢**. Deux corrections faites à la suite de l'essai : (1) l'heure sortie du bloc
+  de données (elle le réécrivait à chaque minute) et mise en tête du dernier message ; (2) le coût
+  compte désormais une écriture dans le cache à 125 % du tarif d'entrée (`costCents`).
+- **Réponse muette** : au 2e tour, Opus a répondu deux fois uniquement par des boutons, sans
+  texte, malgré la consigne (même renforcée). Filet `continuationIfSilent` : l'app relance
+  aussitôt « répondez par écrit » → réponse correcte, **≈ 1,8 ¢** de plus. À câbler en J1.2.
+- **Fuite de la clé LiteLLM dans le journal Android** : en version de développement, Capacitor
+  recopiait les arguments de chaque appel de plugin dans le journal, y compris l'en-tête
+  d'autorisation (vrai pour tous les appels LiteLLM depuis le 26/10). Coupé par
+  `loggingBehavior: "none"` (capacitor.config.json). Yoann invité à remplacer sa clé.
+- **Écran en veille = réseau coupé** : un essai lancé écran éteint échoue (« délai de connexion
+  dépassé ») et l'inspection du téléphone se fige. Pour J4 (brief app fermée), c'est le réveil
+  système qui garantit le réseau ; à vérifier à ce moment-là.
+- **À mesurer en J1.2** : sur une réponse courte, le texte est arrivé presque d'un bloc après la
+  réflexion (sur les longues, il s'étalait sur 3-5 s). Possible mise en tampon par le serveur ou
+  la lecture côté Android.
 
 ### J2 — Actions confirmées
 
