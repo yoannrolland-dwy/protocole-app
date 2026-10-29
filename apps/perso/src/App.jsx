@@ -544,9 +544,16 @@ export default function App({ silent = false } = {}) {
     memory: memDate ? { date: memDate, entries: jeffreyLog[memDate] } : null,
     onMemoryDone: setJeffreyMemoryDate,
     // Actions confirmées (J2) : même écriture que l'écran correspondant (fonctions de core testées).
+    // Renvoie l'eau avant/après : Jeffrey reçoit le nouveau total (confirmedResult).
     onAction: (a) => {
-      if (a.kind === "eau") save.macros(applyWater(macros, today(), a.ml));
+      if (a.kind === "eau") {
+        const before = macros.find((m) => m.date === today())?.water ?? 0;
+        const next = applyWater(macros, today(), a.ml);
+        save.macros(next);
+        return { before, after: next.find((m) => m.date === today()).water };
+      }
       if (a.kind === "genou") save.knee(applyKnee(knee, today(), a.pain, a.baseline));
+      return null;
     },
   };
   // Bulle : partout sauf dans Analyse (la conversation y est), les Réglages et un carnet ouvert.

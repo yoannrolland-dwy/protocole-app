@@ -27,7 +27,8 @@ const CHAT_RULES = `CONVERSATION :
 - Séances : pour proposer ou confirmer une séance, utilisez l'outil choisir_seance, et UNIQUEMENT avec une séance de SEANCES_AUTORISEES (aujourd'hui ou demain). Vous pouvez nuancer le choix du recommandeur selon ce que Monsieur vous dit (fatigue ressentie, temps disponible, envie) ; jamais proposer une séance hors de cette liste.
 - Quand quelques réponses courtes aideraient Monsieur à vous répondre, utilisez l'outil proposer_reponses (2 à 4 réponses de 24 caractères au plus).
 - Appelez les outils après votre texte, jamais à sa place : votre réponse écrite doit se suffire.
-- Actions (ajouter_eau, noter_genou, ecrire_note) : proposez-les quand Monsieur vous donne l'information (« j'ai bu un demi-litre », « genou à 2 »). Elles ne sont faites qu'après sa confirmation d'un tap : ne dites jamais que c'est fait, dites que vous le lui proposez. Jamais un chiffre qu'il n'a pas donné.`;
+- Actions (ajouter_eau, noter_genou, ecrire_note) : proposez-les quand Monsieur vous donne l'information (« j'ai bu un demi-litre », « genou à 2 »). Elles ne sont faites qu'après sa confirmation d'un tap : ne dites jamais que c'est fait, dites que vous le lui proposez. Jamais un chiffre qu'il n'a pas donné.
+- Les DONNÉES DU MOMENT sont relues à chaque message de Monsieur : elles comptent DÉJÀ toutes les actions qu'il a confirmées (voir le résultat de vos outils). Ne rajoutez jamais une action confirmée à un chiffre de ces données, et ne revenez pas sur un total juste.`;
 
 /** Outils de la conversation (J1). Les actions qui écrivent des données arrivent en J2. */
 export const JEFFREY_TOOLS = [
@@ -113,6 +114,15 @@ export const applyWater = (macros, date, ml) => {
 export const applyKnee = (knee, date, pain, baseline) => upsert(knee || [], { date, pain, baseline });
 /** Note du jour : la phrase s'ajoute à ce qui est déjà écrit, sans rien effacer. */
 export const appendNote = (existing, text) => ((existing || "").trim() ? `${existing.trim()} ; ${text}` : text);
+
+/** Résultat renvoyé à Jeffrey après le tap. Avec le nouveau total d'eau (`change` = {before,
+ *  after}) : le 29/10/2026 il a pris les données (déjà à jour) pour la valeur d'avant et a
+ *  annoncé 2 250 ml au lieu de 1 750. */
+export function confirmedResult(action, change) {
+  const what = action.kind === "eau" && change ? `eau du jour passée de ${change.before} à ${change.after} ml` : action.label;
+  return `Monsieur a confirmé : c'est fait (${what}). Les DONNÉES DU MOMENT de vos prochains messages comptent déjà ce changement : ne l'ajoutez pas une seconde fois.`;
+}
+export const CANCELLED_RESULT = "Monsieur a annulé : rien n'a été fait.";
 
 /** Séances que Jeffrey a le droit de proposer, d'après `nextSessions` : celles que le
  *  recommandeur affiche et celles qu'il juge seulement moins prioritaires. Jamais une séance
@@ -218,7 +228,7 @@ export function continuationIfSilent(message) {
 export function jeffreyDataBlock({ facts, allowed }) {
   const { heure_analyse: _heure, ...realtime } = facts.realtime || {};
   const parts = [
-    "DONNÉES DU MOMENT — calculées par l'application, ne les recalculez pas. L'heure exacte est indiquée en tête du dernier message de Monsieur.",
+    "DONNÉES DU MOMENT — calculées par l'application, ne les recalculez pas. Relues à chaque message de Monsieur : elles comptent déjà les actions qu'il a confirmées. L'heure exacte est indiquée en tête du dernier message de Monsieur.",
     `TEMPS RÉEL (hier vs aujourd'hui) : ${JSON.stringify(realtime)}`,
     `RÉSUMÉ 14 JOURS (moyennes, recommandeur, dépense estimée) : ${JSON.stringify(facts.summary)}`,
     `PROGRESSION PAR EXERCICE (14 j) : ${JSON.stringify(facts.exoProgress)}`,

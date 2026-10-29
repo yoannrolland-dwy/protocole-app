@@ -8,7 +8,7 @@ import { TEMPLATES } from "@rawcare/core/session/templates";
 import { streamClaude } from "@rawcare/core/coach/claudeApi";
 import {
   jeffreyAsk, readReply, effortFor, validateSessionChoice, continuationIfSilent, withMemory,
-  isActionTool, validateAction, appendNote,
+  isActionTool, validateAction, appendNote, confirmedResult, CANCELLED_RESULT,
 } from "@rawcare/core/coach/jeffrey";
 import { T } from "../../design/tokens.js";
 import { Panel, Eyebrow, Button, IconButton, Chip } from "../../design/primitives.jsx";
@@ -193,16 +193,17 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
   const decide = (entryId, action, ok, baseline) => {
     if (action.status !== "pending") return;
     let done = action;
+    let change = null;
     if (ok) {
       const act = action.kind === "genou" && action.baseline == null ? { ...action, baseline } : action;
       if (act.kind === "note") { const n = appendNote(note, act.text); setNote(n); saveNote(n); }
-      else onAction?.(act);
+      else change = onAction?.(act) ?? null;
       const label = act.kind === "genou" ? `Genou ${act.pain}/10, ${act.baseline ? "revenu à la base" : "pas revenu à la base"}` : act.label;
       done = { ...act, label, status: "done", doneText: say("actionDone") };
     } else {
       done = { ...action, status: "cancelled", doneText: say("actionCancelled") };
     }
-    const result = ok ? `Monsieur a confirmé : c'est fait (${done.label}).` : "Monsieur a annulé : rien n'a été fait.";
+    const result = ok ? confirmedResult(done, change) : CANCELLED_RESULT;
     setDay(today(), entries.map((e) => (e.id !== entryId ? e : {
       ...e,
       actions: e.actions.map((a) => (a.id === action.id ? done : a)),

@@ -4096,6 +4096,15 @@ habituel) reste à faire ; « démarrer une séance » existe déjà depuis J1.2
   « Oui » → `kneeLog` `{pain 3, baseline true}`, note annulée → rien d'écrit, puis note confirmée
   au tour suivant → `noteLog` ; les trois résultats bien renvoyés dans la requête suivante. Aucune
   erreur console. Installé et **essayé par Yoann sur le téléphone avec le vrai serveur : « tests ok »**.
+- **Correctif v3.130.1 (même jour), Jeffrey recomptait l'eau** : après « J'ai bu 500 ml » (1 250
+  → 1 750 confirmé), Jeffrey a écrit au message suivant « vous étiez déjà à 1 750, vous êtes donc
+  à 2 250 ». **Aucune double écriture** : vérifié sur le téléphone, `macroLog` à 1 750 et une seule
+  action d'eau confirmée. Cause : ses données, relues à chaque message, comptaient déjà l'ajout,
+  mais rien ne le lui disait ; il les a prises pour la valeur d'avant. Corrigé à trois endroits :
+  règle dans `CHAT_RULES` (« les données comptent déjà les actions confirmées, ne les rajoutez
+  jamais »), même phrase en tête de `jeffreyDataBlock`, et `confirmedResult(action, change)` :
+  le `tool_result` d'une eau confirmée dit « eau du jour passée de 1250 à 1750 ml » (`onAction`
+  d'App renvoie `{ before, after }`). Test nommé « régression 29/10 » — 141 tests. Réessayé par Yoann sur le téléphone (eau puis genou) : bon.
 
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 

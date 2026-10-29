@@ -12,6 +12,7 @@ import {
   continuationIfSilent, replyText, readReply, effortFor, jeffreyAsk,
   pendingMemoryDate, memoryTranscript, withMemory,
   validateAction, applyWater, applyKnee, appendNote, isActionTool,
+  confirmedResult, CANCELLED_RESULT, jeffreyDataBlock,
 } from "../src/coach/jeffrey.js";
 import { upsert } from "../src/dateUtils.js";
 
@@ -254,4 +255,21 @@ test("buildCoachPrompt : facts ajouté, system/user inchangés (la capture daté
   const coach = buildCoachPrompt({ weight: [], sleep: [], training: [], knee: [], macros: [], notes: [], steps: [], targets: DEFAULT_TARGETS, phase: "seche", foodLog: [], foodOverrides: {}, profile: "", journal: "" }, "");
   assert.equal(coach.facts.system, coach.system);
   assert.ok(coach.facts.realtime && coach.facts.summary);
+});
+
+test("régression 29/10 : après le tap, Jeffrey reçoit le nouveau total et sait que ses données le comptent déjà", () => {
+  const eau = validateAction("ajouter_eau", { ml: 500 }).action;
+  const r = confirmedResult(eau, { before: 1250, after: 1750 });
+  assert.match(r, /passée de 1250 à 1750 ml/);
+  assert.match(r, /comptent déjà ce changement/);
+  const genou = { ...validateAction("noter_genou", { douleur: 2 }).action, label: "Genou 2/10, revenu à la base" };
+  assert.match(confirmedResult(genou, null), /c'est fait \(Genou 2\/10, revenu à la base\)/);
+  assert.equal(CANCELLED_RESULT, "Monsieur a annulé : rien n'a été fait.");
+  const block = jeffreyDataBlock({ facts: { realtime: {}, summary: {}, exoProgress: {} }, allowed: [] });
+  assert.match(block, /comptent déjà les actions qu'il a confirmées/);
+  const req = buildJeffreyRequest({
+    coach: buildCoachPrompt({ weight: [], sleep: [], training: [], knee: [], macros: [], notes: [], steps: [], targets: DEFAULT_TARGETS, phase: "seche", foodLog: [], foodOverrides: {}, profile: "", journal: "" }, ""),
+    persona: "", nextSession: null, history: [{ role: "user", text: "bonjour" }], heure: "13:45",
+  });
+  assert.match(req.system[0].text, /Ne rajoutez jamais une action confirmée/);
 });
