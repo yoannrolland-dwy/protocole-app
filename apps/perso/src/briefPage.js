@@ -11,9 +11,17 @@ import { today } from "@rawcare/core/dateUtils";
 import { aiMissing } from "./lib/ai.js";
 import { say } from "./lib/jeffrey.js";
 import { makeCoach } from "./lib/coachInputs.js";
+import { getSync } from "./store.js";
 import { loadData, aiFromSettings, readBriefState, writeBriefState, missingText, runBrief, saveFallback } from "./lib/brief.js";
 
 const bridge = window.BriefBridge;
+
+// Voix (J3) : ce que Jeffrey dit de lui-même n'est lu à voix haute que pendant une séance (carnet
+// ouvert) ET casque branché — Kotlin vérifie le casque. Réglages de voix lus sans plugin (pas de
+// pont Capacitor dans cette page).
+const speakIfSession = () => (getSync("trainingDraft", null)?.type
+  ? { voice: null, rate: 1, pitch: 1, ...(getSync("jeffreyVoice", {}) || {}) }
+  : undefined);
 const finish = (result) => {
   if (bridge) bridge.finish(JSON.stringify(result));
   else console.log("brief", result);
@@ -75,7 +83,7 @@ async function main() {
   bridge?.preparing(say("briefPreparing"));
   try {
     const text = await runBrief({ data, ai, transport: bridgeTransport, missing });
-    return finish({ notify: { kind: "brief", text, alert: true }, nextAt: tomorrow });
+    return finish({ notify: { kind: "brief", text, alert: true, speak: speakIfSession() }, nextAt: tomorrow });
   } catch (e) {
     console.error("brief", e);
     const r = briefRetry(now, tries);

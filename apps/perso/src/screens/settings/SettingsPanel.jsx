@@ -16,6 +16,7 @@ import { say, sayStable } from "../../lib/jeffrey.js";
 import { JEFFREY_PERSONA } from "@rawcare/core/coach/jeffrey";
 import { briefEnabled, setBriefEnabled, testBrief } from "../../lib/briefNative.js";
 import { writeBriefState } from "../../lib/brief.js";
+import { voiceSettings, saveVoiceSettings, listVoices, speak, stopSpeaking } from "../../lib/voice.js";
 
 // Brief du matin (J4.1), app native seulement (réveils et notification). « Essayer » efface les
 // marqueurs du jour et lance un VRAI brief dans 10 secondes (quelques centimes) : l'app peut être
@@ -42,6 +43,43 @@ function BriefCard() {
         </Btn>
       )}
       {msg && <Body style={{ fontSize: 13, color: C.text2, marginTop: 6 }}>{msg}</Body>}
+    </Card>
+  );
+}
+
+// Voix de Jeffrey (J3), app native seulement : voix françaises installées sur le téléphone
+// (synthèse d'Android, gratuite et hors ligne), vitesse et hauteur, bouton pour l'entendre.
+const VOICE_TEST = "Bonjour Monsieur. Votre séance vous attend, et je me permets de vous rappeler le genou.";
+function VoiceCard() {
+  const [v, setV] = useState(voiceSettings);
+  const [voices, setVoices] = useState(null);
+  useEffect(() => { listVoices().then(setVoices); }, []);
+  if (!Capacitor.isNativePlatform()) return null;
+  const set = (patch) => { const next = { ...v, ...patch }; setV(next); saveVoiceSettings(next); };
+  return (
+    <Card>
+      <Label style={{ marginBottom: 8 }}>Jeffrey · voix</Label>
+      <Body style={{ fontSize: 13, color: C.dim, marginBottom: 8 }}>
+        Voix françaises installées sur le téléphone. Aucune n'est un vrai majordome anglais : la
+        personnalité est dans ses mots. Une question posée au micro reçoit sa réponse à voix haute.
+      </Body>
+      <Field label="Voix">
+        <select className="p-field" value={v.voice || ""} onChange={(e) => set({ voice: e.target.value || null })}>
+          <option value="">Voix par défaut du téléphone</option>
+          {(voices || []).map((o) => (
+            <option key={o.name} value={o.name}>{o.label}{o.local ? "" : " (réseau)"}</option>
+          ))}
+        </select>
+      </Field>
+      {voices && voices.length === 0 && (
+        <Body style={{ fontSize: 13, color: C.text2, marginTop: 6 }}>Aucune voix française trouvée, Monsieur.</Body>
+      )}
+      <Field label="Vitesse"><Stepper value={v.rate} set={(x) => set({ rate: x })} step={0.1} min={0.5} max={2} /></Field>
+      <Field label="Hauteur"><Stepper value={v.pitch} set={(x) => set({ pitch: x })} step={0.1} min={0.5} max={2} /></Field>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 8, marginTop: 8 }}>
+        <Btn variant="outline" onClick={() => speak(VOICE_TEST, v)}>Tester</Btn>
+        <Btn variant="plain" onClick={() => stopSpeaking()}>Arrêter</Btn>
+      </div>
     </Card>
   );
 }
@@ -201,6 +239,7 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
       </Card>
 
       <BriefCard />
+      <VoiceCard />
 
       <Card>
         <Label style={{ marginBottom: 8 }}>Jeffrey · personnalité</Label>

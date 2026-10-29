@@ -4223,6 +4223,42 @@ Décision 7 de ROADMAP.md appliquée telle quelle.
   en une phrase (« ciel dégagé cet après-midi, 16 degrés sans pluie : une belle occasion de
   marcher »).
 
+## Chantier J — Jeffrey : J3, la voix (29/10/2026, apps/perso v3.134.0)
+
+Choix de Yoann : la dictée part toute seule quand il se tait ; le brief est lu à voix haute pendant
+une séance, casque branché. Règle (décision 11) : **il répond comme on lui a parlé** — question
+dictée → réponse à voix haute (casque ou haut-parleur) ; question écrite → réponse écrite, avec un
+bouton haut-parleur sur chaque message. **Ce qu'il dit de lui-même** (le brief) n'est lu que
+**casque branché ET séance en cours** (`trainingDraft`). Pas de mot de réveil, pas de voix payante :
+aucune voix d'Android n'est un vrai majordome anglais, la personnalité reste dans ses mots.
+- **Natif `JeffreyVoice.kt`** : `Headset` (règle casque partagée avec `RestAlarmReceiver`, USB-C
+  compris) ; `JeffreyTts` (synthèse d'Android, flux « assistant » donc dans le casque s'il est
+  branché, lecture par paragraphes, **la musique baisse le temps qu'il parle** — focus audio
+  `GAIN_TRANSIENT_MAY_DUCK` —, `onDone` en fin de lecture, y compris interrompue) ;
+  `JeffreyVoicePlugin` (« JeffreyVoice » : `listen` en français avec texte partiel en direct par
+  l'événement `voicePartial`, rien entendu = texte vide, `stopListening`, `voices`, `speak` résolu
+  en fin de lecture, `stop`, `headset`). Permission **micro** demandée à la première dictée
+  (`RECORD_AUDIO`) ; `<queries>` pour voir le service de dictée et la synthèse (Android 11+).
+- **Voix proposées** : seulement les voix **hors ligne** (les voix « réseau » doublent les locales et
+  se taisent sans connexion), France d'abord, noms lisibles (« France · voix B »). 27 sur le
+  téléphone de Yoann.
+- **`src/lib/voice.js`** : `listen`, `speak`, `stopSpeaking`, `listVoices`, `headsetConnected`,
+  réglages `jeffreyVoice` (`{ voice, rate, pitch }`, **ajouté à `DATA_KEYS`**, `voice: null` = voix
+  par défaut du téléphone). Rien ne s'affiche hors app native.
+- **Conversation** (`JeffreyChat.jsx`) : bouton micro à côté d'« Envoyer » (le texte s'écrit dans le
+  champ pendant qu'il parle, un second tap arrête) ; question dictée envoyée avec `spoken: true`,
+  puis sa réponse est lue ; bouton haut-parleur sous chaque réponse (re-tap = arrêt). `run` renvoie
+  désormais l'historique pour que `ask` sache quelle réponse lire.
+- **Réglages › « Jeffrey · voix »** : liste des voix, vitesse et hauteur (0,5 à 2), « Tester » /
+  « Arrêter ».
+- **Brief lu à voix haute** : app fermée, `briefPage` ajoute `speak` (réglages de voix) au résultat
+  quand un carnet est ouvert ; `BriefRunner` vérifie le casque, lit le brief et garde le service au
+  premier plan (`BriefService`) jusqu'à la fin de la lecture (arrêt forcé à 150 s). App ouverte :
+  même règle dans l'effet du brief d'`App.jsx` (`headsetConnected` + `speak`).
+- **Vérifié** : 154 tests, builds perso et public, installé sur le téléphone (voix listées, casque
+  détecté). **Non vérifié** : la dictée, la lecture à voix haute et le brief lu en séance — à
+  essayer par Yoann.
+
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 
 Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la

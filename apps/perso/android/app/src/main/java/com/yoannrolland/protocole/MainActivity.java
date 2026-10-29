@@ -18,6 +18,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(JeffreyHttpPlugin.class);
         // Brief du matin : réveils et notification Jeffrey (voir BriefPlugin.kt, BriefRunner.kt)
         registerPlugin(BriefPlugin.class);
+        // Voix de Jeffrey : dictée et lecture à voix haute (voir JeffreyVoice.kt)
+        registerPlugin(JeffreyVoicePlugin.class);
         super.onCreate(savedInstanceState);
     }
 

@@ -85,12 +85,21 @@ object BriefRunner {
         val finish: (String) -> Unit = { json ->
             if (finished.compareAndSet(false, true)) {
                 handler.post {
-                    context.stopService(Intent(context, BriefService::class.java))
+                    val stop = { context.stopService(Intent(context, BriefService::class.java)) }
                     runCatching { handleResult(context, json) }.onFailure {
                         Log.e(TAG, "résultat", it)
                         BriefScheduler.schedule(context, System.currentTimeMillis() + 20 * 60_000)
                     }
                     web.destroy()
+                    // Voix (J3) : séance en cours (la page le dit) ET casque branché → Jeffrey lit le
+                    // brief. Le service au premier plan garde l'app en vie jusqu'à la fin de la lecture.
+                    val speech = runCatching { speechOf(context, json) }.getOrNull()
+                    if (speech != null) {
+                        val (text, s) = speech
+                        handler.postDelayed({ stop() }, 150_000)
+                        JeffreyTts.speak(context, text, if (s.isNull("voice")) null else s.optString("voice").ifEmpty { null },
+                            s.optDouble("rate", 1.0).toFloat(), s.optDouble("pitch", 1.0).toFloat()) { handler.post { stop() } }
+                    } else stop()
                     done()
                 }
             }
@@ -125,6 +134,14 @@ object BriefRunner {
         "png" -> "image/png"
         "woff2" -> "font/woff2"
         else -> "application/octet-stream"
+    }
+
+    private fun speechOf(context: Context, json: String): Pair<String, JSONObject>? {
+        val n = JSONObject(json).optJSONObject("notify") ?: return null
+        val s = n.optJSONObject("speak") ?: return null
+        val text = n.optString("text")
+        if (text.isBlank() || Headset.connected(context) == null) return null
+        return text to s
     }
 
     /** Ce que la page rend : { notify: { kind, text, alert } | null, nextAt } ou { error, nextAt }. */

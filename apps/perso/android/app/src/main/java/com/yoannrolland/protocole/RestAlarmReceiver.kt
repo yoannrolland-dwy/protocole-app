@@ -42,24 +42,9 @@ class RestAlarmReceiver : BroadcastReceiver() {
      * exactement le compromis demandé (priorité à ne pas déranger, plutôt qu'à être entendu
      * coûte que coûte).
      */
-    private fun connectedHeadset(context: Context): AudioDeviceInfo? {
-        val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return null
-        val headsetTypes = setOf(
-            // TYPE_WIRED_HEADSET/HEADPHONES ne concernent que la prise jack 3,5mm analogique —
-            // absente sur ce téléphone (pas de jack). Un casque filaire y est forcément branché
-            // en USB-C, donc vu par Android comme TYPE_USB_HEADSET (voire TYPE_USB_DEVICE selon
-            // le DAC intégré au câble) — constaté le 29/07/2026 : le filtre précédent ne
-            // reconnaissait aucun de ces deux types, d'où le son resté sur haut-parleur malgré
-            // le casque branché.
-            AudioDeviceInfo.TYPE_WIRED_HEADSET,
-            AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
-            AudioDeviceInfo.TYPE_USB_HEADSET,
-            AudioDeviceInfo.TYPE_USB_DEVICE,
-            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-            AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
-        )
-        return am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).firstOrNull { it.type in headsetTypes }
-    }
+    // Types de casque (USB-C compris : pas de prise jack sur ce téléphone, constaté le
+    // 29/07/2026) : règle partagée avec la voix de Jeffrey, voir Headset dans JeffreyVoice.kt.
+    private fun connectedHeadset(context: Context): AudioDeviceInfo? = Headset.connected(context)
 
     override fun onReceive(context: Context, intent: Intent) {
         val exercise = intent.getStringExtra("exercise") ?: ""

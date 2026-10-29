@@ -104,6 +104,18 @@
     <!-- Météo du brief (J4.2) : position APPROXIMATIVE seulement, lue app ouverte (jamais en
          arrière-plan) ; arrondie à ~1 km, elle ne part qu'à Open-Meteo. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Voix de Jeffrey (J3) : dictée dans la conversation, micro demandé à la première fois. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Android 11+ : sans ces déclarations, l'app ne voit ni le service de dictée ni la
+         synthèse vocale. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
 
     <!-- Widget (28/10/2026) : relit les pas toutes les 30 min sans ouvrir l'app
          (WidgetStepsRefresher.kt). Android 14+ exige cette permission pour lire Health Connect

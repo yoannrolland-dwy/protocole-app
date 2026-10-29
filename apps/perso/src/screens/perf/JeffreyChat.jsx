@@ -3,7 +3,7 @@
 // « Chantier J ». La conversation du jour vit dans `jeffreyLog` (App.jsx) : une réponse en cours
 // s'y enregistre même si Monsieur change d'onglet (l'écriture passe par App, toujours montée).
 import { useEffect, useRef, useState } from "react";
-import { Send, ChevronRight, ChevronDown } from "lucide-react";
+import { Send, ChevronRight, ChevronDown, Mic, Square, Volume2 } from "lucide-react";
 import { TEMPLATES } from "@rawcare/core/session/templates";
 import {
   jeffreyAsk, withMemory, appendNote, confirmedResult, CANCELLED_RESULT,
@@ -15,6 +15,7 @@ import { aiMissing, fmtCost } from "../../lib/ai.js";
 import { say, sayStable, sayError } from "../../lib/jeffrey.js";
 import { streamTransportFor } from "../../lib/jeffreyHttp.js";
 import { jeffreyTurn, newId, hhmm } from "../../lib/jeffreyTurn.js";
+import { voiceAvailable, listen, stopListening, speak, stopSpeaking } from "../../lib/voice.js";
 
 function SessionCard({ choice, onStart }) {
   const canStart = choice.jour === "aujourdhui" && TEMPLATES[choice.type];
@@ -58,7 +59,7 @@ function ActionCard({ action, onDecide }) {
   );
 }
 
-function Message({ entry, onStart, onDecide }) {
+function Message({ entry, onStart, onDecide, speaking, onSpeak }) {
   if (entry.hidden) return null;
   // Réponse muette relancée (continuationIfSilent) : rien à montrer, son coût est dans le total.
   if (entry.role === "assistant" && !entry.text && !entry.choices?.length && !entry.actions?.length) return null;
@@ -74,7 +75,17 @@ function Message({ entry, onStart, onDecide }) {
       {entry.text && <div style={{ fontSize: 15, color: T.c.text, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{entry.text}</div>}
       {(entry.choices || []).map((c) => <SessionCard key={c.id} choice={c} onStart={onStart} />)}
       {(entry.actions || []).map((a) => <ActionCard key={a.id} action={a} onDecide={(act, ok, base) => onDecide(entry.id, act, ok, base)} />)}
-      {entry.meta && <div className="p-num" style={{ fontSize: 12, color: T.c.muted }}>{fmtCost(entry.meta.cents)}</div>}
+      {(entry.meta || (entry.text && voiceAvailable())) && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {entry.meta && <span className="p-num" style={{ fontSize: 12, color: T.c.muted }}>{fmtCost(entry.meta.cents)}</span>}
+          {/* J3 : écouter un message (ou arrêter la lecture en cours). */}
+          {entry.text && voiceAvailable() && (
+            <IconButton label={speaking ? "Arrêter la lecture" : "Écouter ce message"} size={44} onClick={() => onSpeak(entry)}>
+              {speaking ? <Square size={16} aria-hidden="true" /> : <Volume2 size={18} aria-hidden="true" />}
+            </IconButton>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -88,6 +99,9 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
   const [err, setErr] = useState("");
   const [note, setNote] = useState(todayNote || "");
   const [openNote, setOpenNote] = useState(false);
+  // Voix (J3) : dictée en cours, message en cours de lecture.
+  const [listening, setListening] = useState(false);
+  const [speakingId, setSpeakingId] = useState(null);
   const endRef = useRef(null);
   const busy = live != null;
 
@@ -115,16 +129,19 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
       setDay(date, h);
     };
     try {
-      apply(await jeffreyTurn({
+      const r = await jeffreyTurn({
         history, mode, coach, ai, note, foodContext, transport: streamTransportFor(ai),
         onText: (text) => setLive((l) => ({ ...(l || {}), text })),
         onRetry: (p) => setLive((l) => ({ ...(l || {}), progress: p })),
         onPass: () => setLive({ text: "", progress: "" }),
-      }));
+      });
+      apply(r);
+      return r.history;
     } catch (e) {
       console.error("Jeffrey", e);
       if (e.partial) apply(e.partial);
       setErr(e?.message || "cause inconnue");
+      return null;
     } finally {
       setLive(null);
     }
@@ -143,7 +160,41 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
     if (memory && !history.some((e) => e.memoryFor === memory.date)) entry = withMemory(entry, memory.date, memory.entries);
     const next = [...history, { ...entry, id: newId(), at: hhmm() }];
     setDay(today(), next);
-    run(next, entry.mode || "chat");
+    const done = run(next, entry.mode || "chat");
+    // Il répond comme on lui a parlé (décision 11) : question dictée → réponse à voix haute.
+    if (entry.spoken) done.then((h) => {
+      const reply = h && [...h].reverse().find((e) => e.role === "assistant" && e.text);
+      if (reply) speakEntry(reply);
+    });
+  };
+
+  const speakEntry = (e) => {
+    setSpeakingId(e.id);
+    speak(e.text).finally(() => setSpeakingId((s) => (s === e.id ? null : s)));
+  };
+  const toggleSpeak = (e) => {
+    if (speakingId === e.id) { stopSpeaking(); setSpeakingId(null); } else speakEntry(e);
+  };
+
+  // Dictée (J3, choix de Yoann) : le texte s'écrit dans le champ pendant qu'il parle, puis part
+  // tout seul quand il se tait. Un second tap arrête l'écoute.
+  const mic = async () => {
+    if (listening) { stopListening(); return; }
+    if (busy) return;
+    stopSpeaking();
+    setSpeakingId(null);
+    setErr("");
+    setListening(true);
+    setDraft("");
+    try {
+      const text = (await listen((p) => setDraft(p))).trim();
+      setDraft("");
+      if (text) ask({ ...jeffreyAsk("chat", { text }), spoken: true });
+    } catch (e) {
+      setErr(e?.message || "dictée impossible");
+    } finally {
+      setListening(false);
+    }
   };
 
   // Confirmation ou annulation d'une action (J2). La note du jour s'écrit ici (elle est aussi
@@ -191,7 +242,7 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
       {entries.length === 0 && !busy && <div style={{ fontSize: 15, color: T.c.text2 }}>{sayStable("chatHello")}</div>}
 
       <div style={{ display: "grid", gap: 14 }}>
-        {entries.map((e) => <Message key={e.id} entry={e} onStart={onStart} onDecide={decide} />)}
+        {entries.map((e) => <Message key={e.id} entry={e} onStart={onStart} onDecide={decide} speaking={speakingId === e.id} onSpeak={toggleSpeak} />)}
         {busy && (
           <div style={{ fontSize: 15, color: live.text ? T.c.text : T.c.muted, whiteSpace: "pre-wrap", lineHeight: 1.5 }} aria-live="polite">
             {live.text || sayStable("chatThinking")}
@@ -216,12 +267,17 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
       )}
 
       <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-        <textarea className="p-field" rows={2} value={draft} disabled={busy}
+        <textarea className="p-field" rows={2} value={draft} disabled={busy || listening}
           placeholder={sayStable("chatPlaceholder")} aria-label="Message à Jeffrey" enterKeyHint="send"
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendDraft(); } }}
           style={{ flex: 1, minWidth: 0, resize: "none", height: "auto", minHeight: 52, padding: "12px 14px", fontFamily: T.f.body, fontSize: 16, lineHeight: 1.4 }} />
-        <IconButton label="Envoyer à Jeffrey" tone="accent" size={52} onClick={sendDraft} disabled={busy || !draft.trim()}>
+        {voiceAvailable() && (
+          <IconButton label={listening ? "Arrêter la dictée" : "Parler à Jeffrey"} tone={listening ? "accent" : undefined} size={52} onClick={mic} disabled={busy && !listening}>
+            {listening ? <Square size={18} aria-hidden="true" /> : <Mic size={20} aria-hidden="true" />}
+          </IconButton>
+        )}
+        <IconButton label="Envoyer à Jeffrey" tone="accent" size={52} onClick={sendDraft} disabled={busy || listening || !draft.trim()}>
           <Send size={20} aria-hidden="true" />
         </IconButton>
       </div>

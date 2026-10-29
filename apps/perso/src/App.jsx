@@ -32,6 +32,7 @@ import { streamTransportFor } from "./lib/jeffreyHttp.js";
 import { aiMissing } from "./lib/ai.js";
 import { say } from "./lib/jeffrey.js";
 import { notePosition } from "./lib/weather.js";
+import { speak, headsetConnected } from "./lib/voice.js";
 import { SettingsPanel } from "./screens/settings/SettingsPanel.jsx";
 import { Dashboard } from "./screens/dashboard/Dashboard.jsx";
 import { WeightTab } from "./screens/WeightTab.jsx";
@@ -557,6 +558,9 @@ export default function App({ silent = false } = {}) {
     runBrief({
       data: { weight, sleep, training, knee, macros, notes, steps, rhr, naps, targets, phase, basketSchedule, targetHistory, palierWeekly, coachProfile, coachJournal, jeffreyPersona },
       ai, transport: streamTransportFor(ai), missing,
+    }).then(async (text) => {
+      // Voix (J3) : brief lu à voix haute seulement pendant une séance, casque branché.
+      if (text && getSync("trainingDraft", null)?.type && await headsetConnected()) speak(text);
     }).catch((e) => console.error("brief", e)).finally(() => {
       setJeffreyLog(getSync("jeffreyLog", {}));
       setCoachJournalState(getSync("coachJournal", ""));
