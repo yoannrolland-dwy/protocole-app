@@ -31,7 +31,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | U2 | Refonte IHM — directions visuelles en maquettes, choix, design system v2 (variables CSS) | gros | ✅ 25/10/2026 (v3.110.0, direction A) |
 | U3 | Refonte IHM — écran par écran (un commit + une install par écran) | gros | ✅ 25/10/2026 (8 étapes, v3.111.0 → v3.118.0) |
 | U4 | Refonte IHM — audit final avant/après + mise à jour CLAUDE.md | petit | ✅ 25/10/2026 (v3.118.1) |
-| J0 | Jeffrey — test jetable : l'app peut-elle préparer le brief seule, écran éteint et app fermée ? | petit | à faire |
+| J0 | Jeffrey — test jetable : l'app peut-elle préparer le brief seule, écran éteint et app fermée ? | petit | ✅ 29/10/2026 (piste A validée avec un réveil système) |
 | J1 | Jeffrey — la conversation : Analyse + bulle partout + compte rendu sur Bord, choix de séance vérifié, mémoire | gros | à faire |
 | J2 | Jeffrey — actions proposées, confirmées d'un tap (eau, genou, note, séance, repas, habituel) | moyen | à faire |
 | J4 | Jeffrey — brief du matin en notification : attend la nuit, météo, réponse dans la notification | gros | à faire |
@@ -1085,8 +1085,16 @@ premier et J1 avant tout le reste.
    fonctions d'enregistrement que les écrans (jamais une écriture parallèle). Une valeur que l'IA
    a déduite d'un texte libre (« ça tire un peu » → genou 2/10) est **montrée en chiffre** avant
    confirmation : c'est le journal du genou qui pilote les gates.
-6. **Modèle : celui des Réglages** (Opus 5.5 aujourd'hui), même fournisseur et même clé
-   (Anthropic direct ou LiteLLM). Coût affiché après chaque réponse, comme aujourd'hui.
+6. **Modèle : celui des Réglages, et tout passe par LiteLLM** (précisé le 29/10/2026 : c'est le
+   fournisseur réglé sur le téléphone). Y compris en arrière-plan, où la WebView sans écran n'a
+   pas `CapacitorHttp` : l'appel passe par un **relais HTTP natif** exposé à la page par
+   l'interface JS (le serveur ne répond pas au CORS). Coût affiché après chaque réponse, comme
+   aujourd'hui. Si le fournisseur est rebasculé sur Anthropic direct dans les Réglages, Jeffrey
+   suit le réglage.
+   **Si LiteLLM ne répond pas** (serveur saturé, refus « trop de requêtes » vus le 26/10) :
+   Jeffrey réessaie quelques minutes, puis envoie un **brief court sans IA** (date, planning du
+   jour, séance du recommandeur, ce qui manque) en le disant (« Mon cerveau est en grève ce
+   matin, Monsieur ; voici l'essentiel »). **Pas de bascule automatique sur Anthropic direct.**
 7. **Météo : position du téléphone, mais jamais lue en arrière-plan.** L'app note la position
    approximative (arrondie à ~1 km) à chaque ouverture, au premier plan seulement ; le brief du
    matin utilise la dernière connue. Pas de permission de localisation en arrière-plan (la plus
@@ -1098,6 +1106,40 @@ premier et J1 avant tout le reste.
    de *Batman*, sans les citer ni les imiter) : vouvoiement, appelle Yoann « Monsieur », langage
    châtié, flegme britannique, bienveillant mais taquin. Texte de personnalité éditable dans les
    Réglages (amorcé avec la version ci-dessous), séparé du « contexte permanent » du coach.
+10. **L'app est Jeffrey** (29/10/2026) : c'est lui qui écrit, qui notifie, qui répond.
+    - **Toutes les notifications** dans sa voix : brief, demandes de ce qui manque, fin de repos,
+      rappel de sauvegarde, et les futures. La fin de repos reste **très courte** (lue entre deux
+      séries) : quelques variantes qui tournent, jamais une phrase longue.
+    - **Les messages de l'app** dans sa voix : confirmations (« Ajouté, Monsieur. »), erreurs,
+      écrans vides. Ce sont des **textes fixes écrits à l'avance** (variantes tirées au hasard),
+      **sans appel à l'IA**, donc gratuits et instantanés. Les libellés (Protéines, Poids…) et
+      les chiffres ne changent pas.
+    - **Il ne parle pas à chaque action** : un ajout donne une confirmation écrite, jamais de voix.
+    - Nom et icône de l'app : **inchangés** (« Protocole »), non retenus à ce stade.
+11. **La voix seulement au casque, à la salle** (29/10/2026) : lecture à voix haute
+    automatique **uniquement si un casque (filaire USB-C ou Bluetooth) est connecté ET qu'une
+    séance est en cours** (brouillon du carnet actif). Jamais par le haut-parleur, jamais quand
+    Yoann travaille, dort ou regarde la télé. Hors de ce cas : texte seul, avec un bouton
+    haut-parleur sur chaque message pour écouter volontairement. Détection du casque : même code
+    que `RestAlarmReceiver` (types filaire, USB, Bluetooth).
+    **Exception : la conversation qu'il lance lui-même** (précisé le 29/10/2026). Quand Yoann
+    parle à Jeffrey (bouton micro), Jeffrey lui répond à voix haute, avec ou sans écouteurs,
+    haut-parleur compris : il a choisi de parler, il attend une réponse parlée. Quand il écrit,
+    Jeffrey répond par écrit. Règle simple : **il répond comme on lui a parlé**. Le garde-fou
+    casque + séance ne vise que ce que Jeffrey dit **de lui-même** (brief, relances,
+    notifications).
+12. **Le brief attend la nuit, la pesée et le genou, jusqu'à 10 h** (29/10/2026). Il dit ce
+    qu'il lui manque dans **une seule notification mise à jour sur place** (pas de sonnerie à
+    chaque mise à jour) : « Bonjour Monsieur. J'ai votre nuit ; il me manque votre pesée et
+    votre genou. » **Une seule relance sonore, vers 9 h** si quelque chose manque encore. À
+    **10 h**, brief avec ce qu'il a, en disant ce qui manquait. Dès que tout est là, brief
+    aussitôt.
+13. **Le genou se donne en écrivant dans la notification** (29/10/2026) : Yoann tape « 2 »,
+    Jeffrey enregistre 2/10 puis demande « Retour à la base sous 24 h ? » avec deux boutons
+    Oui / Non. Un chiffre tapé est une saisie explicite (pas une déduction de l'IA), donc pas de
+    confirmation supplémentaire. Même chemin d'enregistrement que l'onglet Genou. Si la pesée
+    manque encore à 9 h, la même réponse écrite accepte un poids (« 93,8 », enregistré en
+    saisie manuelle).
 
 ### Personnalité d'amorçage (clé `jeffreyPersona`, éditable)
 
@@ -1137,6 +1179,44 @@ planning, prompt) est en JavaScript, et Android ne la fait pas tourner app ferm�
   tout en moins de ~1 min et sans afficher d'activité. Mesurer aussi la batterie.
 - Jetable : rien n'est commité de la piste perdante. Résultat documenté ici.
 
+**Résultat (29/10/2026, sur le téléphone, app tuée par `am kill`, écran d'accueil au premier
+plan) : piste A validée, mais pas avec le déclencheur prévu.**
+
+- **WorkManager : échec.** La tâche (`OneTimeWorkRequest`, délai 60 s) est restée en attente plus
+  de 8 min, et même `cmd jobscheduler run -f` ne l'a pas lancée. `dumpsys jobscheduler` :
+  `Ready: false`, `readyNotRestrictedInBg: false`, alors que l'app n'a aucune restriction réglée
+  (`RUN_ANY_IN_BACKGROUND` à `allow`, compartiment de veille 10 = actif). La gestion d'énergie de
+  Samsung retient les tâches d'une app fermée. **Ne pas construire le brief sur WorkManager.**
+- **Réveil système (`AlarmManager.setAlarmClock`, comme le minuteur de repos) : réussite.** Il a
+  sonné à la seconde près (11:02:58), Android a relancé l'app sans rien afficher, et un
+  `BroadcastReceiver` (`goAsync`) a chargé une page de l'app dans une **WebView sans écran**
+  (créée avec le contexte de l'application, jamais affichée). Mesures : origine
+  `https://localhost` (la même que Capacitor, donc **le même localStorage** : 32 clés lues,
+  dernière pesée lue), fichiers de l'app servis par `WebViewAssetLoader` (domaine `localhost`,
+  dossier `assets/public/`), `fetch` vers l'API Anthropic en 200 avec la clé des Réglages,
+  réponse rendue à Kotlin par `addJavascriptInterface`, notification postée. **1,0 s au total**
+  (0,8 s dans la page). Rien à l'écran pendant le test.
+- **Ce que ça décide pour J4** : réveil `setAlarmClock` → récepteur → WebView sans écran qui
+  charge une **page dédiée** (entrée Vite séparée qui importe `packages/core` et lit le
+  localStorage, sans monter l'app React). Toute la logique reste en JavaScript, rien n'est
+  dupliqué en Kotlin.
+- **Non vérifié par J0, à traiter en J4** :
+  - **Durée.** Un récepteur réveillé en arrière-plan n'a qu'environ une minute ; un brief en
+    Opus 5.5 (réflexion comprise) peut en prendre autant. Prévoir un service au premier plan
+    court lancé depuis le réveil (le réveil exact autorise ce démarrage), avec une notification
+    discrète pendant la préparation.
+  - **LiteLLM.** Les Réglages du téléphone sont sur `litellm` ; le test a appelé Anthropic direct
+    (la clé Anthropic est aussi présente). Depuis la WebView sans écran, `fetch` vers le serveur
+    LiteLLM sera bloqué par le CORS (déjà constaté le 26/10) et `CapacitorHttp` n'existe pas
+    hors de l'app : il faudra un relais HTTP natif exposé par l'interface JS.
+  - **Les plugins Capacitor ne sont pas disponibles** dans cette WebView (pas de pont). Health
+    Connect (nuit, pesée) se lit côté Kotlin avant de charger la page, comme le widget, et se
+    passe à la page par l'interface JS.
+  - **Bruit sans gravité** : `WebViewAssetLoader` journalise une exception pour un fichier absent
+    (probablement `favicon.ico`) ; servir une réponse vide pour les fichiers manquants.
+- Code de test retiré du dépôt après la mesure (les deux essais, la page de test et les
+  dépendances `work-runtime-ktx`/`webkit`) ; le téléphone a été réinstallé sans.
+
 ### J1 — La conversation
 
 - **`packages/core/src/coach/jeffrey.js`** (pur, testé) : construit le `system` (règles + sécurité
@@ -1173,9 +1253,14 @@ l'écran correspondant.
 
 ### J4 — Le brief du matin en notification
 
-- **Déclencheur : dès que la nuit est là** (réponse de Yoann). Entre 6 h et 8 h 30, vérification
-  toutes les ~20 min qu'une nuit datée du jour existe dans Health Connect ; à 8 h 30 au plus
-  tard, brief avec ce qui est disponible (sans inventer de nuit). **Si l'app est ouverte avant**,
+- **Déclencheur : un réveil système** (`setAlarmClock`, validé par J0 ; WorkManager est retenu
+  par Samsung app fermée). À partir de 6 h, réveils successifs (~toutes les 20 min) qui lisent
+  Health Connect côté Kotlin : nuit du jour, pesée du jour ; et le genou dans le localStorage.
+  Tout est là → brief. Sinon, la notification « il me manque… » est mise à jour en silence
+  (décision 12), relance sonore unique vers 9 h, brief avec ce qu'il a à 10 h (sans jamais
+  inventer une nuit ou une pesée). Un service au premier plan court, lancé depuis le réveil,
+  couvre l'appel à l'IA (notification « Je prépare votre brief, Monsieur. » pendant ce
+  temps). **Si l'app est ouverte avant**,
   le brief est généré dans l'app (carte sur Bord) et aucune notification ne part — jamais deux
   appels payés pour le même matin.
 - **Contenu** : salutation datée, météo du jour (créneaux de séance), nuit (score de qualité,
@@ -1194,9 +1279,11 @@ l'écran correspondant.
   (le micro du clavier Samsung marche déjà en attendant). **Pas de mot de réveil** (« Hé
   Jeffrey » à tout moment) : micro en écoute permanente, coûteux en batterie et fragile.
 - **Réponse lue à voix haute** : synthèse vocale d'Android (gratuite, hors ligne). Réglages :
-  choix parmi les voix françaises installées sur le téléphone, vitesse, hauteur, lecture
-  automatique ou bouton haut-parleur par message, bouton « Tester ». Sortie au casque s'il est
-  branché.
+  choix parmi les voix françaises installées sur le téléphone, vitesse, hauteur, bouton
+  « Tester ». **Lecture automatique de ce qu'il dit de lui-même seulement casque connecté ET
+  séance en cours** (décision 11), sinon bouton haut-parleur par message. **Réponse à une
+  question posée au micro : toujours à voix haute**, casque ou haut-parleur (il répond comme on
+  lui a parlé ; une question écrite reçoit une réponse écrite).
 - **Limite à dire à Yoann** : un vrai « majordome britannique qui parle français » n'existe pas
   dans les voix d'Android ; une voix premium (service de synthèse payant, autre clé) est hors
   périmètre, à rouvrir s'il trouve les voix Android trop plates.
