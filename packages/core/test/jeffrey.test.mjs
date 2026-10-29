@@ -10,7 +10,32 @@ import { DEFAULT_TARGETS } from "../src/targets.js";
 import {
   allowedSessions, validateSessionChoice, toApiMessages, buildJeffreyRequest, JEFFREY_TOOLS,
   continuationIfSilent, replyText, readReply, effortFor, jeffreyAsk,
+  pendingMemoryDate, memoryTranscript, withMemory,
 } from "../src/coach/jeffrey.js";
+
+test("mémoire : le dernier jour passé non versé au carnet, transcription sans les messages cachés", () => {
+  const log = {
+    "2026-10-01": [{ role: "user", text: "Vieux" }],
+    "2026-10-02": [{ role: "user", text: "Bonjour", at: "08:00" }, { role: "user", text: "(relance)", hidden: true }, { role: "assistant", text: "Bonjour Monsieur.", at: "08:01" }],
+    "2026-10-03": [{ role: "user", hidden: true, text: "x" }],
+    "2026-10-04": [{ role: "user", text: "Aujourd'hui" }],
+  };
+  assert.equal(pendingMemoryDate(log, "2026-10-04", null), "2026-10-02"); // le 03 n'a rien de visible
+  assert.equal(pendingMemoryDate(log, "2026-10-04", "2026-10-02"), null);  // déjà versé
+  assert.equal(pendingMemoryDate({}, "2026-10-04", null), null);
+  assert.equal(memoryTranscript(log["2026-10-02"]), "08:00 Monsieur : Bonjour\n08:01 Jeffrey : Bonjour Monsieur.");
+  // Message ordinaire : réponse normale puis carnet ; le texte affiché ne change pas.
+  const e = withMemory(jeffreyAsk("chat", { text: "Salut" }), "2026-10-02", log["2026-10-02"]);
+  assert.equal(e.text, "Salut");
+  assert.equal(e.memoryFor, "2026-10-02");
+  assert.match(e.apiText, /^Salut\n\n\(Demande de l'application : voici votre conversation du 2026-10-02[\s\S]*---CARNET---[\s\S]*Jeffrey : Bonjour Monsieur\./);
+  // Point complet : sa consigne de carnet suffit, la mémoire s'y ajoute sans la doubler.
+  const p = withMemory(jeffreyAsk("point"), "2026-10-02", log["2026-10-02"]);
+  assert.equal((p.apiText.match(/---CARNET---/g) || []).length, 1);
+  // Rien de visible : message inchangé.
+  const same = jeffreyAsk("chat", { text: "x" });
+  assert.equal(withMemory(same, "2026-10-03", log["2026-10-03"]), same);
+});
 
 test("point complet et bilan : texte affiché court, consignes envoyées au modèle, carnet séparé", () => {
   const p = jeffreyAsk("point");

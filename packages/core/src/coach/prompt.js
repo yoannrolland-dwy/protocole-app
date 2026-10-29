@@ -271,8 +271,10 @@ export function buildCoachPrompt(data, note) {
     sommeil_avant_hier: sYest ? { heures: round(sYest.hours, 2), qualite: sYest.quality ?? null } : null,
     // `alcool_g` (T5, 04/10/2026) : grammes d'alcool loggés via la saisie libre — ajouté
     // seulement si > 0 (prompt identique à avant sinon). Jamais une cible.
-    macros_hier: mYest ? { proteines: mYest.protein, glucides: mYest.carbs, lipides: mYest.fat, fibres: mYest.fiber, eau_ml: mYest.water, ...(alcYest > 0 ? { alcool_g: alcYest } : {}) } : null,
-    macros_aujourdhui_en_cours: mToday ? { proteines: mToday.protein, glucides: mToday.carbs, lipides: mToday.fat, fibres: mToday.fiber, eau_ml: mToday.water, cible_eau_ml: waterTgtToday, ...(alcToday > 0 ? { alcool_g: alcToday } : {}) } : null,
+    // `kcal` (29/10/2026) : Jeffrey a remarqué qu'il n'avait pas le total du jour. Même calcul que
+    // l'onglet Nutrition (`kcalOfEntry` : vraies calories des aliments, 4/4/9 + fibres sinon).
+    macros_hier: mYest ? { kcal: Math.round(kcalOfEntry(mYest)), proteines: mYest.protein, glucides: mYest.carbs, lipides: mYest.fat, fibres: mYest.fiber, eau_ml: mYest.water, ...(alcYest > 0 ? { alcool_g: alcYest } : {}) } : null,
+    macros_aujourdhui_en_cours: mToday ? { kcal: Math.round(kcalOfEntry(mToday)), cible_kcal: Math.round(kcalFromMacros(atToday.protein, atToday.carbs, atToday.fat, atToday.fiber)), proteines: mToday.protein, glucides: mToday.carbs, lipides: mToday.fat, fibres: mToday.fiber, eau_ml: mToday.water, cible_eau_ml: waterTgtToday, ...(alcToday > 0 ? { alcool_g: alcToday } : {}) } : null,
     repas_hier: mealsFor(foodLog, y),
     repas_aujourdhui: mealsFor(foodLog, today()),
     pas_hier: sYest_steps?.count ?? null, pas_aujourdhui: sToday_steps?.count ?? null,

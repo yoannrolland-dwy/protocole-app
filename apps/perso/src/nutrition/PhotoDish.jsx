@@ -17,7 +17,7 @@ import React, { useState, useRef } from "react";
 import { ChevronLeft, Sparkles, Plus, Camera, Image, X } from "lucide-react";
 import { C, Btn, Label, Body, inputStyle } from "../design/compat.jsx";
 import { callClaude } from "../claudeApi.js";
-import { aiMissing, fmtCost } from "../lib/ai.js";
+import { aiMissing, fmtCost, recordSpend } from "../lib/ai.js";
 import { fileToImagePayload } from "@rawcare/core/nutrition/imageUtils";
 import { newQuickRef } from "./foodStore.js";
 import { say, sayError, sayStable } from "../lib/jeffrey.js";
@@ -117,6 +117,7 @@ export default function PhotoDish({ ai, onAdd, onBack }) {
         setState("error");
         return;
       }
+      recordSpend(cents);
       setMeta({ model: usedModel, fellBack: usedModel !== askedModel, usage: data.usage, cents });
       setResult(parsed);
       setState("done");

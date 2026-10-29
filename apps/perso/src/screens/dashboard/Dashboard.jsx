@@ -20,6 +20,7 @@ import { KneeQuickLog } from "./KneeQuickLog.jsx";
 import { WhyNot } from "./WhyNot.jsx";
 import { InsightsCard } from "./InsightsCard.jsx";
 import { PalierCard } from "./PalierCard.jsx";
+import { JeffreyCard } from "./JeffreyCard.jsx";
 
 const mono = { fontFamily: T.f.num, fontVariantNumeric: "tabular-nums" };
 
@@ -50,7 +51,7 @@ function Tile({ label, value, unit, note, extra, bar, barColor, onClick, big = f
   );
 }
 
-export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, setTab, lastCloudBackup, openSettings, basketSchedule, planFor, palier, onApplyPalier, saveKnee, onStart }) {
+export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, setTab, lastCloudBackup, openSettings, basketSchedule, planFor, palier, onApplyPalier, saveKnee, onStart, jeffreyEntries, onOpenJeffrey }) {
   const tgtW = phaseTarget(phase, targets);
   const wLast = lastN(weight, 1)[0];
   const wDelta = wLast && tgtW != null ? round(wLast.kg - tgtW) : null;
@@ -76,6 +77,7 @@ export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targe
     planFor,
   }), [training, knee, sleep, targets, basketSchedule, energy, clock]);
   const { suggestions, avoid } = next.today;
+  const jeffreyMorning = new Date(clock).getHours() < 12;
 
   const stepsToday = steps.find((s) => s.date === today())?.count ?? 0;
   const waterToday = mToday?.water ?? 0;
@@ -125,6 +127,9 @@ export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targe
         </button>
       )}
 
+      {/* Jeffrey (J1.3) : tout en haut jusqu'à midi (choix de Yoann), replié sous les tuiles ensuite. */}
+      {onOpenJeffrey && jeffreyMorning && <JeffreyCard entries={jeffreyEntries} morning onOpen={onOpenJeffrey} />}
+
       {/* Énergie + Poids : ce que Yoann regarde en premier le matin (moments d'usage U1). */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
         <Tile big label="Énergie" onClick={() => setTab("sleep")}
@@ -161,6 +166,8 @@ export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targe
           );
         })()}
       </div>
+
+      {onOpenJeffrey && !jeffreyMorning && <JeffreyCard entries={jeffreyEntries} morning={false} onOpen={onOpenJeffrey} />}
 
       {/* Prochaine séance */}
       <Panel tone="key" aria-label="Prochaine séance">

@@ -30,7 +30,7 @@ import React, { useState, useRef } from "react";
 import { ChevronLeft, Sparkles, Plus, Check, Camera, Image, X, Link } from "lucide-react";
 import { C, Btn, Label, Body, inputStyle } from "../design/compat.jsx";
 import { callClaude, isClaudeModel } from "../claudeApi.js";
-import { aiMissing, fmtCost } from "../lib/ai.js";
+import { aiMissing, fmtCost, recordSpend } from "../lib/ai.js";
 import { fileToImagePayload } from "@rawcare/core/nutrition/imageUtils";
 import { say, sayError, sayStable } from "../lib/jeffrey.js";
 
@@ -255,6 +255,7 @@ export default function RestaurantMenu({ ai, remaining, meal, onLogDishes, onBac
         setState("error");
         return;
       }
+      recordSpend(cents);
       setMeta({ model: usedModel, fellBack: usedModel !== askedModel, usage: data.usage, cents, fetchErr });
       setResult({ plats: parsed.plats || [], suggestions: parsed.suggestions || [] });
       setState("done");

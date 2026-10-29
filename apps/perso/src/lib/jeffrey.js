@@ -80,6 +80,8 @@ export const PHRASES = {
   chatThinking: ["Un instant, Monsieur, je réfléchis…", "Je consulte vos registres, Monsieur…"],
   chatPlaceholder: ["Écrivez à Jeffrey, Monsieur…"],
   personaReset: ["Personnalité d'origine rétablie, Monsieur."],
+  cardHello: ["Bonjour Monsieur. Je vous fais le point de la matinée ?", "Bien le bonjour, Monsieur. Un point sur la journée ?"],
+  cardTalk: ["Un mot, Monsieur ?", "Je suis là, Monsieur."],
 
   // --- Notifications
   backupReminderTitle: ["Jeffrey"],

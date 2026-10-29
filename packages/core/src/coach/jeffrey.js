@@ -93,6 +93,40 @@ export const effortFor = (mode) => (mode === "point" || mode === "bilan" ? "medi
 
 const POINT_INSTR = `(Demande de l'application : POINT COMPLET. Faites le point sur la journée et la tendance des 14 derniers jours, dans votre voix, 300 mots au plus, texte simple sans titres ni gras. Couvrez ce qui compte aujourd'hui : séance (d'après le recommandeur), nutrition et hydratation (d'après l'heure), récupération, genou ; puis la tendance de fond (poids en moyenne 7 jours, apports, dépense estimée). Terminez par une conclusion complète. Puis, APRÈS la conclusion, écrivez la ligne ${CARNET_MARK} seule, et en dessous la version mise à jour du CARNET DE BORD : un ÉTAT, pas un journal — réécrit en entier, élagué de ce qui est résolu ou périmé, ${CARNET_MAX_CHARS} caractères au plus : progression chiffrée, ce que vous avez demandé et si c'est appliqué, points de vigilance en cours. Pas de conseils dedans.)`;
 
+// --- Mémoire d'un jour sur l'autre (J1.3, 29/10/2026) ------------------------------------
+// La conversation d'un jour passé est versée dans le carnet de bord au premier message suivant,
+// dans le même appel (pas d'appel en plus) : le lendemain, Jeffrey s'en souvient sans tout relire.
+
+const MEMORY_MAX_CHARS = 6000;
+
+/** Dernier jour passé dont la conversation n'est pas encore dans le carnet, ou null.
+ *  `log` : { "AAAA-MM-JJ": [messages] } ; `doneDate` : dernier jour déjà versé au carnet. */
+export function pendingMemoryDate(log, todayKey, doneDate) {
+  const days = Object.keys(log || {})
+    .filter((d) => d < todayKey && (!doneDate || d > doneDate) && (log[d] || []).some((e) => !e.hidden && e.text))
+    .sort();
+  return days.length ? days[days.length - 1] : null;
+}
+
+/** Transcription lisible d'une journée (messages visibles seulement), tronquée par le début. */
+export function memoryTranscript(entries) {
+  const lines = (entries || []).filter((e) => !e.hidden && e.text)
+    .map((e) => `${e.at || ""} ${e.role === "user" ? "Monsieur" : "Jeffrey"} : ${e.text}`.trim());
+  let t = lines.join("\n");
+  if (t.length > MEMORY_MAX_CHARS) t = `…${t.slice(t.length - MEMORY_MAX_CHARS)}`;
+  return t;
+}
+
+/** Ajoute à un message de Monsieur la conversation d'un jour passé et la consigne de mettre le
+ *  carnet à jour. `memoryFor` marque le message : la mémoire n'est versée qu'une fois par jour. */
+export function withMemory(entry, date, entries) {
+  const transcript = memoryTranscript(entries);
+  if (!transcript) return entry;
+  const base = entry.apiText ?? entry.text;
+  const carnet = entry.mode === "point" ? "" : ` Répondez d'abord normalement à Monsieur ; puis, APRÈS votre réponse, écrivez la ligne ${CARNET_MARK} seule, et en dessous la version mise à jour du CARNET DE BORD (un état, réécrit en entier, ${CARNET_MAX_CHARS} caractères au plus : progression chiffrée, ce que vous avez demandé et si c'est appliqué, ce que Monsieur vous a confié, points de vigilance).`;
+  return { ...entry, memoryFor: date, apiText: `${base}\n\n(Demande de l'application : voici votre conversation du ${date} avec Monsieur. Retenez-en l'essentiel dans votre carnet de bord.${carnet})\n${transcript}` };
+}
+
 /** Message envoyé pour une demande. `text` est affiché dans la conversation ; `apiText` (s'il
  *  diffère) est ce que reçoit le modèle — il reste dans l'historique pour que le cache tienne. */
 export function jeffreyAsk(mode, { text, bilanUser } = {}) {

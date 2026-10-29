@@ -10,6 +10,7 @@ import { C, today, fmt, Card, Label, Body, Btn, inputStyle, TextInput, Stepper, 
 import { BasketScheduleCard } from "./BasketScheduleCard.jsx";
 import { APP_VERSION } from "../../version.js";
 import { listLiteLLMModels } from "@rawcare/core/coach/claudeApi";
+import { fmtCost, monthSpend } from "../../lib/ai.js";
 import { widgetBackgroundStatus, requestWidgetBackground } from "../../healthSync.js";
 import { say, sayStable } from "../../lib/jeffrey.js";
 import { JEFFREY_PERSONA } from "@rawcare/core/coach/jeffrey";
@@ -284,6 +285,9 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
         <Label style={{ marginBottom: 8 }}>IA · fournisseur et modèle</Label>
         <Pills options={[{ key: "anthropic", label: "Anthropic direct" }, { key: "litellm", label: "LiteLLM" }]}
           value={aiProvider} onChange={(v) => { setAiProvider(v); setMsg(""); }} small />
+        <Body style={{ fontSize: 13, color: C.text2, marginTop: 8 }}>
+          Dépensé ce mois-ci : <span style={{ fontFamily: C.mono, color: C.accent }}>{fmtCost(monthSpend())}</span> (Jeffrey, Carte resto, Photo d'un plat, depuis le 29/10/2026).
+        </Body>
         <div style={{ height: 12 }} />
         {aiProvider === "litellm" ? (
           <>

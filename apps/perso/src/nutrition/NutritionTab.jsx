@@ -204,6 +204,12 @@ function DuplicatePanel({ entries, date, onConfirm, onClose }) {
 // habituel ne doit pas obliger à rouvrir la ligne pour la supprimer. Fixé juste au-dessus
 // de la barre d'onglets (62 px + zone système).
 function UndoBar({ undo, onUndo }) {
+  // La bulle Jeffrey (J1.3) remonte de cette hauteur pour ne jamais cacher « Annuler ».
+  useEffect(() => {
+    const root = document.documentElement.style;
+    if (undo) root.setProperty("--undo-bar-h", "68px"); else root.removeProperty("--undo-bar-h");
+    return () => root.removeProperty("--undo-bar-h");
+  }, [!!undo]);
   if (!undo) return null;
   return (
     <div role="status" style={{

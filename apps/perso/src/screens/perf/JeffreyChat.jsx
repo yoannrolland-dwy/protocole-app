@@ -7,12 +7,12 @@ import { Send, ChevronRight, ChevronDown } from "lucide-react";
 import { TEMPLATES } from "@rawcare/core/session/templates";
 import { streamClaude } from "@rawcare/core/coach/claudeApi";
 import {
-  jeffreyAsk, readReply, effortFor, validateSessionChoice, continuationIfSilent,
+  jeffreyAsk, readReply, effortFor, validateSessionChoice, continuationIfSilent, withMemory,
 } from "@rawcare/core/coach/jeffrey";
 import { T } from "../../design/tokens.js";
 import { Panel, Eyebrow, Button, IconButton, Chip } from "../../design/primitives.jsx";
 import { today } from "../../ui.jsx";
-import { aiMissing, fmtCost } from "../../lib/ai.js";
+import { aiMissing, fmtCost, recordSpend } from "../../lib/ai.js";
 import { sayStable, sayError } from "../../lib/jeffrey.js";
 import { streamTransportFor } from "../../lib/jeffreyHttp.js";
 
@@ -60,7 +60,10 @@ function Message({ entry, onStart }) {
   );
 }
 
-export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, saveJournal, onStart }) {
+// `memory` (J1.3) : { date, entries } d'un jour passé pas encore versé au carnet, ou null ;
+// `onMemoryDone(date)` quand Jeffrey a réécrit son carnet avec. `initialAsk` : demande lancée à
+// l'ouverture (« point » depuis la carte du tableau de bord), une seule fois.
+export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, saveJournal, onStart, memory, onMemoryDone, initialAsk }) {
   const [draft, setDraft] = useState("");
   const [live, setLive] = useState(null); // { text, progress } pendant une réponse
   const [err, setErr] = useState("");
@@ -70,6 +73,15 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
   const busy = live != null;
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: "nearest" }); }, [entries.length, busy]);
+
+  // Demande lancée à l'ouverture (carte du tableau de bord), une seule fois.
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!initialAsk || asked.current) return;
+    asked.current = true;
+    ask(jeffreyAsk(initialAsk));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAsk]);
 
   // Une réponse de Jeffrey pour l'historique donné (dernier message : celui de Monsieur).
   // Relance automatique une fois si la réponse n'a aucun texte (continuationIfSilent).
@@ -89,8 +101,13 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
           onText: (_, all) => setLive((l) => ({ ...(l || {}), text: readReply([{ type: "text", text: all }]).text })),
           onRetry: (p) => setLive((l) => ({ ...(l || {}), progress: p })),
         });
+        recordSpend(cents);
         const { text, journal } = readReply(message.content);
-        if (journal) saveJournal(journal);
+        if (journal) {
+          saveJournal(journal);
+          const memDate = [...history].reverse().find((e) => e.role === "user" && e.memoryFor)?.memoryFor;
+          if (memDate) onMemoryDone?.(memDate);
+        }
         const tools = message.content.filter((b) => b.type === "tool_use");
         const toolResults = {};
         const choices = [];
@@ -130,7 +147,9 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
     if (userEntry.quickFor && lastA?.quick?.id === userEntry.quickFor) {
       history = history.map((e) => (e === lastA ? { ...e, toolResults: { ...e.toolResults, [lastA.quick.id]: `Monsieur a touché « ${userEntry.text} ».` } } : e));
     }
-    const { quickFor: _q, ...entry } = userEntry;
+    let { quickFor: _q, ...entry } = userEntry;
+    // Mémoire (J1.3) : la conversation d'un jour passé part avec le premier message, une fois.
+    if (memory && !history.some((e) => e.memoryFor === memory.date)) entry = withMemory(entry, memory.date, memory.entries);
     const next = [...history, { ...entry, id: newId(), at: hhmm() }];
     setDay(today(), next);
     run(next, entry.mode || "chat");

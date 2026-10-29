@@ -21,7 +21,7 @@ import { sayStable } from "../../lib/jeffrey.js";
 /* ============================================================
    TAB — PERFORMANCE
    ============================================================ */
-export function PerformanceTab({ macros, targets, training, weight, phase, coach, todayNote, saveNote, saveJournal, jeffreyEntries, setJeffreyDay, onStart }) {
+export function PerformanceTab({ macros, targets, training, weight, phase, coach, jeffrey }) {
 
   // Dépense énergétique adaptative (V7). Calculée à chaque montage de l'onglet — le journal
   // Repas et ses corrections vivent dans un autre onglet (un seul monté à la fois), donc un
@@ -56,7 +56,7 @@ export function PerformanceTab({ macros, targets, training, weight, phase, coach
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {coach && <JeffreyChat coach={coach} ai={coach.ai} entries={jeffreyEntries || []} setDay={setJeffreyDay} todayNote={todayNote} saveNote={saveNote} saveJournal={saveJournal} onStart={onStart} />}
+      {jeffrey && <JeffreyChat {...jeffrey} />}
 
       {/* Moyenne hebdo kcal, 7 jours glissants */}
       <Card>

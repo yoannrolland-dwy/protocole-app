@@ -4036,6 +4036,38 @@ Décisions et vérifications détaillées dans `ROADMAP.md` (J1.2 livré).
 - Vérifié dans l'aperçu avec des réponses simulées (aucun réseau) ; 138 tests ; **essayé en vrai
   par Yoann sur le téléphone le jour même : « ça fonctionne »**.
 
+## Chantier J — Jeffrey : J1.3, bulle, carte du Bord, mémoire, coût du mois (29/10/2026, apps/perso v3.129.0)
+
+Détail et vérifications dans `ROADMAP.md` (J1.3 livré).
+- **Bulle** `components/JeffreyBubble.jsx` : posée dans un conteneur `position: relative` autour de
+  `<main>` (donc au-dessus de la barre « Séance en cours » et des onglets), remonte de
+  `--undo-bar-h` (posé par l'`UndoBar` de Nutrition). `bubbleOn` (App.jsx) : pas dans Analyse, pas
+  dans les Réglages, pas avec un carnet ouvert (`trainingDraft`) ; `<main>` réserve 88 px en bas
+  quand elle est là.
+- **Surimpression** `components/JeffreyOverlay.jsx` (`role="dialog"`, croix « Fermer la
+  conversation »), même `JeffreyChat` que l'onglet Analyse : App construit un seul objet
+  `jeffreyChat` (coach, ai, entrées du jour, setDay, note, carnet, `onStart` qui ferme la
+  surimpression, `memory`, `onMemoryDone`) passé aux deux. `JeffreyChat` gagne `initialAsk`
+  (demande lancée une fois à l'ouverture).
+- **Carte du Bord** `screens/dashboard/JeffreyCard.jsx` : `morning` = heure < 12 (horloge du
+  Dashboard, rafraîchie toutes les 5 min) → en haut, dernier message ou « Faites-moi le point » ;
+  sinon une ligne sous les tuiles. Dashboard reçoit `jeffreyEntries` et `onOpenJeffrey`.
+- **Mémoire** : `pendingMemoryDate(log, today, doneDate)` (dernier jour passé avec des messages
+  visibles, après le marqueur), `withMemory(entry, date, entries)` (transcription ≤ 6 000
+  caractères + consigne carnet, rien de plus pour un « point » qui l'a déjà), ajoutée au premier
+  message du jour s'il n'en porte pas déjà (`memoryFor`). Carnet revenu → `onMemoryDone(date)` →
+  marqueur **`jeffreyMemoryDate` hors `DATA_KEYS`**.
+- **Coût du mois** : `recordSpend(cents)` / `monthSpend()` dans `lib/ai.js`, clé **`aiSpend`**
+  (`{ month: "AAAA-MM", cents }`, dans `DATA_KEYS`), alimentée par Jeffrey, Carte resto et Photo
+  d'un plat ; ligne « Dépensé ce mois-ci » dans Réglages › IA.
+- Phrases ajoutées au recueil : `cardHello`, `cardTalk`. Tests : `jeffrey.test.mjs` (mémoire) —
+  139 au total. Vérifié dans l'aperçu ; installation sur le téléphone à faire (débranché).
+- **Calories du jour ajoutées aux données** (même jour, demandé après que Jeffrey a écrit « Je n'ai
+  pas le total des calories du jour ») : `macros_hier.kcal`, `macros_aujourdhui_en_cours.kcal` et
+  `.cible_kcal` dans `buildCoachPrompt` (`kcalOfEntry`, même calcul que l'onglet Nutrition). Le
+  texte du Coach change donc : captures datées mises à jour (seul ajout : ces champs). Installé
+  et vérifié sur le téléphone (bulle et carte du Bord présentes).
+
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 
 Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la

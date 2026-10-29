@@ -33,7 +33,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | U4 | Refonte IHM — audit final avant/après + mise à jour CLAUDE.md | petit | ✅ 25/10/2026 (v3.118.1) |
 | J0 | Jeffrey — test jetable : l'app peut-elle préparer le brief seule, écran éteint et app fermée ? | petit | ✅ 29/10/2026 (piste A validée avec un réveil système) |
 | JT | Jeffrey — textes de l'app et notifications dans sa voix (textes fixes, sans IA) | petit | ✅ 29/10/2026 (v3.126.0) |
-| J1 | Jeffrey — la conversation, en 3 lots installés : J1.1 relais Android + cœur testé ; J1.2 conversation dans Analyse ; J1.3 bulle partout + carte Bord + mémoire | gros | J1.1 ✅ 29/10/2026 (v3.127.0) ; J1.2 ✅ 29/10/2026 (v3.128.0) ; J1.3 à faire |
+| J1 | Jeffrey — la conversation, en 3 lots installés : J1.1 relais Android + cœur testé ; J1.2 conversation dans Analyse ; J1.3 bulle partout + carte Bord + mémoire | gros | J1.1 ✅ 29/10/2026 (v3.127.0) ; J1.2 ✅ 29/10/2026 (v3.128.0) ; J1.3 ✅ 29/10/2026 (v3.129.0) |
 | J2 | Jeffrey — actions proposées, confirmées d'un tap (eau, genou, note, séance, repas, habituel) | moyen | à faire |
 | J4 | Jeffrey — brief du matin en notification : attend la nuit, météo, réponse dans la notification | gros | à faire |
 | J3 | Jeffrey — la voix : micro (dictée) + réponse lue à voix haute, voix réglable | moyen | à faire |
@@ -1301,6 +1301,35 @@ question avant de coder : « Faites-moi le point » remplace « Analyser » (poi
 - **Non fait, prévu en J1.3** : bulle sur tous les onglets, carte sur Bord, mémoire de la
   conversation de la veille dans le carnet, compteur de coût du mois. Conversations des jours
   précédents : enregistrées mais pas encore consultables à l'écran.
+
+**J1.3 livré (29/10/2026, v3.129.0).**
+- **Bulle « Parler à Jeffrey »** (`components/JeffreyBubble.jsx`, icône de sonnette de majordome) en
+  bas à droite de la zone de contenu, donc toujours au-dessus de la barre « Séance en cours » et
+  des onglets ; elle remonte de la hauteur du bandeau « Annuler » de Nutrition (`--undo-bar-h`).
+  Masquée dans Analyse (la conversation y est), dans les Réglages et pendant un carnet ouvert.
+  Ouvre **`components/JeffreyOverlay.jsx`** : la même conversation par-dessus l'écran, fermée
+  par la croix (pas de gestion du bouton retour d'Android : en ajouter une changerait son
+  comportement partout). « Démarrer » depuis la conversation ferme la surimpression.
+- **Carte du Bord** (`screens/dashboard/JeffreyCard.jsx`) : avant midi, tout en haut (dernier
+  message du jour + « Continuer la conversation », ou « Faites-moi le point » s'il n'a encore
+  rien dit, qui ouvre la conversation et lance le point) ; l'après-midi, une ligne sous les tuiles.
+  En attendant le brief du matin (J4).
+- **Mémoire** (`pendingMemoryDate`, `memoryTranscript`, `withMemory` dans `coach/jeffrey.js`) : la
+  conversation du dernier jour passé non encore versée part avec le premier message suivant
+  (6 000 caractères au plus, messages cachés exclus), et Jeffrey réécrit son carnet dans la même
+  réponse — pas d'appel en plus. Marqueur **`jeffreyMemoryDate`, hors `DATA_KEYS`** (comme
+  `lastCloudBackup`). Si le carnet ne revient pas, la mémoire repart au jour suivant.
+- **Coût du mois** : clé **`aiSpend`** (`{ month, cents }`, dans `DATA_KEYS`), alimentée par
+  `recordSpend` (Jeffrey, Carte resto, Photo d'un plat), affichée dans Réglages › IA. Compte à
+  partir du 29/10/2026.
+- **Vérifié dans l'aperçu** (360 px, réponses simulées) : bulle présente sur Bord et Nutrition,
+  absente dans Analyse ; surimpression ouverte et fermée ; mémoire envoyée au 1er message puis plus
+  jamais, carnet mis à jour et retiré du texte affiché, marqueur posé ; coût du mois additionné ;
+  carte en haut à 9 h simulées, repliée l'après-midi. **Pas vérifié** : la variante matin « Faites-
+  moi le point » d'une journée sans message (la simulation d'heure ne survit pas au rechargement).
+- **Calories du jour** ajoutées aux données de Jeffrey (et du bilan/briefing qui partagent
+  `buildCoachPrompt`) : `kcal` et `cible_kcal`. Jeffrey l'avait signalé lui-même dans une vraie
+  conversation de Yoann.
 
 ### J2 — Actions confirmées
 

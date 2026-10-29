@@ -9,7 +9,9 @@ import { PHASES, DEFAULT_TARGETS, targetsForDate, kcalFromMacros, kcalOfEntry, t
 import { recommendTargets, palierWeekOf, loggedRateLastDays } from "@rawcare/core/palier";
 import { nextSessions } from "@rawcare/core/nextSession";
 import { buildCoachPrompt, buildCoachBriefing, buildBilanPrompt, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
-import { buildJeffreyRequest, JEFFREY_PERSONA } from "@rawcare/core/coach/jeffrey";
+import { buildJeffreyRequest, JEFFREY_PERSONA, pendingMemoryDate } from "@rawcare/core/coach/jeffrey";
+import { JeffreyBubble } from "./components/JeffreyBubble.jsx";
+import { JeffreyOverlay } from "./components/JeffreyOverlay.jsx";
 import { syncHealthConnect } from "./healthSync.js";
 import { updateDashboardWidget, consumeWidgetTab } from "./widgetSync.js";
 import { runAutoBackup } from "./autoBackup.js";
@@ -109,6 +111,11 @@ export default function App({ silent = false } = {}) {
   // Jeffrey (J1.2) : conversations par jour { "AAAA-MM-JJ": [messages] } et personnalité.
   const [jeffreyLog, setJeffreyLog] = useState({});
   const [jeffreyPersona, setJeffreyPersonaState] = useState("");
+  // J1.3 : dernier jour de conversation déjà versé au carnet (marqueur hors sauvegarde, comme
+  // lastCloudBackup : restaurer un vieux fichier ne doit pas faire croire qu'il est fait) et
+  // conversation ouverte par-dessus l'écran ({ initialAsk } ou null).
+  const [jeffreyMemoryDate, setJeffreyMemoryDateState] = useState(null);
+  const [chatOpen, setChatOpen] = useState(null);
   const [lastAutoBackup, setLastAutoBackup] = useState(null);
   const [lastCloudBackup, setLastCloudBackup] = useState(null);
 
@@ -185,6 +192,7 @@ export default function App({ silent = false } = {}) {
         setJeffreyPersonaState(storedPersona);
       }
       setJeffreyLog(await store.get("jeffreyLog", {}));
+      setJeffreyMemoryDateState(await store.get("jeffreyMemoryDate", null));
       setLastAutoBackup(await store.get("lastAutoBackupDate", null));
       // Hors de DATA_KEYS volontairement (voir cloudBackup.js) : restaurer une vieille
       // sauvegarde ne doit pas faire croire à l'app qu'elle vient d'être sauvegardée.
@@ -465,6 +473,7 @@ export default function App({ silent = false } = {}) {
   const setCoachProfile = (v) => { setCoachProfileState(v); store.set("coachProfile", v); };
   const setCoachJournal = (v) => { setCoachJournalState(v); store.set("coachJournal", v); };
   const setJeffreyPersona = (v) => { setJeffreyPersonaState(v); store.set("jeffreyPersona", v); };
+  const setJeffreyMemoryDate = (v) => { setJeffreyMemoryDateState(v); store.set("jeffreyMemoryDate", v); };
   // Écriture fonctionnelle : une réponse qui arrive après un changement d'onglet s'enregistre
   // quand même. On ne garde que 30 jours de conversations (décision du chantier J).
   const setJeffreyDay = (date, entries) => setJeffreyLog((prev) => {
@@ -527,6 +536,17 @@ export default function App({ silent = false } = {}) {
     ai,
   };
 
+  // Conversation avec Jeffrey (J1.2/J1.3) : mêmes réglages dans Analyse et par-dessus l'écran.
+  const memDate = pendingMemoryDate(jeffreyLog, today(), jeffreyMemoryDate);
+  const jeffreyChat = {
+    coach, ai, entries: jeffreyLog[today()] || [], setDay: setJeffreyDay, todayNote, saveNote, saveJournal,
+    onStart: (t) => { setChatOpen(null); startSession(t); },
+    memory: memDate ? { date: memDate, entries: jeffreyLog[memDate] } : null,
+    onMemoryDone: setJeffreyMemoryDate,
+  };
+  // Bulle : partout sauf dans Analyse (la conversation y est), les Réglages et un carnet ouvert.
+  const bubbleOn = !loading && !showSettings && !chatOpen && tab !== "perf" && !(tab === "train" && getSync("trainingDraft", null)?.type);
+
   // Retour en haut au changement d'onglet (07/08/2026, retour de Yoann) : `<main>` est un
   // conteneur scrollable UNIQUE dont le contenu change avec `tab` — React ne le démonte pas
   // entre deux onglets, donc le navigateur conservait le scroll de l'onglet précédent au
@@ -552,12 +572,13 @@ export default function App({ silent = false } = {}) {
         onToggleSettings={() => setShowSettings((v) => !v)} />
 
       {/* Contenu */}
-      <main ref={mainRef} style={{ flex: 1, overflowY: "auto", padding: "14px 16px 24px" }}>
+      <div style={{ flex: 1, minHeight: 0, position: "relative", display: "flex", flexDirection: "column" }}>
+      <main ref={mainRef} style={{ flex: 1, overflowY: "auto", padding: bubbleOn ? "14px 16px 88px" : "14px 16px 24px" }}>
         {loading ? <Empty>Chargement…</Empty> : showSettings ? (
           <SettingsPanel {...{ apiKey, setApiKey, model, setModel, aiProvider, setAiProvider, litellmUrl, setLitellmUrl, litellmKey, setLitellmKey, litellmModel, setLitellmModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, jeffreyPersona, setJeffreyPersona, targets, lastAutoBackup, lastCloudBackup, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, lastCloudBackup, basketSchedule, planFor: planForDate(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier, saveKnee: save.knee, onStart: startSession }} setTab={goTo} openSettings={() => setShowSettings(true)} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, lastCloudBackup, basketSchedule, planFor: planForDate(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier, saveKnee: save.knee, onStart: startSession, jeffreyEntries: jeffreyLog[today()] || [], onOpenJeffrey: (initialAsk) => setChatOpen({ initialAsk }) }} setTab={goTo} openSettings={() => setShowSettings(true)} />}
             {tab === "corps" && (
               <CorpsTab sub={corpsSub} onSub={setCorpsSub}>
                 {corpsSub === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}
@@ -567,17 +588,22 @@ export default function App({ silent = false } = {}) {
               </CorpsTab>
             )}
             {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, startType }} onStartConsumed={() => setStartType(null)} />}
-            {tab === "perf" && <PerformanceTab {...{ macros, targets, training, weight, phase, coach, todayNote, saveNote, saveJournal }} jeffreyEntries={jeffreyLog[today()] || []} setJeffreyDay={setJeffreyDay} onStart={startSession} />}
+            {tab === "perf" && <PerformanceTab {...{ macros, targets, training, weight, phase, coach }} jeffrey={jeffreyChat} />}
             {tab === "macro" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} ai={ai} />}
           </>
         )}
       </main>
+      {bubbleOn && <JeffreyBubble onOpen={() => setChatOpen({})} />}
+      </div>
 
       {/* Séance en cours (U3 étape 3) : rappel + minuteur partagé hors de l'onglet Séance. */}
       {!loading && tab !== "train" && !showSettings && <SessionBar onOpen={() => goTo("train")} />}
 
       {/* Navigation */}
       <TabBar tab={tab} dimmed={showSettings} onSelect={goTo} />
+
+      {/* Jeffrey par-dessus l'écran (J1.3), ouvert par la bulle ou la carte du Bord. */}
+      {chatOpen && <JeffreyOverlay chat={jeffreyChat} initialAsk={chatOpen.initialAsk} onClose={() => setChatOpen(null)} />}
     </div>
   );
 }
