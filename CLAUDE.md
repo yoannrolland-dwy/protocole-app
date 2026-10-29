@@ -4199,6 +4199,30 @@ dans l'app et aucune notification ne part ce jour-là.
   un vrai brief commence une journée vide, environ 7 ¢ attendus (mesure J1 du premier message).
   Test `apps/perso/test/jeffreyTurn.test.mjs` — 151 au total.
 
+## Chantier J — Jeffrey : J4.2, la météo du brief (29/10/2026, apps/perso v3.133.0)
+
+Décision 7 de ROADMAP.md appliquée telle quelle.
+- **Position** (`lib/weather.js`, `notePosition`) : notée à l'ouverture de l'app et au retour au
+  premier plan, **jamais en arrière-plan** ; permission **`ACCESS_COARSE_LOCATION` seule**
+  (approximative, ~2 km ; Capacitor gère la demande de la WebView, aucun plugin ajouté) ; arrondie
+  à 0,01° (~1 km) dans la clé **`lastPosition` = { lat, lon, at }, hors `DATA_KEYS`** (propre au
+  téléphone, jamais exportée). Refus ou échec : brief sans météo.
+- **Météo** (`packages/core/src/weather.js`, pur et testé) : `openMeteoUrl` (Open-Meteo, gratuit,
+  sans clé, position arrondie seulement), `summarizeWeather` → 4 créneaux `matin` 6-10 h, `midi`
+  11-14 h, `apres_midi` 14-18 h, `soir` 18-22 h : temp min/max, risque de pluie max, cumul en mm,
+  vent max, ciel (le code WMO le plus marquant, `skyLabel`). `fetchWeather` (6 s au plus) est
+  appelé par `runBrief` : dans la page sans écran, après le démarrage du service au premier plan,
+  donc avec réseau même en économie d'énergie.
+- **Prompt** : `jeffreyAsk("brief", { weather })` ajoute le résumé à la demande du brief seulement
+  (jamais dans le bloc de données de la conversation : le cache n'est pas touché), avec la
+  consigne « une phrase, seulement si ça change quelque chose ; sans météo, n'en dites rien ».
+  **Les coordonnées ne partent jamais vers l'IA** (vérifié dans la requête).
+- Tests `weather.test.mjs` (arrondi, URL, résumé par créneau, météo absente) — 154 au total.
+  Aperçu : vraie météo de Paris résumée et envoyée. **Téléphone, app tuée, économie d'énergie
+  activée** : position approximative accordée par Yoann, brief en 4,5 s, météo reçue et utilisée
+  en une phrase (« ciel dégagé cet après-midi, 16 degrés sans pluie : une belle occasion de
+  marcher »).
+
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 
 Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la

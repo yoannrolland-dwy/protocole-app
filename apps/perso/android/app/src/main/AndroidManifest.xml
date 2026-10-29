@@ -101,6 +101,9 @@
     <!-- Brief du matin (J4.1) : remettre le réveil après un redémarrage du téléphone. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Météo du brief (J4.2) : position APPROXIMATIVE seulement, lue app ouverte (jamais en
+         arrière-plan) ; arrondie à ~1 km, elle ne part qu'à Open-Meteo. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!-- Widget (28/10/2026) : relit les pas toutes les 30 min sans ouvrir l'app
          (WidgetStepsRefresher.kt). Android 14+ exige cette permission pour lire Health Connect

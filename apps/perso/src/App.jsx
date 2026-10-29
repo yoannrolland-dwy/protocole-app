@@ -31,6 +31,7 @@ import { scheduleBrief, cancelBriefNotification } from "./lib/briefNative.js";
 import { streamTransportFor } from "./lib/jeffreyHttp.js";
 import { aiMissing } from "./lib/ai.js";
 import { say } from "./lib/jeffrey.js";
+import { notePosition } from "./lib/weather.js";
 import { SettingsPanel } from "./screens/settings/SettingsPanel.jsx";
 import { Dashboard } from "./screens/dashboard/Dashboard.jsx";
 import { WeightTab } from "./screens/WeightTab.jsx";
@@ -287,7 +288,7 @@ export default function App({ silent = false } = {}) {
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     // La page du brief (J4.1) a pu écrire dans la conversation pendant que l'app dormait : relue.
-    const handle = CapacitorApp.addListener("resume", () => { runHealthSync(); doAutoBackup(); setPalierTick((t) => t + 1); openWidgetTab(); setJeffreyLog(getSync("jeffreyLog", {})); setBriefTick((t) => t + 1); });
+    const handle = CapacitorApp.addListener("resume", () => { runHealthSync(); doAutoBackup(); setPalierTick((t) => t + 1); openWidgetTab(); setJeffreyLog(getSync("jeffreyLog", {})); setBriefTick((t) => t + 1); notePosition(); });
     return () => { handle.then((h) => h.remove()); };
   }, []);
 
@@ -536,6 +537,8 @@ export default function App({ silent = false } = {}) {
     const id = setInterval(() => setBriefTick((t) => t + 1), 5 * 60000);
     return () => clearInterval(id);
   }, []);
+  // Météo du brief (J4.2) : position approximative notée à l'ouverture (et au retour au premier plan).
+  useEffect(() => { if (!silent) notePosition(); }, []);
   useEffect(() => {
     if (loading || silent || healthSync.status === "running" || healthSync.at == null) return;
     const now = new Date();

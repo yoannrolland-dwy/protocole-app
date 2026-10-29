@@ -35,7 +35,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | JT | Jeffrey — textes de l'app et notifications dans sa voix (textes fixes, sans IA) | petit | ✅ 29/10/2026 (v3.126.0) |
 | J1 | Jeffrey — la conversation, en 3 lots installés : J1.1 relais Android + cœur testé ; J1.2 conversation dans Analyse ; J1.3 bulle partout + carte Bord + mémoire | gros | J1.1 ✅ 29/10/2026 (v3.127.0) ; J1.2 ✅ 29/10/2026 (v3.128.0) ; J1.3 ✅ 29/10/2026 (v3.129.0) |
 | J2 | Jeffrey — actions proposées, confirmées d'un tap (eau, genou, note, séance, repas, habituel) | moyen | ✅ 29/10/2026 (J2a + J2b) |
-| J4 | Jeffrey — brief du matin en notification : attend la nuit, météo, réponse dans la notification | gros | en cours (J4.1 ✅ 29/10/2026) |
+| J4 | Jeffrey — brief du matin en notification : attend la nuit, météo, réponse dans la notification | gros | en cours (J4.1 et J4.2 ✅ 29/10/2026) |
 | J3 | Jeffrey — la voix : micro (dictée) + réponse lue à voix haute, voix réglable | moyen | à faire |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il
@@ -1387,8 +1387,12 @@ décide (`core/coach/brief.js`) et écrit le brief avec le même tour que la con
 (`lib/jeffreyTurn.js`). Essai réel : l'économie d'énergie coupe le réseau des apps en
 arrière-plan, d'où un service au premier plan court (`BriefService.kt`, `shortService`) le temps
 de l'appel. Le brief s'écrit sans outils (`tool_choice: none`) : un seul appel, 8 s au réel ;
-la carte de séance et les réponses rapides reviendront dans la notification avec J4.3. **Reste J4.2 (météo) et J4.3 (répondre
-dans la notification).**
+la carte de séance et les réponses rapides reviendront dans la notification avec J4.3.
+
+**J4.2 livré le 29/10/2026 (v3.133.0)** : météo Open-Meteo par créneau (matin, midi, après-midi,
+soir) dans le brief ; position approximative notée à l'ouverture seulement (`ACCESS_COARSE_LOCATION`,
+arrondie à ~1 km, clé `lastPosition` hors sauvegarde), jamais transmise à l'IA. **Reste J4.3
+(répondre dans la notification).**
 
 ### J3 — La voix
 

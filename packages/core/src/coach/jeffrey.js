@@ -267,7 +267,7 @@ export function withMemory(entry, date, entries) {
 
 /** Message envoyé pour une demande. `text` est affiché dans la conversation ; `apiText` (s'il
  *  diffère) est ce que reçoit le modèle — il reste dans l'historique pour que le cache tienne. */
-export function jeffreyAsk(mode, { text, bilanUser, missing, reminders, dateLabel } = {}) {
+export function jeffreyAsk(mode, { text, bilanUser, missing, reminders, dateLabel, weather } = {}) {
   if (mode === "point") {
     const t = text || "Faites-moi le point, Jeffrey.";
     return { role: "user", text: t, apiText: `${t}\n\n${POINT_INSTR}`, mode };
@@ -286,7 +286,9 @@ export function jeffreyAsk(mode, { text, bilanUser, missing, reminders, dateLabe
       ? `Il manque encore : ${missing.join(", ")}. Dites-le en une phrase et n'inventez jamais la valeur absente.`
       : "La nuit, la pesée et le genou du jour sont là.";
     const rappels = reminders?.length ? ` Rappels possibles : ${reminders.join(" ; ")}.` : "";
-    return { role: "user", text: t, mode, apiText: `${t}\n\n(Demande de l'application : BRIEF DU MATIN du ${dateLabel || "jour"}. ${manque}${rappels} Dans cet ordre, 150 mots au plus, texte simple : une salutation datée ; la nuit (score de qualité, jamais la durée seule) ; l'énergie ; la pesée et la tendance 7 j ; le planning du jour et la séance que vous proposez, prise dans SEANCES_AUTORISEES ; une ou deux questions (le genou s'il n'est pas noté, le ressenti) ; un rappel seulement s'il est utile (palier de la semaine, sauvegarde). La première phrase est courte : c'est elle qu'on lit sur l'écran verrouillé. Texte seul, sans outil : le brief est lu dans une notification.)` };
+    // J4.2 : météo du jour par créneau (Open-Meteo, position approximative jamais transmise).
+    const meteo = weather ? ` Météo du jour par créneau : ${JSON.stringify(weather)}. Une phrase, seulement ce qui change quelque chose (pluie pour la marche ou le trajet, froid ou chaleur) ; sans météo, n'en dites rien.` : "";
+    return { role: "user", text: t, mode, apiText: `${t}\n\n(Demande de l'application : BRIEF DU MATIN du ${dateLabel || "jour"}. ${manque}${rappels}${meteo} Dans cet ordre, 150 mots au plus, texte simple : une salutation datée ; la météo si elle compte ; la nuit (score de qualité, jamais la durée seule) ; l'énergie ; la pesée et la tendance 7 j ; le planning du jour et la séance que vous proposez, prise dans SEANCES_AUTORISEES ; une ou deux questions (le genou s'il n'est pas noté, le ressenti) ; un rappel seulement s'il est utile (palier de la semaine, sauvegarde). La première phrase est courte : c'est elle qu'on lit sur l'écran verrouillé. Texte seul, sans outil : le brief est lu dans une notification.)` };
   }
   return { role: "user", text, mode: "chat" };
 }

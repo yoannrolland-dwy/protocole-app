@@ -9,6 +9,7 @@ import { today, shiftDateKey, daysBetween } from "@rawcare/core/dateUtils";
 import { makeCoach } from "./coachInputs.js";
 import { jeffreyTurn, newId, hhmm } from "./jeffreyTurn.js";
 import { say } from "./jeffrey.js";
+import { fetchWeather } from "./weather.js";
 
 // Marqueurs du jour { doneDate, appDate, remindedDate, tries: { date, n } }. Hors DATA_KEYS, comme
 // jeffreyMemoryDate : restaurer une vieille sauvegarde ne doit pas faire croire qu'un brief est fait.
@@ -96,7 +97,9 @@ export async function runBrief({ data, ai, transport, missing, onText }) {
   const date = today();
   const log = getSync("jeffreyLog", {});
   const entries = log[date] || [];
-  let ask = jeffreyAsk("brief", { dateLabel: dateLabel(), missing, reminders: briefReminders() });
+  // Météo (J4.2) : dernière position connue, résumé par créneau ; absente = brief sans météo.
+  const weather = await fetchWeather();
+  let ask = jeffreyAsk("brief", { dateLabel: dateLabel(), missing, reminders: briefReminders(), weather });
   // Mémoire de la veille (J1.3) : versée au premier message du jour, comme dans la conversation.
   const memDate = pendingMemoryDate(log, date, getSync("jeffreyMemoryDate", null));
   if (memDate && !entries.some((e) => e.memoryFor === memDate)) ask = withMemory(ask, memDate, log[memDate]);
