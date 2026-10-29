@@ -75,6 +75,9 @@ export const DATA_KEYS = [
   // result, appliedAt } — recalculée seulement quand la semaine change.
   "palierWeekly",
   "coachProfile", "coachJournal",
+  // Jeffrey (chantier J, J1.2, 29/10/2026) : conversations par jour (30 j glissants) et sa
+  // personnalité, éditable dans les Réglages.
+  "jeffreyLog", "jeffreyPersona",
   "foodLog", "foodPins", "foodMuted", "foodPortions", "foodRecipes", "foodOverrides",
 ];
 

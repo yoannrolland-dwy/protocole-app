@@ -9,8 +9,29 @@ import { nextSessions } from "../src/nextSession.js";
 import { DEFAULT_TARGETS } from "../src/targets.js";
 import {
   allowedSessions, validateSessionChoice, toApiMessages, buildJeffreyRequest, JEFFREY_TOOLS,
-  continuationIfSilent, replyText,
+  continuationIfSilent, replyText, readReply, effortFor, jeffreyAsk,
 } from "../src/coach/jeffrey.js";
+
+test("point complet et bilan : texte affiché court, consignes envoyées au modèle, carnet séparé", () => {
+  const p = jeffreyAsk("point");
+  assert.equal(p.text, "Faites-moi le point, Jeffrey.");
+  assert.match(p.apiText, /POINT COMPLET/);
+  assert.match(p.apiText, /---CARNET---/);
+  const b = jeffreyAsk("bilan", { bilanUser: "BILAN LONG TERME — 90 derniers jours" });
+  assert.match(b.apiText, /BILAN 3 MOIS[\s\S]*BILAN LONG TERME/);
+  assert.equal(jeffreyAsk("chat", { text: "Bonjour" }).apiText, undefined);
+  // Le modèle reçoit apiText, la conversation garde text.
+  const m = toApiMessages([p]);
+  assert.match(m[0].content[0].text, /POINT COMPLET/);
+  // Carnet retiré du texte affiché, gardé à part.
+  const r = readReply([{ type: "text", text: "Voici le point, Monsieur.\n---CARNET---\nÉtat : genou 2/10." }]);
+  assert.equal(r.text, "Voici le point, Monsieur.");
+  assert.equal(r.journal, "État : genou 2/10.");
+  assert.deepEqual(readReply([{ type: "text", text: "Bonjour Monsieur." }]), { text: "Bonjour Monsieur.", journal: null });
+  assert.equal(effortFor("chat"), "low");
+  assert.equal(effortFor("point"), "medium");
+  assert.equal(effortFor("bilan"), "medium");
+});
 
 test("réponse sans texte (seulement des boutons) : relance écrite ; avec texte : rien", () => {
   const tool = { type: "tool_use", id: "t", name: "proposer_reponses", input: { options: ["A", "B"] } };

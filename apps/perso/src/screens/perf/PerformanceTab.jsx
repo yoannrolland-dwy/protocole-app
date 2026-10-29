@@ -13,15 +13,15 @@ import { PROT_LINE } from "../../lib/helpers.js";
 import { progressColor } from "../../lib/progress.js";
 import { TdeeCard } from "./TdeeCard.jsx";
 import { WEEKLY_PLAN } from "../../lib/plan.js";
-// Coach IA (U3 étape 4, 25/10/2026) : quitte le tableau de bord pour l'onglet Analyse
-// (décision 4 du chantier U). Style v1 jusqu'à l'étape 7 (Analyse).
-import { CoachIA } from "../dashboard/CoachIA.jsx";
+// Jeffrey (chantier J, J1.2, 29/10/2026) : la conversation remplace la carte Coach IA, à la même
+// place (« Faites-moi le point » remplace « Analyser », le bilan 3 mois passe dans sa voix).
+import { JeffreyChat } from "./JeffreyChat.jsx";
 import { sayStable } from "../../lib/jeffrey.js";
 
 /* ============================================================
    TAB — PERFORMANCE
    ============================================================ */
-export function PerformanceTab({ macros, targets, training, weight, phase, coach, todayNote, saveNote, saveJournal }) {
+export function PerformanceTab({ macros, targets, training, weight, phase, coach, todayNote, saveNote, saveJournal, jeffreyEntries, setJeffreyDay, onStart }) {
 
   // Dépense énergétique adaptative (V7). Calculée à chaque montage de l'onglet — le journal
   // Repas et ses corrections vivent dans un autre onglet (un seul monté à la fois), donc un
@@ -56,7 +56,7 @@ export function PerformanceTab({ macros, targets, training, weight, phase, coach
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {coach && <CoachIA coach={coach} todayNote={todayNote} saveNote={saveNote} saveJournal={saveJournal} />}
+      {coach && <JeffreyChat coach={coach} ai={coach.ai} entries={jeffreyEntries || []} setDay={setJeffreyDay} todayNote={todayNote} saveNote={saveNote} saveJournal={saveJournal} onStart={onStart} />}
 
       {/* Moyenne hebdo kcal, 7 jours glissants */}
       <Card>

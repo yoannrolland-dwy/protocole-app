@@ -33,7 +33,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | U4 | Refonte IHM — audit final avant/après + mise à jour CLAUDE.md | petit | ✅ 25/10/2026 (v3.118.1) |
 | J0 | Jeffrey — test jetable : l'app peut-elle préparer le brief seule, écran éteint et app fermée ? | petit | ✅ 29/10/2026 (piste A validée avec un réveil système) |
 | JT | Jeffrey — textes de l'app et notifications dans sa voix (textes fixes, sans IA) | petit | ✅ 29/10/2026 (v3.126.0) |
-| J1 | Jeffrey — la conversation, en 3 lots installés : J1.1 relais Android + cœur testé ; J1.2 conversation dans Analyse ; J1.3 bulle partout + carte Bord + mémoire | gros | J1.1 ✅ 29/10/2026 (v3.127.0) ; J1.2, J1.3 à faire |
+| J1 | Jeffrey — la conversation, en 3 lots installés : J1.1 relais Android + cœur testé ; J1.2 conversation dans Analyse ; J1.3 bulle partout + carte Bord + mémoire | gros | J1.1 ✅ 29/10/2026 (v3.127.0) ; J1.2 ✅ 29/10/2026 (v3.128.0) ; J1.3 à faire |
 | J2 | Jeffrey — actions proposées, confirmées d'un tap (eau, genou, note, séance, repas, habituel) | moyen | à faire |
 | J4 | Jeffrey — brief du matin en notification : attend la nuit, météo, réponse dans la notification | gros | à faire |
 | J3 | Jeffrey — la voix : micro (dictée) + réponse lue à voix haute, voix réglable | moyen | à faire |
@@ -1278,6 +1278,29 @@ Opus 5.5, vraies données :**
 - **À mesurer en J1.2** : sur une réponse courte, le texte est arrivé presque d'un bloc après la
   réflexion (sur les longues, il s'étalait sur 3-5 s). Possible mise en tampon par le serveur ou
   la lecture côté Android.
+
+**J1.2 livré (29/10/2026, v3.128.0) — conversation dans l'onglet Analyse.** Décisions prises par
+question avant de coder : « Faites-moi le point » remplace « Analyser » (point complet dans sa voix,
+300 mots, et **mise à jour du carnet de bord** comme avant) ; le **bilan 3 mois passe dans sa voix**
+(mêmes calculs sur 90 jours) ; **réflexion réduite** (`effort: low`) pour la conversation, normale
+(`medium`) pour le point et le bilan.
+- Écran `screens/perf/JeffreyChat.jsx` à la place de la carte Coach IA (fichier `CoachIA.jsx`
+  retiré) : conversation du jour, réponse au fil de l'eau, carte de séance avec « Démarrer » si
+  c'est pour aujourd'hui, réponses rapides en pastilles, coût par réponse et total du jour, note du
+  jour conservée (repliée). Relance automatique d'une réponse muette, invisible pour Monsieur.
+- Nouvelles clés dans `DATA_KEYS` : **`jeffreyLog`** (`{ "AAAA-MM-JJ": [messages] }`, 30 jours
+  glissants) et **`jeffreyPersona`** (amorcée avec `JEFFREY_PERSONA`, même règle que le profil du
+  coach : `null` = jamais amorcée). Carte **« Jeffrey · personnalité »** dans les Réglages, avec
+  « Rétablir la personnalité d'origine ».
+- Une réponse en cours s'enregistre même si Monsieur change d'onglet (écriture par App).
+- **Vérifié dans l'aperçu** (réponses simulées, aucun appel réseau, 360 px) : texte au fil de l'eau,
+  carte de séance, réponses rapides (le résultat d'outil dit « Monsieur a touché « Parfait » »),
+  relance d'une réponse muette, changement d'onglet en pleine réponse, personnalité amorcée et
+  rétablie, aucun débordement. **Essayé en vrai par Yoann sur le téléphone le jour même : « ça
+  fonctionne »** (saisie au clavier, dictée possible par le micro du clavier Samsung en attendant J3).
+- **Non fait, prévu en J1.3** : bulle sur tous les onglets, carte sur Bord, mémoire de la
+  conversation de la veille dans le carnet, compteur de coût du mois. Conversations des jours
+  précédents : enregistrées mais pas encore consultables à l'écran.
 
 ### J2 — Actions confirmées
 

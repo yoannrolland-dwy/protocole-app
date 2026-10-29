@@ -4004,6 +4004,38 @@ Rien de visible dans l'app : c'est la fondation de la conversation (J1.2). Déta
 - **Piège d'essai** : écran en veille = réseau de l'app coupé et inspection figée ; garder le
   téléphone déverrouillé pendant un essai réel.
 
+## Chantier J — Jeffrey : J1.2, la conversation dans Analyse (29/10/2026, apps/perso v3.128.0)
+
+Décisions et vérifications détaillées dans `ROADMAP.md` (J1.2 livré).
+- **`screens/perf/JeffreyChat.jsx`** remplace la carte Coach IA en tête de l'onglet Analyse
+  (`screens/dashboard/CoachIA.jsx` supprimé ; `apps/public` garde son propre CoachIA). Conversation
+  du jour, texte au fil de l'eau (`streamClaude` + `streamTransportFor(ai)`), « Un instant,
+  Monsieur, je réfléchis… » avant le premier mot, cartes de séance (`choisir_seance` validé par
+  `validateSessionChoice` ; « Démarrer » seulement pour aujourd'hui et un gabarit connu, via
+  `startSession`), réponses rapides en pastilles (le `tool_result` dit quelle pastille a été
+  touchée), coût par réponse et total du jour, erreurs par `sayError` avec « Réessayer », note du
+  jour repliée. Relance automatique d'une réponse muette (`continuationIfSilent`), message de
+  relance stocké avec `hidden: true` et jamais affiché.
+- **Boutons « Faites-moi le point »** (remplace « Analyser » : `jeffreyAsk("point")`, 300 mots, se
+  termine par `---CARNET---` → `readReply` → `saveJournal`, donc la mémoire se met à jour comme
+  avant) et **« Bilan 3 mois »** (`jeffreyAsk("bilan", { bilanUser: coach.buildBilan().user })` :
+  mêmes calculs sur 90 jours, rédigé par Jeffrey). Réflexion : `effortFor` → `low` pour la
+  conversation, `medium` pour le point et le bilan (choix de Yoann : plus rapide).
+- **`packages/core/src/coach/jeffrey.js`** gagne `jeffreyAsk` (texte affiché court, `apiText` envoyé
+  au modèle et gardé dans l'historique pour que le cache tienne), `readReply`, `effortFor` ;
+  `toApiMessages` envoie `apiText` quand il existe.
+- **App.jsx** : états `jeffreyLog` et `jeffreyPersona` ; `setJeffreyDay(date, entries)` en écriture
+  fonctionnelle (une réponse arrivée après un changement d'onglet s'enregistre) et élagage à
+  30 jours ; `coach.jeffreyRequest(history, note)` (même `nextSessions` que la carte « Prochaine
+  séance »). La réflexion n'est conservée que pour la dernière réponse.
+- **Clés ajoutées à `DATA_KEYS`** : `jeffreyLog` (`{ "AAAA-MM-JJ": [ { id, role, at: "HH:MM",
+  text, apiText?, mode?, hidden?, content?, choices?, quick?, toolResults?, meta: { cents,
+  model } } ] }`) et `jeffreyPersona` (`null` = jamais amorcée → `JEFFREY_PERSONA`).
+- **Réglages** : carte « Jeffrey · personnalité » (texte éditable, « Rétablir la personnalité
+  d'origine »), avant « Coach IA · contexte permanent ».
+- Vérifié dans l'aperçu avec des réponses simulées (aucun réseau) ; 138 tests ; **essayé en vrai
+  par Yoann sur le téléphone le jour même : « ça fonctionne »**.
+
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 
 Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la

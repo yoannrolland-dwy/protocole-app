@@ -12,13 +12,14 @@ import { APP_VERSION } from "../../version.js";
 import { listLiteLLMModels } from "@rawcare/core/coach/claudeApi";
 import { widgetBackgroundStatus, requestWidgetBackground } from "../../healthSync.js";
 import { say, sayStable } from "../../lib/jeffrey.js";
+import { JEFFREY_PERSONA } from "@rawcare/core/coach/jeffrey";
 
 /* ============================================================
    RÉGLAGES
    ============================================================ */
 export function SettingsPanel({ apiKey, setApiKey, model, setModel,
                          aiProvider, setAiProvider, litellmUrl, setLitellmUrl, litellmKey, setLitellmKey, litellmModel, setLitellmModel, onClose, healthSync, onHealthSync,
-                         coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, saveTargets, buildBriefing,
+                         coachProfile, setCoachProfile, coachJournal, setCoachJournal, jeffreyPersona, setJeffreyPersona, targets, saveTargets, buildBriefing,
                          lastAutoBackup, lastCloudBackup, onCloudBackupDone, phase, setPhase,
                          basketSchedule, setBasketSchedule }) {
   const [k, setK] = useState(apiKey);
@@ -41,6 +42,8 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
   const [msg, setMsg] = useState("");
   const [prof, setProf] = useState(coachProfile);
   const [jour, setJour] = useState(coachJournal);
+  const [pers, setPers] = useState(jeffreyPersona || "");
+  const [persMsg, setPersMsg] = useState("");
   const [briefing, setBriefing] = useState("");   // rempli seulement si la copie auto échoue
 
   // navigator.clipboard existe dans la WebView Capacitor (origine sécurisée), mais peut
@@ -163,6 +166,22 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
           Cible quotidienne hors basket. +1 L automatique les jours où une séance Basket est loggée.
         </Body>
         <Field label="Eau (mL)"><Stepper value={targets.water ?? 0} set={(v) => saveTargets({ ...targets, water: v })} step={100} min={0} int /></Field>
+      </Card>
+
+      <Card>
+        <Label style={{ marginBottom: 8 }}>Jeffrey · personnalité</Label>
+        <Body style={{ fontSize: 13, color: C.dim, marginBottom: 8 }}>
+          Sa façon de parler. Deux règles passent toujours avant ce texte : le ton ne change jamais
+          les faits, et une alerte est toujours dite clairement.
+        </Body>
+        <textarea rows={8} value={pers} onChange={(e) => { setPers(e.target.value); setPersMsg(""); }}
+          onBlur={() => setJeffreyPersona(pers)} aria-label="Personnalité de Jeffrey"
+          style={{ ...inputStyle(false), fontFamily: "inherit", fontSize: 13, fontWeight: 400, resize: "vertical", padding: "10px 12px", minHeight: 0, lineHeight: 1.45 }} />
+        <Btn variant="outline" style={{ width: "100%", marginTop: 8 }}
+          onClick={() => { setPers(JEFFREY_PERSONA); setJeffreyPersona(JEFFREY_PERSONA); setPersMsg(say("personaReset")); }}>
+          Rétablir la personnalité d'origine
+        </Btn>
+        {persMsg && <Body style={{ fontSize: 13, color: C.text2, marginTop: 6 }}>{persMsg}</Body>}
       </Card>
 
       <Card>

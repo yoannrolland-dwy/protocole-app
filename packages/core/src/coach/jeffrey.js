@@ -7,6 +7,8 @@
 // Ordre du `system`, du plus stable au plus changeant, pour le cache de l'API : rôle et règles,
 // puis personnalité (éditable), puis données du moment. Les règles priment sur la personnalité.
 
+import { splitCarnet, CARNET_MARK, CARNET_MAX_CHARS } from "./prompt.js";
+
 /** Personnalité d'amorçage (clé `jeffreyPersona`, éditable dans les Réglages). */
 export const JEFFREY_PERSONA = `Vous êtes Jeffrey, le majordome de Monsieur. Vous le vouvoyez toujours et l'appelez « Monsieur ». Langage châtié, phrases courtes et élégantes, flegme britannique. Vous avez le sens de l'humour : traits d'esprit, understatement, pince-sans-rire, une vraie blague quand l'occasion s'y prête. Taquin, volontiers cynique, et ce en toute circonstance, mais toujours avec une bienveillance évidente derrière la pique : on doit sentir que vous êtes de son côté. Ne répétez pas la même plaisanterie d'un message à l'autre. Vous ne flattez pas et ne dramatisez pas : vous constatez, vous conseillez, vous laissez Monsieur décider.`;
 
@@ -79,6 +81,32 @@ export function validateSessionChoice(input, allowed) {
 /** Texte visible d'une réponse. */
 export const replyText = (content) => (content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
 
+/** Texte à afficher (sans le carnet de bord écrit en fin de « point ») et carnet à enregistrer. */
+export function readReply(content) {
+  const { advice, journal } = splitCarnet(replyText(content));
+  return { text: advice, journal };
+}
+
+/** Réflexion selon la demande (choix de Yoann, 29/10/2026) : réduite pour la conversation (premier
+ *  mot plus tôt), normale pour le point complet et le bilan. */
+export const effortFor = (mode) => (mode === "point" || mode === "bilan" ? "medium" : "low");
+
+const POINT_INSTR = `(Demande de l'application : POINT COMPLET. Faites le point sur la journée et la tendance des 14 derniers jours, dans votre voix, 300 mots au plus, texte simple sans titres ni gras. Couvrez ce qui compte aujourd'hui : séance (d'après le recommandeur), nutrition et hydratation (d'après l'heure), récupération, genou ; puis la tendance de fond (poids en moyenne 7 jours, apports, dépense estimée). Terminez par une conclusion complète. Puis, APRÈS la conclusion, écrivez la ligne ${CARNET_MARK} seule, et en dessous la version mise à jour du CARNET DE BORD : un ÉTAT, pas un journal — réécrit en entier, élagué de ce qui est résolu ou périmé, ${CARNET_MAX_CHARS} caractères au plus : progression chiffrée, ce que vous avez demandé et si c'est appliqué, points de vigilance en cours. Pas de conseils dedans.)`;
+
+/** Message envoyé pour une demande. `text` est affiché dans la conversation ; `apiText` (s'il
+ *  diffère) est ce que reçoit le modèle — il reste dans l'historique pour que le cache tienne. */
+export function jeffreyAsk(mode, { text, bilanUser } = {}) {
+  if (mode === "point") {
+    const t = text || "Faites-moi le point, Jeffrey.";
+    return { role: "user", text: t, apiText: `${t}\n\n${POINT_INSTR}`, mode };
+  }
+  if (mode === "bilan") {
+    const t = text || "Le bilan des trois derniers mois, je vous prie.";
+    return { role: "user", text: t, mode, apiText: `${t}\n\n(Demande de l'application : BILAN 3 MOIS. Les données ci-dessous ont été calculées sur 90 jours. Rédigez-le dans votre voix, vouvoiement, 400 mots au plus, texte simple sans titres ni gras ; les consignes de forme écrites ci-dessous au tutoiement sont remplacées par celles-ci. Interprétez, ne recalculez pas ; un champ null veut dire pas assez de recul.)\n\n${bilanUser || ""}` };
+  }
+  return { role: "user", text, mode: "chat" };
+}
+
 /** Filet de sécurité (essai réel du 29/10/2026 : une réponse faite uniquement de boutons, sans un
  *  mot, malgré la consigne). Si la réponse n'a aucun texte mais appelle des outils, l'app renvoie
  *  aussitôt ce message pour que Jeffrey réponde par écrit (un appel de plus, seulement dans ce cas).
@@ -129,7 +157,7 @@ export function toApiMessages(history) {
           content: history[i - 1]?.toolResults?.[b.id] ?? "Affiché à Monsieur.",
         }))
       : [];
-    out.push({ role: "user", content: [...results, { type: "text", text: h.text }] });
+    out.push({ role: "user", content: [...results, { type: "text", text: h.apiText ?? h.text }] });
   });
   return out;
 }

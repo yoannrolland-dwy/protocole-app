@@ -9,6 +9,7 @@ import { PHASES, DEFAULT_TARGETS, targetsForDate, kcalFromMacros, kcalOfEntry, t
 import { recommendTargets, palierWeekOf, loggedRateLastDays } from "@rawcare/core/palier";
 import { nextSessions } from "@rawcare/core/nextSession";
 import { buildCoachPrompt, buildCoachBriefing, buildBilanPrompt, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
+import { buildJeffreyRequest, JEFFREY_PERSONA } from "@rawcare/core/coach/jeffrey";
 import { syncHealthConnect } from "./healthSync.js";
 import { updateDashboardWidget, consumeWidgetTab } from "./widgetSync.js";
 import { runAutoBackup } from "./autoBackup.js";
@@ -105,6 +106,9 @@ export default function App({ silent = false } = {}) {
   const [litellmModel, setLitellmModelState] = useState("");
   const [coachProfile, setCoachProfileState] = useState("");
   const [coachJournal, setCoachJournalState] = useState("");
+  // Jeffrey (J1.2) : conversations par jour { "AAAA-MM-JJ": [messages] } et personnalité.
+  const [jeffreyLog, setJeffreyLog] = useState({});
+  const [jeffreyPersona, setJeffreyPersonaState] = useState("");
   const [lastAutoBackup, setLastAutoBackup] = useState(null);
   const [lastCloudBackup, setLastCloudBackup] = useState(null);
 
@@ -172,6 +176,15 @@ export default function App({ silent = false } = {}) {
         setCoachProfileState(storedProfile);
       }
       setCoachJournalState(await store.get("coachJournal", ""));
+      // Personnalité de Jeffrey : même règle que le profil du coach (null = jamais amorcée).
+      const storedPersona = await store.get("jeffreyPersona", null);
+      if (storedPersona == null) {
+        setJeffreyPersonaState(JEFFREY_PERSONA);
+        store.set("jeffreyPersona", JEFFREY_PERSONA);
+      } else {
+        setJeffreyPersonaState(storedPersona);
+      }
+      setJeffreyLog(await store.get("jeffreyLog", {}));
       setLastAutoBackup(await store.get("lastAutoBackupDate", null));
       // Hors de DATA_KEYS volontairement (voir cloudBackup.js) : restaurer une vieille
       // sauvegarde ne doit pas faire croire à l'app qu'elle vient d'être sauvegardée.
@@ -451,6 +464,15 @@ export default function App({ silent = false } = {}) {
     : { provider: "anthropic", apiKey, model };
   const setCoachProfile = (v) => { setCoachProfileState(v); store.set("coachProfile", v); };
   const setCoachJournal = (v) => { setCoachJournalState(v); store.set("coachJournal", v); };
+  const setJeffreyPersona = (v) => { setJeffreyPersonaState(v); store.set("jeffreyPersona", v); };
+  // Écriture fonctionnelle : une réponse qui arrive après un changement d'onglet s'enregistre
+  // quand même. On ne garde que 30 jours de conversations (décision du chantier J).
+  const setJeffreyDay = (date, entries) => setJeffreyLog((prev) => {
+    const oldest = shiftDateKey(today(), -30);
+    const next = Object.fromEntries(Object.entries({ ...prev, [date]: entries }).filter(([d]) => d >= oldest));
+    store.set("jeffreyLog", next);
+    return next;
+  });
 
   const todayNote = notes.find((n) => n.date === today())?.text || "";
   const saveNote = (text) => {
@@ -495,6 +517,13 @@ export default function App({ silent = false } = {}) {
       const facts = computeBilanFacts({ training, weight, macros, sleep, rhr, steps, knee, targets, tdeeResult, kcalTargetToday, todayDate: today() });
       return buildBilanPrompt({ facts, phase, targets, profile: coachProfile, notes });
     },
+    // Jeffrey (J1.2) : requête de la conversation, mêmes faits que le Coach IA et même verdict
+    // du recommandeur que la carte « Prochaine séance ».
+    jeffreyRequest: (history, note) => {
+      const energy = computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps });
+      const nextSession = nextSessions({ now: new Date(), base: { training, knee, sleep, targets, basketSchedule, energy }, planFor: planForDate(basketSchedule) });
+      return buildJeffreyRequest({ coach: coach.buildPrompt(note), persona: jeffreyPersona, nextSession, history, heure: new Date().toTimeString().slice(0, 5) });
+    },
     ai,
   };
 
@@ -525,7 +554,7 @@ export default function App({ silent = false } = {}) {
       {/* Contenu */}
       <main ref={mainRef} style={{ flex: 1, overflowY: "auto", padding: "14px 16px 24px" }}>
         {loading ? <Empty>Chargement…</Empty> : showSettings ? (
-          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, aiProvider, setAiProvider, litellmUrl, setLitellmUrl, litellmKey, setLitellmKey, litellmModel, setLitellmModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, targets, lastAutoBackup, lastCloudBackup, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
+          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, aiProvider, setAiProvider, litellmUrl, setLitellmUrl, litellmKey, setLitellmKey, litellmModel, setLitellmModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, jeffreyPersona, setJeffreyPersona, targets, lastAutoBackup, lastCloudBackup, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
             {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, lastCloudBackup, basketSchedule, planFor: planForDate(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier, saveKnee: save.knee, onStart: startSession }} setTab={goTo} openSettings={() => setShowSettings(true)} />}
@@ -538,7 +567,7 @@ export default function App({ silent = false } = {}) {
               </CorpsTab>
             )}
             {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, startType }} onStartConsumed={() => setStartType(null)} />}
-            {tab === "perf" && <PerformanceTab {...{ macros, targets, training, weight, phase, coach, todayNote, saveNote, saveJournal }} />}
+            {tab === "perf" && <PerformanceTab {...{ macros, targets, training, weight, phase, coach, todayNote, saveNote, saveJournal }} jeffreyEntries={jeffreyLog[today()] || []} setJeffreyDay={setJeffreyDay} onStart={startSession} />}
             {tab === "macro" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} ai={ai} />}
           </>
         )}

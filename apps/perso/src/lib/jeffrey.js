@@ -75,6 +75,12 @@ export const PHRASES = {
   menuUnreadable: ["Réponse illisible, Monsieur. Réessayez, ou simplifiez le texte ou la photo."],
   linkFailed: ["Lecture du lien échouée, Monsieur : {x} Essayez une photo à la place."],
 
+  // --- Conversation (J1.2)
+  chatHello: ["À votre service, Monsieur. Que puis-je pour vous ?", "Monsieur m'a sonné ? Je vous écoute."],
+  chatThinking: ["Un instant, Monsieur, je réfléchis…", "Je consulte vos registres, Monsieur…"],
+  chatPlaceholder: ["Écrivez à Jeffrey, Monsieur…"],
+  personaReset: ["Personnalité d'origine rétablie, Monsieur."],
+
   // --- Notifications
   backupReminderTitle: ["Jeffrey"],
   backupReminder: ["Monsieur, voilà une semaine que vos données n'ont pas quitté ce téléphone. Réglages → Sauvegarder hors du téléphone."],
