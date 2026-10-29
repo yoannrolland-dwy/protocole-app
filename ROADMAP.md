@@ -31,6 +31,11 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | U2 | Refonte IHM — directions visuelles en maquettes, choix, design system v2 (variables CSS) | gros | ✅ 25/10/2026 (v3.110.0, direction A) |
 | U3 | Refonte IHM — écran par écran (un commit + une install par écran) | gros | ✅ 25/10/2026 (8 étapes, v3.111.0 → v3.118.0) |
 | U4 | Refonte IHM — audit final avant/après + mise à jour CLAUDE.md | petit | ✅ 25/10/2026 (v3.118.1) |
+| J0 | Jeffrey — test jetable : l'app peut-elle préparer le brief seule, écran éteint et app fermée ? | petit | à faire |
+| J1 | Jeffrey — la conversation : Analyse + bulle partout + compte rendu sur Bord, choix de séance vérifié, mémoire | gros | à faire |
+| J2 | Jeffrey — actions proposées, confirmées d'un tap (eau, genou, note, séance, repas, habituel) | moyen | à faire |
+| J4 | Jeffrey — brief du matin en notification : attend la nuit, météo, réponse dans la notification | gros | à faire |
+| J3 | Jeffrey — la voix : micro (dictée) + réponse lue à voix haute, voix réglable | moyen | à faire |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il
 alimente le recommandeur + le Coach IA. V2 tôt parce que c'est une protection, pas
@@ -1037,3 +1042,172 @@ anciens onglets (Poids/Énergie/Pas/Douleurs → Corps).
   que la mesure ne voyait pas (elle ne comptait que boutons/champs/liens) changés en boutons. Mesure
   élargie aux éléments au curseur `pointer` : 0 partout, écrans principaux et 9 sous-écrans de Nutrition.
 
+---
+
+## Chantier J — Jeffrey, le majordome (cadré le 29/10/2026)
+
+Demande de Yoann : « plus d'IA dans l'app », qu'elle devienne « un peu mon JARVIS ». Un brief
+chaque matin qui arrive tout seul (date, météo, programme du jour, recommandation), un coach qui
+pose des questions et à qui l'on répond, à qui l'on peut écrire ou parler à tout moment, et qui
+agit dans l'app. Le tout avec la clé et le modèle des Réglages. Cadré par questions le 29/10/2026.
+
+**Ordre retenu** : J0 → J1 → J2 → J4 → J3. J4 (notification) a besoin de J2 pour enregistrer les
+réponses (genou, note) ; J3 (voix) se branche sur la conversation de J1. Réarrangeable sauf J0 en
+premier et J1 avant tout le reste.
+
+### Décisions prises (ne pas rouvrir sans raison)
+
+1. **Le recommandeur n'est PAS remplacé par l'IA.** Il reste le garde-fou : il dit ce qui est
+   autorisé (gates genou, tirage du jour, déjà fait, créneaux). Raisons : un modèle ne garantit
+   pas qu'il respecte une règle à chaque appel, ça ne se teste pas, ça coûte à chaque affichage
+   (la carte se recalcule toutes les 5 min), et ça ne marche pas hors réseau. La carte
+   « Prochaine séance » reste 100 % JS, instantanée.
+2. **L'IA apporte la nuance** (réponse de Yoann : « il manque de nuance ») : elle **choisit parmi
+   les séances autorisées** en tenant compte de ce que Yoann lui dit (fatigue ressentie, temps
+   disponible, envie). **L'app vérifie** que la séance choisie est dans la liste autorisée ;
+   sinon elle l'ignore et garde le choix du recommandeur. Une séance de `avoid` n'est jamais
+   proposée, quoi que le modèle écrive.
+3. **Un seul coach, une seule conversation par jour, visible à trois endroits** (réponse de
+   Yoann : « un mixte de tout ») :
+   - **Bord** : le compte rendu du matin en carte (repliée à quelques lignes), un tap ouvre la
+     conversation ;
+   - **Analyse** : la conversation complète **remplace la carte Coach IA**. « Analyser » devient
+     « Refaire le point » (un message d'analyse complète dans le fil, même contrat que l'analyse
+     actuelle). Le Bilan 3 mois reste un bouton à part ;
+   - **Partout** : une bulle en bas à droite qui ouvre la conversation par-dessus l'écran
+     courant. **Masquée dans le carnet de séance et dans les Réglages** (elle gênerait la saisie).
+4. **Mélange point du matin court / conversation libre selon la disponibilité** : le matin,
+   1-2 questions avec réponses rapides (boutons) ou réponse écrite dans la notification ; pressé,
+   on répond en un tap et c'est fini ; disponible, on ouvre l'app et la même conversation
+   continue. On peut lui écrire à toute heure.
+5. **Il agit, toujours avec confirmation** : chaque action proposée s'affiche en carte
+   « Confirmer / Annuler », rien n'est écrit sans un tap. Les actions passent par les mêmes
+   fonctions d'enregistrement que les écrans (jamais une écriture parallèle). Une valeur que l'IA
+   a déduite d'un texte libre (« ça tire un peu » → genou 2/10) est **montrée en chiffre** avant
+   confirmation : c'est le journal du genou qui pilote les gates.
+6. **Modèle : celui des Réglages** (Opus 5.5 aujourd'hui), même fournisseur et même clé
+   (Anthropic direct ou LiteLLM). Coût affiché après chaque réponse, comme aujourd'hui.
+7. **Météo : position du téléphone, mais jamais lue en arrière-plan.** L'app note la position
+   approximative (arrondie à ~1 km) à chaque ouverture, au premier plan seulement ; le brief du
+   matin utilise la dernière connue. Pas de permission de localisation en arrière-plan (la plus
+   intrusive d'Android). Météo via Open-Meteo (gratuit, sans clé). **Les coordonnées ne partent
+   qu'à Open-Meteo** : le modèle ne reçoit que la météo (températures, pluie par créneau), jamais
+   la position.
+8. **Il répond à l'écrit ET à voix haute** ; la voix et la façon de répondre sont réglables.
+9. **Personnalité : Jeffrey**, un majordome (inspiration Geoffrey du *Prince de Bel-Air* et Alfred
+   de *Batman*, sans les citer ni les imiter) : vouvoiement, appelle Yoann « Monsieur », langage
+   châtié, flegme britannique, bienveillant mais taquin. Texte de personnalité éditable dans les
+   Réglages (amorcé avec la version ci-dessous), séparé du « contexte permanent » du coach.
+
+### Personnalité d'amorçage (clé `jeffreyPersona`, éditable)
+
+> Vous êtes Jeffrey, le majordome de Monsieur. Vous le vouvoyez toujours et l'appelez
+> « Monsieur ». Langage châtié, phrases courtes et élégantes, flegme britannique. Vous avez le
+> sens de l'humour : traits d'esprit, understatement, pince-sans-rire, une vraie blague quand
+> l'occasion s'y prête. Taquin, volontiers cynique, et ce en toute circonstance, mais toujours
+> avec une bienveillance évidente derrière la pique : on doit sentir que vous êtes de son côté.
+> Ne répétez pas la même plaisanterie d'un message à l'autre. Vous ne flattez pas et ne
+> dramatisez pas : vous constatez, vous conseillez, vous laissez Monsieur décider.
+
+**Deux règles qui priment sur la personnalité** (dans le code, pas dans le texte éditable,
+validées par Yoann le 29/10/2026) : **le ton ne change jamais les faits ni les garde-fous** ;
+**une alerte est toujours dite clairement**, sans détour stylistique (une phrase nette, l'humour
+éventuellement après). Ordre dans le `system` : règles du coach > ces deux règles > personnalité.
+La taquinerie est permise partout, y compris sur la douleur et le sommeil (choix de Yoann, qui a
+retiré les deux interdits proposés). Ce qui reste vrai par la première règle : une nuit courte
+n'est pas un problème (short sleeper, seul le score de qualité compte), donc Jeffrey peut en
+plaisanter sans jamais la présenter comme un signal de fatigue ; un genou hors base reste une
+séance écartée, quelle que soit la tournure de la phrase.
+
+### J0 — Test jetable : le brief préparé app fermée
+
+La question qui décide de l'architecture de J4. Toute la logique (recommandeur, score d'énergie,
+planning, prompt) est en JavaScript, et Android ne la fait pas tourner app fermée.
+
+- **Piste A (à tester en premier)** : un réveil Android lance un travail en arrière-plan qui crée
+  une WebView sans écran, charge l'app avec un drapeau (`?brief=1`), et laisse le JS calculer,
+  appeler l'API et poster la notification. Même origine que l'app, donc même localStorage. Zéro
+  logique dupliquée.
+- **Piste B (repli)** : l'app écrit le contexte du lendemain à chaque fermeture ou passage en
+  arrière-plan (elle sait déjà calculer « demain », c'est la ligne Demain de la carte), et un
+  travail Kotlin complète le matin avec la nuit et la pesée lues dans Health Connect, puis
+  appelle l'API. Coût : un peu de logique en double côté Kotlin.
+- **Critères de réussite de A**, app tuée (`am kill`), écran verrouillé : la WebView lit le
+  localStorage, `fetch` vers l'API passe, un plugin (Health Connect, notification) répond, le
+  tout en moins de ~1 min et sans afficher d'activité. Mesurer aussi la batterie.
+- Jetable : rien n'est commité de la piste perdante. Résultat documenté ici.
+
+### J1 — La conversation
+
+- **`packages/core/src/coach/jeffrey.js`** (pur, testé) : construit le `system` (règles + sécurité
+  + persona) et le contexte (réutilise les faits déjà calculés de `buildCoachPrompt` : temps
+  réel, résumé 14 j, recommandeur, séances autorisées/interdites aujourd'hui et demain,
+  carnet). Ordre pensé pour le cache : parties stables d'abord, temps réel en dernier.
+- **Outils (tool use) plutôt que JSON libre** : `choisir_seance(type, raison)` (validé contre la
+  liste autorisée), `proposer_reponses(options[])` (2 à 4 réponses rapides affichées en boutons),
+  et à partir de J2 les actions. Le texte de la réponse s'affiche au fil de l'eau (streaming) —
+  Opus 5.5 réfléchit avant de répondre, l'attente doit se voir le moins possible.
+- **Cache de l'API** (`cache_control`) sur le préfixe stable : à partir du 2e message d'une
+  conversation, l'entrée coûte ~10 % du prix. À mesurer sur le `usage` réel, jamais estimer.
+- **Mémoire** : la conversation de la veille est résumée dans le carnet de bord existant
+  (`coachJournal`, mécanisme `---CARNET---`) au premier appel du jour (le brief), dans le même
+  appel. Le lendemain, il s'en souvient sans tout relire.
+- **Données** : `jeffreyLog` (fils par jour, 30 j glissants — consultables, ajouté à
+  `DATA_KEYS`), `jeffreyPersona` (`DATA_KEYS`). Compteur de coût du mois affiché dans les
+  Réglages (`aiSpend`, `{ month, cents }`, `DATA_KEYS`).
+- Note du jour conservée (Jeffrey peut aussi l'écrire via une action en J2).
+- **À trancher au début de J1** : la carte « compte rendu » en tête de Bord passe au-dessus
+  d'Énergie et Poids (ordre choisi en U2) ou juste sous eux ?
+- Tests : validation du choix de séance (hors liste → ignoré), règles de ton présentes dans le
+  `system`, capture datée du prompt.
+
+### J2 — Actions confirmées
+
+Liste fermée d'outils, chacun mappé sur la fonction d'écran existante : ajouter de l'eau,
+enregistrer la douleur genou (+ retour à la base), écrire la note du jour, démarrer une séance
+(ouvre le carnet comme le bouton « Démarrer »), reprendre un repas d'hier (`copyEntries`),
+ajouter un aliment habituel à sa dernière quantité. Chaque appel d'outil → carte
+« Confirmer / Annuler » dans le fil ; le résultat est renvoyé au modèle (`tool_result`) pour qu'il
+enchaîne. Annuler n'écrit rien. Tests : chaque outil produit exactement la même écriture que
+l'écran correspondant.
+
+### J4 — Le brief du matin en notification
+
+- **Déclencheur : dès que la nuit est là** (réponse de Yoann). Entre 6 h et 8 h 30, vérification
+  toutes les ~20 min qu'une nuit datée du jour existe dans Health Connect ; à 8 h 30 au plus
+  tard, brief avec ce qui est disponible (sans inventer de nuit). **Si l'app est ouverte avant**,
+  le brief est généré dans l'app (carte sur Bord) et aucune notification ne part — jamais deux
+  appels payés pour le même matin.
+- **Contenu** : salutation datée, météo du jour (créneaux de séance), nuit (score de qualité,
+  jamais la durée seule), énergie, pesée/tendance, planning du jour + séance proposée (choisie
+  parmi les autorisées), 1-2 questions (genou si pas noté, ressenti), un rappel utile si
+  pertinent (sauvegarde en retard, palier de la semaine).
+- **Notification de conversation Android** (style messagerie) : 3-4 lignes visibles, boutons de
+  réponse rapide, « Répondre » (réponse écrite dans la notification), « Ouvrir ». Une réponse
+  dans la notification appelle l'API en arrière-plan et la réponse de Jeffrey s'affiche dans la
+  même notification ; une action à confirmer (genou 2/10) apparaît en bouton « Confirmer ».
+- Nouveau canal de notification « Jeffrey », désactivable dans les réglages Android.
+
+### J3 — La voix
+
+- **Dictée** : bouton micro dans la conversation, reconnaissance vocale d'Android en français
+  (le micro du clavier Samsung marche déjà en attendant). **Pas de mot de réveil** (« Hé
+  Jeffrey » à tout moment) : micro en écoute permanente, coûteux en batterie et fragile.
+- **Réponse lue à voix haute** : synthèse vocale d'Android (gratuite, hors ligne). Réglages :
+  choix parmi les voix françaises installées sur le téléphone, vitesse, hauteur, lecture
+  automatique ou bouton haut-parleur par message, bouton « Tester ». Sortie au casque s'il est
+  branché.
+- **Limite à dire à Yoann** : un vrai « majordome britannique qui parle français » n'existe pas
+  dans les voix d'Android ; une voix premium (service de synthèse payant, autre clé) est hors
+  périmètre, à rouvrir s'il trouve les voix Android trop plates.
+
+### Coût attendu (à remplacer par la mesure réelle)
+
+Brief : quelques centimes par matin avec Opus 5.5. Conversation : surtout la sortie, l'entrée
+étant en cache à partir du 2e message. En discutant chaque jour, peut-être 3 à 6 $/mois —
+surveiller le crédit Anthropic. Le compteur `aiSpend` donnera le vrai chiffre.
+
+### Hors périmètre
+
+`apps/public` (aucun de ces écrans) ; mot de réveil vocal ; voix premium payante ; Jeffrey qui
+modifie les cibles, le planning ou les gabarits de séance (les actions restent celles de J2).
