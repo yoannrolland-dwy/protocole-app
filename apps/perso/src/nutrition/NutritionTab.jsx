@@ -22,7 +22,6 @@ import {
   copySourceCandidates, copyEntries, deriveMacroLog, suggestions,
 } from "./foodStore.js";
 import FoodSearch from "./FoodSearch.jsx";
-import { PeriCard } from "../screens/perf/ReferenceCards.jsx";
 import { say, sayStable } from "../lib/jeffrey.js";
 
 // Cibles PROTOCOLE (protein/carbs/fat/fiber) → noms internes du module (prot/gluc/lip/fib).
@@ -380,32 +379,8 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
     setDuplicating(false);
   };
 
-  // Navigation au doigt (demandé le 03/08/2026) : swipe gauche = jour suivant, droite =
-  // jour précédent. Décision volontairement AU RELÂCHÉ (touchend), jamais preventDefault
-  // sur touchmove — le scroll vertical normal de la page n'est donc jamais bloqué ni
-  // saccadé, on se contente d'observer si le trajet final ressemble à un swipe horizontal
-  // une fois le doigt levé. Départ ignoré si trop près du bord gauche de l'écran, pour ne
-  // jamais entrer en conflit avec le geste "retour" du système Android.
-  const touchStart = useRef(null);
-  const EDGE_GUARD = 24;
-  const SWIPE_MIN_DIST = 60;
-  const SWIPE_MAX_SLOPE = 0.6; // vertical / horizontal — au-delà, c'est un scroll, pas un swipe
-  const onTouchStart = (e) => {
-    if (openMeal) { touchStart.current = null; return; } // FoodSearch est une feuille à part, pas concernée
-    const tt = e.touches[0];
-    touchStart.current = tt.clientX < EDGE_GUARD ? null : { x: tt.clientX, y: tt.clientY };
-  };
-  const onTouchEnd = (e) => {
-    const start = touchStart.current;
-    touchStart.current = null;
-    if (!start) return;
-    const tt = e.changedTouches[0];
-    const dx = tt.clientX - start.x;
-    const dy = tt.clientY - start.y;
-    if (Math.abs(dx) < SWIPE_MIN_DIST || Math.abs(dy) > Math.abs(dx) * SWIPE_MAX_SLOPE) return;
-    setDate((d) => shiftDateKey(d, dx < 0 ? 1 : -1));
-  };
-
+  // Le changement de jour au doigt (03/08/2026) a été retiré le 29/10/2026 à la demande de
+  // Yoann : seules les flèches de la barre du jour changent de jour.
   // Barre du jour collante (05/08/2026, refaite en U3) : le jour affiché reste visible en
   // scrollant, avec flèches veille/lendemain de 48 px (30 % des repas sont saisis à l'avance,
   // mesuré en U1). Toucher la date ouvre le calendrier. Écart de jours en arithmétique
@@ -422,8 +397,7 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
   return (
     // `minmax(0, 1fr)` (27/10/2026) : une ligne trop large ne peut plus élargir tout l'écran
     // (défilement horizontal constaté avec la police d'Android agrandie).
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12, fontFamily: T.f.body, color: T.c.text }}
-      onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12, fontFamily: T.f.body, color: T.c.text }}>
 
       {/* Barre du jour collante. Hors aujourd'hui elle passe en CITRON PLEIN, texte noir, avec le
           bouton « Aujourd'hui » à l'intérieur (25/10/2026, retour de Yoann : « beaucoup plus
@@ -615,9 +589,6 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
           </Button>
         )}
       </Panel>
-
-      {/* Péri-training + protocoles basket (déplacés depuis l'onglet Analyse, U3 étape 7) */}
-      <PeriCard />
 
       <UndoBar undo={undo} onUndo={runUndo} />
 

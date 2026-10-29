@@ -12,7 +12,7 @@ import { restTimer } from "../../lib/restTimer.js";
 import { ProgressScreen } from "./ProgressScreen.jsx";
 import { GeneField } from "./GeneField.jsx";
 import { VolumeCard } from "./VolumeCard.jsx";
-import { PlanCard } from "../perf/ReferenceCards.jsx";
+import { PlanCard, PeriCard } from "../perf/ReferenceCards.jsx";
 import { sayStable } from "../../lib/jeffrey.js";
 
 export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType, onStartConsumed }) {
@@ -176,6 +176,8 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
 
       {/* Planning idéal (déplacé depuis l'onglet Analyse, U3 étape 7) */}
       <PlanCard />
+      {/* Péri-training + protocoles basket : déplacés de Nutrition le 29/10/2026 (demande de Yoann) */}
+      <PeriCard />
 
       {/* Semaine HSR */}
       <Card>

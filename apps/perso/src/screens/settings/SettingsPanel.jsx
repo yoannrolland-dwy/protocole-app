@@ -8,6 +8,7 @@ import { isBackupStale, daysSinceBackup } from "../../cloudBackup.js";
 import { PHASES, kcalFromMacros } from "@rawcare/core/targets";
 import { C, today, fmt, Card, Label, Body, Btn, inputStyle, TextInput, Stepper, Field, Pills, ScreenHeader } from "../../design/compat.jsx";
 import { BasketScheduleCard } from "./BasketScheduleCard.jsx";
+import { SubTabs } from "../../components/SubTabs.jsx";
 import { APP_VERSION } from "../../version.js";
 import { listLiteLLMModels } from "@rawcare/core/coach/claudeApi";
 import { fmtCost, monthSpend } from "../../lib/ai.js";
@@ -84,6 +85,14 @@ function VoiceCard() {
   );
 }
 
+const SETTINGS_TABS = [
+  { key: "objectifs", label: "Objectifs" },
+  { key: "jeffrey", label: "Jeffrey" },
+  { key: "appareil", label: "Appareil" },
+];
+// Onglet ouvert retenu pendant la session (fermer puis rouvrir les Réglages y revient).
+let lastSettingsTab = "objectifs";
+
 /* ============================================================
    RÉGLAGES
    ============================================================ */
@@ -92,6 +101,8 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
                          coachProfile, setCoachProfile, coachJournal, setCoachJournal, jeffreyPersona, setJeffreyPersona, targets, saveTargets, buildBriefing,
                          lastAutoBackup, lastCloudBackup, onCloudBackupDone, phase, setPhase,
                          basketSchedule, setBasketSchedule }) {
+  const [sub, setSubState] = useState(lastSettingsTab);
+  const setSub = (v) => { lastSettingsTab = v; setSubState(v); setMsg(""); };
   const [k, setK] = useState(apiKey);
   const [m, setM] = useState(model);
   // Accès Health Connect en arrière-plan pour le widget (28/10/2026), relu à chaque ouverture.
@@ -176,16 +187,12 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {/* Titre et bouton de fermeture : dans l'en-tête de l'app (AppHeader) depuis U3. */}
 
-      {/* Réordonné le 14/09/2026 (retour de Yoann : "c'est un peu le bordel"), puis affiné le
-          même jour après un premier essai trop grossier ("mettre un rappel actif en tête" ≠
-          "utilisé souvent" — Sauvegarde n'est en fait PAS un réglage fréquent malgré son
-          bandeau/sa notification). Ordre final confirmé par Yoann réglage par réglage : du
-          plus fréquemment utilisé au moins fréquent, sans regrouper "Coach IA" comme un seul
-          bloc — contexte permanent/carnet de bord/revue de fond sont utilisés souvent, clé
-          API/modèle quasi jamais, donc les deux moitiés ne sont plus adjacentes. "Objectif
-          temporaire" reste retiré de l'écran (jugé inutile) — `targets.cut` reste intact en
-          interne, juste plus affiché nulle part. */}
+      {/* Trois onglets depuis le 29/10/2026 (retour de Yoann : « c'est un peu le bordel ») :
+          Objectifs, Jeffrey, Appareil. Dans chaque onglet, l'ordre reste celui du 14/09/2026 (du
+          plus utilisé au moins utilisé). « Objectif temporaire » reste retiré de l'écran. */}
+      <SubTabs label="Réglages" tabs={SETTINGS_TABS} value={sub} onChange={setSub} />
 
+      {sub === "objectifs" && (<>
       <BasketScheduleCard basketSchedule={basketSchedule} setBasketSchedule={setBasketSchedule} />
 
       <Card>
@@ -238,6 +245,9 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
         <Field label="Eau (mL)"><Stepper value={targets.water ?? 0} set={(v) => saveTargets({ ...targets, water: v })} step={100} min={0} int /></Field>
       </Card>
 
+      </>)}
+
+      {sub === "jeffrey" && (<>
       <BriefCard />
       <VoiceCard />
 
@@ -310,6 +320,9 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
         )}
       </Card>
 
+      </>)}
+
+      {sub === "appareil" && (<>
       {Capacitor.isNativePlatform() && (
         <Card>
           <Label style={{ marginBottom: 8 }}>Health Connect · pas, sommeil & macros</Label>
@@ -447,6 +460,8 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
           </Body>
         )}
       </Card>
+
+      </>)}
 
       {msg && <Body style={{ color: C.accent, fontSize: 12 }}>{msg}</Body>}
       <Body style={{ fontSize: 12, color: C.dim, textAlign: "center", fontFamily: C.mono }}>Protocole v{APP_VERSION}</Body>

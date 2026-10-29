@@ -4259,6 +4259,23 @@ aucune voix d'Android n'est un vrai majordome anglais, la personnalité reste da
   détecté). **Non vérifié** : la dictée, la lecture à voix haute et le brief lu en séance — à
   essayer par Yoann.
 
+## Réglages en 3 onglets, plus de swipe dans Nutrition, péri-training dans Séance (29/10/2026, apps/perso v3.135.0)
+
+Trois demandes de Yoann, choix tranchés par question.
+- **Réglages en onglets** (`SettingsPanel.jsx`) : **Objectifs** (planning basket, phase, cibles
+  macro, eau) · **Jeffrey** (brief du matin, voix, personnalité, contexte permanent, carnet de bord,
+  revue claude.ai) · **Appareil** (Health Connect, fournisseur IA, sauvegarde). Dans chaque onglet,
+  l'ordre du 14/09/2026 est gardé. L'onglet ouvert est retenu pendant la session. Barre partagée
+  avec Corps : nouveau `components/SubTabs.jsx` (CorpsTab l'utilise, rendu identique).
+- **Plus de changement de jour au doigt dans Nutrition** (le swipe du 03/08/2026 est retiré) :
+  seules les flèches ‹ › de la barre du jour changent de jour.
+- **Fiche péri-training et protocoles basket** (`PeriCard`) : quittent Nutrition pour le bas de
+  l'onglet **Séance**, sous le planning idéal. Contenu inchangé.
+- Vérifié dans l'aperçu (375 px) : 3 onglets avec les bonnes cartes (brief, voix, Health Connect
+  n'apparaissent que sur l'app native), onglet retenu, aucun débordement ; Nutrition sans fiche et
+  avec ses flèches ; Séance avec planning idéal et fiche. 154 tests, builds perso et public,
+  installé sur le téléphone.
+
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 
 Retour de Yoann après U3 (« un truc que j'aimais a disparu », puis « beaucoup plus visible ») : la
