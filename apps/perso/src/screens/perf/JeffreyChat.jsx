@@ -123,6 +123,8 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
         const { message, usedModel, cents } = await streamClaude({
           provider: ai.provider, baseUrl: ai.baseUrl, apiKey: ai.apiKey, model: ai.model,
           system: req.system, messages: req.messages, tools: req.tools,
+          // Relance d'une réponse muette : outils interdits, sinon elle peut rester muette (29/10).
+          toolChoice: pass > 0 ? { type: "none" } : undefined,
           effort: effortFor(mode), maxTokens: 16000, streamTransport: streamTransportFor(ai),
           onText: (_, all) => setLive((l) => ({ ...(l || {}), text: readReply([{ type: "text", text: all }]).text })),
           onRetry: (p) => setLive((l) => ({ ...(l || {}), progress: p })),

@@ -273,3 +273,16 @@ test("régression 29/10 : après le tap, Jeffrey reçoit le nouveau total et sai
   });
   assert.match(req.system[0].text, /Ne rajoutez jamais une action confirmée/);
 });
+
+test("régression 29/10 : la relance d'une réponse muette interdit les outils ; sans toolChoice, requête inchangée", async () => {
+  const tools = [{ name: "x", input_schema: { type: "object" } }];
+  const tr = fakeTransport([{ events: EVENTS }, { events: EVENTS }, { events: EVENTS }]);
+  const base = { provider: "litellm", baseUrl: "https://srv", apiKey: "k", model: "anthropic/claude-opus-5-5", system: [], messages: [], maxTokens: 100, streamTransport: tr, retryDelays: [0] };
+  await streamClaude({ ...base, tools, toolChoice: { type: "none" } });
+  await streamClaude({ ...base, tools });
+  await streamClaude({ ...base, toolChoice: { type: "none" } });
+  assert.deepEqual(tr.calls[0].tool_choice, { type: "none" });
+  assert.deepEqual(tr.calls[0].tools, tools);
+  assert.equal("tool_choice" in tr.calls[1], false);
+  assert.equal("tool_choice" in tr.calls[2], false); // jamais sans outils déclarés
+});

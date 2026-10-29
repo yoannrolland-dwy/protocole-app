@@ -4105,6 +4105,13 @@ habituel) reste à faire ; « démarrer une séance » existe déjà depuis J1.2
   jamais »), même phrase en tête de `jeffreyDataBlock`, et `confirmedResult(action, change)` :
   le `tool_result` d'une eau confirmée dit « eau du jour passée de 1250 à 1750 ml » (`onAction`
   d'App renvoie `{ before, after }`). Test nommé « régression 29/10 » — 141 tests. Réessayé par Yoann sur le téléphone (eau puis genou) : bon.
+- **Correctif v3.130.2, relance muette** : quand Jeffrey ne répond que par un outil (carte, pastilles),
+  l'app le relance une fois pour qu'il écrive (`continuationIfSilent`). Le 29/10 à 13 h 50, la
+  relance n'a encore produit que des pastilles. Désormais la relance part avec
+  `tool_choice: { type: "none" }` : outils toujours déclarés (le cache du `system` tient) mais réponse
+  écrite obligatoire. `streamClaude` gagne un paramètre optionnel `toolChoice`, envoyé seulement si
+  des outils sont déclarés ; absent → requête identique. Test « régression 29/10 » — 142 tests.
+  Pas encore vu en conditions réelles (une réponse muette ne se provoque pas à la demande).
 
 ## Nutrition : barre du jour en citron plein hors aujourd'hui (25/10/2026, v3.119.1)
 

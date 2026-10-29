@@ -1350,6 +1350,7 @@ le tap, phrase fixe et `tool_result` mis à jour, aucun nouvel appel à l'IA. «
 (`copyEntries`) et ajouter un aliment habituel — à écrire dans `foodLog` ET à dériver dans
 `macroLog` depuis App, l'onglet Nutrition (qui fait la dérivation M6) n'étant pas forcément monté.
 Correctif v3.130.1 : Jeffrey recomptait une eau déjà ajoutée (aucune double écriture). Ses données comptent déjà les actions confirmées : c'est désormais dit dans ses règles et en tête des données, et le résultat d'une eau confirmée donne le nouveau total.
+Correctif v3.130.2 : la relance d'une réponse sans texte part avec les outils interdits (`tool_choice: none`), donc toujours une réponse écrite.
 
 ### J4 — Le brief du matin en notification
 

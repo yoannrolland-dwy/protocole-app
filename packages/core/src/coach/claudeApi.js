@@ -231,11 +231,13 @@ export function messagesEndpoint({ provider, baseUrl, apiKey }) {
  * serait dupliqué). `onText(delta, texteComplet)` à chaque morceau visible.
  * Retourne { message, usedModel, cents } — `message` a la forme d'une réponse non-flux.
  */
-export async function streamClaude({ apiKey, model, system, messages, effort, maxTokens, tools, onText, onRetry, provider = "anthropic", baseUrl, streamTransport = fetchStreamTransport, retryDelays = [1200, 4000] }) {
+export async function streamClaude({ apiKey, model, system, messages, effort, maxTokens, tools, toolChoice, onText, onRetry, provider = "anthropic", baseUrl, streamTransport = fetchStreamTransport, retryDelays = [1200, 4000] }) {
   const attempt = async (m) => {
     const body = { model: m, max_tokens: maxTokens, system, messages, stream: true };
     if (effort && SUPPORTS_EFFORT.has(baseModel(m))) body.output_config = { effort };
     if (tools) body.tools = tools;
+    // `{ type: "none" }` : outils déclarés (le cache tient) mais réponse écrite obligatoire.
+    if (tools && toolChoice) body.tool_choice = toolChoice;
     const acc = createMessageAccumulator({ onText });
     const { url, headers } = messagesEndpoint({ provider, baseUrl, apiKey });
     let res;
