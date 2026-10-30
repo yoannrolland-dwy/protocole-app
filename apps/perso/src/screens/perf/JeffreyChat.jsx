@@ -104,10 +104,19 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
   const [speakingId, setSpeakingId] = useState(null);
   // Voix indisponible (pas de réseau, serveur arrêté) : une ligne discrète, la réponse reste écrite.
   const [voiceNote, setVoiceNote] = useState("");
-  const endRef = useRef(null);
+  const composerRef = useRef(null);
+  const bottomRef = useRef(null);
   const busy = live != null;
 
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "nearest" }); }, [entries.length, busy]);
+  // À l'ouverture (onglet Analyse, bulle, carte du Bord) : tout en bas de la conversation, champ et
+  // boutons à portée de pouce (30/10/2026). Une image plus tard, car l'app remet l'écran en haut à
+  // chaque changement d'onglet et son effet passe après celui-ci.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: "end" }));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  // À chaque message : le champ de saisie reste visible (fin de la réponse juste au-dessus).
+  useEffect(() => { composerRef.current?.scrollIntoView({ block: "nearest" }); }, [entries.length, busy]);
 
   // Demande lancée à l'ouverture (carte du tableau de bord), une seule fois.
   const asked = useRef(false);
@@ -260,7 +269,6 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
             {lastEntry?.role === "user" && <Button variant="outline" onClick={retry}>Réessayer</Button>}
           </div>
         )}
-        <div ref={endRef} />
       </div>
 
       {quick?.options?.length > 0 && (
@@ -273,7 +281,7 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
 
       {voiceNote && <div className="p-sec" role="status">{voiceNote}</div>}
 
-      <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+      <div ref={composerRef} style={{ display: "flex", gap: 8, alignItems: "flex-end", scrollMarginBottom: 12 }}>
         <textarea className="p-field" rows={2} value={draft} disabled={busy || listening}
           placeholder={sayStable("chatPlaceholder")} aria-label="Message à Jeffrey" enterKeyHint="send"
           onChange={(e) => setDraft(e.target.value)}
@@ -294,7 +302,7 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
         <Button variant="outline" disabled={busy} onClick={() => ask(jeffreyAsk("bilan", { bilanUser: coach.buildBilan().user }))}>Bilan 3 mois</Button>
       </div>
 
-      <div>
+      <div ref={bottomRef} style={{ scrollMarginBottom: 24 }}>
         <button type="button" className="p-tap" onClick={() => setOpenNote((o) => !o)} aria-expanded={openNote}
           style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", minHeight: 48, padding: 0, background: "none", border: "none", fontFamily: "inherit" }}>
           {openNote ? <ChevronDown size={18} color={T.c.text2} aria-hidden="true" /> : <ChevronRight size={18} color={T.c.text2} aria-hidden="true" />}

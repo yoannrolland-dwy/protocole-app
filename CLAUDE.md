@@ -5888,3 +5888,14 @@ de débordement, aucune erreur console.
 - Tests : `nutritionStats.test.mjs` (4 tests) — 168 au total. Aperçu (375 px, 35 jours
   synthétiques) : les 5 cartes, barres présentes, sous-onglets restés en haut après défilement,
   aucun débordement horizontal, aucune erreur console. Builds perso et public propres.
+
+## Jeffrey s'ouvre tout en bas de la conversation (30/10/2026, apps/perso v3.140.1)
+
+Demande de Yoann : en ouvrant Jeffrey, arriver tout en bas, champ et boutons à portée de pouce,
+dans tous les écrans. `JeffreyChat` (partagé par l'onglet Analyse et la surimpression ouverte par
+la bulle ou la carte du Bord) défile à l'ouverture jusqu'au bas de la carte (« Note du jour »
+comprise), une image plus tard (`requestAnimationFrame`) : `App.jsx` remet `<main>` en haut à
+chaque changement d'onglet, et cet effet passe après celui de la conversation. À chaque message, le
+champ de saisie reste visible (il remplace l'ancien repère placé au-dessus de lui, qui laissait le
+champ sous le bord de l'écran après une longue réponse). Vérifié dans l'aperçu (375 px, 16
+messages) : Analyse, bulle et carte du Bord ouvrent toutes en bas, aucune erreur console.
