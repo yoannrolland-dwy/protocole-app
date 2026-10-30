@@ -23,7 +23,7 @@ import { Eyebrow, Button, IconButton, Chip, NumberField, TextField } from "../de
 import { searchCiqual, normalize, getCiqual } from "@rawcare/core/nutrition/ciqual";
 import { searchOFF, getOFFByBarcode } from "@rawcare/core/nutrition/off";
 import { suggestions, searchBoost, MACROS, newQuickRef, portionsFor, compileRecipe, recipeAsFood, isRecipeRef,
-         applyOverride } from "./foodStore.js";
+         applyOverride, recipePortionGrams } from "./foodStore.js";
 import { scanBarcode } from "@rawcare/core/nutrition/scan";
 import RestaurantMenu from "./RestaurantMenu.jsx";
 import PhotoDish from "./PhotoDish.jsx";
@@ -368,6 +368,8 @@ function IngredientPicker({ onAdd, onCancel, log, pins, muted }) {
 function RecipeBuilder({ recipe, onSave, onBack, log, pins, muted }) {
   const [name, setName] = useState(recipe?.name ?? "");
   const [ingredients, setIngredients] = useState(recipe?.ingredients ?? []);
+  // Portions (30/10/2026) : en combien la recette se partage, pour proposer 1 portion à l'ajout.
+  const [portions, setPortions] = useState(recipe?.portions ?? 1);
   const [picking, setPicking] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
 
@@ -386,8 +388,9 @@ function RecipeBuilder({ recipe, onSave, onBack, log, pins, muted }) {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recipe]);
-  const compiled = useMemo(() => compileRecipe(name || "?", ingredients), [name, ingredients]);
+  const compiled = useMemo(() => compileRecipe(name || "?", ingredients, null, portions), [name, ingredients, portions]);
   const ok = name.trim().length > 0 && ingredients.length > 0;
+  const portionG = recipePortionGrams(compiled);
 
   if (picking) {
     return <IngredientPicker onCancel={() => setPicking(false)} log={log} pins={pins} muted={muted}
@@ -451,7 +454,17 @@ function RecipeBuilder({ recipe, onSave, onBack, log, pins, muted }) {
         </div>
       )}
 
-      <Btn variant="primary" disabled={!ok} onClick={() => onSave(name.trim(), ingredients)}>
+      <div style={{ display: "grid", gap: 6 }}>
+        <Label>Portions</Label>
+        <Stepper value={portions} step={1} min={1} int set={(v) => setPortions(Math.max(1, Math.round(v || 1)))} />
+        {ingredients.length > 0 && (
+          <div style={{ fontFamily: C.mono, fontSize: 13, color: C.text2 }}>
+            1 portion = {portionG} g · <span style={{ color: C.accent, fontWeight: 700 }}>{val(kcalFor(compiled.per100, portionG))} kcal</span>
+          </div>
+        )}
+      </div>
+
+      <Btn variant="primary" disabled={!ok} onClick={() => onSave(name.trim(), ingredients, portions)}>
         {recipe ? "Enregistrer les modifications" : "Enregistrer la recette"}
       </Btn>
     </div>
@@ -501,6 +514,21 @@ function QtyPanel({ food, initialQ, portions, onSavePortion, onRemovePortion, on
         {/* Entrée = Ajouter : régler la quantité puis valider sans quitter le clavier. */}
         <NumberField value={qTxt} onChange={setQTxt} unit="g" step={10} min={1} inputMode="numeric"
           label="Quantité en grammes" onEnter={submit} big />
+
+        {/* Portions d'une recette (30/10/2026) : 1 · 2 · 3… jusqu'au nombre de portions. */}
+        {food.portions > 1 && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {Array.from({ length: food.portions }, (_, i) => i + 1).map((n) => {
+              // Calculé sur le poids total, pas « portion arrondie × n » : 4 portions = la recette entière.
+              const g = Math.round((food.totalWeight * n) / food.portions);
+              return (
+                <Chip key={n} on={q === g} onClick={() => setQ(g)}>
+                  {n} portion{n > 1 ? "s" : ""} · <span style={mono}>{g}</span> g
+                </Chip>
+              );
+            })}
+          </div>
+        )}
 
         {portions.length > 0 && (
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -687,6 +715,16 @@ export default function FoodSearch({
   // profit de CIQUAL — un favori mettait donc plus de temps à retrouver que la première
   // fois. `sugg` porte déjà tous les favoris/récents (jamais limité, voir foodStore), un
   // simple filtre texte local suffit, sans nouvelle requête ni debounce.
+  // Une recette ouverte depuis les habituels ou une recherche n'a pas ses portions (la ligne
+  // vient du journal) : on les reprend de la recette enregistrée. Une recette partagée en
+  // plusieurs portions propose toujours 1 portion, jamais la quantité de la dernière fois.
+  const selFood = useMemo(() => {
+    if (!sel || !isRecipeRef(sel.ref) || sel.portions) return sel;
+    const r = recipes?.find((x) => `recipe:${x.id}` === sel.ref);
+    if (!r) return sel;
+    const { portions: n, portionGrams, totalWeight, grp } = recipeAsFood(r);
+    return { ...sel, portions: n, portionGrams, totalWeight, grp };
+  }, [sel, recipes]);
   const favMatches = useMemo(() => {
     if (showSugg) return [];
     const nq = normalize(q);
@@ -722,8 +760,8 @@ export default function FoodSearch({
         {building ? (
           <RecipeBuilder recipe={editingRecipe} log={log} pins={pins} muted={muted}
             onBack={() => { setBuilding(false); setEditingRecipe(null); }}
-            onSave={(name, ingredients) => {
-              const r = compileRecipe(name, ingredients, editingRecipe);
+            onSave={(name, ingredients, nPortions) => {
+              const r = compileRecipe(name, ingredients, editingRecipe, nPortions);
               if (editingRecipe) onUpdateRecipe(r); else onCreateRecipe(r);
               setBuilding(false);
               setEditingRecipe(null);
@@ -738,7 +776,7 @@ export default function FoodSearch({
         ) : photoMode ? (
           <PhotoDish ai={ai} onAdd={onAdd} onBack={() => setPhotoMode(false)} />
         ) : sel ? (
-          <QtyPanel food={sel} initialQ={sel.lastQ ?? sel.defaultQ}
+          <QtyPanel food={selFood} initialQ={selFood.portions > 1 ? selFood.portionGrams : sel.lastQ ?? sel.defaultQ}
             portions={portionsFor(portions, sel.ref)} onSavePortion={onSavePortion} onRemovePortion={onRemovePortion}
             override={overrides?.[sel.ref]} onSaveOverride={onSaveOverride} onClearOverride={onClearOverride}
             onAdd={onAdd} onBack={() => setSel(null)} />

@@ -274,7 +274,10 @@ export function portionsFor(portions, ref) {
 // aliment CIQUAL dont la fiche serait corrigée) plutôt que d'en générer une nouvelle. Les
 // entrées de journal déjà loguées avec cette recette gardent leur `per100` figé à la saisie
 // (M1) : modifier une recette ne réécrit jamais rétroactivement ce qui a déjà été mangé.
-export function compileRecipe(name, ingredients, existing) {
+// `portions` (30/10/2026) : en combien de portions la recette se partage (« 800 g en 4 » →
+// 1 portion = 200 g). Absent : on garde celui de la recette modifiée, sinon 1 (recette entière,
+// comportement d'avant). Seule une quantité proposée en dépend, jamais les valeurs pour 100 g.
+export function compileRecipe(name, ingredients, existing, portions) {
   const totalWeight = ingredients.reduce((s, i) => s + i.q, 0);
   const per100 = {};
   for (const m of MACROS) {
@@ -294,15 +297,25 @@ export function compileRecipe(name, ingredients, existing) {
     totalWeight,
     ingredients: ingredients.map((i) => ({ ref: i.ref, name: i.name, q: i.q, per100: i.per100 })),
     per100,
+    portions: Math.max(1, Math.round(portions ?? existing?.portions ?? 1)),
     createdAt: existing?.createdAt ?? new Date().toISOString(),
   };
 }
 
+/** Nombre de portions d'une recette stockée (1 pour une recette d'avant le 30/10/2026). */
+export const recipePortions = (r) => Math.max(1, Math.round(r?.portions ?? 1));
+
+/** Poids d'une portion, en grammes entiers. */
+export const recipePortionGrams = (r) => Math.round((r?.totalWeight ?? 0) / recipePortions(r));
+
 /** Forme "aliment" d'une recette stockée, pour l'utiliser dans la recherche/QtyPanel
- * exactement comme un résultat CIQUAL/OFF. `defaultQ` = tout le lot (pas 100 g) : une
- * recette se mange en général en une fois, pas par portion de 100 g. */
+ * exactement comme un résultat CIQUAL/OFF. `defaultQ` = une portion (tout le lot pour une
+ * recette en 1 portion) : une recette se mange par portion, pas par tranche de 100 g. */
 export function recipeAsFood(r) {
-  return { ref: `recipe:${r.id}`, name: r.name, grp: `Recette · ${r.totalWeight} g`, per100: r.per100, defaultQ: r.totalWeight };
+  const portions = recipePortions(r);
+  const portionGrams = recipePortionGrams(r);
+  const grp = portions > 1 ? `Recette · ${r.totalWeight} g · ${portions} portions` : `Recette · ${r.totalWeight} g`;
+  return { ref: `recipe:${r.id}`, name: r.name, grp, per100: r.per100, defaultQ: portionGrams, portions, portionGrams, totalWeight: r.totalWeight };
 }
 
 export const isRecipeRef = (ref) => typeof ref === "string" && ref.startsWith("recipe:");

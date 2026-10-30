@@ -53,3 +53,27 @@ test("correction (Retirer) : ligne négative soustraite des totaux, marquée, ex
   const stats = usageStats([plus, moins], { date: T0 });
   assert.ok(stats.has("quick:a") && !stats.has("quick:b"), "la correction ne remonte jamais dans les habituels");
 });
+
+test("recette en portions (30/10/2026) : 800 g en 4 → 1 portion = 200 g proposée, per100 inchangé", async () => {
+  const { compileRecipe, recipeAsFood, recipePortionGrams } = await import("../src/nutrition/foodStore.js");
+  const ings = [{ ref: "ciqual:1", name: "Riz", q: 500, per100: { kcal: 130, prot: 2.5, gluc: 28, lip: 0.3, fib: 0.4 } },
+                { ref: "ciqual:2", name: "Poulet", q: 300, per100: { kcal: 120, prot: 23, gluc: 0, lip: 2.5, fib: 0 } }];
+  const one = compileRecipe("Riz poulet", ings);
+  const four = compileRecipe("Riz poulet", ings, null, 4);
+  assert.equal(one.portions, 1);
+  assert.deepEqual(four.per100, one.per100, "les valeurs pour 100 g ne dépendent pas des portions");
+  assert.equal(recipePortionGrams(four), 200);
+  const f = recipeAsFood(four);
+  assert.equal(f.defaultQ, 200);
+  assert.equal(f.portions, 4);
+  assert.equal(f.totalWeight, 800);
+  assert.match(f.grp, /4 portions/);
+  // Recette d'avant (sans champ portions) : tout le lot, comme avant.
+  const old = { ...one }; delete old.portions;
+  assert.equal(recipeAsFood(old).defaultQ, 800);
+  assert.equal(recipeAsFood(old).grp, "Recette · 800 g");
+  // Modifier sans préciser garde le nombre de portions ; le préciser le remplace.
+  assert.equal(compileRecipe("Riz poulet", ings, four).portions, 4);
+  assert.equal(compileRecipe("Riz poulet", ings, four, 5).portions, 5);
+  assert.equal(recipePortionGrams(compileRecipe("Riz poulet", ings, four, 5)), 160);
+});

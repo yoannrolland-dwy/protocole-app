@@ -5899,3 +5899,28 @@ chaque changement d'onglet, et cet effet passe après celui de la conversation. 
 champ de saisie reste visible (il remplace l'ancien repère placé au-dessus de lui, qui laissait le
 champ sous le bord de l'écran après une longue réponse). Vérifié dans l'aperçu (375 px, 16
 messages) : Analyse, bulle et carte du Bord ouvrent toutes en bas, aucune erreur console.
+
+## Recettes en portions (30/10/2026, apps/perso v3.141.0)
+
+Demande de Yoann : partager une recette en portions pour n'en ajouter qu'une à un repas.
+- **`compileRecipe(name, ingredients, existing, portions)`** (`packages/core/src/nutrition/foodStore.js`) :
+  la recette garde `portions` (1 par défaut ; en modification, celui de la recette d'origine si rien
+  n'est précisé). `recipePortions`, `recipePortionGrams` (poids total ÷ portions, arrondi au gramme).
+  `recipeAsFood` porte `portions`, `portionGrams`, `totalWeight`, et `defaultQ` = **une portion**
+  (tout le lot pour une recette en 1 portion, donc les recettes d'avant ne changent pas). Les
+  valeurs pour 100 g ne dépendent jamais du nombre de portions.
+- **Création et modification de recette** (`RecipeBuilder`) : champ « Portions » (−/+) sous le total,
+  avec « 1 portion = 200 g · 252 kcal ».
+- **Réglage de la quantité** (`QtyPanel`) : boutons « 1 portion · 200 g », « 2 portions · 400 g »…
+  jusqu'au nombre de portions (grammes calculés sur le poids total, donc la dernière = la recette
+  entière). **Choix de Yoann : toujours 1 portion proposée** pour une recette en plusieurs
+  portions, même si la dernière fois en comptait deux, et que la recette soit ouverte depuis « Vos
+  recettes », les habituels ou la recherche (`selFood` reprend les portions de la recette
+  enregistrée). Les ajouts en un tap (pastilles d'habituels, bouton +) gardent la quantité de la
+  dernière fois, affichée en grammes.
+- Recette passée de 4 à 5 portions avec le crayon : 1 portion devient 160 g. Les repas déjà
+  enregistrés ne changent pas.
+- Test `nutrition.test.mjs` — 169 tests. Aperçu (375 px) : recette d'avant modifiée en 4 portions,
+  boutons 1 à 4, 2 portions ajoutées (400 g dans le journal), réouverte depuis les habituels →
+  200 g proposés, aucune erreur console. `apps/public` : rien de visible (pas de champ Portions,
+  `defaultQ` inchangé pour une recette en 1 portion).
