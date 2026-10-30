@@ -5771,3 +5771,38 @@ phrase** ; brief **préparé à l'avance** ; **une seule vitesse** dans les Rég
 
   Arrêt en pleine parole vérifié. **Non mesuré** : réseau mobile, Bluetooth, brief réel app fermée,
   et le délai complet d'une question dictée (la réflexion du LLM, 7-11 s, se mesure à part).
+
+## Retours du premier vrai brief (30/10/2026, apps/perso v3.137.0)
+
+Premier brief réel le 30/10 : réveil à 5 h 17, notification « il me manque la nuit et la pesée »,
+app ouverte à 5 h 26 → brief écrit par l'app (176 mots, 9,9 ¢), audio prêt aussitôt, « Écouter »
+immédiat. Six retours de Yoann, choix tranchés par question :
+- **Widget** : la tuile Poids devient un **raccourci vers le Bord**. Elle affiche la cloche de
+  Jeffrey (`ic_jeffrey_bell.xml`, l'icône Lucide « concierge-bell » de la bulle) et ouvre
+  `open_tab=dash`. Le poids n'est plus envoyé au widget (`WidgetBridgePlugin.KEYS`).
+- **Musique** : elle se met en **pause** pendant que Jeffrey parle, puis reprend
+  (`AUDIOFOCUS_GAIN_TRANSIENT` au lieu de `…_MAY_DUCK`). Baissée par Android, elle couvrait encore
+  sa voix ; une app ne peut pas choisir de combien Android baisse la musique.
+- **Volume, travail indirect** (`volume.js`, `indirectGroupOf`) :
+  - une série de développé (poussée pecs/épaules) compte pour **½ série de triceps** ;
+  - une série de tirage ou de rowing (dos) compte pour **½ série de biceps** ;
+  - le face pull et l'écarté n'en font pas partie ;
+  - `series` = direct + ½ indirect, avec `direct` et `indirect` détaillés. La carte affiche
+    « 3 + ½ × 6 développés » ;
+  - le Coach IA reçoit les totaux (`volume_hebdo_series` gagne biceps/triceps).
+- **Gêne en escalade** : nouvelle zone **orteils** (`GENE_ZONES`, `pull: false`). À ≥ 4/10, elle
+  pénalise l'escalade du lendemain (−12), **jamais le haut du corps** : la pénalité Upper (−8) ne
+  regarde que doigts/poignets/coudes (`sessionGene(s, { pullOnly: true })`). La gêne pilotait
+  déjà le recommandeur depuis le 08/10.
+- **Brief** (`core/coach/brief.js`) :
+  - **plus de notification « il me manque… » avant 9 h** (`briefDecision` → `wait`). La relance
+    sonore de 9 h et le brief de 10 h sont inchangés ;
+  - **réveils toutes les 5 min** au lieu de 20 (`BRIEF.stepMin`) : le brief part au plus 5 min
+    après la dernière donnée, app fermée ;
+  - **quand l'app écrit le brief, la notification part aussi**, sans bruit (`Brief.post`,
+    `postBriefNotification`).
+- **Challenge de Yoann sur 5 h 17** : avec sa routine (montre → Health Connect, app ouverte pour
+  le genou, pesée), c'est presque toujours l'app qui écrit le brief. Les réveils restent un filet
+  gratuit (aucun appel à l'IA tant qu'il manque une donnée).
+- Constat de coût, sans changement : avec Opus 5.5, chaque réponse de Jeffrey coûte 6 à 11 ¢
+  (environ 62 ¢ le matin du 30/10, bilan compris).

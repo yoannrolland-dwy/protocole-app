@@ -234,10 +234,15 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   // Gêne articulaire notée PENDANT la dernière escalade (08/10/2026, sessionLoad.js) : à
   // partir de GENE_THRESHOLD/10, le lendemain pénalise l'escalade (plus fort) et le tirage
   // lourd — même logique qu'une zone ambre, mais sur un seul jour et sans journal quotidien.
+  // Les orteils (30/10/2026) ne pénalisent que l'escalade : le haut du corps ne les sollicite pas.
   const climbGene = dClimb <= 1 ? sessionGene(lastClimb) : null;
+  const pullGene = dClimb <= 1 ? sessionGene(lastClimb, { pullOnly: true }) : null;
   const geneHot = !!(climbGene && climbGene.pain >= GENE_THRESHOLD);
+  const pullGeneHot = !!(pullGene && pullGene.pain >= GENE_THRESHOLD);
   const GENE_PEN = { upper: 8, climb: 12 };
-  const geneWhy = geneHot ? `Gêne ${geneZoneLabel(climbGene.zone)} ${climbGene.pain}/10 à la dernière escalade → à ménager.` : "";
+  const geneText = (g) => `Gêne ${geneZoneLabel(g.zone)} ${g.pain}/10 à la dernière escalade → à ménager.`;
+  const geneWhy = geneHot ? geneText(climbGene) : "";
+  const pullGeneWhy = pullGeneHot ? geneText(pullGene) : "";
 
   // Zones de douleur, génériques par tag de charge (RawCare Phase 1) — `buildZones`
   // (packages/core/src/pain.js) sait désormais gérer N zones arbitraires ; `apps/perso`
@@ -350,7 +355,7 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
     if (kneeRed) { upScore += 18; upReason += " Genou à ménager → c'est l'option sûre, jambes au repos."; }
     if (elbowAmber) { upScore -= AMBER_PENALTY.tirage["Upper A"]; upReason += ` ${elbowWhy} → charge de tirage prudente, prises neutres/pronation.`; }
     if (dClimb <= 1) { upScore -= climbPen; upReason += ` ${climbWhy}`; }
-    if (geneHot) { upScore -= GENE_PEN.upper; upReason += ` ${geneWhy}`; }
+    if (pullGeneHot) { upScore -= GENE_PEN.upper; upReason += ` ${pullGeneWhy}`; }
     if (dUpper === 0) { upScore -= 32; upReason = `Haut du corps déjà fait aujourd'hui (${upper7}/2 cette semaine) — à reprendre après récupération.`; }
     upScore = fatigueScore(upScore);
     const upFat = fatigueReason(); if (upFat) upReason += ` ${upFat}`;

@@ -16,10 +16,12 @@ test("briefMissing : nuit, pesée, genou du jour, dans cet ordre", () => {
   assert.deepEqual(briefMissing({ today: D, sleep: [{ date: D }], weight: [{ date: D }], knee: [{ date: D }] }), []);
 });
 
-test("briefDecision : attendre, mettre à jour sans bruit, relancer à 9 h une fois, brief à 10 h ou dès que tout est là", () => {
+test("briefDecision : attendre en silence avant 9 h, relancer à 9 h une fois, brief à 10 h ou dès que tout est là", () => {
   const miss = ["genou"];
   assert.equal(briefDecision({ now: t(5, 0), today: D, missing: miss }), "wait");
-  assert.equal(briefDecision({ now: t(5, 17), today: D, missing: miss }), "update");
+  // 30/10/2026 : plus de notification « il me manque… » avant 9 h.
+  assert.equal(briefDecision({ now: t(5, 17), today: D, missing: miss }), "wait");
+  assert.equal(briefDecision({ now: t(8, 59), today: D, missing: miss }), "wait");
   assert.equal(briefDecision({ now: t(6, 40), today: D, missing: [] }), "brief");
   assert.equal(briefDecision({ now: t(9, 0), today: D, missing: miss }), "remind");
   assert.equal(briefDecision({ now: t(9, 20), today: D, missing: miss, state: { remindedDate: D } }), "update");
@@ -31,11 +33,12 @@ test("briefDecision : attendre, mettre à jour sans bruit, relancer à 9 h une f
   assert.equal(briefDecision({ now: t(7, 0), today: D, missing: [], state: { doneDate: "2026-10-29", appDate: "2026-10-29" } }), "brief");
 });
 
-test("nextBriefAlarm : 5 h 17, puis toutes les 20 min sans sauter 9 h ni 10 h, puis demain", () => {
+test("nextBriefAlarm : 5 h 17, puis toutes les 5 min sans sauter 9 h ni 10 h, puis demain", () => {
   assert.equal(hm(nextBriefAlarm(t(3, 0))), "30 05:17");
-  assert.equal(hm(nextBriefAlarm(t(5, 17))), "30 05:37");
-  assert.equal(hm(nextBriefAlarm(t(8, 50))), "30 09:00");
-  assert.equal(hm(nextBriefAlarm(t(9, 50))), "30 10:00");
+  assert.equal(hm(nextBriefAlarm(t(5, 17))), "30 05:22");
+  assert.equal(hm(nextBriefAlarm(t(8, 57))), "30 09:00");
+  assert.equal(hm(nextBriefAlarm(t(9, 50))), "30 09:55");
+  assert.equal(hm(nextBriefAlarm(t(9, 57))), "30 10:00");
   assert.equal(hm(nextBriefAlarm(t(10, 0))), "31 05:17");
   assert.equal(hm(nextBriefAlarm(t(6, 0), { doneToday: true })), "31 05:17");
   assert.equal(hm(nextBriefAlarm(t(23, 0))), "31 05:17");

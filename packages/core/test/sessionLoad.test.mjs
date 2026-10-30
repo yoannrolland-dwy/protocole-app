@@ -60,6 +60,20 @@ test("recommandeur : gêne ≥ 4 à la dernière escalade pénalise Escalade (�
   assert.equal(score(hot, "Escalade"), score(none, "Escalade") - 12);
 });
 
+test("gêne aux orteils (30/10/2026) : pénalise l'escalade du lendemain, jamais le haut du corps", () => {
+  const run = (gene) => recommendSessions(base({ limit: 10, training: [{ date: d(1), type: "Escalade", duration: 60, rpe: 7, ...(gene ? { gene } : {}) }] }));
+  const none = run(null), toes = run({ orteils: 7 }), both = run({ orteils: 7, coudes: 5 });
+  const up = (r) => r.suggestions.find((s) => s.type.startsWith("Upper"));
+  assert.equal(score(toes, "Escalade"), score(none, "Escalade") - 12);
+  assert.equal(up(toes).score, up(none).score, "orteils : rien sur le haut du corps");
+  assert.ok(!up(toes).reason.includes("orteils"));
+  // Orteils 7 et coudes 5 : l'escalade cite la plus forte (orteils), le haut du corps les coudes.
+  assert.equal(up(both).score, up(none).score - 8);
+  assert.ok(up(both).reason.includes("Gêne coudes 5/10"));
+  assert.ok(both.suggestions.concat(both.avoid).some((s) => s.type === "Escalade" && (s.reason || "").includes("Gêne orteils 7/10")));
+  assert.equal(geneLabel({ gene: { orteils: 4 } }), "gêne orteils 4/10");
+});
+
 test("prompt : charge/niveau et gêne dans les séances sans séries, légende gêne conditionnelle", () => {
   const empty = { weight: [], sleep: [], knee: [], macros: [], notes: [], steps: [], targets: DEFAULT_TARGETS, phase: "seche", foodLog: [], foodOverrides: {}, profile: "", journal: "" };
   const a = buildCoachPrompt({ ...empty, training: [{ date: d(1), type: "Escalade", duration: 60, rpe: 7 }] }, "").user;

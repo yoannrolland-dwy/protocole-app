@@ -46,10 +46,13 @@ export function loadLabel(session) {
    lendemain l'escalade et le tirage lourd (recommender.js). Si une gêne revient plusieurs
    séances de suite, c'est le signal pour rouvrir une vraie zone de douleur. */
 
+// `pull` : la zone est aussi sollicitée par le tirage du haut du corps (Upper). Les orteils
+// (chaussons d'escalade, 30/10/2026) ne pénalisent que l'escalade du lendemain.
 export const GENE_ZONES = [
-  { key: "doigts", label: "Doigts" },
-  { key: "poignets", label: "Poignets" },
-  { key: "coudes", label: "Coudes" },
+  { key: "doigts", label: "Doigts", pull: true },
+  { key: "poignets", label: "Poignets", pull: true },
+  { key: "coudes", label: "Coudes", pull: true },
+  { key: "orteils", label: "Orteils", pull: false },
 ];
 export const GENE_THRESHOLD = 4;
 
@@ -65,10 +68,11 @@ export function sessionGenes(session) {
   return list.length ? list : null;
 }
 
-/** La gêne la plus forte (`{ zone, pain }`) ou `null` — c'est elle qui pilote la pénalité. */
-export function sessionGene(session) {
-  const list = sessionGenes(session);
-  return list ? list.reduce((a, b) => (b.pain > a.pain ? b : a)) : null;
+/** La gêne la plus forte (`{ zone, pain }`) ou `null` — c'est elle qui pilote la pénalité.
+ *  `{ pullOnly: true }` : seulement parmi les zones que le tirage du haut du corps sollicite. */
+export function sessionGene(session, { pullOnly = false } = {}) {
+  const list = (sessionGenes(session) || []).filter((g) => !pullOnly || GENE_ZONES.find((z) => z.key === g.zone)?.pull);
+  return list.length ? list.reduce((a, b) => (b.pain > a.pain ? b : a)) : null;
 }
 
 export const geneZoneLabel = (key) => GENE_ZONES.find((z) => z.key === key)?.label?.toLowerCase() || key;

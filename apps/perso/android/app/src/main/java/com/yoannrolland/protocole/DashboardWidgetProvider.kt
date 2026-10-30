@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Widget d'écran d'accueil : 5 tuiles du tableau de bord (Poids, Calories, Énergie,
+ * Widget d'écran d'accueil : 5 tuiles du tableau de bord (Bord, Calories, Énergie,
  * Pas, Eau) en lecture seule, plus un bouton Sync. Tap sur une tuile de donnée = ouvre l'app
  * sur l'écran correspondant (TILE_TABS) ; tap sur le fond = ouvre l'app normalement. Le bouton Sync, lui, lance
  * SilentSyncActivity (invisible) qui exécute la synchro Health Connect sans jamais
@@ -116,7 +116,7 @@ class DashboardWidgetProvider : AppWidgetProvider() {
         // dans l'extra EXTRA_OPEN_TAB, lu puis effacé par le JS (WidgetBridge.consumeOpenTab).
         // Un code de requête par tuile, sinon Android réutiliserait le même PendingIntent et ses extras.
         private val TILE_TABS = listOf(
-            Triple(R.id.tile_poids, "weight", 10),
+            Triple(R.id.tile_bord, "dash", 10),
             Triple(R.id.tile_calories, "macro", 11),
             Triple(R.id.tile_energie, "sleep", 12),
             Triple(R.id.tile_pas, "steps", 13),
@@ -126,7 +126,6 @@ class DashboardWidgetProvider : AppWidgetProvider() {
         private fun buildViews(context: Context, prefs: SharedPreferences, syncAngle: Float): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.widget_dashboard)
 
-            fillTile(views, R.id.tile_poids_value, R.id.tile_poids_note, prefs, "poids")
             fillTile(views, R.id.tile_pas_value, R.id.tile_pas_note, prefs, "pas")
             fillTile(views, R.id.tile_calories_value, R.id.tile_calories_note, prefs, "calories")
             fillTile(views, R.id.tile_eau_value, R.id.tile_eau_note, prefs, "eau")

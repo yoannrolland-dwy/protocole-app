@@ -1,7 +1,7 @@
 // Volume hebdomadaire par groupe musculaire (volume.js) — chantier T2, 04/10/2026.
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import { weeklyVolumeByGroup, volumeForCoach, groupOf, zoneStatus, PRIORITY_GROUPS, VOLUME_TARGET } from "../src/volume.js";
+import { weeklyVolumeByGroup, volumeForCoach, groupOf, indirectGroupOf, zoneStatus, PRIORITY_GROUPS, VOLUME_TARGET } from "../src/volume.js";
 import { buildCoachPrompt } from "../src/coach/prompt.js";
 import { DEFAULT_TARGETS } from "../src/targets.js";
 import { fixClock, T0, d, summaryOf } from "./_helpers.mjs";
@@ -75,9 +75,30 @@ test("Coach IA : volume_hebdo_series dans le résumé + consigne quand il y a de
   const training = [{ date: d(1), type: "Upper A", exercices: [ex("Développé incliné haltères", 3), ex("Rowing barre ou machine", 4)] }];
   const u = buildCoachPrompt({ ...empty, training, phase: "seche" }, "").user;
   const s = summaryOf(u);
-  assert.deepEqual(s.volume_hebdo_series, { pecs: 3, epaules: 0, dos: 4 });
+  assert.deepEqual(s.volume_hebdo_series, { pecs: 3, epaules: 0, dos: 4, biceps: 2, triceps: 1.5 });
   assert.deepEqual(volumeForCoach(training), s.volume_hebdo_series);
   assert.match(u, /volume_hebdo_series.*zone cible 10-20 séries\/semaine pour pecs\/epaules/);
   const u0 = buildCoachPrompt({ ...empty, phase: "seche" }, "").user;
   assert.ok(!u0.includes("volume_hebdo"), "aucune série : prompt sans ce champ ni cette consigne");
+});
+
+test("travail indirect (30/10/2026) : développés → triceps à ½, tirages du dos → biceps à ½", () => {
+  assert.equal(indirectGroupOf({ nom: "Développé couché haltères" }), "triceps");
+  assert.equal(indirectGroupOf({ nom: "Développé militaire haltères" }), "triceps");
+  assert.equal(indirectGroupOf({ nom: "Tirage vertical prise neutre" }), "biceps");
+  assert.equal(indirectGroupOf({ nom: "Rowing barre ou machine" }), "biceps");
+  assert.equal(indirectGroupOf({ nom: "Face pull" }), null, "arrière d'épaule : pas de biceps");
+  assert.equal(indirectGroupOf({ nom: "Écarté poulie basse" }), null, "isolation pecs : pas de triceps");
+  const training = [{ date: T0, type: "Upper A", exercices: [
+    ex("Développé incliné haltères", 3), ex("Développé militaire haltères", 2), ex("Extension triceps poulie haute", 3),
+    ex("Tirage vertical prise neutre", 3), ex("Rowing barre ou machine", 3),
+  ] }];
+  const r = weeklyVolumeByGroup(training);
+  const tri = r.groups.find((g) => g.groupe === "triceps");
+  assert.deepEqual([tri.series, tri.direct, tri.indirect], [5.5, 3, 5]);
+  const bi = r.groups.find((g) => g.groupe === "biceps");
+  assert.deepEqual([bi.series, bi.direct, bi.indirect], [3, 0, 6], "biceps visibles même sans curl");
+  // Les groupes d'origine gardent leurs séries directes.
+  assert.equal(byG(r).dos, 6);
+  assert.equal(byG(r).pecs, 3);
 });

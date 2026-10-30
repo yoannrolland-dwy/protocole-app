@@ -22,6 +22,15 @@ class BriefPlugin : Plugin() {
         call.resolve()
     }
 
+    /** Brief écrit par l'app ouverte (30/10/2026) : la notification part quand même, sans bruit
+     *  (Monsieur a l'app sous les yeux), pour le retrouver plus tard. Un tap ouvre la conversation. */
+    @PluginMethod
+    fun post(call: PluginCall) {
+        val text = call.getString("text") ?: return call.reject("texte manquant")
+        BriefRunner.post(context, text, alert = false)
+        call.resolve()
+    }
+
     @PluginMethod
     fun cancelNotification(call: PluginCall) {
         NotificationManagerCompat.from(context).cancel(BriefRunner.NOTIF_ID)

@@ -3,13 +3,16 @@
 // pour qu'il n'y ait jamais deux briefs payés le même matin.
 //
 // Décisions (ROADMAP.md, chantier J, décision 12 et J4) : il attend la nuit, la pesée et le
-// genou ; tant qu'il en manque, une seule notification mise à jour sans bruit, une relance
-// sonore vers 9 h, et à 10 h le brief part avec ce qu'il a. Premier réveil à 5 h 17 (choix de
-// Yoann), puis toutes les 20 minutes. Tous les jours.
+// genou ; une relance sonore vers 9 h s'il en manque encore, et à 10 h le brief part avec ce
+// qu'il a. Premier réveil à 5 h 17 (choix de Yoann), puis toutes les 5 minutes : le brief part
+// au plus 5 min après la dernière donnée. Tous les jours.
+// 30/10/2026, retour du premier vrai brief : plus aucune notification « il me manque… » avant
+// 9 h (au réveil, les données arrivent dans les minutes qui suivent, c'était du bruit) ; réveils
+// toutes les 5 min au lieu de 20 (gratuits : aucun appel à l'IA tant qu'il manque une donnée).
 
 export const BRIEF = {
   start: [5, 17],
-  stepMin: 20,
+  stepMin: 5,
   remind: [9, 0],
   deadline: [10, 0],
   retryMin: 5,
@@ -27,21 +30,23 @@ export function briefMissing({ today, sleep, weight, knee }) {
 /**
  * Que faire à ce réveil ? `state` = { doneDate, appDate, remindedDate } (marqueurs du jour).
  * - skip : brief déjà fait, ou l'app a pris la main ce matin (ouverte avant le brief) ;
- * - wait : trop tôt (réveil en avance) ;
+ * - wait : trop tôt (réveil en avance), ou il manque quelque chose avant 9 h (rien à afficher) ;
  * - brief : tout est là, ou il est 10 h passées ;
  * - remind : il manque encore quelque chose à 9 h passées, relance sonore pas encore faite ;
- * - update : il manque quelque chose, notification mise à jour sans bruit.
+ * - update : il manque encore quelque chose après la relance de 9 h, notification mise à jour
+ *   sans bruit.
  */
 export function briefDecision({ now, today, missing, state = {} }) {
   if (state.doneDate === today || state.appDate === today) return "skip";
   if (now < at(now, BRIEF.start)) return "wait";
   if (!missing.length || now >= at(now, BRIEF.deadline)) return "brief";
-  if (now >= at(now, BRIEF.remind) && state.remindedDate !== today) return "remind";
+  if (now < at(now, BRIEF.remind)) return "wait";
+  if (state.remindedDate !== today) return "remind";
   return "update";
 }
 
 /** Heure du prochain réveil. Brief fait (ou 10 h passées) → demain 5 h 17. Sinon toutes les
- *  20 minutes, sans jamais sauter 9 h (la relance) ni 10 h (l'échéance). */
+ *  5 minutes, sans jamais sauter 9 h (la relance) ni 10 h (l'échéance). */
 export function nextBriefAlarm(now, { doneToday = false } = {}) {
   const start = at(now, BRIEF.start);
   const remind = at(now, BRIEF.remind);

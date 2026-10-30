@@ -8,7 +8,8 @@ import { sayStable } from "../../lib/jeffrey.js";
 // Carte « Volume · 7 jours » (onglet Séances, chantier T2). Lecture seule, dérivée de
 // `trainingLog` — aucune donnée nouvelle. Les groupes prioritaires affichent leur position
 // par rapport à la zone cible (accent = dans la zone, ambre = sous, danger = au-dessus) ; les
-// autres n'affichent que le compte, sans jugement.
+// autres n'affichent que le compte, sans jugement. Biceps et triceps comptent aussi le travail
+// indirect (tirages, développés) à ½ série, détaillé sous le nom (30/10/2026).
 export function VolumeCard({ training }) {
   const { groups } = useMemo(() => weeklyVolumeByGroup(training), [training]);
   const AMBER = C.warn;
@@ -23,14 +24,19 @@ export function VolumeCard({ training }) {
       </div>
       {groups.map((g) => (
         <div key={g.groupe} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderTop: `1px solid ${C.divider}` }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0, flexWrap: "wrap" }}>
             <Body style={{ fontSize: 12, color: g.priority ? C.text : C.muted }}>{g.label}</Body>
             {g.priority && g.series > 0 && (
               <span style={{ fontSize: 12, color: statusColor(g.status) }}>{statusLabel(g.status)}</span>
             )}
+            {g.indirect > 0 && (
+              <span style={{ fontSize: 12, color: C.dim }}>
+                {g.direct} + ½ × {g.indirect} {g.groupe === "triceps" ? "développés" : "tirages"}
+              </span>
+            )}
           </div>
           <span style={{ fontFamily: C.mono, fontSize: 13, fontWeight: 800, color: g.priority ? statusColor(g.status) : C.muted }}>
-            {g.series}{g.priority ? <span style={{ fontSize: 12, fontWeight: 400, color: C.dim }}> / {VOLUME_TARGET.min}-{VOLUME_TARGET.max}</span> : null}
+            {String(g.series).replace(".", ",")}{g.priority ? <span style={{ fontSize: 12, fontWeight: 400, color: C.dim }}> / {VOLUME_TARGET.min}-{VOLUME_TARGET.max}</span> : null}
           </span>
         </div>
       ))}

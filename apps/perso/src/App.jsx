@@ -27,7 +27,7 @@ import { isMatchWeek, isPostMatchDay, planForDate } from "./lib/plan.js";
 import { makeCoach } from "./lib/coachInputs.js";
 import { BRIEF, briefMissing, nextBriefAlarm } from "@rawcare/core/coach/brief";
 import { readBriefState, writeBriefState, runBrief, missingText } from "./lib/brief.js";
-import { scheduleBrief, cancelBriefNotification } from "./lib/briefNative.js";
+import { scheduleBrief, cancelBriefNotification, postBriefNotification } from "./lib/briefNative.js";
 import { streamTransportFor } from "./lib/jeffreyHttp.js";
 import { aiMissing } from "./lib/ai.js";
 import { say } from "./lib/jeffrey.js";
@@ -307,7 +307,6 @@ export default function App({ silent = false } = {}) {
   // qui préfère la durée brute au score de sommeil sur cette tuile).
   useEffect(() => {
     if (loading || !Capacitor.isNativePlatform()) return;
-    const wLast = lastN(weight, 1)[0];
     const lastNightDash = lastN(sleep, 1)[0];
     const energyDash = computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps });
     const mToday = macros.find((m) => m.date === today());
@@ -332,7 +331,6 @@ export default function App({ silent = false } = {}) {
       barColor: progressColor(v, tgt, kind),
     });
     updateDashboardWidget({
-      poids: { value: wLast ? `${wLast.kg} kg` : "—", note: wLast ? fmt(wLast.date) : "—" },
       pas: { value: stepsToday.toLocaleString("fr-FR"), note: `/ ${STEPS_TARGET.toLocaleString("fr-FR")}`,
         color: valColor(progressColor(stepsToday, STEPS_TARGET, "goal")), ...bar(stepsToday, STEPS_TARGET, "goal") },
       calories: { value: kcalToday != null ? `${kcalToday}` : "—", note: `/ ${kcalTgt}`,
@@ -559,9 +557,12 @@ export default function App({ silent = false } = {}) {
       data: { weight, sleep, training, knee, macros, notes, steps, rhr, naps, targets, phase, basketSchedule, targetHistory, palierWeekly, coachProfile, coachJournal, jeffreyPersona },
       ai, transport: streamTransportFor(ai), missing,
     }).then(async (text) => {
-      // Voix (29/10/2026) : l'audio du brief est préparé tout de suite et gardé sur le téléphone ;
-      // lu à voix haute seulement pendant une séance, casque branché.
-      if (text) speak(text, { play: !!getSync("trainingDraft", null)?.type && await headsetConnected() });
+      if (!text) return;
+      // La notification part aussi quand c'est l'app qui écrit le brief (30/10/2026, choix de
+      // Yoann), sans bruit. L'audio est préparé tout de suite et gardé sur le téléphone ; lu à
+      // voix haute seulement pendant une séance, casque branché.
+      postBriefNotification(text);
+      speak(text, { play: !!getSync("trainingDraft", null)?.type && await headsetConnected() });
     }).catch((e) => console.error("brief", e)).finally(() => {
       setJeffreyLog(getSync("jeffreyLog", {}));
       setCoachJournalState(getSync("coachJournal", ""));

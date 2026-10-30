@@ -64,8 +64,9 @@ object Headset {
  * Une seule session à la fois, une seule synthèse active : les phrases d'une session partent l'une
  * après l'autre, l'audio de la suivante s'empile dans le tampon du lecteur pendant que la
  * précédente se joue. Arrêter = couper la requête HTTP, vider le lecteur, attendre la fin du fil.
- * Sortie : flux « assistant », donc casque s'il est branché, sinon haut-parleur ; la musique baisse
- * le temps qu'il parle. Cache : le PCM d'un texte entièrement reçu est gardé (filesDir), relu sans
+ * Sortie : flux « assistant », donc casque s'il est branché, sinon haut-parleur. La musique se met
+ * en pause le temps qu'il parle et reprend ensuite (30/10/2026 : baissée par Android, elle couvrait
+ * encore sa voix ; une app ne peut pas choisir de combien Android baisse la musique). Cache : le PCM d'un texte entièrement reçu est gardé (filesDir), relu sans
  * réseau ; un son incomplet n'est jamais gardé. La clé n'apparaît dans aucun journal.
  */
 object JeffreySpeech {
@@ -101,7 +102,7 @@ object JeffreySpeech {
 
     private fun duck(context: Context) {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
-        val req = focus ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+        val req = focus ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
             .setAudioAttributes(attrs).build().also { focus = it }
         am.requestAudioFocus(req)
     }
