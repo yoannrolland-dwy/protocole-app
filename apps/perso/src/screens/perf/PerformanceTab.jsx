@@ -17,19 +17,90 @@ import { WEEKLY_PLAN } from "../../lib/plan.js";
 // place (« Faites-moi le point » remplace « Analyser », le bilan 3 mois passe dans sa voix).
 import { JeffreyChat } from "./JeffreyChat.jsx";
 import { sayStable } from "../../lib/jeffrey.js";
+import { SubTabs } from "../../components/SubTabs.jsx";
+
+// Sous-onglets (30/10/2026, retour de Yoann : la conversation prenait toute la place). Jeffrey
+// s'ouvre d'abord ; le dernier sous-onglet ouvert est retenu pendant la session, comme Corps et
+// les Réglages. Chaque sous-onglet ne calcule que ce qu'il affiche.
+const ANALYSE_TABS = [
+  { key: "jeffrey", label: "Jeffrey" },
+  { key: "calories", label: "Calories" },
+  { key: "depense", label: "Dépense" },
+];
+let lastAnalyseTab = "jeffrey";
 
 /* ============================================================
    TAB — PERFORMANCE
    ============================================================ */
 export function PerformanceTab({ macros, targets, training, weight, phase, coach, jeffrey }) {
+  const [sub, setSub] = useState(lastAnalyseTab);
+  const pick = (k) => { lastAnalyseTab = k; setSub(k); };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
+      <SubTabs label="Sections de l'analyse" tabs={ANALYSE_TABS} value={sub} onChange={pick} />
+      {sub === "jeffrey" && jeffrey && <JeffreyChat {...jeffrey} />}
+      {sub === "calories" && <CaloriesView macros={macros} targets={targets} />}
+      {sub === "depense" && <DepenseView macros={macros} targets={targets} weight={weight} phase={phase} />}
+    </div>
+  );
+}
 
-  // Dépense énergétique adaptative (V7). Calculée à chaque montage de l'onglet — le journal
-  // Repas et ses corrections vivent dans un autre onglet (un seul monté à la fois), donc un
-  // remount suffit à rester à jour, sans mémoïsation ni dépendance fragile sur `foodLog`.
-  // Toujours ancrée sur AUJOURD'HUI (l'estimation porte sur la dépense réelle actuelle).
-  const tdeeToday = tdeeNow({ foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}), macros, weight, targets });
+/** Cible kcal et protéines du jour (mêmes calculs que la carte et le TDEE). */
+function todayTargets(targets) {
   const atToday = targetsForDate(today(), targets);
-  const kcalTargetToday = Math.round(kcalFromMacros(atToday.protein, atToday.carbs, atToday.fat, atToday.fiber));
+  return { atToday, kcalTargetToday: Math.round(kcalFromMacros(atToday.protein, atToday.carbs, atToday.fat, atToday.fiber)) };
+}
+
+/* Moyenne hebdo kcal + protéines, 7 jours glissants. */
+function CaloriesView({ macros, targets }) {
+  const { atToday, kcalTargetToday } = todayTargets(targets);
+  // Moyenne hebdomadaire glissante, 7 jours (13/09/2026 — remplace l'ancienne moyenne lun-ven :
+  // les cheat meals de Yoann ne suivent pas un jour fixe, exclure le week-end n'avait donc pas
+  // de sens pour lui). Une vraie moyenne glissante absorbe un écart ponctuel quel que soit le
+  // jour où il tombe, sans avoir à deviner lequel exclure.
+  const protByWeek = new Map(weeklyProteinTrend(macros, { weeks: 8 }).map((w) => [w.weekStart, w.avgProtein]));
+  const weeklyTrend = weeklyKcalTrend(macros, { weeks: 8 }).map((w) => ({ ...w, label: fmt(w.weekStart), avgProtein: protByWeek.get(w.weekStart) ?? null }));
+  const weeksWithData = weeklyTrend.filter((w) => w.days > 0);
+  return (
+    <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8, flexWrap: "wrap", gap: 4 }}>
+        <Label>Moyenne kcal · semaine (lun-dim)</Label>
+        <span style={{ fontSize: 13, color: C.muted, fontFamily: C.mono }}>cible ~{kcalTargetToday} kcal · <span style={{ color: PROT_LINE }}>{atToday.protein} g prot.</span></span>
+      </div>
+      {weeksWithData.length ? (
+        <div style={{ height: 160 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={weeklyTrend} margin={{ top: 4, right: -14, left: -22, bottom: 0 }}>
+              <CartesianGrid stroke={C.divider} vertical={false} />
+              <XAxis dataKey="label" tick={chartAxis} interval="preserveEnd" />
+              <YAxis yAxisId="kcal" tick={chartAxis} />
+              <YAxis yAxisId="prot" orientation="right" tick={{ ...chartAxis, fill: PROT_LINE }} domain={["dataMin - 15", "dataMax + 15"]} />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle}
+                formatter={(v, name) => (v == null ? ["—", name === "avgProtein" ? "g/j prot." : "kcal"] : [v, name === "avgProtein" ? "g/j prot." : "kcal"])} />
+              <ReferenceLine yAxisId="kcal" y={kcalTargetToday} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
+              <Bar yAxisId="kcal" dataKey="avgKcal" radius={[3, 3, 0, 0]}>
+                {weeklyTrend.map((d, i) => (
+                  // Au-delà de la cible : orange puis rouge (lib/progress.js) ; jusqu'à 10 % sous la
+                  // cible : citron ; plus bas : gris.
+                  <Cell key={i} fill={d.avgKcal == null ? "transparent" : d.avgKcal > kcalTargetToday ? progressColor(d.avgKcal, kcalTargetToday, "limit") : d.avgKcal >= kcalTargetToday * 0.9 ? C.accent : C.border} />
+                ))}
+              </Bar>
+              <Line yAxisId="prot" type="monotone" dataKey="avgProtein" stroke={PROT_LINE} strokeWidth={2} dot={{ r: 3, fill: PROT_LINE, strokeWidth: 0 }} connectNulls />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      ) : <Empty>{sayStable("noData")}</Empty>}
+    </Card>
+  );
+}
+
+/* Dépense énergétique adaptative (V7), zone de recomposition (R2), comparaison des fenêtres. */
+function DepenseView({ macros, targets, weight, phase }) {
+  const { kcalTargetToday } = todayTargets(targets);
+  // Calculée à chaque ouverture du sous-onglet — le journal Repas et ses corrections vivent dans
+  // un autre onglet, donc un nouvel affichage suffit à rester à jour, sans mémoïsation ni
+  // dépendance fragile sur `foodLog`. Toujours ancrée sur AUJOURD'HUI (dépense réelle actuelle).
+  const tdeeToday = tdeeNow({ foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}), macros, weight, targets });
   const deficitReel = tdeeToday.status === "ok" ? realDeficit(kcalTargetToday, tdeeToday.tdee) : null;
   // Historique du TDEE semaine par semaine (13/09/2026, demande explicite) : même donnée que
   // `tdeeToday` (kcal réelles fusionnées), juste rejouée à des dates passées.
@@ -45,53 +116,5 @@ export function PerformanceTab({ macros, targets, training, weight, phase, coach
   const recomp = PHASES[phase]?.noTarget
     ? recompWindows({ foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}), macros, weight, targets })
     : null;
-
-  // Moyenne hebdomadaire glissante, 7 jours (13/09/2026 — remplace l'ancienne moyenne lun-ven :
-  // les cheat meals de Yoann ne suivent pas un jour fixe, exclure le week-end n'avait donc pas
-  // de sens pour lui). Une vraie moyenne glissante absorbe un écart ponctuel quel que soit le
-  // jour où il tombe, sans avoir à deviner lequel exclure.
-  const protByWeek = new Map(weeklyProteinTrend(macros, { weeks: 8 }).map((w) => [w.weekStart, w.avgProtein]));
-  const weeklyTrend = weeklyKcalTrend(macros, { weeks: 8 }).map((w) => ({ ...w, label: fmt(w.weekStart), avgProtein: protByWeek.get(w.weekStart) ?? null }));
-  const weeksWithData = weeklyTrend.filter((w) => w.days > 0);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {jeffrey && <JeffreyChat {...jeffrey} />}
-
-      {/* Moyenne hebdo kcal, 7 jours glissants */}
-      <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-          <Label>Moyenne kcal · semaine (lun-dim)</Label>
-          <span style={{ fontSize: 13, color: C.muted, fontFamily: C.mono }}>cible ~{kcalTargetToday} kcal · <span style={{ color: PROT_LINE }}>{atToday.protein} g prot.</span></span>
-        </div>
-        {weeksWithData.length ? (
-          <div style={{ height: 130 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={weeklyTrend} margin={{ top: 4, right: -14, left: -22, bottom: 0 }}>
-                <CartesianGrid stroke={C.divider} vertical={false} />
-                <XAxis dataKey="label" tick={chartAxis} interval="preserveEnd" />
-                <YAxis yAxisId="kcal" tick={chartAxis} />
-                <YAxis yAxisId="prot" orientation="right" tick={{ ...chartAxis, fill: PROT_LINE }} domain={["dataMin - 15", "dataMax + 15"]} />
-                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle}
-                  formatter={(v, name) => (v == null ? ["—", name === "avgProtein" ? "g/j prot." : "kcal"] : [v, name === "avgProtein" ? "g/j prot." : "kcal"])} />
-                <ReferenceLine yAxisId="kcal" y={kcalTargetToday} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
-                <Bar yAxisId="kcal" dataKey="avgKcal" radius={[3, 3, 0, 0]}>
-                  {weeklyTrend.map((d, i) => (
-                    // Au-delà de la cible : orange puis rouge (lib/progress.js) ; jusqu'à 10 % sous la
-                    // cible : citron ; plus bas : gris.
-                    <Cell key={i} fill={d.avgKcal == null ? "transparent" : d.avgKcal > kcalTargetToday ? progressColor(d.avgKcal, kcalTargetToday, "limit") : d.avgKcal >= kcalTargetToday * 0.9 ? C.accent : C.border} />
-                  ))}
-                </Bar>
-                <Line yAxisId="prot" type="monotone" dataKey="avgProtein" stroke={PROT_LINE} strokeWidth={2} dot={{ r: 3, fill: PROT_LINE, strokeWidth: 0 }} connectNulls />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        ) : <Empty>{sayStable("noData")}</Empty>}
-      </Card>
-
-      {/* Dépense énergétique adaptative (V7) */}
-      <TdeeCard result={tdeeToday} deficitReel={deficitReel} trend={tdeeHistory} windows={tdeeWindows} recomp={recomp} />
-
-    </div>
-  );
+  return <TdeeCard result={tdeeToday} deficitReel={deficitReel} trend={tdeeHistory} windows={tdeeWindows} recomp={recomp} />;
 }

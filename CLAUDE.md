@@ -5847,3 +5847,16 @@ Au passage, la tuile Bord du widget n'affiche plus que la cloche, centrée (v3.1
 - Tests : `apps/perso/test/jeffreyNotify.test.mjs` (fil, réponse rapide, Confirmer, base genou,
   `decideAction`) et `jeffreyTurn.test.mjs` (le brief n'envoie que `proposer_reponses`).
   164 tests au total.
+
+## Analyse en trois sous-onglets (30/10/2026, apps/perso v3.139.0)
+
+Retour de Yoann : la conversation de Jeffrey prenait toute la place de l'onglet Analyse. L'onglet
+est désormais découpé en sous-onglets (`SubTabs`, comme Corps et les Réglages) :
+- **Jeffrey** : la conversation. C'est le sous-onglet ouvert par défaut.
+- **Calories** : la moyenne kcal et protéines par semaine (graphique un peu plus haut, 160 px).
+- **Dépense** : la dépense estimée (TDEE, zone de recomposition, comparaison des fenêtres).
+
+Le dernier sous-onglet ouvert est retenu pendant la session. Chaque sous-onglet ne calcule que ce
+qu'il affiche : avant, chaque message de Jeffrey recalculait la dépense estimée. Vérifié dans
+l'aperçu (375 px) : bascule entre les trois, sous-onglet retenu après un passage par Nutrition, pas
+de débordement, aucune erreur console.
