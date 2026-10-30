@@ -13,34 +13,20 @@
         android:layout_weight="1"
         android:orientation="horizontal">
 
-        <!-- Raccourci vers le Bord, avec la cloche de Jeffrey (remplace la tuile Poids, 30/10/2026). -->
+        <!-- Raccourci vers le Bord : la cloche de Jeffrey seule, centrée (remplace la tuile Poids, 30/10/2026). -->
         <LinearLayout
             android:id="@+id/tile_bord"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:layout_margin="3dp"
+            android:gravity="center"
             android:orientation="vertical"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="6dp"
             android:background="@drawable/widget_tile_background">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="BORD"
-                android:textSize="12sp"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:textStyle="bold"
-                android:fontFamily="sans-serif"
-                android:letterSpacing="0.06"
-                android:textColor="#bdbdb4" />
-
             <ImageView
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:layout_marginTop="4dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:src="@drawable/ic_jeffrey_bell"
                 android:contentDescription="Ouvrir le tableau de bord"
                 android:scaleType="fitCenter" />

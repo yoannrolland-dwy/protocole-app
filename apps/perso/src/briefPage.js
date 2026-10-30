@@ -4,16 +4,18 @@
 // décide (core/coach/brief.js), écrit le brief si c'est le moment, puis rend la main à Kotlin avec
 // la notification à afficher et l'heure du prochain réveil. Aucun plugin Capacitor ici : pas de
 // pont dans cette WebView. Les appels à l'IA passent par le relais HTTP natif du pont.
+// J4.3 (30/10/2026) : la même page répond aussi à Monsieur depuis la notification (`?mode=reply`).
 import { createSSEParser } from "@rawcare/core/coach/stream";
 import { briefMissing, briefDecision, nextBriefAlarm, briefRetry } from "@rawcare/core/coach/brief";
 import { mergeSleep, mergeWeight, mergeRhr, mergeNaps } from "@rawcare/core/healthMerge";
 import { today } from "@rawcare/core/dateUtils";
 import { aiMissing } from "./lib/ai.js";
-import { say } from "./lib/jeffrey.js";
+import { say, sayError } from "./lib/jeffrey.js";
 import { makeCoach } from "./lib/coachInputs.js";
 import { getSync } from "./store.js";
 import { voiceServer, speechPlan } from "./lib/voiceConfig.js";
-import { loadData, aiFromSettings, readBriefState, writeBriefState, missingText, runBrief, saveFallback } from "./lib/brief.js";
+import { loadData, aiFromSettings, readBriefState, writeBriefState, missingText, runBrief, runReply, saveFallback } from "./lib/brief.js";
+import { notificationSpec } from "./lib/jeffreyNotify.js";
 
 const bridge = window.BriefBridge;
 
@@ -53,6 +55,32 @@ const bridgeTransport = ({ url, headers, body, onEvent }) => new Promise((resolv
   bridge.http(id, url, JSON.stringify(headers), JSON.stringify(body));
 });
 
+// Notification de conversation (J4.3) : le fil du jour, les boutons Écouter / Répondre / réponse
+// rapide ou Confirmer. Kotlin la construit (BriefRunner.postThread).
+const todaySpec = (extra) => {
+  const spec = notificationSpec(getSync("jeffreyLog", {})[today()] || []);
+  return extra ? { ...spec, messages: [...spec.messages, extra] } : spec;
+};
+
+// Réponse de Monsieur depuis la notification (J4.3) : `bridge.payload()` dit ce qu'il a fait
+// (réponse écrite, réponse rapide, action confirmée). Pas de réveil à reprogrammer ici. La voix de
+// la réponse est préparée (jamais jouée d'office : question écrite, réponse écrite).
+async function reply() {
+  const payload = JSON.parse(bridge?.payload() || "{}");
+  const ai = aiFromSettings();
+  if (payload.kind !== "confirm" && aiMissing(ai)) {
+    return finish({ notify: { kind: "thread", alert: false, spec: todaySpec({ me: false, text: aiMissing(ai) }) } });
+  }
+  try {
+    const r = await runReply({ payload, data: loadData(), ai, transport: bridgeTransport });
+    const voice = r.reply ? voiceFor(r.reply) : undefined;
+    return finish({ notify: { kind: "thread", alert: false, spec: todaySpec(), voice: voice && { ...voice, play: false } } });
+  } catch (e) {
+    console.error("réponse", e);
+    return finish({ notify: { kind: "thread", alert: false, spec: todaySpec({ me: false, text: sayError(e) }) } });
+  }
+}
+
 async function main() {
   const now = new Date();
   const date = today();
@@ -82,7 +110,7 @@ async function main() {
   const ai = aiFromSettings();
   const fallback = () => {
     const text = saveFallback(makeCoach(data).nextSession(), missing);
-    return finish({ notify: { kind: "brief", text, alert: true, voice: voiceFor(text) }, nextAt: tomorrow });
+    return finish({ notify: { kind: "brief", text, alert: true, voice: voiceFor(text), spec: todaySpec() }, nextAt: tomorrow });
   };
   if (aiMissing(ai)) return fallback();
   const tries = (state.tries?.date === date ? state.tries.n : 0) + 1;
@@ -90,7 +118,7 @@ async function main() {
   bridge?.preparing(say("briefPreparing"));
   try {
     const text = await runBrief({ data, ai, transport: bridgeTransport, missing });
-    return finish({ notify: { kind: "brief", text, alert: true, voice: voiceFor(text) }, nextAt: tomorrow });
+    return finish({ notify: { kind: "brief", text, alert: true, voice: voiceFor(text), spec: todaySpec() }, nextAt: tomorrow });
   } catch (e) {
     console.error("brief", e);
     const r = briefRetry(now, tries);
@@ -99,4 +127,8 @@ async function main() {
   }
 }
 
-main().catch((e) => finish({ error: String(e?.message || e), nextAt: Date.now() + 20 * 60000 }));
+if (new URLSearchParams(location.search).get("mode") === "reply") {
+  reply().catch((e) => finish({ error: String(e?.message || e) }));
+} else {
+  main().catch((e) => finish({ error: String(e?.message || e), nextAt: Date.now() + 20 * 60000 }));
+}

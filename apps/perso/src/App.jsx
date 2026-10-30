@@ -27,7 +27,8 @@ import { isMatchWeek, isPostMatchDay, planForDate } from "./lib/plan.js";
 import { makeCoach } from "./lib/coachInputs.js";
 import { BRIEF, briefMissing, nextBriefAlarm } from "@rawcare/core/coach/brief";
 import { readBriefState, writeBriefState, runBrief, missingText } from "./lib/brief.js";
-import { scheduleBrief, cancelBriefNotification, postBriefNotification } from "./lib/briefNative.js";
+import { scheduleBrief, cancelBriefNotification, postJeffreyNotification } from "./lib/briefNative.js";
+import { notificationSpec } from "./lib/jeffreyNotify.js";
 import { streamTransportFor } from "./lib/jeffreyHttp.js";
 import { aiMissing } from "./lib/ai.js";
 import { say } from "./lib/jeffrey.js";
@@ -561,7 +562,7 @@ export default function App({ silent = false } = {}) {
       // La notification part aussi quand c'est l'app qui écrit le brief (30/10/2026, choix de
       // Yoann), sans bruit. L'audio est préparé tout de suite et gardé sur le téléphone ; lu à
       // voix haute seulement pendant une séance, casque branché.
-      postBriefNotification(text);
+      postJeffreyNotification(notificationSpec(getSync("jeffreyLog", {})[today()] || []));
       speak(text, { play: !!getSync("trainingDraft", null)?.type && await headsetConnected() });
     }).catch((e) => console.error("brief", e)).finally(() => {
       setJeffreyLog(getSync("jeffreyLog", {}));

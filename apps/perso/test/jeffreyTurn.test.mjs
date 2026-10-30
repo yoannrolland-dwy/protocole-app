@@ -1,5 +1,6 @@
-// Tour de Jeffrey (lib/jeffreyTurn.js) : le brief s'écrit en un seul appel, outils interdits
-// (essai réel du 29/10/2026 : réponse faite d'outils seuls puis relancée, 10,5 ¢ au lieu de ~5).
+// Tour de Jeffrey (lib/jeffreyTurn.js) : le brief s'écrit en un seul appel, avec le seul outil
+// proposer_reponses (J4.3, 30/10/2026 ; avant : outils interdits — essai réel du 29/10, réponse
+// faite d'outils seuls puis relancée, 10,5 ¢ au lieu de ~5).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { jeffreyTurn } from "../src/lib/jeffreyTurn.js";
@@ -22,16 +23,18 @@ const transport = (replies) => {
   fn.calls = calls;
   return fn;
 };
-const coach = { jeffreyRequest: () => ({ system: [], messages: [{ role: "user", content: "x" }], tools: [{ name: "proposer_reponses", input_schema: { type: "object" } }], allowed: [] }) };
+const coach = { jeffreyRequest: () => ({ system: [], messages: [{ role: "user", content: "x" }], tools: [{ name: "proposer_reponses", input_schema: { type: "object" } }, { name: "ajouter_eau", input_schema: { type: "object" } }], allowed: [] }) };
 const ai = { provider: "anthropic", apiKey: "k", model: "claude-opus-5-5" };
 const history = [{ id: "u", role: "user", text: "x" }];
 
-test("brief : un seul appel, outils interdits dès le premier passage", async () => {
-  const tr = transport([[{ type: "text", text: "Bonjour Monsieur." }]]);
+test("brief : un seul appel, seul outil proposer_reponses, la réponse rapide est gardée", async () => {
+  const tr = transport([[{ type: "text", text: "Bonjour Monsieur." }, { type: "tool_use", id: "q1", name: "proposer_reponses", input: { options: ["Démarrer Upper A", "Genou 2/10"] } }]]);
   const r = await jeffreyTurn({ history, mode: "brief", coach, ai, transport: tr });
   assert.equal(tr.calls.length, 1);
-  assert.deepEqual(tr.calls[0].tool_choice, { type: "none" });
+  assert.deepEqual(tr.calls[0].tool_choice, { type: "auto" });
+  assert.deepEqual(tr.calls[0].tools.map((t) => t.name), ["proposer_reponses"]);
   assert.equal(r.history.at(-1).text, "Bonjour Monsieur.");
+  assert.deepEqual(r.history.at(-1).quick.options, ["Démarrer Upper A", "Genou 2/10"]);
 });
 
 test("conversation : outils permis au premier passage, interdits seulement à la relance d'une réponse muette", async () => {

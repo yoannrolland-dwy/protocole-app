@@ -23,11 +23,13 @@ class BriefPlugin : Plugin() {
     }
 
     /** Brief écrit par l'app ouverte (30/10/2026) : la notification part quand même, sans bruit
-     *  (Monsieur a l'app sous les yeux), pour le retrouver plus tard. Un tap ouvre la conversation. */
+     *  (Monsieur a l'app sous les yeux). `spec` : conversation façon messagerie avec ses boutons
+     *  (J4.3, BriefRunner.postThread) ; à défaut, `text` seul. Un tap ouvre la conversation. */
     @PluginMethod
     fun post(call: PluginCall) {
-        val text = call.getString("text") ?: return call.reject("texte manquant")
-        BriefRunner.post(context, text, alert = false)
+        val spec = call.getString("spec")
+        if (spec != null) BriefRunner.postThread(context, spec, alert = false)
+        else BriefRunner.post(context, call.getString("text") ?: return call.reject("texte manquant"), alert = false)
         call.resolve()
     }
 

@@ -35,7 +35,7 @@ Pour lancer une étape : « GO V1 ». Pour la relire d'abord : « détaille-moi 
 | JT | Jeffrey — textes de l'app et notifications dans sa voix (textes fixes, sans IA) | petit | ✅ 29/10/2026 (v3.126.0) |
 | J1 | Jeffrey — la conversation, en 3 lots installés : J1.1 relais Android + cœur testé ; J1.2 conversation dans Analyse ; J1.3 bulle partout + carte Bord + mémoire | gros | J1.1 ✅ 29/10/2026 (v3.127.0) ; J1.2 ✅ 29/10/2026 (v3.128.0) ; J1.3 ✅ 29/10/2026 (v3.129.0) |
 | J2 | Jeffrey — actions proposées, confirmées d'un tap (eau, genou, note, séance, repas, habituel) | moyen | ✅ 29/10/2026 (J2a + J2b) |
-| J4 | Jeffrey — brief du matin en notification : attend la nuit, météo, réponse dans la notification | gros | en cours (J4.1 et J4.2 ✅ 29/10/2026) |
+| J4 | Jeffrey — brief du matin en notification : attend la nuit, météo, réponse dans la notification | gros | ✅ 30/10/2026 (J4.1, J4.2 le 29/10 ; J4.3 le 30/10, essai réel à faire) |
 | J3 | Jeffrey — la voix : micro (dictée) + réponse lue à voix haute, voix réglable | moyen | ✅ 29/10/2026 (v3.134.0) |
 
 **Ordre choisi** : V1 d'abord car c'est le seul vrai angle mort médical et il
@@ -1391,8 +1391,14 @@ la carte de séance et les réponses rapides reviendront dans la notification av
 
 **J4.2 livré le 29/10/2026 (v3.133.0)** : météo Open-Meteo par créneau (matin, midi, après-midi,
 soir) dans le brief ; position approximative notée à l'ouverture seulement (`ACCESS_COARSE_LOCATION`,
-arrondie à ~1 km, clé `lastPosition` hors sauvegarde), jamais transmise à l'IA. **Reste J4.3
-(répondre dans la notification).**
+arrondie à ~1 km, clé `lastPosition` hors sauvegarde), jamais transmise à l'IA.
+
+**J4.3 livré le 30/10/2026 (v3.138.0)** : notification de conversation façon messagerie, fil du jour
+depuis le brief, trois boutons au plus (limite d'Android) : Écouter (dernier message, cache du
+téléphone), Répondre (Jeffrey répond en arrière-plan, sa réponse s'affiche dans la notification),
+et la première réponse rapide proposée par Jeffrey, ou « Confirmer » quand une action attend
+(genou sans réponse sur la base : « Revenu à la base » / « Pas revenu »). Le brief a de nouveau
+droit au seul outil proposer_reponses. Détail dans CLAUDE.md.
 
 ### J3 — La voix
 

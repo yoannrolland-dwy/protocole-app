@@ -4,12 +4,13 @@
 import { getSync, store } from "../store.js";
 import { DEFAULT_TARGETS } from "@rawcare/core/targets";
 import { SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
-import { JEFFREY_PERSONA, jeffreyAsk, withMemory, pendingMemoryDate } from "@rawcare/core/coach/jeffrey";
+import { JEFFREY_PERSONA, jeffreyAsk, withMemory, pendingMemoryDate, decideAction } from "@rawcare/core/coach/jeffrey";
 import { today, shiftDateKey, daysBetween } from "@rawcare/core/dateUtils";
 import { makeCoach } from "./coachInputs.js";
 import { jeffreyTurn, newId, hhmm } from "./jeffreyTurn.js";
 import { say } from "./jeffrey.js";
 import { fetchWeather } from "./weather.js";
+import { applyActionStored } from "./jeffreyNotify.js";
 
 // Marqueurs du jour { doneDate, appDate, remindedDate, tries: { date, n } }. Hors DATA_KEYS, comme
 // jeffreyMemoryDate : restaurer une vieille sauvegarde ne doit pas faire croire qu'un brief est fait.
@@ -114,6 +115,51 @@ export async function runBrief({ data, ai, transport, missing, onText }) {
     save(r);
     writeBriefState({ doneDate: date });
     return [...r.history].reverse().find((e) => e.role === "assistant" && e.text)?.text || "";
+  } catch (e) {
+    if (e.partial) save(e.partial);
+    throw e;
+  }
+}
+
+/**
+ * Réponse de Monsieur depuis la notification (J4.3), app fermée ou non :
+ * - { kind: "text", text } : réponse écrite → Jeffrey répond (comme dans la conversation) ;
+ * - { kind: "quick", text, quickFor } : réponse rapide touchée → idem, et Jeffrey sait laquelle ;
+ * - { kind: "confirm", entryId, actionId, ok, baseline } : action confirmée ou annulée, sans IA.
+ * → { entries, reply } : conversation du jour à jour et texte de la réponse de Jeffrey ("" sans IA).
+ */
+export async function runReply({ payload, data, ai, transport }) {
+  const date = today();
+  const log = getSync("jeffreyLog", {});
+  const entries = log[date] || [];
+  if (payload.kind === "confirm") {
+    const next = decideAction(entries, payload.entryId, payload.actionId, {
+      ok: payload.ok !== false, baseline: payload.baseline, apply: applyActionStored,
+      doneText: say("actionDone"), cancelledText: say("actionCancelled"),
+    });
+    if (next) saveDay(date, next);
+    return { entries: next || entries, reply: "" };
+  }
+  const text = (payload.text || "").trim();
+  if (!text) return { entries, reply: "" };
+  let history = entries;
+  const lastA = [...history].reverse().find((e) => e.role === "assistant");
+  if (payload.quickFor && lastA?.quick?.id === payload.quickFor) {
+    history = history.map((e) => (e === lastA ? { ...e, toolResults: { ...e.toolResults, [lastA.quick.id]: `Monsieur a touché « ${text} ».` } } : e));
+  }
+  let ask = jeffreyAsk("chat", { text });
+  const memDate = pendingMemoryDate(log, date, getSync("jeffreyMemoryDate", null));
+  if (memDate && !history.some((e) => e.memoryFor === memDate)) ask = withMemory(ask, memDate, log[memDate]);
+  history = [...history, { ...ask, id: newId(), at: hhmm() }];
+  const note = (data.notes || []).find((n) => n.date === date)?.text || "";
+  const save = ({ history: h, journal, memDate: md }) => {
+    if (journal) { store.set("coachJournal", journal); if (md) store.set("jeffreyMemoryDate", md); }
+    saveDay(date, h);
+  };
+  try {
+    const r = await jeffreyTurn({ history, mode: "chat", coach: makeCoach(data), ai, note, transport, foodContext });
+    save(r);
+    return { entries: r.history, reply: [...r.history].reverse().find((e) => e.role === "assistant" && e.text)?.text || "" };
   } catch (e) {
     if (e.partial) save(e.partial);
     throw e;

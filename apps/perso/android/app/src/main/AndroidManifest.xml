@@ -60,6 +60,11 @@
         <receiver
             android:name=".BriefAlarmReceiver"
             android:exported="false" />
+        <!-- Boutons de la notification de Jeffrey (J4.3) : Écouter, Répondre, réponse rapide,
+             Confirmer. Non exporté : seules les notifications de l'app l'appellent. -->
+        <receiver
+            android:name=".JeffreyNotifReceiver"
+            android:exported="false" />
         <!-- Pendant l'appel à l'IA seulement : rend le réseau quand l'économie d'énergie le coupe
              aux apps en arrière-plan (essai réel du 29/10/2026, voir BriefService.kt). -->
         <service

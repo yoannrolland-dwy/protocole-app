@@ -191,6 +191,35 @@ export function confirmedResult(action, change) {
 }
 export const CANCELLED_RESULT = "Monsieur a annulé : rien n'a été fait.";
 
+/**
+ * Confirme (`ok`) ou annule une action en attente (J2) — partagé par la conversation et la
+ * notification (J4.3). `apply(action)` écrit l'action confirmée et renvoie le changement
+ * (eau avant/après) ou null ; `baseline` complète une douleur au genou sans réponse sur la base.
+ * → nouvelle liste d'entrées (action marquée faite ou annulée, résultat d'outil pour Jeffrey),
+ * ou null si l'action n'est plus en attente.
+ */
+export function decideAction(entries, entryId, actionId, { ok, baseline, apply, doneText, cancelledText }) {
+  const entry = entries.find((e) => e.id === entryId);
+  const action = entry?.actions?.find((a) => a.id === actionId);
+  if (!action || action.status !== "pending") return null;
+  let done;
+  let change = null;
+  if (ok) {
+    const act = action.kind === "genou" && action.baseline == null ? { ...action, baseline: !!baseline } : action;
+    change = apply?.(act) ?? null;
+    const label = act.kind === "genou" ? `Genou ${act.pain}/10, ${act.baseline ? "revenu à la base" : "pas revenu à la base"}` : act.label;
+    done = { ...act, label, status: "done", doneText };
+  } else {
+    done = { ...action, status: "cancelled", doneText: cancelledText };
+  }
+  const result = ok ? confirmedResult(done, change) : CANCELLED_RESULT;
+  return entries.map((e) => (e.id !== entryId ? e : {
+    ...e,
+    actions: e.actions.map((a) => (a.id === actionId ? done : a)),
+    toolResults: { ...e.toolResults, [actionId]: result },
+  }));
+}
+
 /** Séances que Jeffrey a le droit de proposer, d'après `nextSessions` : celles que le
  *  recommandeur affiche et celles qu'il juge seulement moins prioritaires. Jamais une séance
  *  écartée (à éviter, créneau passé, journée fermée) ni une variante non retenue. */
@@ -288,7 +317,7 @@ export function jeffreyAsk(mode, { text, bilanUser, missing, reminders, dateLabe
     const rappels = reminders?.length ? ` Rappels possibles : ${reminders.join(" ; ")}.` : "";
     // J4.2 : météo du jour par créneau (Open-Meteo, position approximative jamais transmise).
     const meteo = weather ? ` Météo du jour par créneau : ${JSON.stringify(weather)}. Une phrase, seulement ce qui change quelque chose (pluie pour la marche ou le trajet, froid ou chaleur) ; sans météo, n'en dites rien.` : "";
-    return { role: "user", text: t, mode, apiText: `${t}\n\n(Demande de l'application : BRIEF DU MATIN du ${dateLabel || "jour"}. ${manque}${rappels}${meteo} Dans cet ordre, 150 mots au plus, texte simple : une salutation datée ; la météo si elle compte ; la nuit (score de qualité, jamais la durée seule) ; l'énergie ; la pesée et la tendance 7 j ; le planning du jour et la séance que vous proposez, prise dans SEANCES_AUTORISEES ; une ou deux questions (le genou s'il n'est pas noté, le ressenti) ; un rappel seulement s'il est utile (palier de la semaine, sauvegarde). La première phrase est courte : c'est elle qu'on lit sur l'écran verrouillé. Texte seul, sans outil : le brief est lu dans une notification.)` };
+    return { role: "user", text: t, mode, apiText: `${t}\n\n(Demande de l'application : BRIEF DU MATIN du ${dateLabel || "jour"}. ${manque}${rappels}${meteo} Dans cet ordre, 150 mots au plus, texte simple : une salutation datée ; la météo si elle compte ; la nuit (score de qualité, jamais la durée seule) ; l'énergie ; la pesée et la tendance 7 j ; le planning du jour et la séance que vous proposez, prise dans SEANCES_AUTORISEES ; une ou deux questions (le genou s'il n'est pas noté, le ressenti) ; un rappel seulement s'il est utile (palier de la semaine, sauvegarde). La première phrase est courte : c'est elle qu'on lit sur l'écran verrouillé. Le brief est lu dans une notification : écrivez tout le texte d'abord, puis appelez seulement l'outil proposer_reponses avec 2 ou 3 réponses courtes, la plus probable en premier (elle devient un bouton de la notification). Aucun autre outil.)` };
   }
   return { role: "user", text, mode: "chat" };
 }

@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Send, ChevronRight, ChevronDown, Mic, Square, Volume2 } from "lucide-react";
 import { TEMPLATES } from "@rawcare/core/session/templates";
 import {
-  jeffreyAsk, withMemory, appendNote, confirmedResult, CANCELLED_RESULT,
+  jeffreyAsk, withMemory, appendNote, decideAction,
 } from "@rawcare/core/coach/jeffrey";
 import { T } from "../../design/tokens.js";
 import { Panel, Eyebrow, Button, IconButton, Chip } from "../../design/primitives.jsx";
@@ -213,25 +213,17 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
   // Confirmation ou annulation d'une action (J2). La note du jour s'écrit ici (elle est aussi
   // dans ce composant) ; l'eau et le genou par App (`onAction`), avec l'écriture de l'écran.
   const decide = (entryId, action, ok, baseline) => {
-    if (action.status !== "pending") return;
-    let done = action;
-    let change = null;
-    if (ok) {
-      const act = action.kind === "genou" && action.baseline == null ? { ...action, baseline } : action;
-      if (act.kind === "note") { const n = appendNote(note, act.text); setNote(n); saveNote(n); }
-      else change = onAction?.(act) ?? null;
-      const label = act.kind === "genou" ? `Genou ${act.pain}/10, ${act.baseline ? "revenu à la base" : "pas revenu à la base"}` : act.label;
-      done = { ...act, label, status: "done", doneText: say("actionDone") };
-    } else {
-      done = { ...action, status: "cancelled", doneText: say("actionCancelled") };
-    }
-    const result = ok ? confirmedResult(done, change) : CANCELLED_RESULT;
-    setDay(today(), entries.map((e) => (e.id !== entryId ? e : {
-      ...e,
-      actions: e.actions.map((a) => (a.id === action.id ? done : a)),
-      toolResults: { ...e.toolResults, [action.id]: result },
-    })));
+    const next = decideAction(entries, entryId, action.id, {
+      ok, baseline, doneText: say("actionDone"), cancelledText: say("actionCancelled"),
+      apply: (act) => {
+        if (act.kind !== "note") return onAction?.(act) ?? null;
+        const n = appendNote(note, act.text); setNote(n); saveNote(n);
+        return null;
+      },
+    });
+    if (next) setDay(today(), next);
   };
+
 
   const sendDraft = () => {
     const t = draft.trim();

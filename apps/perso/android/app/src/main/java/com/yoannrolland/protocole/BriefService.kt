@@ -14,6 +14,9 @@ import androidx.core.app.NotificationCompat
  * à l'IA n'obtenait aucune réponse. Démarré seulement quand le brief s'écrit (BriefRunner, pont
  * `preparing`), il fait passer l'app au premier plan pour Android le temps de l'appel, ce qui lui
  * rend le réseau. Il ne fait rien d'autre que porter la notification « Je prépare votre brief ».
+ * J4.3 (30/10/2026) : aussi pendant une réponse depuis la notification et la lecture d'un message.
+ * Sa notification a son propre identifiant, pour ne jamais effacer le fil de la conversation
+ * (la notification de Jeffrey) quand le service s'arrête.
  * Type `shortService` : pas de permission particulière, arrêté par Android après ~3 min au plus.
  */
 class BriefService : Service() {
@@ -29,8 +32,8 @@ class BriefService : Service() {
             .setOngoing(true)
             .setSilent(true)
             .build()
-        if (Build.VERSION.SDK_INT >= 34) startForeground(BriefRunner.NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE)
-        else startForeground(BriefRunner.NOTIF_ID, n)
+        if (Build.VERSION.SDK_INT >= 34) startForeground(BriefRunner.SERVICE_NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE)
+        else startForeground(BriefRunner.SERVICE_NOTIF_ID, n)
         return START_NOT_STICKY
     }
 

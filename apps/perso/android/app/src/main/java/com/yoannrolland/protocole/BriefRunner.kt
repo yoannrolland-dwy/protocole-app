@@ -18,6 +18,8 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.Person
+import androidx.core.app.RemoteInput
 import androidx.health.connect.client.time.TimeRangeFilter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +48,10 @@ object BriefRunner {
     private const val TAG = "JeffreyBrief"
     const val CHANNEL = "jeffrey"
     const val NOTIF_ID = 5050
+    // Service au premier plan (BriefService) : identifiant à part, pour que son arrêt n'efface
+    // jamais la notification de la conversation (J4.3).
+    const val SERVICE_NOTIF_ID = 5052
+    private const val THREAD_PREFS = "jeffrey_thread"
     // Un réveil en arrière-plan dispose d'environ une minute (goAsync) : on rend la main avant.
     private const val TIMEOUT_MS = 55_000L
     private val pool = Executors.newCachedThreadPool()
@@ -54,8 +60,15 @@ object BriefRunner {
         val app = context.applicationContext
         CoroutineScope(Dispatchers.Main).launch {
             val health = withContext(Dispatchers.IO) { readHealth(app) }
-            startPage(app, health, done)
+            startPage(app, health, null, done)
         }
+    }
+
+    /** Réponse de Monsieur depuis la notification (J4.3) : la page répond (`?mode=reply`) avec
+     *  `payload` ({ kind: text | quick | confirm, … }), puis rend le fil à afficher. */
+    fun runReply(context: Context, payload: String, done: () -> Unit) {
+        val app = context.applicationContext
+        CoroutineScope(Dispatchers.Main).launch { startPage(app, "{}", payload, done) }
     }
 
     /** Nuit, pesée et FC repos des deux derniers jours, au format de healthSync.js. "{}" si
@@ -78,7 +91,7 @@ object BriefRunner {
     }
 
     @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
-    private fun startPage(context: Context, health: String, done: () -> Unit) {
+    private fun startPage(context: Context, health: String, payload: String?, done: () -> Unit) {
         val handler = Handler(Looper.getMainLooper())
         val finished = AtomicBoolean(false)
         val web = WebView(context)
@@ -115,7 +128,7 @@ object BriefRunner {
 
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
-        web.addJavascriptInterface(Bridge(context, health, web, handler, finish), "BriefBridge")
+        web.addJavascriptInterface(Bridge(context, health, payload ?: "{}", web, handler, finish), "BriefBridge")
         web.webViewClient = object : WebViewClient() {
             // Fichiers de l'app servis depuis assets/public (comme Capacitor), à la même origine.
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
@@ -129,7 +142,7 @@ object BriefRunner {
                 }
             }
         }
-        web.loadUrl("https://localhost/brief.html")
+        web.loadUrl(if (payload != null) "https://localhost/brief.html?mode=reply" else "https://localhost/brief.html")
     }
 
     private fun mime(path: String) = when (path.substringAfterLast('.', "")) {
@@ -150,14 +163,18 @@ object BriefRunner {
         return v
     }
 
-    /** Ce que la page rend : { notify: { kind, text, alert } | null, nextAt } ou { error, nextAt }. */
+    /** Ce que la page rend : { notify: { kind, text, alert, spec?, voice? } | null, nextAt? } ou
+     *  { error, nextAt? }. `spec` : notification de conversation (J4.3, voir postThread). */
     private fun handleResult(context: Context, json: String) {
         val r = JSONObject(json)
         if (r.has("error")) Log.w(TAG, "page : ${r.optString("error")}")
         val n = r.optJSONObject("notify")
-        if (n != null) post(context, n.optString("text"), n.optBoolean("alert"))
+        val spec = n?.optJSONObject("spec")
+        if (spec != null) postThread(context, spec.toString(), n.optBoolean("alert"))
+        else if (n != null) post(context, n.optString("text"), n.optBoolean("alert"))
         else if (!r.has("error")) NotificationManagerCompat.from(context).cancel(NOTIF_ID)
-        BriefScheduler.schedule(context, r.optLong("nextAt", System.currentTimeMillis() + 20 * 60_000))
+        // Une réponse depuis la notification ne touche pas aux réveils du brief.
+        if (r.has("nextAt")) BriefScheduler.schedule(context, r.optLong("nextAt"))
     }
 
     fun ensureChannel(context: Context) {
@@ -191,12 +208,110 @@ object BriefRunner {
         try { NotificationManagerCompat.from(context).notify(NOTIF_ID, n) } catch (e: SecurityException) { Log.w(TAG, "notification", e) }
     }
 
+    fun storedSpec(context: Context): JSONObject? =
+        context.getSharedPreferences(THREAD_PREFS, Context.MODE_PRIVATE).getString("spec", null)
+            ?.let { runCatching { JSONObject(it) }.getOrNull() }
+
+    private fun openIntent(context: Context): PendingIntent {
+        val open = Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            .putExtra("open_tab", "jeffrey")
+        return PendingIntent.getActivity(context, NOTIF_ID, open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+    }
+
+    private fun actionIntent(context: Context, action: String, req: Int, mutable: Boolean = false, fill: Intent.() -> Unit = {}): PendingIntent {
+        val i = Intent(context, JeffreyNotifReceiver::class.java).setAction(action).apply(fill)
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (mutable) PendingIntent.FLAG_MUTABLE else PendingIntent.FLAG_IMMUTABLE)
+        return PendingIntent.getBroadcast(context, req, i, flags)
+    }
+
+    /**
+     * Notification de conversation de Jeffrey (J4.3, choix de Yoann) : le fil du jour façon
+     * messagerie, et trois boutons au plus (limite d'Android) — Écouter (dernier message, depuis le
+     * cache), Répondre (champ de réponse), puis la réponse rapide proposée par Jeffrey ou
+     * « Confirmer » quand une action attend. Douleur au genou sans réponse sur la base : Répondre,
+     * « Revenu à la base », « Pas revenu ». `spec` vient de notificationSpec (jeffreyNotify.js) ;
+     * il est gardé pour Écouter et pour afficher la réponse de Monsieur pendant que Jeffrey écrit.
+     */
+    fun postThread(context: Context, specJson: String, alert: Boolean, pending: Boolean = false) {
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
+        if (!pending) context.getSharedPreferences(THREAD_PREFS, Context.MODE_PRIVATE).edit().putString("spec", specJson).apply()
+        ensureChannel(context)
+        val spec = JSONObject(specJson)
+        val me = Person.Builder().setName("Monsieur").setKey("monsieur").build()
+        val jeffrey = Person.Builder().setName("Jeffrey").setKey("jeffrey").build()
+        val style = NotificationCompat.MessagingStyle(me)
+        val msgs = spec.optJSONArray("messages")
+        val now = System.currentTimeMillis()
+        val count = msgs?.length() ?: 0
+        for (i in 0 until count) {
+            val m = msgs!!.getJSONObject(i)
+            style.addMessage(m.optString("text"), now - (count - i) * 1_000L, if (m.optBoolean("me")) me else jeffrey)
+        }
+        if (count == 0 && spec.optString("text").isNotBlank()) style.addMessage(spec.optString("text"), now, jeffrey)
+        val confirm = spec.optJSONObject("confirm")
+        if (pending) style.addMessage("…", now, jeffrey)
+        else if (confirm != null) style.addMessage("À confirmer : ${confirm.optString("label")}", now, jeffrey)
+        val b = NotificationCompat.Builder(context, CHANNEL)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setStyle(style)
+            .setContentIntent(openIntent(context))
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setSilent(!alert)
+        if (!pending) {
+            val icon = R.drawable.ic_jeffrey_bell
+            val reply = NotificationCompat.Action.Builder(icon, "Répondre",
+                actionIntent(context, JeffreyNotifReceiver.ACTION_REPLY, 5060, mutable = true))
+                .addRemoteInput(RemoteInput.Builder(JeffreyNotifReceiver.KEY_REPLY).setLabel("Répondre à Jeffrey").build())
+                .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
+                .setAllowGeneratedReplies(false)
+                .build()
+            fun confirmAction(label: String, req: Int, baseline: Boolean?) = NotificationCompat.Action.Builder(icon, label,
+                actionIntent(context, JeffreyNotifReceiver.ACTION_CONFIRM, req) {
+                    putExtra("entryId", confirm!!.optString("entryId")); putExtra("actionId", confirm.optString("actionId"))
+                    if (baseline != null) putExtra("baseline", baseline)
+                }).build()
+            if (confirm?.optBoolean("needsBaseline") == true) {
+                b.addAction(reply)
+                b.addAction(confirmAction("Revenu à la base", 5062, true))
+                b.addAction(confirmAction("Pas revenu", 5063, false))
+            } else {
+                if (spec.optJSONObject("listen") != null) {
+                    b.addAction(NotificationCompat.Action.Builder(icon, "Écouter", actionIntent(context, JeffreyNotifReceiver.ACTION_LISTEN, 5061)).build())
+                }
+                b.addAction(reply)
+                val quick = spec.optJSONObject("quick")
+                if (confirm != null) b.addAction(confirmAction("Confirmer", 5062, null))
+                else if (quick != null) b.addAction(NotificationCompat.Action.Builder(icon, quick.optString("label"),
+                    actionIntent(context, JeffreyNotifReceiver.ACTION_QUICK, 5064) {
+                        putExtra("text", quick.optString("label")); putExtra("quickFor", quick.optString("quickFor"))
+                    }).build())
+            }
+        }
+        try { NotificationManagerCompat.from(context).notify(NOTIF_ID, b.build()) } catch (e: SecurityException) { Log.w(TAG, "notification", e) }
+    }
+
+    /** Pendant que Jeffrey répond : la réponse de Monsieur s'ajoute au fil, sans boutons (Android
+     *  attend aussi cette mise à jour pour arrêter l'indicateur du champ de réponse). */
+    fun postPending(context: Context, userText: String?) {
+        val spec = storedSpec(context) ?: JSONObject()
+        if (!userText.isNullOrBlank()) {
+            val msgs = spec.optJSONArray("messages") ?: org.json.JSONArray()
+            msgs.put(JSONObject().put("me", true).put("text", userText))
+            spec.put("messages", msgs)
+        }
+        postThread(context, spec.toString(), alert = false, pending = true)
+    }
+
     /** Pont exposé à la page sous `window.BriefBridge`. */
     private class Bridge(
-        private val context: Context, private val health: String, private val web: WebView,
+        private val context: Context, private val health: String, private val payload: String, private val web: WebView,
         private val handler: Handler, private val onFinish: (String) -> Unit,
     ) {
         @JavascriptInterface fun health(): String = health
+
+        /** Réponse de Monsieur depuis la notification (J4.3), "{}" pour le brief. */
+        @JavascriptInterface fun payload(): String = payload
 
         // Service au premier plan le temps de l'appel (BriefService : rend le réseau quand
         // l'économie d'énergie le coupe aux apps en arrière-plan). Repli : simple notification.

@@ -5806,3 +5806,44 @@ immédiat. Six retours de Yoann, choix tranchés par question :
   gratuit (aucun appel à l'IA tant qu'il manque une donnée).
 - Constat de coût, sans changement : avec Opus 5.5, chaque réponse de Jeffrey coûte 6 à 11 ¢
   (environ 62 ¢ le matin du 30/10, bilan compris).
+
+## Chantier J — Jeffrey : J4.3, répondre depuis la notification (30/10/2026, apps/perso v3.138.0)
+
+Choix de Yoann : trois boutons, « Écouter · Répondre · 1 réponse rapide » ; Jeffrey répond
+**dans la notification** ; une action à confirmer prend la place de la réponse rapide.
+Au passage, la tuile Bord du widget n'affiche plus que la cloche, centrée (v3.137.1).
+
+- **Notification de conversation** (`BriefRunner.postThread`) :
+  - `MessagingStyle` (Monsieur / Jeffrey), fil du jour à partir du brief (le message de demande
+    du brief n'est pas montré), 6 messages au plus ;
+  - boutons (3 au plus, limite d'Android) : **Écouter** (si la voix est configurée), **Répondre**
+    (`RemoteInput`), puis la **première réponse rapide** de Jeffrey ou **Confirmer** si une action
+    attend (« À confirmer : … » ajouté au fil) ;
+  - douleur au genou sans réponse sur la base : Répondre, « Revenu à la base », « Pas revenu ».
+  - Le contenu vient de `notificationSpec(entries)` (`lib/jeffreyNotify.js`, testé), le même pour
+    la page sans écran et pour l'app. Il est gardé dans les préférences Android `jeffrey_thread`
+    (avec la voix du dernier message, clé comprise : stockage privé de l'app).
+- **Boutons** (`JeffreyNotifReceiver.kt`, non exporté) :
+  - **Répondre** et **réponse rapide** : la réponse de Monsieur s'ajoute aussitôt au fil
+    (`postPending`, avec « … » pour Jeffrey). Ensuite `BriefService` démarre (réseau,
+    app en vie), et la page sans écran `brief.html?mode=reply` fait répondre Jeffrey
+    (`runReply`, `lib/brief.js` : même tour que la conversation, mémoire, réponse rapide signalée
+    à Jeffrey). Puis le fil est mis à jour et l'audio de la réponse préparé.
+  - **Confirmer** : `decideAction` (core, **partagé avec la conversation de l'app**) et
+    `applyActionStored` (écritures directes : eau, genou, note, repas, habituel), sans appel à
+    l'IA.
+  - **Écouter** : lit le dernier message depuis le cache (sinon le serveur vocal) ; un second tap
+    arrête.
+- **Brief** : il a de nouveau droit à **un seul outil, `proposer_reponses`**. Sa consigne demande
+  le texte d'abord, puis 2 ou 3 réponses courtes, la plus probable en premier.
+- `BriefService` porte désormais sa **propre notification** (id 5052) : son arrêt n'efface plus
+  le fil (id 5050). `handleResult` ne reprogramme un réveil que si la page rend `nextAt` (jamais
+  après une réponse).
+- **Quand c'est l'app qui écrit le brief**, elle poste la même notification de conversation, sans
+  bruit (`postJeffreyNotification`).
+- **Limite connue** : une réponse depuis la notification pendant que l'app est ouverte au premier
+  plan écrit la conversation pendant que l'app garde son état en mémoire. L'app relit la
+  conversation au retour au premier plan, mais pas si elle reste affichée.
+- Tests : `apps/perso/test/jeffreyNotify.test.mjs` (fil, réponse rapide, Confirmer, base genou,
+  `decideAction`) et `jeffreyTurn.test.mjs` (le brief n'envoie que `proposer_reponses`).
+  164 tests au total.

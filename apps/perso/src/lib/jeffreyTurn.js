@@ -32,11 +32,13 @@ export async function jeffreyTurn({ history, mode, coach, ai, note, transport, f
       const req = coach.jeffreyRequest(history, note);
       const { message, usedModel, cents } = await streamClaude({
         provider: ai.provider, baseUrl: ai.baseUrl, apiKey: ai.apiKey, model: ai.model,
-        system: req.system, messages: req.messages, tools: req.tools,
-        // Outils interdits pour la relance d'une réponse muette (sinon elle peut rester muette), et
-        // pour le brief dès le premier passage : essai réel du 29/10, Opus avait répondu par des
-        // outils seuls puis été relancé, 10,5 ¢ au lieu de ~5 ¢. La séance est dite dans le texte.
-        toolChoice: pass > 0 || mode === "brief" ? { type: "none" } : undefined,
+        system: req.system, messages: req.messages,
+        // Outils interdits pour la relance d'une réponse muette (sinon elle peut rester muette). Le
+        // brief n'a droit qu'à proposer_reponses (J4.3, 30/10/2026 : la première réponse devient un
+        // bouton de la notification) ; sa consigne demande le texte d'abord. Essai du 29/10 : avec
+        // tous les outils, Opus avait répondu par des outils seuls, d'où une relance payée.
+        toolChoice: pass > 0 ? { type: "none" } : mode === "brief" ? { type: "auto" } : undefined,
+        tools: mode === "brief" ? req.tools.filter((t) => t.name === "proposer_reponses") : req.tools,
         effort: effortFor(mode), maxTokens: 16000, streamTransport: transport,
         onText: onText ? (_, all) => onText(readReply([{ type: "text", text: all }]).text) : undefined,
         onRetry,
