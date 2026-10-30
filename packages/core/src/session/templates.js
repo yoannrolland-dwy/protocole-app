@@ -153,20 +153,23 @@ const TEMPLATES = {
   // (7 étapes, intensité croissante) au lieu des 5 blocs d'origine — contenu réétalé, pas
   // juste renommé, pour une vraie progressivité (cardio → mobilité → primer genou → charge
   // légère → charge élevée → spécifique modéré → spécifique intense).
+  // Durée divisée par deux le 30/10/2026 (~21 → ~11 min, demande de Yoann) : c'est un
+  // pré-échauffement, l'équipe s'échauffe ensuite. Les 7 étapes et leur ordre sont gardés ;
+  // le primer genou passe de 4 à 2 tenues de 40 s (toujours avant toute charge).
   "Basket": { kind: "muscu", knee: true, withMeta: true, chargeTags: ["genou"], exos: [
-    { n: "Cardio léger (vélo ou trot)", s: 1, r: "5 min", rest: 0, mode: "temps", c: "élever la température, allure tranquille",
+    { n: "Cardio léger (vélo ou trot)", s: 1, r: "3 min", rest: 0, mode: "temps", c: "élever la température, allure tranquille",
       groupe: "cardio", mouvement: "cardio", materiel: "aucun", tendon: null },
-    { n: "Mobilité dynamique", s: 1, r: "5 min", rest: 0, mode: "temps", c: "fentes marchées, balancements hanche/cheville",
+    { n: "Mobilité dynamique", s: 1, r: "2 min", rest: 0, mode: "temps", c: "fentes marchées, balancements hanche/cheville",
       groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
-    { n: "Primer iso genou (wall-sit @60°)", s: 4, r: "40 s", rest: 20, mode: "temps", c: "sous le seuil de douleur — antalgie + activation",
+    { n: "Primer iso genou (wall-sit @60°)", s: 2, r: "40 s", rest: 20, mode: "temps", c: "sous le seuil de douleur — antalgie + activation",
       groupe: "quadriceps", mouvement: "genou", materiel: "aucun", tendon: "genou" },
-    { n: "Montée en charge : squats", s: 2, r: "45 s", rest: 30, mode: "temps", c: "poids du corps, amplitude progressive · ~60-70 %",
+    { n: "Montée en charge : squats", s: 1, r: "45 s", rest: 30, mode: "temps", c: "poids du corps, amplitude progressive · ~60-70 %",
       groupe: "quadriceps", mouvement: "genou", materiel: "aucun", tendon: "genou" },
-    { n: "Montée en charge : sauts", s: 2, r: "30 s", rest: 30, mode: "temps", c: "hauteur ↑ seulement si indolore · ~80 %",
+    { n: "Montée en charge : sauts", s: 1, r: "30 s", rest: 30, mode: "temps", c: "hauteur ↑ seulement si indolore · ~80 %",
       groupe: "quadriceps", mouvement: "genou", materiel: "aucun", tendon: "genou" },
-    { n: "Spécifique basket : accél/décél", s: 1, r: "90 s", rest: 20, mode: "temps", c: "changements de direction ~70-80 %",
+    { n: "Spécifique basket : accél/décél", s: 1, r: "45 s", rest: 20, mode: "temps", c: "changements de direction ~70-80 %",
       groupe: "cardio", mouvement: "specifique", materiel: "aucun", tendon: null },
-    { n: "Spécifique basket : tirs en mouvement", s: 1, r: "60 s", rest: 0, mode: "temps", c: "intensité proche du match",
+    { n: "Spécifique basket : tirs en mouvement", s: 1, r: "30 s", rest: 0, mode: "temps", c: "intensité proche du match",
       groupe: "cardio", mouvement: "specifique", materiel: "aucun", tendon: null },
   ]},
   "Escalade": { kind: "sport", climb: true, chargeTags: ["tirage"], exos: [] },

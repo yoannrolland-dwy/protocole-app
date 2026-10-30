@@ -1,8 +1,11 @@
-// Barre de sous-onglets (Corps, Réglages) : boutons de 48 px, citron plein sur l'onglet actif.
+// Barre de sous-onglets (Corps, Réglages, Analyse) : boutons de 48 px, citron plein sur l'onglet
+// actif. `sticky` (Analyse, 30/10/2026) la garde collée en haut de l'écran quand on fait défiler :
+// même procédé que la barre du jour de Nutrition (marges négatives = padding de <main>, fond de
+// l'app derrière pour que le contenu passe dessous proprement).
 import { T } from "../design/tokens.js";
 
-export function SubTabs({ label, tabs, value, onChange }) {
-  return (
+export function SubTabs({ label, tabs, value, onChange, sticky = false }) {
+  const bar = (
     <div role="tablist" aria-label={label} style={{
       display: "flex", gap: 4, padding: 4, borderRadius: 14,
       background: T.c.card, border: `1px solid ${T.c.lineSoft}`, fontFamily: T.f.body,
@@ -18,6 +21,12 @@ export function SubTabs({ label, tabs, value, onChange }) {
             }}>{text}</button>
         );
       })}
+    </div>
+  );
+  if (!sticky) return bar;
+  return (
+    <div style={{ position: "sticky", top: -14, zIndex: 5, margin: "-14px -16px 0", padding: "14px 16px 8px", background: T.c.bg }}>
+      {bar}
     </div>
   );
 }

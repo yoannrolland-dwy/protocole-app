@@ -5860,3 +5860,31 @@ Le dernier sous-onglet ouvert est retenu pendant la session. Chaque sous-onglet 
 qu'il affiche : avant, chaque message de Jeffrey recalculait la dépense estimée. Vérifié dans
 l'aperçu (375 px) : bascule entre les trois, sous-onglet retenu après un passage par Nutrition, pas
 de débordement, aucune erreur console.
+
+## Échauffement basket raccourci, sous-onglet Calories étoffé, sous-onglets d'Analyse collés (30/10/2026, apps/perso v3.140.0)
+
+- **Échauffement basket ~21 → ~11 min** (`TEMPLATES.Basket`, demande de Yoann : c'est un
+  pré-échauffement, l'équipe s'échauffe ensuite). Mêmes 7 étapes dans le même ordre : cardio
+  5 → 3 min, mobilité dynamique 5 → 2 min, primer iso genou 4 → **2** × 40 s (toujours avant
+  toute charge), squats et sauts 2 → 1 série, accél/décél 90 → 45 s, tirs 60 → 30 s. Calculé :
+  650 s avec les repos, contre 1 280 s. Gabarit partagé avec `apps/public` (visible au prochain
+  déploiement, comme tout changement de gabarit).
+- **Sous-onglets d'Analyse collés en haut au défilement** : `SubTabs` gagne `sticky` (même
+  procédé que la barre du jour de Nutrition : `top: -14`, marges négatives, fond de l'app
+  derrière). Activé sur Analyse seulement ; Corps et Réglages inchangés.
+- **Sous-onglet Calories** : sous le graphique par semaine, quatre cartes choisies par Yoann,
+  calculées par `packages/core/src/nutritionStats.js` (pur, testé) :
+  - **Moyenne · 7 jours** : kcal, protéines, glucides, lipides, fibres contre la cible du jour,
+    barre colorée par `progressColor` (`MACRO_KIND`), écart avec les 7 jours d'avant (« ±0 »
+    pour un écart nul) ;
+  - **Kcal · 14 jours** : une barre par jour (mêmes couleurs que le graphique par semaine),
+    ligne de cible, aujourd'hui en gris (« en cours ») ;
+  - **Par repas · 14 jours** : kcal et protéines moyennes par repas et par jour saisi, barre de
+    part des kcal ; corrections V6 appliquées, lignes « Retirer » soustraites ;
+  - **Régularité · 28 jours** : jours saisis, jours dans ±10 % de la cible kcal du jour (fenêtre
+    de sèche comprise), alcool sur 7 et 28 jours.
+  Moyennes sur les jours TERMINÉS seulement (aujourd'hui exclu), et un jour sans repas (ligne
+  d'eau seule) n'est pas compté comme saisi. `foodLog` lu frais à l'ouverture (`getSync`).
+- Tests : `nutritionStats.test.mjs` (4 tests) — 168 au total. Aperçu (375 px, 35 jours
+  synthétiques) : les 5 cartes, barres présentes, sous-onglets restés en haut après défilement,
+  aucun débordement horizontal, aucune erreur console. Builds perso et public propres.
