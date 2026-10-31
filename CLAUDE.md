@@ -17,6 +17,124 @@ les pièges identifiés et les tests attendus — ne pas les rouvrir sans raison
 À la fin d'une étape : cocher son état dans le tableau de `ROADMAP.md`, et
 documenter le livré ici, dans CLAUDE.md.
 
+## Jeffrey, état actuel (mis à jour le 31/10/2026, apps/perso v3.146.0)
+
+Résumé de référence. Les sections datées plus bas (chantier J, 29-31/10/2026) racontent comment on
+en est arrivé là ; **en cas de désaccord, c'est cette section qui fait foi**. À tenir à jour à
+chaque changement de Jeffrey.
+
+**Qui il est.** Le majordome de PROTOCOLE, dans `apps/perso` seulement (`apps/public` garde son
+ancien Coach IA). Il remplace la carte « Coach IA » (bouton « Analyser ») depuis v3.128.0.
+Derrière le majordome : coach sportif, kiné, nutritionniste et coach de vie ; ce n'est pas un avis
+médical. Principe hérité du Coach IA : **le JS calcule les faits, Jeffrey les juge**. Ses données
+sont celles de `buildCoachPrompt` (champ `facts`) ; le recommandeur reste le garde-fou : Jeffrey
+ne propose qu'une séance de la liste autorisée, et l'app le vérifie (`validateSessionChoice`).
+
+**Personnalité** (`JEFFREY_PERSONA`, `packages/core/src/coach/jeffrey.js`). Ce texte n'est que la
+version de départ : celle qui sert est la clé `jeffreyPersona`, éditable dans Réglages › Jeffrey ›
+« Jeffrey · personnalité » (« Rétablir la personnalité d'origine » remet ce texte). Relu sur le
+téléphone le 31/10/2026 : identique au texte du code. Version de départ : vouvoiement, « Monsieur » ; langage châtié, phrases courtes, flegme britannique ; humour
+(traits d'esprit, understatement, pince-sans-rire, vraie blague quand l'occasion s'y prête) ;
+taquin, volontiers cynique, mais toujours bienveillant, on sent qu'il est du côté de Monsieur ; ne
+répète pas une plaisanterie d'un message à l'autre ; ne flatte pas, ne dramatise pas : il constate,
+conseille et laisse Monsieur décider.
+
+**Deux règles qui priment sur la personnalité** (`JEFFREY_RULES`) :
+1. Le ton ne change jamais les faits ni les garde-fous (séance écartée, douleur, chiffre). Monsieur
+   est un petit dormeur : une nuit courte n'est jamais un signe de fatigue, seul le score de
+   qualité compte (on peut en plaisanter, jamais le présenter comme un problème).
+2. Une alerte se dit toujours clairement : une phrase nette d'abord, l'humour éventuellement après.
+
+Les **messages fixes de l'app** (écrans vides, confirmations, erreurs, notifications) parlent aussi
+dans sa voix : recueil `PHRASES` dans `apps/perso/src/lib/jeffrey.js` (`say`, `sayStable`,
+`sayError`), sans aucun appel à l'IA. Tout nouveau message de l'app va dans ce recueil (test :
+chaque phrase dit « Monsieur », aucune ne tutoie).
+
+**Où il apparaît.** Onglet Analyse › sous-onglet « Jeffrey » (ouvert par défaut) ; bulle sur les
+autres onglets (pas dans Analyse, les Réglages, ni avec un carnet de séance ouvert), qui ouvre la
+même conversation en surimpression ; carte du Bord (en haut le matin, une ligne sous les tuiles
+l'après-midi) ; notification de conversation (brief et réponses). La conversation s'ouvre tout en
+bas, champ de saisie visible.
+
+**Ce qu'il fait.**
+- Conversation libre, texte au fil de l'eau ; « Faites-moi le point » (300 mots, met à jour le
+  carnet de bord après `---CARNET---`) ; « Bilan 3 mois » (faits calculés sur 90 jours).
+- Outils : `choisir_seance` (carte avec « Démarrer »), `proposer_reponses` (pastilles), et cinq
+  actions **jamais écrites sans un tap de Monsieur** : `ajouter_eau`, `noter_genou`, `ecrire_note`,
+  `reprendre_repas` (même repas d'hier), `ajouter_habituel` (quantité de la dernière fois).
+- Mémoire : la conversation d'un jour passé est versée dans le carnet de bord au premier message
+  suivant ; les conversations sont gardées 30 jours (`jeffreyLog`).
+- Brief du matin : premier réveil à 5 h 17 puis toutes les 5 min ; il attend la nuit, la pesée et
+  le genou ; aucune notification « il me manque… » avant 9 h ; relance sonore à 9 h ; brief à 10 h
+  au plus tard ; météo Open-Meteo en une phrase si elle change quelque chose (position
+  approximative, jamais envoyée à l'IA). Si l'app est ouverte, c'est elle qui l'écrit et poste la
+  notification sans bruit. Le brief n'a qu'un outil : `proposer_reponses`.
+- Notification de conversation : Écouter · Répondre · une réponse rapide (ou « Confirmer » si une
+  action attend). Une réponse écrite dans la notification fait répondre Jeffrey sans ouvrir l'app.
+- Fin de repos du carnet : après le bip, il annonce la série ou l'exercice suivant.
+
+**Modèle et fournisseur.**
+- Un seul modèle pour toute l'IA de l'app (Jeffrey, Carte resto, Photo d'un plat) : **Claude
+  Opus 5.5** choisi par Yoann le 26/10/2026. Le modèle et le fournisseur se règlent dans Réglages ›
+  Appareil › « IA · fournisseur et modèle » : **Anthropic direct** (clé `apiKey`, modèle `model`)
+  ou **LiteLLM**, son serveur Oracle `https://141.253.109.120` (clés `litellmUrl`, `litellmKey`,
+  `litellmModel`, au format `anthropic/claude-opus-5-5`). Sans réglage stocké, le code retombe sur
+  `claude-sonnet-5-5` en Anthropic direct.
+- **Réglage en place sur le téléphone (relu le 31/10/2026)** : fournisseur **LiteLLM**, modèle
+  `anthropic/claude-opus-5-5`, serveur `https://141.253.109.120`. Le secours « Anthropic direct »
+  est prêt (clé saisie, modèle `claude-opus-5-5`) : il suffit de basculer en un tap si le serveur
+  tombe. Dépensé en octobre 2026 : 2,97 $ (`aiSpend`).
+- Sur l'app native, LiteLLM passe par le relais `JeffreyHttpPlugin.kt` (le serveur ne gère pas la
+  vérification CORS). Anthropic direct passe par `fetch`.
+- Réflexion : `low` pour la conversation et le brief, `medium` pour le point et le bilan
+  (`effortFor`). Budget de réponse 16 000 tokens.
+- Reprise : 3 essais, jamais après le début du flux ; puis repli sur Haiku 4.5 seulement pour un
+  modèle Claude (`anthropic/claude-haiku-4-5` via LiteLLM).
+- Coût mesuré (Opus 5.5) : environ 7 ¢ le premier message du jour, environ 2 ¢ les suivants grâce
+  au cache, jusqu'à 11 ¢ quand la conversation du jour est longue. Total du mois dans Réglages
+  (`aiSpend`).
+
+**Voix.**
+- Sa voix vient du **serveur Oracle** : Pocket TTS français (Kyutai), voix `jeffrey`, via LiteLLM
+  (`POST {url}/v1/audio/speech`, modèle `protocole/jeffrey`, son PCM 24 kHz en flux). Le serveur
+  produit toujours à vitesse 1,00 ; l'app lit à **1,20** (réglage `jeffreyVoice.speed`). Clé
+  `voiceKey`, jamais exportée ; `jeffreyVoice.url` vide = même adresse que LiteLLM. Sur le
+  téléphone (31/10/2026), `jeffreyVoice` garde encore l'ancienne forme de la voix Android
+  (`voice`, `rate`, `pitch`), ignorée : la vitesse appliquée est donc celle par défaut, 1,20, et
+  l'adresse celle de LiteLLM. Elle sera réécrite au prochain réglage de la vitesse. Config du
+  serveur : autre dépôt, `LiteLLM_Oracle/protocole-voice/`.
+- **La voix intégrée d'Android n'existe plus** (retirée en v3.136.0) : plus de choix de voix ni de
+  hauteur. Sans réseau, Jeffrey se tait (pas de voix de secours).
+- Quand il parle : **casque branché → il dit toutes ses réponses** (conversation, brief,
+  réponses depuis la notification), séance ou pas. Sans casque : seulement si Monsieur lui a
+  parlé à la voix ; sinon bouton « Écouter » sous chaque réponse (cache sur le téléphone, 60 Mo).
+  Fin de repos : annoncée toujours, casque ou haut-parleur.
+- La musique se met **en pause** pendant qu'il parle, puis reprend.
+- La dictée (micro dans la conversation) reste celle d'Android, en français, envoi quand Monsieur
+  se tait.
+
+**Fichiers.**
+- Core (`packages/core/src/`) : `coach/jeffrey.js` (personnalité, règles, outils, requête,
+  validation des actions, mémoire), `coach/brief.js` (décision du brief et réveils),
+  `coach/stream.js` (lecture du flux), `coach/claudeApi.js` (`streamClaude`, reprise, coût),
+  `coach/speechText.js` (texte découpé et écrit en toutes lettres pour la voix),
+  `coach/prompt.js` (les données), `weather.js`, `healthMerge.js`.
+- App (`apps/perso/src/`) : `lib/jeffrey.js` (phrases fixes), `lib/jeffreyTurn.js` (un tour de
+  conversation), `lib/coachInputs.js`, `lib/brief.js`, `lib/briefNative.js`,
+  `lib/jeffreyNotify.js`, `lib/jeffreyHttp.js`, `lib/voice.js`, `lib/voiceConfig.js`,
+  `lib/restSpeech.js`, `lib/weather.js`, `lib/ai.js` ; `screens/perf/JeffreyChat.jsx`,
+  `screens/dashboard/JeffreyCard.jsx`, `components/JeffreyBubble.jsx`,
+  `components/JeffreyOverlay.jsx` ; page sans écran du brief `brief.html` + `src/briefPage.js`.
+- Android : `JeffreyVoice.kt` (voix, dictée, casque), `JeffreyHttpPlugin.kt`,
+  `JeffreyNotifReceiver.kt`, `BriefRunner.kt`, `BriefService.kt`, `BriefPlugin.kt`,
+  `BriefAlarmReceiver.kt`, `HealthReads.kt`, `RestAlarmReceiver.kt` (voix de fin de repos).
+
+**Clés.** Exportées (`DATA_KEYS`) : `jeffreyLog`, `jeffreyPersona`, `jeffreyVoice`, `aiProvider`,
+`litellmUrl`, `litellmModel`, `model`, `aiSpend`, `coachProfile`, `coachJournal`, `noteLog`.
+**Jamais exportées, volontairement** : `apiKey`, `litellmKey`, `voiceKey` (clés secrètes),
+`jeffreyMemoryDate`, `jeffreyBrief` (marqueurs du jour), `lastPosition` (position du téléphone).
+Préférences Android privées : `jeffrey_brief`, `jeffrey_thread`, `rest_voice`.
+
 ## Qui je suis (Yoann)
 
 43 ans, athlète (musculation / basket / escalade), en phase de sèche.
@@ -95,7 +213,7 @@ Coach IA) vit dans `packages/core/`, réutilisable par une future `apps/public`.
 protocole-app/                    (racine = workspaces npm uniquement)
   package.json                    { private:true, workspaces:["apps/*","packages/*"] }
   package-lock.json                (unique, couvre tout le monorepo)
-  netlify.toml                     # cible apps/perso via --workspace, pas de `base`
+  netlify.toml                     # cible apps/public via --workspace (depuis le 06/08/2026)
   packages/
     core/                          # @rawcare/core — logique métier pure, zéro React/DOM
       package.json                 # exports en wildcard : "./*" → "./src/*.js"
@@ -103,7 +221,6 @@ protocole-app/                    (racine = workspaces npm uniquement)
         dateUtils.js               # today/localDateKey/shiftDateKey/lastN/daysBetween/fmtHM...
         training.js                # progression, records, détection de records
         tdee.js                    # dépense énergétique adaptative (V7)
-        climbing.js                # cotation/résumé des séances d'escalade
         pain.js                    # PAIN_FRESH_DAYS + zoneState (genou/coude)
         recommender.js             # recommendSessions ("Prochaine séance")
         targets.js                 # PHASES, cibles macro, fenêtre de sèche, tdeeNow
@@ -111,8 +228,10 @@ protocole-app/                    (racine = workspaces npm uniquement)
           templates.js             # TEMPLATES, HSR_TABLE, PERI, BASKET_PROTOCOLS...
           perf.js                  # lastPerf/perfHistory/medianTarget (carnet muscu)
         coach/
-          claudeApi.js             # appel API Anthropic (PRICING, callClaude)
+          claudeApi.js             # appel API Anthropic/LiteLLM (PRICING, callClaude, streamClaude)
           prompt.js                # buildCoachPrompt/buildCoachBriefing, splitCarnet
+          jeffrey.js, brief.js,    # Jeffrey : personnalité, outils, brief, flux, texte pour la
+          stream.js, speechText.js #   voix (voir « Jeffrey, état actuel » en tête)
         nutrition/
           ciqual.js, off.js, scan.js, imageUtils.js
           foodStore.js             # fonctions pures (le hook useFoodLog reste dans l'app)
@@ -130,14 +249,18 @@ protocole-app/                    (racine = workspaces npm uniquement)
         App.jsx                    # composant racine seul : état, synchro, navigation (U0)
         version.js                 # APP_VERSION (à bumper à chaque livraison)
         lib/helpers.js, lib/plan.js # utilitaires partagés, planning idéal / semaine de match
-        components/                # composants partagés entre écrans (SyncedBanner)
+        lib/jeffrey*.js, brief.js, # Jeffrey : phrases fixes, tour de conversation, brief,
+          voice*.js, ai.js...       #   notification, voix, fournisseur IA (voir en tête)
+        components/                # composants partagés (SyncedBanner, TabBar, SubTabs,
+                                    # SessionBar, JeffreyBubble, JeffreyOverlay...)
         screens/                   # un fichier par écran (U0, 25/10/2026) :
-                                    # dashboard/ (Dashboard, CoachIA, PalierCard, WhyNot,
+                                    # dashboard/ (Dashboard, JeffreyCard, PalierCard, WhyNot,
                                     # KneeQuickLog, InsightsCard), WeightTab, SleepTab,
                                     # StepsTab, PainTab, train/ (TrainTab, MuscuLogger,
                                     # ProgressScreen, GeneField, VolumeCard), perf/
-                                    # (PerformanceTab, TdeeCard), settings/ (SettingsPanel,
-                                    # BasketScheduleCard)
+                                    # (PerformanceTab, TdeeCard, JeffreyChat, ReferenceCards),
+                                    # settings/ (SettingsPanel, BasketScheduleCard)
+        briefPage.js (+ brief.html) # page sans écran du brief du matin (Jeffrey)
         store.js                   # persistance localStorage + export/import JSON
         healthSync.js              # synchro Health Connect (pas/sommeil/macros/eau)
         design/                    # design system v2 (U2) : tokens.js (source unique des
@@ -147,7 +270,8 @@ protocole-app/                    (racine = workspaces npm uniquement)
         claudeApi.js                # shim de ré-export vers @rawcare/core/coach/claudeApi
         nutrition/
           foodStore.js              # hook useFoodLog + ré-export du reste depuis core
-          NutritionTab.jsx, FoodSearch.jsx, RestaurantMenu.jsx, PhotoDish.jsx
+          NutritionTab.jsx, FoodSearch.jsx, RestaurantMenu.jsx, PhotoDish.jsx,
+          RecipesPanel.jsx, FoodsPanel.jsx
         index.css                  # @import "tailwindcss" + resets minimaux
       android/                     # projet natif Capacitor — commandes préfixées
                                     # apps/perso/, voir "Mise à jour de l'app native"
@@ -155,7 +279,13 @@ protocole-app/                    (racine = workspaces npm uniquement)
           MainActivity.java
           HealthNutritionPlugin.kt # lecteur natif maison (macros complètes,
                                     # voir section Health Connect)
-    public/                        # apps/public — coquille inerte (Phase 2 la remplira)
+          HealthReads.kt            # nuit, pesée, FC repos (partagé avec le brief)
+          JeffreyVoice.kt, JeffreyHttpPlugin.kt, JeffreyNotifReceiver.kt,
+          Brief*.kt                 # Jeffrey : voix, relais HTTP, notification, brief
+          RestTimerPlugin.kt, RestAlarmReceiver.kt  # minuteur de repos, réveil, voix
+          DashboardWidgetProvider.kt, WidgetBridgePlugin.kt,
+          WidgetStepsRefresher.kt   # widget d'écran d'accueil
+    public/                        # apps/public — RawCare, en ligne sur Netlify
       package.json                 # name "@rawcare/public", dépend de @rawcare/core
 ```
 
@@ -400,6 +530,13 @@ monospace), corrigée pour la lisibilité mesurée à l'audit U1.
   écraserait tout et laisserait `cut` absent.
 
 ### Coach IA — contrat exact (ne pas simplifier sans le signaler)
+
+> **Historique pour `apps/perso`** : depuis v3.128.0 (29/10/2026), la carte Coach IA et son bouton
+> « Analyser » sont remplacés par Jeffrey (voir « Jeffrey, état actuel » en tête). Restent valables
+> ici : les données envoyées (`buildCoachPrompt`, que Jeffrey reçoit via `facts`), le carnet de
+> bord, l'export claude.ai et le principe « le JS calcule, l'IA juge ». **Périmés pour
+> `apps/perso`** : le modèle (Sonnet 5), `effort: "medium"` partout, `max_tokens: 6000`, la limite
+> de 500 mots, le bouton « Analyser ». Ce contrat reste celui de la carte Coach IA d'`apps/public`.
 - **Détail des repas dans le prompt** (02/08/2026) : jusqu'ici le Coach IA ne
   voyait que les totaux macros du jour (`macroLog`, alimenté par `foodLog`
   depuis M6) — jamais QUOI a été mangé. `buildPrompt` lit désormais `foodLog`
@@ -3843,7 +3980,8 @@ modèle pour toute l'IA**, **Anthropic direct gardé à côté** (bascule en un 
   Opus 5.5 la réflexion est toujours active et consomme ce même budget, 1 024 aurait coupé le JSON de
   la photo. Simple plafond, seuls les tokens produits sont facturés. Réglages du téléphone basculés sur
   « Anthropic direct » + `claude-opus-5-5` (via `cdp.mjs`, relu après redémarrage à froid) : le serveur
-  LiteLLM renvoyait des 429 sur tout sauf Haiku 4.5. Coût attendu ~2× Sonnet 5.5 (~9 ¢ l'analyse du
+  LiteLLM renvoyait des 429 sur tout sauf Haiku 4.5. *(État du 26/10 seulement : les essais du 29/10
+  sont passés par LiteLLM ; le réglage actuel est dans « Jeffrey, état actuel ».)* Coût attendu ~2× Sonnet 5.5 (~9 ¢ l'analyse du
   jour). Non testé par un vrai appel Opus à ce stade.
 
 ## Habituels sous les repas : une ligne fine qui défile (26/10/2026, apps/perso v3.123.0)
@@ -4225,6 +4363,13 @@ Décision 7 de ROADMAP.md appliquée telle quelle.
 
 ## Chantier J — Jeffrey : J3, la voix (29/10/2026, apps/perso v3.134.0)
 
+> **Périmé en grande partie (historique).** La voix Android décrite ici (`JeffreyTts`, choix parmi
+> les voix du téléphone, vitesse et hauteur, musique baissée) a été **retirée en v3.136.0** : la voix
+> vient du serveur Oracle. Le brief n'est plus lu « seulement casque branché ET séance en cours » :
+> depuis v3.142.0, casque branché = Jeffrey dit toutes ses réponses. La musique se met en pause
+> (v3.137.0). **Toujours vrai** : la dictée Android, le micro de la conversation, « il répond comme
+> on lui a parlé » sans casque, la détection du casque (`Headset`). État actuel : section en tête.
+
 Choix de Yoann : la dictée part toute seule quand il se tait ; le brief est lu à voix haute pendant
 une séance, casque branché. Règle (décision 11) : **il répond comme on lui a parlé** — question
 dictée → réponse à voix haute (casque ou haut-parleur) ; question écrite → réponse écrite, avec un
@@ -4304,7 +4449,8 @@ Vérifié dans l'aperçu : 1:58 → 1:28 après un saut d'horloge de 30 s simul�
    `trainingLog`, `kneeLog`, `elbowLog`, `rhrLog`, `napLog`, `macroLog`, `noteLog`, `stepsLog`, `targets`,
    `phase`, `hsrWeek`, `climbScheme`, `basketSchedule`, `apiKey`, `model`, `coachProfile`,
    `coachJournal`, `foodLog`, `foodPins`, `foodMuted`, `foodPortions`, `foodRecipes`,
-   `foodOverrides` —
+   `foodOverrides`, `targetHistory`, `palierWeekly`, `aiProvider`, `litellmUrl`, `litellmKey`,
+   `litellmModel`, `aiSpend`, `jeffreyLog`, `jeffreyPersona`, `jeffreyVoice`, `voiceKey` —
    préfixées `protocole:` dans `store.js`)
    sans écrire une migration. Casser une clé = perdre l'historique de
    l'utilisateur, ce qui est la pire chose possible ici.
@@ -4320,6 +4466,11 @@ Vérifié dans l'aperçu : 1:58 → 1:28 après un saut d'horloge de 30 s simul�
    chantier dédié plus bas) est une quatrième exception volontaire : état éphémère lié à
    l'appareil au moment présent, pas une donnée à restaurer sur un autre appareil ou à une
    autre date — ne jamais l'ajouter à `DATA_KEYS`.
+   **Autres clés volontairement hors `DATA_KEYS`, à ne jamais y ajouter** : les clés secrètes
+   `apiKey`, `litellmKey`, `voiceKey` (jamais dans un export) ; les marqueurs du jour de Jeffrey
+   `jeffreyMemoryDate` et `jeffreyBrief` (les restaurer ferait sauter un brief ou une mise en
+   mémoire) ; `lastPosition` (position du téléphone, propre à l'appareil). `climbScheme` reste
+   dans `DATA_KEYS` mais n'est plus lu depuis le 08/10/2026 (même cas qu'`elbowLog`).
 2. **Toujours vérifier que le build passe** (`npm run build --workspace=apps/perso`,
    depuis la racine du monorepo) **et que `npm test` est vert** avant de considérer une
    modification terminée. Depuis le chantier T1 (04/10/2026), un hook pre-commit lance
@@ -5725,7 +5876,7 @@ phrase** ; brief **préparé à l'avance** ; **une seule vitesse** dans les Rég
   - une session à la fois, une seule synthèse active ;
   - les phrases partent l'une après l'autre, le son de la suivante s'empile dans le tampon pendant
     que la précédente se joue ;
-  - `AudioTrack` en flux (usage « assistant » : casque sinon haut-parleur, musique baissée) ;
+  - `AudioTrack` en flux (usage « assistant » : casque sinon haut-parleur, musique baissée — *mise en pause depuis v3.137.0*) ;
   - vitesse de lecture (1,20) par `PlaybackParams`, hauteur 1 : **le serveur produit toujours à
     1,00**, ne jamais lui demander 1,2 ;
   - octet isolé gardé entre deux blocs réseau ;
@@ -5759,7 +5910,8 @@ phrase** ; brief **préparé à l'avance** ; **une seule vitesse** dans les Rég
     l'audio (service au premier plan gardé le temps de la synthèse) ;
   - app ouverte : `speak(text, { play })` ;
   - lu tout de suite seulement en séance avec un casque, sinon « Écouter » le joue depuis le cache,
-    sans attendre ni réseau. Yoann l'écoute chez lui ou sur le chemin de la salle.
+    sans attendre ni réseau. Yoann l'écoute chez lui ou sur le chemin de la salle. *(Remplacé en
+    v3.142.0 : casque branché suffit, séance ou pas.)*
 - **Mesuré sur le S25 (Wi-Fi, 29/10)** :
 
   | Essai | Premier son | Coupures | Durée du son |
