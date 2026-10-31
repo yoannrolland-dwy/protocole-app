@@ -109,6 +109,12 @@ export function useFoodLog() {
         store.set("foodPins", nextPins);
       }
     },
+    // Onglet Aliments (31/10/2026) : remettre un aliment masqué dans « Vos aliments habituels ».
+    unmute: (ref) => {
+      const next = muted.filter((r) => r !== ref);
+      setMuted(next);
+      store.set("foodMuted", next);
+    },
     savePortion: (ref, label, grams) => {
       const list = portions[ref] || [];
       // Même libellé retapé = on remplace, pas de doublon silencieux.

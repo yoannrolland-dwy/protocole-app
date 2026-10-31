@@ -22,11 +22,23 @@ import {
   copySourceCandidates, copyEntries, deriveMacroLog, suggestions,
 } from "./foodStore.js";
 import FoodSearch from "./FoodSearch.jsx";
+import RecipesPanel from "./RecipesPanel.jsx";
+import FoodsPanel from "./FoodsPanel.jsx";
+import { SubTabs } from "../components/SubTabs.jsx";
 import { say, sayStable } from "../lib/jeffrey.js";
 
 // Cibles PROTOCOLE (protein/carbs/fat/fiber) → noms internes du module (prot/gluc/lip/fib).
 const TARGET_KEY = { prot: "protein", gluc: "carbs", lip: "fat", fib: "fiber" };
 const MACRO_SHORT = { prot: "Prot", gluc: "Gluc", lip: "Lip", fib: "Fib" };
+
+// Sous-onglets (31/10/2026, demande de Yoann) : Journal (l'écran du jour), Recettes, Aliments.
+// Le dernier ouvert est retenu pendant la session, comme Corps, Séance et Analyse.
+const NUTRITION_TABS = [
+  { key: "journal", label: "Journal" },
+  { key: "recettes", label: "Recettes" },
+  { key: "aliments", label: "Aliments" },
+];
+let lastNutritionTab = "journal";
 
 const n0 = (x) => Math.round(x);
 const n1 = (x) => Math.round(x * 10) / 10;
@@ -227,6 +239,8 @@ function UndoBar({ undo, onUndo }) {
 
 export default function NutritionTab({ targetsFor, macros, save, training, ai }) {
   const [date, setDate] = useState(today());
+  const [sub, setSubState] = useState(lastNutritionTab);
+  const setSub = (k) => { lastNutritionTab = k; setSubState(k); };
   const [openMeal, setOpenMeal] = useState(null);
   // Distinct de openMeal : "Macro rapide" ouvre la même feuille mais directement sur la
   // saisie libre, sans passer par la recherche — c'est justement la recherche qu'on
@@ -402,6 +416,14 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
     // (défilement horizontal constaté avec la police d'Android agrandie).
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12, fontFamily: T.f.body, color: T.c.text }}>
 
+      <SubTabs label="Sections de l'onglet Nutrition" tabs={NUTRITION_TABS} value={sub} onChange={setSub} />
+
+      {sub === "recettes" && (
+        <RecipesPanel food={food} date={date} dayLabel={diff === 0 ? "aujourd'hui" : longDate(date)} onAdded={offerUndo} />
+      )}
+      {sub === "aliments" && <FoodsPanel food={food} />}
+
+      {sub === "journal" && (<>
       {/* Barre du jour collante. Hors aujourd'hui elle passe en CITRON PLEIN, texte noir, avec le
           bouton « Aujourd'hui » à l'intérieur (25/10/2026, retour de Yoann : « beaucoup plus
           visible ») : en v2 elle restait sombre et seul le mot « Hier » changeait de couleur — on
@@ -413,7 +435,7 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
         const arrow = away ? { color: T.c.onAccent, borderColor: "rgba(0,0,0,.35)" } : undefined;
         return (
           <div style={{
-            position: "sticky", top: -14, zIndex: 5, margin: "-14px -16px 0", padding: "10px 12px",
+            position: "sticky", top: -14, zIndex: 5, margin: "0 -16px", padding: "10px 12px",
             display: "flex", alignItems: "center", gap: 8,
             background: away ? T.c.accent : T.c.bg,
             borderBottom: `1px solid ${away ? T.c.accent : T.c.lineSoft}`,
@@ -592,6 +614,8 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
           </Button>
         )}
       </Panel>
+
+      </>)}
 
       <UndoBar undo={undo} onUndo={runUndo} />
 

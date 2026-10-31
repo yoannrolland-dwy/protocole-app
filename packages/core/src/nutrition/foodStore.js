@@ -320,6 +320,57 @@ export function recipeAsFood(r) {
 
 export const isRecipeRef = (ref) => typeof ref === "string" && ref.startsWith("recipe:");
 
+// --- Onglets Recettes et Aliments de Nutrition (31/10/2026) --------------------
+
+const at = (per100, g) => Object.fromEntries(MACROS.map((m) => {
+  const v = per100?.[m];
+  if (v === null || v === undefined) return [m, null];
+  const x = (v * g) / 100;
+  return [m, m === "kcal" ? Math.round(x) : Math.round(x * 10) / 10];
+}));
+
+/** Fiche d'une recette : valeurs du lot entier et d'une portion, kcal de chaque ingrédient. */
+export function recipeSheet(r) {
+  const portions = recipePortions(r);
+  const portionGrams = recipePortionGrams(r);
+  return {
+    portions, portionGrams, totalWeight: r.totalWeight,
+    whole: at(r.per100, r.totalWeight),
+    portion: at(r.per100, portionGrams),
+    ingredients: (r.ingredients || []).map((i) => ({ name: i.name, q: i.q, kcal: at(i.per100, i.q).kcal })),
+  };
+}
+
+/** Dernière utilisation de chaque aliment du journal : Map ref → { date, count }. */
+export function lastUseByRef(log) {
+  const m = new Map();
+  for (const e of log || []) {
+    if (!e.ref || isCorrection(e)) continue;
+    const cur = m.get(e.ref);
+    if (!cur) m.set(e.ref, { date: e.date, count: 1 });
+    else { cur.count++; if (e.date > cur.date) cur.date = e.date; }
+  }
+  return m;
+}
+
+/** Recettes de la plus récemment mangée à la plus ancienne, puis jamais mangées par nom. */
+export function sortRecipes(recipes, log) {
+  const use = lastUseByRef(log);
+  return [...(recipes || [])].sort((a, b) => {
+    const da = use.get(`recipe:${a.id}`)?.date ?? "";
+    const db = use.get(`recipe:${b.id}`)?.date ?? "";
+    return da === db ? a.name.localeCompare(b.name, "fr") : da < db ? 1 : -1;
+  });
+}
+
+/** Nom affichable d'un aliment par son ref : la recette, sinon la dernière ligne du journal. */
+export function refNames(log, recipes) {
+  const names = new Map();
+  for (const e of log || []) if (e.ref && e.name) names.set(e.ref, e.name);
+  for (const r of recipes || []) names.set(`recipe:${r.id}`, r.name);
+  return names;
+}
+
 // --- Favoris et historique intelligent ---------------------------------------
 //
 // Rien n'est stocké : tout se DÉRIVE de `foodLog`. Une liste de favoris entretenue en

@@ -365,7 +365,7 @@ function IngredientPicker({ onAdd, onCancel, log, pins, muted }) {
 // quantité de chaque ingrédient comprise) plutôt que d'en créer une nouvelle — jusqu'ici
 // seule la suppression totale était possible, sans aucun moyen de corriger un ingrédient
 // sans tout ressaisir depuis zéro.
-function RecipeBuilder({ recipe, onSave, onBack, log, pins, muted }) {
+export function RecipeBuilder({ recipe, onSave, onBack, log, pins, muted }) {
   const [name, setName] = useState(recipe?.name ?? "");
   const [ingredients, setIngredients] = useState(recipe?.ingredients ?? []);
   // Portions (30/10/2026) : en combien la recette se partage, pour proposer 1 portion à l'ajout.

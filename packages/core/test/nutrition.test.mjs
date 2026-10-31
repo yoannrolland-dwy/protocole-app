@@ -77,3 +77,31 @@ test("recette en portions (30/10/2026) : 800 g en 4 → 1 portion = 200 g propos
   assert.equal(compileRecipe("Riz poulet", ings, four, 5).portions, 5);
   assert.equal(recipePortionGrams(compileRecipe("Riz poulet", ings, four, 5)), 160);
 });
+
+test("onglets Recettes et Aliments (31/10/2026) : fiche, tri par dernière utilisation, noms", async () => {
+  const { compileRecipe, recipeSheet, sortRecipes, lastUseByRef, refNames } = await import("../src/nutrition/foodStore.js");
+  const ing = (name, q, kcal) => ({ ref: `ciqual:${name}`, name, q, per100: { kcal, prot: 10, gluc: 20, lip: 5, fib: 2 } });
+  const r = compileRecipe("Chili", [ing("Haricots", 400, 100), ing("Boeuf", 400, 200)], null, 4);
+  const s = recipeSheet(r);
+  assert.equal(s.portions, 4);
+  assert.equal(s.portionGrams, 200);
+  assert.equal(s.whole.kcal, 1200);
+  assert.equal(s.portion.kcal, 300);
+  assert.equal(s.portion.prot, 20);
+  assert.deepEqual(s.ingredients.map((i) => [i.name, i.q, i.kcal]), [["Haricots", 400, 400], ["Boeuf", 400, 800]]);
+  const a = { ...compileRecipe("Abricot", [ing("Abricot", 100, 50)]), id: "a" };
+  const b = { ...compileRecipe("Brioche", [ing("Brioche", 100, 350)]), id: "b" };
+  const c = { ...compileRecipe("Crumble", [ing("Pomme", 100, 50)]), id: "c" };
+  const log = [
+    { ref: "recipe:c", name: "Crumble", date: "2026-10-20", q: 100 },
+    { ref: "recipe:b", name: "Brioche", date: "2026-10-28", q: 100 },
+    { ref: "recipe:c", name: "Crumble", date: "2026-10-10", q: 100 },
+    { ref: "ciqual:x", name: "Correction", date: "2026-10-29", q: 100, correction: true },
+  ];
+  assert.deepEqual(sortRecipes([a, c, b], log).map((x) => x.id), ["b", "c", "a"]);
+  assert.deepEqual(lastUseByRef(log).get("recipe:c"), { date: "2026-10-20", count: 2 });
+  assert.equal(lastUseByRef(log).has("ciqual:x"), false);
+  const names = refNames([{ ref: "off:1", name: "Skyr" }, { ref: "off:1", name: "Skyr nature" }], [a]);
+  assert.equal(names.get("off:1"), "Skyr nature");
+  assert.equal(names.get("recipe:a"), "Abricot");
+});

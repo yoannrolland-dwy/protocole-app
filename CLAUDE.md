@@ -5960,3 +5960,26 @@ Quatre demandes de Yoann, choix tranchés par question.
   sans débordement, ajout du crunch dans Upper A, série cochée, séance validée puis rouverte depuis
   Historique avec « (ajouté) » et sa série. **Non vérifié** : la voix après le bip et le casque, à
   essayer sur le téléphone.
+
+## Nutrition en 3 sous-onglets : Journal, Recettes, Aliments (31/10/2026, apps/perso v3.143.0)
+
+Demande de Yoann : pour revoir une recette et la refaire, il fallait passer par « Chercher » puis le
+crayon. Choix tranchés par question : trois sous-onglets, et une fiche de recette avec ajout à un repas.
+- **`NutritionTab.jsx`** : `SubTabs` (non collés : la barre du jour reste la seule barre collante,
+  marge haute passée de `-14px` à `0` puisqu'elle n'est plus en tête), dernier sous-onglet retenu
+  pendant la session. **Journal** = l'écran d'avant, inchangé. Le bandeau « Annuler » reste partagé.
+- **Recettes** (`nutrition/RecipesPanel.jsx`) : « Nouvelle recette », liste de la plus récemment
+  mangée à la plus ancienne (puis jamais mangées, par nom ; recherche au-delà de 6 recettes), chaque
+  ligne avec portions, kcal par portion et dernière date. **Fiche** : 1 portion (kcal + P/G/L/Fib),
+  recette entière, ingrédients avec grammes et kcal ; « Ajouter à un repas » (repas à choisir, rien
+  de présélectionné ; 1 portion proposée, boutons 1 à N ; date = jour affiché dans Journal ;
+  « Annuler » 5 s) ; « Modifier » (même `RecipeBuilder`, exporté de `FoodSearch.jsx`) ; « Supprimer »
+  en deux taps (3 s). La recherche garde aussi ses recettes.
+- **Aliments** (`nutrition/FoodsPanel.jsx`) : épinglés (Désépingler), masqués (Réafficher, nouveau
+  `unmute` dans `useFoodLog`), portions nommées (Retirer), valeurs corrigées V6 (Retirer → valeur
+  d'origine partout). Noms retrouvés par `refNames` (recette, sinon dernière ligne du journal).
+- **Core** (`nutrition/foodStore.js`, testés) : `recipeSheet`, `lastUseByRef` (corrections exclues),
+  `sortRecipes`, `refNames`. Aucune clé nouvelle. Phrases `noRecipe`, `noRecipeMatch`,
+  `noFoodSettings`. 174 tests. Aperçu (360 px) : fiche du chili (300 kcal la portion), 2 portions
+  ajoutées au déjeuner (400 g, `recipe:r1`), Modifier puis Retour, les 4 sections d'Aliments,
+  « Réafficher » vide `foodMuted`, Journal intact, aucun débordement, aucune erreur console.
