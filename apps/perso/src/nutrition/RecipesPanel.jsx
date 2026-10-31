@@ -1,9 +1,9 @@
 // Sous-onglet Recettes de Nutrition (31/10/2026, demande de Yoann : pour revoir une recette et la
 // refaire, il fallait passer par « Chercher » puis le crayon). Liste des recettes (la plus
 // récemment mangée en tête), fiche avec ingrédients, valeurs du lot et d'une portion, ajout à un
-// repas du jour affiché dans Journal (1 portion proposée), modification et suppression.
+// repas du jour affiché dans Journal (1 portion proposée), modification, duplication et suppression.
 import { useState, useMemo, useEffect, useRef } from "react";
-import { ChefHat, ChevronLeft, ChevronRight, PencilLine, Plus, Search, Trash2 } from "lucide-react";
+import { ChefHat, ChevronLeft, ChevronRight, Copy, PencilLine, Plus, Search, Trash2 } from "lucide-react";
 import { T } from "../design/tokens.js";
 import { Panel, Eyebrow, Button, IconButton, Chip, TextField } from "../design/primitives.jsx";
 import { fmt } from "../ui.jsx";
@@ -23,7 +23,7 @@ function Macros({ m }) {
   );
 }
 
-function RecipeSheet({ recipe, dayLabel, onAdd, onEdit, onRemove, onBack }) {
+function RecipeSheet({ recipe, dayLabel, onAdd, onEdit, onDuplicate, onRemove, onBack }) {
   const s = recipeSheet(recipe);
   const [meal, setMeal] = useState(null);
   const [n, setN] = useState(1);
@@ -83,9 +83,12 @@ function RecipeSheet({ recipe, dayLabel, onAdd, onEdit, onRemove, onBack }) {
         </Button>
       </Panel>
 
-      <div style={{ display: "flex", gap: 8 }}>
-        <Button variant="outline" style={{ flex: 1 }} onClick={onEdit}><PencilLine size={18} aria-hidden="true" />Modifier</Button>
-        <Button variant={armed ? "danger" : "plain"} onClick={() => {
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+        <Button variant="outline" onClick={onEdit}><PencilLine size={18} aria-hidden="true" />Modifier</Button>
+        <Button variant="outline" onClick={onDuplicate}><Copy size={18} aria-hidden="true" />Dupliquer</Button>
+      </div>
+      <div style={{ display: "flex" }}>
+        <Button variant={armed ? "danger" : "plain"} block onClick={() => {
           if (armed) { onRemove(); return; }
           setArmed(true); clearTimeout(armTimer.current); armTimer.current = setTimeout(() => setArmed(false), 3000);
         }}>
@@ -98,7 +101,8 @@ function RecipeSheet({ recipe, dayLabel, onAdd, onEdit, onRemove, onBack }) {
 
 export default function RecipesPanel({ food, date, dayLabel, onAdded }) {
   const [openId, setOpenId] = useState(null);
-  const [building, setBuilding] = useState(null); // null | "new" | recette en modification
+  // null | "new" | { recipe, copy } : recette à modifier, ou à dupliquer (préremplit une nouvelle)
+  const [building, setBuilding] = useState(null);
   const [q, setQ] = useState("");
   const sorted = useMemo(() => sortRecipes(food.recipes, food.log), [food.recipes, food.log]);
   const use = useMemo(() => lastUseByRef(food.log), [food.log]);
@@ -109,9 +113,12 @@ export default function RecipesPanel({ food, date, dayLabel, onAdded }) {
   const open = openId && food.recipes.find((r) => r.id === openId);
 
   if (building) {
-    const editing = building === "new" ? null : building;
+    // Dupliquer (31/10/2026) : nouvelle recette préremplie (nom « (copie) », mêmes ingrédients et
+    // portions) ; elle n'existe qu'une fois enregistrée, avec son propre identifiant.
+    const { recipe = null, copy = false } = building === "new" ? {} : building;
+    const editing = copy ? null : recipe;
     return (
-      <RecipeBuilder recipe={editing} log={food.log} pins={food.pins} muted={food.muted}
+      <RecipeBuilder recipe={recipe} copy={copy} log={food.log} pins={food.pins} muted={food.muted}
         onBack={() => setBuilding(null)}
         onSave={(name, ingredients, portions) => {
           const r = compileRecipe(name, ingredients, editing, portions);
@@ -126,7 +133,8 @@ export default function RecipesPanel({ food, date, dayLabel, onAdded }) {
     return (
       <RecipeSheet key={open.id} recipe={open} dayLabel={dayLabel}
         onBack={() => setOpenId(null)}
-        onEdit={() => setBuilding(open)}
+        onEdit={() => setBuilding({ recipe: open })}
+        onDuplicate={() => setBuilding({ recipe: { ...open, name: `${open.name} (copie)` }, copy: true })}
         onRemove={() => { food.removeRecipe(open.id); setOpenId(null); }}
         onAdd={(meal, grams) => {
           const entry = makeEntry({ date, meal, food: recipeAsFood(open), q: grams });

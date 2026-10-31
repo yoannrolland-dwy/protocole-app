@@ -5983,3 +5983,9 @@ crayon. Choix tranchés par question : trois sous-onglets, et une fiche de recet
   `noFoodSettings`. 174 tests. Aperçu (360 px) : fiche du chili (300 kcal la portion), 2 portions
   ajoutées au déjeuner (400 g, `recipe:r1`), Modifier puis Retour, les 4 sections d'Aliments,
   « Réafficher » vide `foodMuted`, Journal intact, aucun débordement, aucune erreur console.
+- **Dupliquer une recette (31/10/2026, v3.144.0)** : bouton « Dupliquer » dans la fiche (à côté de
+  « Modifier », « Supprimer » passe en dessous). Il ouvre l'éditeur prérempli comme une **nouvelle**
+  recette (« Copie de la recette », nom suivi de « (copie) », mêmes ingrédients et portions) :
+  rien n'existe tant que « Enregistrer la copie » n'est pas touché, et la copie a son propre
+  identifiant (`compileRecipe` sans recette d'origine), donc son propre historique. Prop `copy` de
+  `RecipeBuilder`. Vérifié dans l'aperçu : deux recettes distinctes, l'originale intacte.

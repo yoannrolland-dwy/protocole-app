@@ -365,7 +365,8 @@ function IngredientPicker({ onAdd, onCancel, log, pins, muted }) {
 // quantité de chaque ingrédient comprise) plutôt que d'en créer une nouvelle — jusqu'ici
 // seule la suppression totale était possible, sans aucun moyen de corriger un ingrédient
 // sans tout ressaisir depuis zéro.
-export function RecipeBuilder({ recipe, onSave, onBack, log, pins, muted }) {
+// `copy` (31/10/2026) : la recette sert seulement à préremplir une nouvelle recette (Dupliquer).
+export function RecipeBuilder({ recipe, copy = false, onSave, onBack, log, pins, muted }) {
   const [name, setName] = useState(recipe?.name ?? "");
   const [ingredients, setIngredients] = useState(recipe?.ingredients ?? []);
   // Portions (30/10/2026) : en combien la recette se partage, pour proposer 1 portion à l'ajout.
@@ -418,7 +419,7 @@ export function RecipeBuilder({ recipe, onSave, onBack, log, pins, muted }) {
         <button type="button" className="p-tap" onClick={onBack} aria-label="Retour" style={{ background: "none", border: "none", color: C.accent, width: 44, height: 44, display: "grid", placeItems: "center", padding: 0, flexShrink: 0 }}>
           <ChevronLeft size={24} aria-hidden="true" />
         </button>
-        <Label style={{ fontSize: 13 }}>{recipe ? "Modifier la recette" : "Nouvelle recette"}</Label>
+        <Label style={{ fontSize: 13 }}>{copy ? "Copie de la recette" : recipe ? "Modifier la recette" : "Nouvelle recette"}</Label>
       </div>
       <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom (ex. Mon shaker du matin)" />
 
@@ -465,7 +466,7 @@ export function RecipeBuilder({ recipe, onSave, onBack, log, pins, muted }) {
       </div>
 
       <Btn variant="primary" disabled={!ok} onClick={() => onSave(name.trim(), ingredients, portions)}>
-        {recipe ? "Enregistrer les modifications" : "Enregistrer la recette"}
+        {copy ? "Enregistrer la copie" : recipe ? "Enregistrer les modifications" : "Enregistrer la recette"}
       </Btn>
     </div>
   );
