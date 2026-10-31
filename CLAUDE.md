@@ -5998,3 +5998,14 @@ rapide », **app native seulement** (comme le scan de la recherche). Il ouvre la
 recherche avec `startScan` : `FoodSearch` lance `scan()` à l'ouverture, sans mettre le clavier sous
 le scanner. Produit trouvé → réglage de la quantité ; scan annulé → la recherche reste ouverte.
 Mesuré à 360 px : « Chercher » passe à 114 px, toujours sur une ligne, sans débordement.
+- **Retour au Journal après l'ajout (v3.145.1, même jour)** : quand le scan part du bouton du
+  repas, « Ajouter » referme la feuille et ramène au Journal (`scanEntry` dans `FoodSearch`).
+  Si Monsieur passe par la recherche (scan annulé ou inconnu, « Retour » depuis la quantité),
+  l'ajout ramène à la liste comme avant. Natif seulement, non testable dans l'aperçu.
+
+## Nutrition : 8 habituels sous chaque repas (31/10/2026, apps/perso v3.146.0)
+
+La ligne d'habituels sous chaque repas du Journal passe de 3 à **8** aliments (même classement :
+épinglés, puis les plus fréquents à CE repas ; ceux déjà dans le repas exclus). La ligne défile
+déjà horizontalement, sa hauteur ne change pas. Vérifié à 360 px : 8 pastilles + « Comme hier »
+sur une ligne de 44 px, pas de débordement de la page.

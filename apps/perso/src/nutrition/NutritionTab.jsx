@@ -529,11 +529,11 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
         const entries = dayEntries.filter((e) => e.meal === meal.key);
         const mt = totals(entries);
         const yEntries = yesterdayEntries.filter((e) => e.meal === meal.key);
-        // 3 habituels de CE repas (même classement que la recherche), sans ceux déjà
+        // 8 habituels de CE repas (3 jusqu'au 31/10/2026) (même classement que la recherche), sans ceux déjà
         // présents dans le repas du jour affiché.
         const present = new Set(entries.map((e) => e.ref));
         const habits = suggestions(food.log, { meal: meal.key, pins: food.pins, muted: food.muted, date })
-          .filter((s) => !present.has(s.ref)).slice(0, 3);
+          .filter((s) => !present.has(s.ref)).slice(0, 8);
         const panelOpen = copyMeal === meal.key || yesterdayMeal === meal.key;
         return (
           <Panel key={meal.key} aria-label={meal.label}>

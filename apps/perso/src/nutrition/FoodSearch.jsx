@@ -692,16 +692,19 @@ export default function FoodSearch({
   const [scanState, setScanState] = useState("idle");
   const [scanCode, setScanCode] = useState(null);
   const inputRef = useRef(null);
+  // Ouvert par le bouton « Scanner » d'un repas (31/10/2026) : tant que Monsieur n'est pas
+  // passé par la recherche, « Ajouter » referme la feuille et ramène au Journal.
+  const [scanEntry, setScanEntry] = useState(startScan);
 
   const scan = async () => {
     setScanState("idle"); // efface un message d'un scan précédent (notfound/error)
     const { code, status } = await scanBarcode();
-    if (status !== "ok") { if (status === "error") setScanState("error"); return; }
+    if (status !== "ok") { setScanEntry(false); if (status === "error") setScanState("error"); return; }
     setScanCode(code);
     setScanState("lookup");
     const { item, notFound, error } = await getOFFByBarcode(code);
     if (item) { setSel(item); setScanState("idle"); }
-    else setScanState(error ? "error" : "notfound");
+    else { setScanEntry(false); setScanState(error ? "error" : "notfound"); }
   };
 
   const boost = useMemo(() => searchBoost(log, { meal, date }), [log, meal, date]);
@@ -784,7 +787,8 @@ export default function FoodSearch({
           <QtyPanel food={selFood} initialQ={selFood.portions > 1 ? selFood.portionGrams : sel.lastQ ?? sel.defaultQ}
             portions={portionsFor(portions, sel.ref)} onSavePortion={onSavePortion} onRemovePortion={onRemovePortion}
             override={overrides?.[sel.ref]} onSaveOverride={onSaveOverride} onClearOverride={onClearOverride}
-            onAdd={onAdd} onBack={() => setSel(null)} />
+            onAdd={(f, q) => { onAdd(f, q); if (scanEntry) onClose(); }}
+            onBack={() => { setSel(null); setScanEntry(false); }} />
         ) : (
           <>
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
