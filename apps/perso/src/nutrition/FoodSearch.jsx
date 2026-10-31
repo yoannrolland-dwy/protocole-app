@@ -671,7 +671,7 @@ export default function FoodSearch({
   onAdd, onTogglePin, onMute, onSavePortion, onRemovePortion, onCreateRecipe, onRemoveRecipe, onUpdateRecipe,
   onSaveOverride, onClearOverride,
   ai, remaining, onLogDishes,
-  onClose, startFree = false,
+  onClose, startFree = false, startScan = false,
 }) {
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(null);
@@ -708,7 +708,11 @@ export default function FoodSearch({
   const sugg = useMemo(() => suggestions(log, { meal, pins, muted, date }), [log, meal, pins, muted, date]);
   const { results, offResults, offState } = useFoodSearch(q, { boost });
 
-  useEffect(() => { if (!startFree) inputRef.current?.focus(); }, [startFree]);
+  // Bouton « Scanner » d'un repas : scan lancé à l'ouverture, sans ouvrir le clavier dessous.
+  useEffect(() => {
+    if (startScan) scan();
+    else if (!startFree) inputRef.current?.focus();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const showSugg = q.trim().length < 2;
   // Favoris/récents cherchés EN PREMIER, même en tapant (01/09/2026, retour de Yoann) :

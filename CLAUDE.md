@@ -5989,3 +5989,12 @@ crayon. Choix tranchés par question : trois sous-onglets, et une fiche de recet
   rien n'existe tant que « Enregistrer la copie » n'est pas touché, et la copie a son propre
   identifiant (`compileRecipe` sans recette d'origine), donc son propre historique. Prop `copy` de
   `RecipeBuilder`. Vérifié dans l'aperçu : deux recettes distinctes, l'originale intacte.
+
+## Nutrition : bouton « Scanner » sous chaque repas (31/10/2026, apps/perso v3.145.0)
+
+Demande de Yoann : scanner un code-barres directement depuis le Journal, sans passer par
+« Chercher ». Nouveau bouton icône (code-barres, citron, 52 px) entre « Chercher » et « Macro
+rapide », **app native seulement** (comme le scan de la recherche). Il ouvre la même feuille de
+recherche avec `startScan` : `FoodSearch` lance `scan()` à l'ouverture, sans mettre le clavier sous
+le scanner. Produit trouvé → réglage de la quantité ; scan annulé → la recherche reste ouverte.
+Mesuré à 360 px : « Chercher » passe à 114 px, toujours sur une ligne, sans débordement.

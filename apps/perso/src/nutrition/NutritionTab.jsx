@@ -12,7 +12,8 @@
 // modifiable au clavier numérique (Entrée = Enregistrer).
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { Plus, Trash2, ChevronDown, ChevronRight, ChevronLeft, Droplet, Zap, Copy, Search, Check, History } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight, ChevronLeft, Droplet, Zap, Copy, Search, Check, History, ScanBarcode } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
 import { today, fmt, longDate, upsert, shiftDateKey } from "../ui.jsx";
 import { T, COLORS } from "../design/tokens.js";
 import { progressColor, MACRO_KIND } from "../lib/progress.js";
@@ -246,6 +247,9 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
   // saisie libre, sans passer par la recherche — c'est justement la recherche qu'on
   // veut éviter pour un ajout rapide de macros sans aliment précis en tête.
   const [quickAdd, setQuickAdd] = useState(false);
+  // Scanner direct (31/10/2026, demande de Yoann) : ouvre la même feuille et lance le scan
+  // tout de suite ; annulé, on reste sur la recherche.
+  const [scanFirst, setScanFirst] = useState(false);
   const [copyMeal, setCopyMeal] = useState(null);
   const [yesterdayMeal, setYesterdayMeal] = useState(null);
   const [duplicating, setDuplicating] = useState(false);
@@ -369,7 +373,7 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
       q: 100,
     })));
   };
-  const closeSearch = () => { setOpenMeal(null); setQuickAdd(false); };
+  const closeSearch = () => { setOpenMeal(null); setQuickAdd(false); setScanFirst(false); };
 
   const copyFrom = (mealKey, fromDate) => {
     const entries = food.log.filter((e) => e.date === fromDate && e.meal === mealKey);
@@ -587,10 +591,15 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
                   </div>
                 )}
                 <div style={{ display: "flex", gap: 8 }}>
-                  <Button variant="outline" style={{ flex: 1 }} onClick={() => { setOpenMeal(meal.key); setQuickAdd(false); }}>
+                  <Button variant="outline" style={{ flex: 1 }} onClick={() => { setOpenMeal(meal.key); setQuickAdd(false); setScanFirst(false); }}>
                     <Search size={18} aria-hidden="true" />Chercher
                   </Button>
-                  <IconButton label={`Macro rapide · ${meal.label}`} size={52} onClick={() => { setOpenMeal(meal.key); setQuickAdd(true); }}>
+                  {Capacitor.isNativePlatform() && (
+                    <IconButton label={`Scanner un code-barres · ${meal.label}`} tone="accent" size={52} onClick={() => { setOpenMeal(meal.key); setQuickAdd(false); setScanFirst(true); }}>
+                      <ScanBarcode size={20} aria-hidden="true" />
+                    </IconButton>
+                  )}
+                  <IconButton label={`Macro rapide · ${meal.label}`} size={52} onClick={() => { setOpenMeal(meal.key); setQuickAdd(true); setScanFirst(false); }}>
                     <Zap size={20} aria-hidden="true" />
                   </IconButton>
                   <IconButton label={`Copier ${meal.label} depuis un autre jour`} size={52} onClick={() => { setCopyMeal(meal.key); setYesterdayMeal(null); }}>
@@ -645,6 +654,7 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
           onLogDishes={logRestoDishes}
           onClose={closeSearch}
           startFree={quickAdd}
+          startScan={scanFirst}
         />
       )}
     </div>
