@@ -106,7 +106,7 @@ object BriefRunner {
                     web.destroy()
                     // Voix (29/10/2026) : le brief est préparé en audio juste après sa notification
                     // (serveur Oracle), gardé sur le téléphone pour être écouté sans attendre ni
-                    // réseau. Lu tout de suite seulement en séance (la page le dit), casque branché.
+                    // réseau. Lu tout de suite si un casque est branché (31/10/2026 : casque = Jeffrey parle).
                     // Le service au premier plan garde l'app (et le réseau) le temps de la synthèse.
                     val voice = runCatching { voiceOf(json) }.getOrNull()
                     if (voice != null) {

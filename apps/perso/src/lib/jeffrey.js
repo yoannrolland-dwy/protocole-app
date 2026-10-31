@@ -48,6 +48,7 @@ export const PHRASES = {
   noSession: ["Aucune séance enregistrée, Monsieur. Le carnet attend son premier chapitre."],
   noMuscu: ["Aucune séance de muscu pour l'instant, Monsieur."],
   noVolume: ["Aucune série de musculation cochée ces 7 derniers jours, Monsieur. Les haltères s'ennuient."],
+  noExerciseMatch: ["Aucun exercice ne répond à ce nom, Monsieur. Essayons un autre mot."],
   noRecentExercise: ["Aucun exercice fait ces 60 derniers jours, Monsieur."],
   noExercise: ["Aucun exercice enregistré, Monsieur. Validez une séance de muscu, il apparaîtra ici."],
   firstTime: ["Première fois, Monsieur.", "Terrain vierge, Monsieur."],
@@ -96,6 +97,27 @@ export const PHRASES = {
   // --- Voix (serveur Oracle, 29/10/2026) : sans réseau ou sans serveur, il se tait et le dit.
   voiceDown: ["Ma voix ne passe pas pour l'instant, Monsieur : je m'en tiens à l'écrit.", "Je suis enroué, Monsieur ; la réponse reste écrite."],
   voiceMissing: ["Il me faut l'adresse du serveur et la clé de la voix, Monsieur."],
+
+  // --- Fin de repos (31/10/2026) : dite par Jeffrey juste après le bip. {dx} = « de développé
+  // incliné » ou « d'élévations latérales » (élision faite par restSpeech.js).
+  restEndSet: [
+    "Le repos est terminé, Monsieur. Série {n} {dx}.",
+    "Fin de la récréation, Monsieur. Série {n} {dx}.",
+    "Je ne voudrais pas vous presser, Monsieur, mais la série {n} {dx} vous attend.",
+    "Monsieur, la série {n} {dx} ne va pas se faire toute seule.",
+    "À vous, Monsieur. Série {n} {dx}, avec panache si possible.",
+  ],
+  restEndNext: [
+    "Le repos est terminé, Monsieur. Place à {x}.",
+    "Fin de la récréation, Monsieur. Au tour de {x}.",
+    "Monsieur, {x} vous attend, avec une impatience toute mécanique.",
+  ],
+  restEndLast: [
+    "Repos terminé, Monsieur. C'était la dernière série : il ne reste qu'à valider la séance.",
+    "Monsieur, tout est fait. Je vous laisse valider la séance, et l'admiration qui va avec.",
+  ],
+  restEnd: ["Le repos est terminé, Monsieur.", "Fin de la récréation, Monsieur.", "À vous, Monsieur."],
+  holdEnd: ["Le temps est écoulé, Monsieur. Vous pouvez relâcher.", "Monsieur, vous pouvez relâcher. Avec élégance, si possible."],
 
   // --- Notifications
   backupReminderTitle: ["Jeffrey"],

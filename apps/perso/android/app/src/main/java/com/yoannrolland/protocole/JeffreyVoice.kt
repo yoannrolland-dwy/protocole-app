@@ -118,6 +118,9 @@ object JeffreySpeech {
     /** Une session joue ou prépare déjà quelque chose. */
     fun busy() = current?.let { !it.done && !it.cancelled } == true
 
+    /** Une session est en train de parler (pas seulement de préparer le cache). */
+    fun playing() = current?.let { !it.done && !it.cancelled && it.play } == true
+
     /**
      * Nouvelle session (arrête la précédente). `chunks` : premières phrases ; `final` : rien
      * d'autre à venir. `play` faux : préparer le cache sans rien jouer. Si `cacheKey` est déjà en

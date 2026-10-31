@@ -561,9 +561,9 @@ export default function App({ silent = false } = {}) {
       if (!text) return;
       // La notification part aussi quand c'est l'app qui écrit le brief (30/10/2026, choix de
       // Yoann), sans bruit. L'audio est préparé tout de suite et gardé sur le téléphone ; lu à
-      // voix haute seulement pendant une séance, casque branché.
+      // voix haute dès qu'un casque est branché (31/10/2026, séance ou pas).
       postJeffreyNotification(notificationSpec(getSync("jeffreyLog", {})[today()] || []));
-      speak(text, { play: !!getSync("trainingDraft", null)?.type && await headsetConnected() });
+      speak(text, { play: await headsetConnected() });
     }).catch((e) => console.error("brief", e)).finally(() => {
       setJeffreyLog(getSync("jeffreyLog", {}));
       setCoachJournalState(getSync("coachJournal", ""));

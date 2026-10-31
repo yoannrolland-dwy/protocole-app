@@ -11,7 +11,8 @@ import { Capacitor } from "@capacitor/core";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "../timerNotify.js";
 
 // endAt != null ⇔ décompte en cours. `remaining` = secondes affichées (figées en pause).
-let state = { secs: 120, remaining: 120, endAt: null, label: "" };
+// `speech` (31/10/2026) : phrase que Jeffrey dit après le bip, gardée pour la pause/reprise et +30 s.
+let state = { secs: 120, remaining: 120, endAt: null, label: "", speech: "" };
 const subs = new Set();
 const set = (patch) => { state = { ...state, ...patch }; subs.forEach((f) => f()); };
 const now = () => Date.now();
@@ -59,15 +60,16 @@ function finish() {
 }
 
 export const restTimer = {
-  /** Lance un décompte de `secs` secondes (coche d'une série, bouton repos/maintien). */
-  start(secs, label = "") {
+  /** Lance un décompte de `secs` secondes (coche d'une série, bouton repos/maintien).
+   *  `speech` : phrase de Jeffrey à la fin (app native, voix configurée). */
+  start(secs, label = "", speech = "") {
     ensureAudio();
-    set({ secs, remaining: secs, endAt: now() + secs * 1000, label });
+    set({ secs, remaining: secs, endAt: now() + secs * 1000, label, speech });
     startTicking();
-    scheduleRestAlarm(secs, label);
+    scheduleRestAlarm(secs, label, speech);
   },
   /** Pause / reprise ; relance depuis la durée réglée si le décompte était fini. */
-  toggle(label) {
+  toggle(label, speech) {
     if (state.endAt) {
       const r = left();
       stopTicking(); set({ endAt: null, remaining: r });
@@ -76,9 +78,9 @@ export const restTimer = {
     }
     const secs = state.remaining > 0 ? state.remaining : state.secs;
     ensureAudio();
-    set({ remaining: secs, endAt: now() + secs * 1000, label: label ?? state.label });
+    set({ remaining: secs, endAt: now() + secs * 1000, label: label ?? state.label, speech: speech ?? state.speech });
     startTicking();
-    scheduleRestAlarm(secs, label ?? state.label);
+    scheduleRestAlarm(secs, label ?? state.label, state.speech);
   },
   /** Règle la durée sans lancer (pastilles 2:00…0:30, remise à zéro). Arrête un décompte. */
   set(secs) {
@@ -90,7 +92,7 @@ export const restTimer = {
     if (state.endAt) {
       set({ endAt: state.endAt + secs * 1000 });
       const r = left(); set({ remaining: r });
-      scheduleRestAlarm(r, state.label);
+      scheduleRestAlarm(r, state.label, state.speech);
     } else {
       set({ remaining: state.remaining + secs });
     }

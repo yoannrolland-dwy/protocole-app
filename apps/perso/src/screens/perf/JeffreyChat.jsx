@@ -15,7 +15,7 @@ import { aiMissing, fmtCost } from "../../lib/ai.js";
 import { say, sayStable, sayError } from "../../lib/jeffrey.js";
 import { streamTransportFor } from "../../lib/jeffreyHttp.js";
 import { jeffreyTurn, newId, hhmm } from "../../lib/jeffreyTurn.js";
-import { voiceAvailable, voiceReady, listen, stopListening, speak, stopSpeaking, createSpeechStream } from "../../lib/voice.js";
+import { voiceAvailable, voiceReady, listen, stopListening, speak, stopSpeaking, createSpeechStream, headsetConnected } from "../../lib/voice.js";
 
 function SessionCard({ choice, onStart }) {
   const canStart = choice.jour === "aujourdhui" && TEMPLATES[choice.type];
@@ -159,7 +159,7 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
     }
   };
 
-  const ask = (userEntry) => {
+  const ask = async (userEntry) => {
     if (busy) return;
     let history = entries;
     // Réponse rapide touchée : on le dit à Jeffrey dans le résultat de son outil.
@@ -174,8 +174,9 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
     setDay(today(), next);
     setVoiceNote("");
     // Il répond comme on lui a parlé (décision 11) : question dictée → réponse à voix haute, dès
-    // la première phrase complète, pendant que le reste s'écrit.
-    if (!entry.spoken) { run(next, entry.mode || "chat"); return; }
+    // la première phrase complète, pendant que le reste s'écrit. Casque branché (31/10/2026, choix
+    // de Yoann) : il parle aussi quand Monsieur écrit.
+    if (!entry.spoken && !(voiceReady() && await headsetConnected())) { run(next, entry.mode || "chat"); return; }
     const voice = createSpeechStream();
     run(next, entry.mode || "chat", voice.feed).then((h) => {
       const reply = h && [...h].reverse().find((e) => e.role === "assistant" && e.text);

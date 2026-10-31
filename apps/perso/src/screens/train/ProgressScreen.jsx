@@ -120,8 +120,9 @@ export function ProgressScreen({ training, knee, onBack }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <ScreenHeader title="Progression"
-        right={<Btn variant="ghost" onClick={onBack} aria-label="Fermer" style={{ width: 52, padding: 0 }}><X size={20} aria-hidden="true" /></Btn>} />
+      {/* Sous-onglet « Progrès » de Séance (31/10/2026) : sans `onBack`, pas d'en-tête de fermeture. */}
+      {onBack && <ScreenHeader title="Progression"
+        right={<Btn variant="ghost" onClick={onBack} aria-label="Fermer" style={{ width: 52, padding: 0 }}><X size={20} aria-hidden="true" /></Btn>} />}
       <Card style={{ padding: "6px 14px" }}>
         {list.length ? list.map((e) => {
           // Tendance calculée par exercice : c'est l'information qu'on vient chercher, la

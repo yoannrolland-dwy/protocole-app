@@ -5924,3 +5924,39 @@ Demande de Yoann : partager une recette en portions pour n'en ajouter qu'une à 
   boutons 1 à 4, 2 portions ajoutées (400 g dans le journal), réouverte depuis les habituels →
   200 g proposés, aucune erreur console. `apps/public` : rien de visible (pas de champ Portions,
   `defaultQ` inchangé pour une recette en 1 portion).
+
+## Séance en 4 sous-onglets, ajout d'exercice, casque = Jeffrey parle, fin de repos annoncée (31/10/2026, apps/perso v3.142.0)
+
+Quatre demandes de Yoann, choix tranchés par question.
+- **Onglet Séance en sous-onglets** (`TrainTab.jsx`, `SubTabs`) : **Séance** (choix du type, carnet,
+  semaine HSR) · **Historique** (dernières séances) · **Progrès** (progression par exercice, sans
+  en-tête de fermeture — `ProgressScreen` sans `onBack` —, puis volume 7 j) · **Repères** (planning
+  idéal, péri-training, protocoles basket). « Progrès » plutôt que « Progression » : tient à 360 px.
+  Dernier sous-onglet retenu pendant la session ; un brouillon de séance, « Démarrer » (Bord) ou
+  la modification d'une séance ramènent sur Séance. Les sous-onglets restent visibles carnet ouvert.
+- **Ajouter un exercice en cours de séance** (bouton sous le dernier exercice du carnet) :
+  `packages/core/src/session/exoCatalog.js` (`EXERCISE_CATALOG`, `catalogGroups`, `catalogEntry`) —
+  tous les exercices des gabarits (sauf l'échauffement Basket) puis les variantes poulie/disque de
+  la bibliothèque, un nom une seule fois (première définition = prescription), classés par muscle
+  (`GROUP_ORDER`, exporté de `volume.js`), recherche sans accents, exercices déjà dans la séance
+  exclus. L'exercice ajouté prend séries, reps, repos (HSR et superset compris) de sa définition,
+  s'ouvre tout de suite, porte « (ajouté) » et se retire tant qu'aucune série n'est cochée. Même nom
+  = même historique. Rien de nouveau dans `trainingLog` : à la réouverture, tout exercice enregistré
+  qui ne vient pas du gabarit (ni par substitution) est remis à la fin comme ajouté.
+- **Casque branché = Jeffrey parle** : chaque réponse de la conversation, même écrite (`JeffreyChat`
+  vérifie `headsetConnected()`), le brief dès qu'il est prêt (app ouverte ou fermée), et la réponse
+  écrite depuis la notification. Plus de condition « séance en cours ». Sans casque, inchangé.
+- **Fin de repos annoncée par Jeffrey, après le bip, toujours** (casque ou haut-parleur, choix de
+  Yoann) : `lib/restSpeech.js` (`nextAfter`, `restAnnouncement` : « Série 3 de développé incliné »,
+  sinon l'exercice suivant — une option pas commencée est sautée —, sinon « il ne reste qu'à valider »),
+  phrases `restEndSet` / `restEndNext` / `restEndLast` / `restEnd` / `holdEnd` du recueil. Calculée au
+  cochage (ou « Repos », « Lancer », « Maintien »), gardée par le minuteur pour la pause et +30 s.
+  `scheduleRestAlarm` prépare l'audio tout de suite (cache, serveur Oracle) et passe la voix au
+  natif, qui la range dans les **préférences privées `rest_voice`** (jamais dans l'intent du réveil,
+  clé comprise). `RestAlarmReceiver` la joue à la fin du bip (`goAsync`, 9,5 s au plus), jamais par-
+  dessus Jeffrey s'il parle déjà (`JeffreySpeech.playing()`). La musique se met en pause le temps de
+  la phrase. Sans voix configurée : bip seul, comme avant.
+- Tests : `exoCatalog.test.mjs`, `restSpeech.test.mjs` — 173 au total. Aperçu (360 px) : 4 sous-onglets
+  sans débordement, ajout du crunch dans Upper A, série cochée, séance validée puis rouverte depuis
+  Historique avec « (ajouté) » et sa série. **Non vérifié** : la voix après le bip et le casque, à
+  essayer sur le téléphone.

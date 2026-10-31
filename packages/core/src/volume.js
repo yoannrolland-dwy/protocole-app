@@ -33,7 +33,7 @@ export const GROUP_LABELS = {
   "ischios-fessiers": "Ischios / fessiers", fessiers: "Fessiers", mollets: "Mollets", core: "Core", coiffe: "Coiffe des rotateurs",
 };
 // Ordre d'affichage : prioritaires d'abord, puis haut du corps, puis bas, puis core.
-const ORDER = ["pecs", "epaules", "dos", "biceps", "triceps", "avant-bras", "quadriceps", "ischios", "ischios-fessiers", "fessiers", "mollets", "core", "coiffe"];
+export const GROUP_ORDER = ["pecs", "epaules", "dos", "biceps", "triceps", "avant-bras", "quadriceps", "ischios", "ischios-fessiers", "fessiers", "mollets", "core", "coiffe"];
 
 /** Groupe musculaire d'une entrée d'exercice du journal, ou `null` si inconnu/exclu. */
 export function groupOf(entry) {
@@ -93,7 +93,7 @@ export function weeklyVolumeByGroup(training, { asOf = today(), days = 7 } = {})
         exercices: [...v.exercices], priority, status: priority ? zoneStatus(series) : null,
       };
     })
-    .sort((a, b) => (ORDER.indexOf(a.groupe) + 1 || 99) - (ORDER.indexOf(b.groupe) + 1 || 99));
+    .sort((a, b) => (GROUP_ORDER.indexOf(a.groupe) + 1 || 99) - (GROUP_ORDER.indexOf(b.groupe) + 1 || 99));
   return { from, to, groups };
 }
 

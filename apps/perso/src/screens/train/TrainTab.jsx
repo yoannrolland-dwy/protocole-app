@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { CheckCircle2, Trash2, ChevronRight } from "lucide-react";
 import { store, getSync } from "../../store.js";
-import { splitExerciseList, recordsBySession, painOutOfBase } from "@rawcare/core/training";
+import { recordsBySession, painOutOfBase } from "@rawcare/core/training";
 import { loadLabel, geneLabel } from "@rawcare/core/sessionLoad";
 import { TEMPLATES, TYPES, hsrForWeek } from "@rawcare/core/session/templates";
 import { C, today, fmt, round, byDate, lastN, daysBetween, Card, Label, Body, Empty, Btn, inputStyle, Stepper, Field, DateField } from "../../design/compat.jsx";
@@ -14,6 +14,17 @@ import { GeneField } from "./GeneField.jsx";
 import { VolumeCard } from "./VolumeCard.jsx";
 import { PlanCard, PeriCard } from "../perf/ReferenceCards.jsx";
 import { sayStable } from "../../lib/jeffrey.js";
+import { SubTabs } from "../../components/SubTabs.jsx";
+
+// Sous-onglets (31/10/2026, demande de Yoann, comme Corps, Analyse et les Réglages). Le dernier
+// ouvert est retenu pendant la session ; une séance en cours ou « Démarrer » ramène sur Séance.
+const TRAIN_TABS = [
+  { key: "seance", label: "Séance" },
+  { key: "historique", label: "Historique" },
+  { key: "progression", label: "Progrès" },
+  { key: "reperes", label: "Repères" },
+];
+let lastTrainTab = "seance";
 
 export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType, onStartConsumed }) {
   // Séance dont la suppression est « armée » (1er tap sur la corbeille), voir Dernières séances.
@@ -27,7 +38,8 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
   // sur un type devenu invalide.
   const [draft0] = useState(() => getSync("trainingDraft", null));
   const [open, setOpen] = useState(() => (draft0?.type && TEMPLATES[draft0.type]) ? draft0.type : null);
-  const [progress, setProgress] = useState(false);
+  const [sub, setSubState] = useState(() => (draft0?.type || startType ? "seance" : lastTrainTab));
+  const setSub = (k) => { lastTrainTab = k; setSubState(k); };
   const [date, setDate] = useState(() => draft0?.date ?? today());
   const [startTime, setStartTime] = useState(() => draft0?.start ?? new Date().toTimeString().slice(0, 5));
   const [duration, setDuration] = useState(() => draft0?.duration ?? 60);
@@ -43,7 +55,7 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
   // T3 : arrivée via « Démarrer » (Dashboard) → ouvrir ce type d'emblée (force, pas de toggle),
   // en écrasant un éventuel brouillon comme le ferait un tap sur la tuile.
   useEffect(() => {
-    if (startType && TEMPLATES[startType]) { pickType(startType, true); onStartConsumed?.(); }
+    if (startType && TEMPLATES[startType]) { setSub("seance"); pickType(startType, true); onStartConsumed?.(); }
   }, [startType]);
 
   const pickType = (type, force = false) => {
@@ -69,6 +81,7 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
     setRpe(t.rpe ?? 7);
     setGene(t.gene ?? null);
     setOpen(t.type);
+    setSub("seance");
   };
 
   const logSession = (type) => {
@@ -95,101 +108,13 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
 
   const vol = {};
   training.filter((t) => daysBetween(t.date, today()) <= 14).forEach((t) => { vol[t.type] = (vol[t.type] || 0) + 1; });
-  const exoCount = useMemo(() => splitExerciseList(training).active.length, [training]);
   // Records rejoués sur tout l'historique (V4) : quelles séances contenaient un record au
   // moment où elles ont eu lieu. Clé par référence d'objet, comme la suppression.
   const records = useMemo(() => recordsBySession(training), [training]);
   const painRed = painOutOfBase([knee], date);
 
-  if (open && TEMPLATES[open]?.kind === "muscu") {
-    return (
-      <MuscuLogger key={editing?.id || `new-${open}`} type={open} training={training} hsrWeek={hsrWeek} date={date} onDate={setDate}
-        onSave={saveMuscu} onCancel={() => { setOpen(null); setEditing(null); }} initial={editing} painRed={painRed} />
-    );
-  }
-  if (progress) return <ProgressScreen training={training} knee={knee} onBack={() => setProgress(false)} />;
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {/* Choix du type */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
-        {TYPES.map((type) => {
-          const sel = open === type;
-          return (
-            <button key={type} onClick={() => pickType(type)} style={{
-              background: sel ? C.accentRow : C.card, textAlign: "left", cursor: "pointer",
-              border: `1.5px solid ${sel ? C.accent : C.border}`, borderRadius: 10, padding: "13px 14px", fontFamily: "inherit",
-            }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: sel ? C.accent : C.text, textTransform: "uppercase" }}>{type}</span>
-                <ChevronRight size={13} color={sel ? C.accent : C.dim} />
-              </div>
-              <div style={{ fontSize: 12, color: C.muted, marginTop: 3, fontFamily: C.mono }}>
-                {vol[type] ? `${vol[type]}× / 14j` : "—"}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Séance non-muscu */}
-      {open && TEMPLATES[open].kind !== "muscu" && (
-        <Card style={{ borderColor: C.accent }}>
-          <div style={{ fontSize: 14, color: C.accent, fontWeight: 800, textTransform: "uppercase", marginBottom: 8 }}>
-            {open}{editing && <span style={{ fontSize: 13, textTransform: "none", marginLeft: 6 }}>(modification)</span>}
-          </div>
-          {/* Basket est passé en carnet d'exercices (04/09/2026, kind:"muscu") : cette carte
-              ne sert plus qu'à Escalade, seul type "sport" restant. */}
-          <div style={{ marginBottom: 10 }}><DateField value={date} onChange={setDate} /></div>
-          <div style={{ display: "grid", gap: 10, marginBottom: 10 }}>
-            <Field label="Début">
-              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={inputStyle(false)} />
-            </Field>
-            <Field label="Durée (min)"><Stepper value={duration} set={setDuration} step={5} min={0} int /></Field>
-          </div>
-          <Field label="RPE"><Stepper value={rpe} set={setRpe} step={1} min={1} max={10} int /></Field>
-          {open === "Escalade" && <GeneField gene={gene} setGene={setGene} />}
-          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <Btn variant="primary" onClick={() => logSession(open)} style={{ flex: 1 }}>
-              <CheckCircle2 size={14} style={{ display: "inline", marginRight: 4 }} />{editing ? "Enregistrer les modifications" : "Enregistrer"}
-            </Btn>
-            <Btn variant="ghost" onClick={() => { store.set("trainingDraft", null); setOpen(null); setEditing(null); }}>Annuler</Btn>
-          </div>
-        </Card>
-      )}
-
-      {/* Progression par exercice */}
-      <Card accentLeft onClick={() => setProgress(true)} style={{ padding: "13px 14px", cursor: "pointer" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <Label style={{ letterSpacing: 1.5 }}>Progression par exercice</Label>
-            {!exoCount && <Body style={{ marginTop: 3 }}>{sayStable("noMuscu")}</Body>}
-          </div>
-          <ChevronRight size={15} color={C.accent} />
-        </div>
-      </Card>
-
-      {/* Volume hebdo par groupe musculaire (T2, 04/10/2026) : séries cochées sur 7 jours,
-          hors gainage — même calcul que `volume_hebdo_series` envoyé au Coach IA. Zone cible
-          10-20 séries/sem. sur les groupes prioritaires (pecs, épaules), compte neutre ailleurs. */}
-      <VolumeCard training={training} />
-
-      {/* Planning idéal (déplacé depuis l'onglet Analyse, U3 étape 7) */}
-      <PlanCard />
-      {/* Péri-training + protocoles basket : déplacés de Nutrition le 29/10/2026 (demande de Yoann) */}
-      <PeriCard />
-
-      {/* Semaine HSR */}
-      <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-          <Label>Semaine HSR</Label>
-          <span style={{ fontFamily: C.mono, fontSize: 12, color: C.accent, fontWeight: 800 }}>{hsrForWeek(hsrWeek).scheme}</span>
-        </div>
-        <Stepper value={hsrWeek} set={setHsrWeek} step={1} min={1} max={12} int unit="/12" />
-        <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>Pilote presse à cuisses + leg extension en Lower A et Lower C. Tempo 6 s · repos 2-3 min.</Body>
-      </Card>
-
-      {/* Historique */}
+  // Historique (Dernières séances) : son propre sous-onglet depuis le 31/10/2026.
+  const history = (
       <Card style={{ padding: "6px 14px" }}>
         <Label style={{ padding: "10px 0 6px", letterSpacing: 1.5 }}>Dernières séances</Label>
         {training.length ? lastN(training, 10).reverse().map((t, i) => {
@@ -243,6 +168,111 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
           );
         }) : <Empty>{sayStable("noSession")}</Empty>}
       </Card>
+  );
+
+  const tabs = <SubTabs label="Sections de l'onglet Séance" tabs={TRAIN_TABS} value={sub} onChange={setSub} />;
+
+  if (sub === "progression") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {tabs}
+        <ProgressScreen training={training} knee={knee} />
+        {/* Volume hebdo par groupe musculaire (T2, 04/10/2026) : séries cochées sur 7 jours,
+            hors gainage — même calcul que `volume_hebdo_series` envoyé au Coach IA. */}
+        <VolumeCard training={training} />
+      </div>
+    );
+  }
+  if (sub === "reperes") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {tabs}
+        {/* Planning idéal (déplacé depuis l'onglet Analyse, U3 étape 7) */}
+        <PlanCard />
+        {/* Péri-training + protocoles basket : déplacés de Nutrition le 29/10/2026 (demande de Yoann) */}
+        <PeriCard />
+      </div>
+    );
+  }
+  if (sub === "historique") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {tabs}
+        {history}
+      </div>
+    );
+  }
+
+  if (open && TEMPLATES[open]?.kind === "muscu") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {tabs}
+        <MuscuLogger key={editing?.id || `new-${open}`} type={open} training={training} hsrWeek={hsrWeek} date={date} onDate={setDate}
+          onSave={saveMuscu} onCancel={() => { setOpen(null); setEditing(null); }} initial={editing} painRed={painRed} />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {tabs}
+      {/* Choix du type */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+        {TYPES.map((type) => {
+          const sel = open === type;
+          return (
+            <button key={type} onClick={() => pickType(type)} style={{
+              background: sel ? C.accentRow : C.card, textAlign: "left", cursor: "pointer",
+              border: `1.5px solid ${sel ? C.accent : C.border}`, borderRadius: 10, padding: "13px 14px", fontFamily: "inherit",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: sel ? C.accent : C.text, textTransform: "uppercase" }}>{type}</span>
+                <ChevronRight size={13} color={sel ? C.accent : C.dim} />
+              </div>
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 3, fontFamily: C.mono }}>
+                {vol[type] ? `${vol[type]}× / 14j` : "—"}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Séance non-muscu */}
+      {open && TEMPLATES[open].kind !== "muscu" && (
+        <Card style={{ borderColor: C.accent }}>
+          <div style={{ fontSize: 14, color: C.accent, fontWeight: 800, textTransform: "uppercase", marginBottom: 8 }}>
+            {open}{editing && <span style={{ fontSize: 13, textTransform: "none", marginLeft: 6 }}>(modification)</span>}
+          </div>
+          {/* Basket est passé en carnet d'exercices (04/09/2026, kind:"muscu") : cette carte
+              ne sert plus qu'à Escalade, seul type "sport" restant. */}
+          <div style={{ marginBottom: 10 }}><DateField value={date} onChange={setDate} /></div>
+          <div style={{ display: "grid", gap: 10, marginBottom: 10 }}>
+            <Field label="Début">
+              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={inputStyle(false)} />
+            </Field>
+            <Field label="Durée (min)"><Stepper value={duration} set={setDuration} step={5} min={0} int /></Field>
+          </div>
+          <Field label="RPE"><Stepper value={rpe} set={setRpe} step={1} min={1} max={10} int /></Field>
+          {open === "Escalade" && <GeneField gene={gene} setGene={setGene} />}
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <Btn variant="primary" onClick={() => logSession(open)} style={{ flex: 1 }}>
+              <CheckCircle2 size={14} style={{ display: "inline", marginRight: 4 }} />{editing ? "Enregistrer les modifications" : "Enregistrer"}
+            </Btn>
+            <Btn variant="ghost" onClick={() => { store.set("trainingDraft", null); setOpen(null); setEditing(null); }}>Annuler</Btn>
+          </div>
+        </Card>
+      )}
+
+      {/* Semaine HSR */}
+      <Card>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+          <Label>Semaine HSR</Label>
+          <span style={{ fontFamily: C.mono, fontSize: 12, color: C.accent, fontWeight: 800 }}>{hsrForWeek(hsrWeek).scheme}</span>
+        </div>
+        <Stepper value={hsrWeek} set={setHsrWeek} step={1} min={1} max={12} int unit="/12" />
+        <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>Pilote presse à cuisses + leg extension en Lower A et Lower C. Tempo 6 s · repos 2-3 min.</Body>
+      </Card>
+
     </div>
   );
 }

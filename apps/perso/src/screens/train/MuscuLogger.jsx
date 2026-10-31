@@ -4,7 +4,7 @@
 // fixe en haut du carnet SEULEMENT pendant le décompte (choix de Yoann — en juillet, une
 // pastille épinglée en permanence gênait le défilement).
 import { useState, useEffect, useMemo, useRef } from "react";
-import { Check, Play, Pause, RotateCcw, Timer, Repeat, Plus, Minus, TrendingUp } from "lucide-react";
+import { Check, Play, Pause, RotateCcw, Timer, Repeat, Plus, Minus, TrendingUp, Search, X } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { store, getSync } from "../../store.js";
 import { exerciseSessions, setLabel, beats, recordToBeat, progressiveOverloadSuggestion } from "@rawcare/core/training";
@@ -12,12 +12,14 @@ import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { TEMPLATES, DEFAULT_WEIGHTS, hsrForWeek, hsrParse, parseSecs, exoSeriesCount } from "@rawcare/core/session/templates";
 import { lastPerf, perfHistory, lastExerciseSets, medianTarget } from "@rawcare/core/session/perf";
 import { EXERCISE_LIBRARY } from "@rawcare/core/session/exercises";
+import { catalogGroups, catalogEntry } from "@rawcare/core/session/exoCatalog";
 import { fmt, round, today } from "../../ui.jsx";
 import { T } from "../../design/tokens.js";
-import { Panel, Eyebrow, Button, IconButton, Chip, NumberField } from "../../design/primitives.jsx";
+import { Panel, Eyebrow, Button, IconButton, Chip, NumberField, TextField } from "../../design/primitives.jsx";
 import { mmss } from "../../lib/helpers.js";
 import { restTimer, useRestTimer } from "../../lib/restTimer.js";
 import { sayStable } from "../../lib/jeffrey.js";
+import { restAnnouncement, holdAnnouncement, genericAnnouncement } from "../../lib/restSpeech.js";
 
 const mono = { fontFamily: T.f.num, fontVariantNumeric: "tabular-nums" };
 const WARN = T.c.warn;
@@ -45,13 +47,42 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   const template = TEMPLATES[type];
   const hp = hsrParse(hsrForWeek(hsrWeek).scheme);
 
-  const buildExos = () => template.exos.map((ex) => {
-    const nSeries = exoSeriesCount(template, ex, hsrWeek);
+  // Exercice neuf (suggestions tirées de l'historique). `tpl` : gabarit qui le prescrit (séries
+  // d'un HSR ou d'un superset), null pour une variante de la bibliothèque.
+  const makeExo = (ex, tpl) => {
+    const nSeries = exoSeriesCount(tpl, ex, hsrWeek);
     const last = lastPerf(training, ex.n);
     const lastSets = lastExerciseSets(training, ex.n);
     const target = ex.hsr ? `${hp.reps}` : ex.r;
     const def = DEFAULT_WEIGHTS[ex.n];
     const medVal = medianTarget(target);
+    const pick = (leg, k) => {
+      if (!lastSets) return null;
+      const pool = leg == null ? lastSets : lastSets.filter((s) => s.leg === leg);
+      return pool[k] || null;
+    };
+    const mk = (leg, k) => {
+      const prev = pick(leg, k);
+      return {
+        poids: prev?.poids ?? last?.poids ?? def ?? "",
+        val: prev?.val ?? (medVal === "" ? "" : medVal),
+        fait: false, leg,
+      };
+    };
+    const series = ex.perLeg
+      ? [...Array(nSeries)].map((_, k) => mk("G", k)).concat([...Array(nSeries)].map((_, k) => mk("D", k)))
+      : [...Array(nSeries)].map((_, k) => mk(null, k));
+    return { nom: ex.n, mode: ex.mode, perLeg: !!ex.perLeg, opt: !!ex.opt, rest: ex.rest,
+      target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${nSeries} × ${ex.r}`, consigne: ex.c, def, last,
+      groupe: ex.groupe, mouvement: ex.mouvement, materiel: ex.materiel, tendon: ex.tendon, famille: ex.famille, rir: null, series };
+  };
+  // Exercice ajouté en cours de séance (31/10/2026) : prescription de sa définition d'origine.
+  const makeAdded = (c) => ({ ...makeExo(c.ex, c.type ? TEMPLATES[c.type] : null), opt: false, added: true });
+
+  const buildExos = () => template.exos.map((ex) => {
+    const target = ex.hsr ? `${hp.reps}` : ex.r;
+    const last = lastPerf(training, ex.n);
+    const def = DEFAULT_WEIGHTS[ex.n];
 
     // Édition d'une séance déjà enregistrée : on réaffiche les séries telles
     // qu'elles ont été sauvegardées (valeurs réelles), pas des suggestions
@@ -75,26 +106,20 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
         series: savedEx.series.map((s) => ({ poids: s.poids, val: s.val, fait: s.fait, leg: s.leg })) };
     }
 
-    const pick = (leg, k) => {
-      if (!lastSets) return null;
-      const pool = leg == null ? lastSets : lastSets.filter((s) => s.leg === leg);
-      return pool[k] || null;
-    };
-    const mk = (leg, k) => {
-      const prev = pick(leg, k);
-      return {
-        poids: prev?.poids ?? last?.poids ?? def ?? "",
-        val: prev?.val ?? (medVal === "" ? "" : medVal),
-        fait: false, leg,
-      };
-    };
-    const series = ex.perLeg
-      ? [...Array(nSeries)].map((_, k) => mk("G", k)).concat([...Array(nSeries)].map((_, k) => mk("D", k)))
-      : [...Array(nSeries)].map((_, k) => mk(null, k));
-    return { nom: ex.n, mode: ex.mode, perLeg: !!ex.perLeg, opt: !!ex.opt, rest: ex.rest,
-      target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${exoSeriesCount(template, ex, hsrWeek)} × ${ex.r}`, consigne: ex.c, def, last,
-      groupe: ex.groupe, mouvement: ex.mouvement, materiel: ex.materiel, tendon: ex.tendon, famille: ex.famille, rir: null, series };
-  });
+    return makeExo(ex, template);
+  }).concat(addedFromInitial());
+
+  // Réouverture d'une séance : les exercices enregistrés qui ne viennent pas du gabarit (ni
+  // directement ni par substitution) ont été ajoutés en cours de séance ; on les remet à la fin.
+  function addedFromInitial() {
+    const names = new Set(template.exos.map((x) => x.n));
+    return (initial?.exercices || []).filter((e) => !names.has(e.nom) && !names.has(e.origine)).map((se) => {
+      const c = catalogEntry(se.nom);
+      const base = c ? makeAdded(c) : { nom: se.nom, mode: se.mode, rest: 90, target: "", scheme: "", consigne: "", last: lastPerf(training, se.nom), added: true };
+      return { ...base, nom: se.nom, mode: se.mode ?? base.mode, perLeg: !!se.perLeg, origine: se.origine, rir: se.rir ?? null,
+        series: se.series.map((s) => ({ poids: s.poids, val: s.val, fait: s.fait, leg: s.leg })) };
+    });
+  }
 
   // Brouillon auto-sauvegardé (localStorage, hors DATA_KEYS — voir Règles absolues #1) :
   // capture la séance en cours dès qu'une série est cochée, pour survivre à un changement
@@ -121,6 +146,9 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   // panneau "remplacer" est ouvert, ou null. Purement une affaire de CETTE séance — Upper/
   // Lower ne sont jamais modifiés, le remplacement se logue sous son propre nom.
   const [subOpen, setSubOpen] = useState(null);
+  // « Ajouter un exercice » (31/10/2026) : panneau ouvert et recherche.
+  const [addOpen, setAddOpen] = useState(false);
+  const [addQuery, setAddQuery] = useState("");
 
   // ---- minuteur (repos + maintien), partagé avec la barre « Séance en cours » ----
   const timer = useRestTimer();
@@ -158,7 +186,8 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
     setExos((p) => p.map((e, i) => i !== ei ? e : { ...e, series: e.series.map((s, j) => j !== si ? s : { ...s, fait: !s.fait }) }));
     // coche = fin de série → relance le minuteur sur le dernier temps utilisé pour cet exercice (fin de série uniquement, pas décoche)
     if (!exos[ei].series[si].fait) {
-      restTimer.start(lastTimerByExo[ei] ?? exos[ei].rest, exos[ei].nom);
+      // Fin de repos dite par Jeffrey (31/10/2026) : la série ou l'exercice qui vient.
+      restTimer.start(lastTimerByExo[ei] ?? exos[ei].rest, exos[ei].nom, restAnnouncement(exos, ei, si));
       // Haptique (T5, 04/10/2026) : impulsion brève au cochage, natif seulement — jamais
       // bloquant, une erreur du plugin est ignorée.
       if (Capacitor.isNativePlatform()) Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
@@ -184,6 +213,24 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
     const j = lastRemovable(e, leg);
     return j < 0 ? e : { ...e, series: e.series.filter((_, k) => k !== j) };
   }));
+  // Ajout d'un exercice déjà dans l'application (31/10/2026) : prescription de sa définition
+  // d'origine, ouvert tout de suite. Retrait possible tant qu'aucune série n'est cochée.
+  const addExercise = (c) => {
+    const item = makeAdded(c);
+    setExos((p) => [...p, item]);
+    setOpen(exos.length);
+    setSubOpen(null);
+    setAddOpen(false);
+    setAddQuery("");
+    if (!timer.running) restTimer.set(item.rest);
+  };
+  const removeExercise = (ei) => {
+    setExos((p) => p.filter((_, i) => i !== ei));
+    setLastTimerByExo((m) => Object.fromEntries(Object.entries(m).filter(([k]) => +k !== ei).map(([k, v]) => [+k > ei ? +k - 1 : +k, v])));
+    setOpen(-1);
+  };
+  const addGroups = useMemo(() => (addOpen ? catalogGroups({ exclude: exos.map((e) => e.nom), query: addQuery }) : []), [addOpen, addQuery, exos]);
+
   // T4 : RIR par exercice (0/1/2/3+ → 0/1/2/3), re-tap = désélection (optionnel, jamais imposé).
   const setRir = (ei, v) => setExos((p) => p.map((e, i) => i !== ei ? e : { ...e, rir: e.rir === v ? null : v }));
 
@@ -382,7 +429,7 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ ...mono, fontSize: 28, fontWeight: 700, flex: 1, minWidth: 0 }}>{mmss(timer.remaining)}</span>
             <IconButton label="Remettre le minuteur à zéro" onClick={() => restTimer.set(timer.secs)}><RotateCcw size={20} aria-hidden="true" /></IconButton>
-            <Button variant="primary" onClick={() => restTimer.toggle(openName())}><Play size={18} aria-hidden="true" />Lancer</Button>
+            <Button variant="primary" onClick={() => restTimer.toggle(openName(), open >= 0 ? restAnnouncement(exos, open, -1) : genericAnnouncement())}><Play size={18} aria-hidden="true" />Lancer</Button>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             {[120, 90, 60, 45, 30].map((s) => (
@@ -410,6 +457,7 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
               <span style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
                 <span style={{ fontSize: isOpen ? 18 : 16, fontWeight: 700, lineHeight: 1.25 }}>
                   {e.nom}{e.opt && <span style={{ fontSize: 13, color: T.c.muted, fontWeight: 500, marginLeft: 6 }}>(option)</span>}
+                  {e.added && <span style={{ fontSize: 13, color: T.c.accent, fontWeight: 500, marginLeft: 6 }}>(ajouté)</span>}
                 </span>
                 <span style={{ ...mono, fontSize: 13, color: T.c.text2, whiteSpace: "nowrap" }}>{e.scheme}</span>
               </span>
@@ -445,7 +493,7 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
                     : [];
                   // Retour à l'exercice d'origine : l'exercice du gabarit n'est pas forcément
                   // dans la bibliothèque, on le prend donc directement dans le gabarit.
-                  const original = e.origine ? template.exos.find((x) => x.n === e.origine) : null;
+                  const original = e.origine ? (template.exos.find((x) => x.n === e.origine) ?? catalogEntry(e.origine)?.ex) : null;
                   if (original) candidates.unshift({ ...original, isOriginal: true });
                   if (!candidates.length) return null;
                   return subOpen === ei ? (
@@ -509,7 +557,10 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
 
                 <div style={{ display: "flex", gap: 8 }}>
                   <Button variant="outline" style={{ flex: 1 }}
-                    onClick={() => { const s = e.mode === "temps" ? parseSecs(e.target) : e.rest; restTimer.start(s, e.nom); recordLast(ei, s); }}>
+                    onClick={() => {
+                      const s = e.mode === "temps" ? parseSecs(e.target) : e.rest;
+                      restTimer.start(s, e.nom, e.mode === "temps" ? holdAnnouncement() : restAnnouncement(exos, ei, -1)); recordLast(ei, s);
+                    }}>
                     <Timer size={18} aria-hidden="true" />
                     {e.mode === "temps" ? `Maintien ${parseSecs(e.target)} s` : `Repos ${e.rest} s`}
                   </Button>
@@ -531,11 +582,52 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
                       : <div className="p-sec">{sayStable("firstTime")}</div>}
                   </div>
                 )}
+
+                {e.added && !e.series.some((s) => s.fait) && (
+                  <button type="button" className="p-tap" onClick={() => removeExercise(ei)} style={{
+                    display: "flex", alignItems: "center", gap: 8, minHeight: 44, padding: 0,
+                    background: "none", border: "none", color: T.c.text2, fontSize: 14, fontFamily: "inherit", textDecoration: "underline",
+                  }}>
+                    <X size={16} aria-hidden="true" />Retirer cet exercice de la séance
+                  </button>
+                )}
               </>
             )}
           </Panel>
         );
       })}
+
+      {/* Ajouter un exercice déjà dans l'application (31/10/2026), classé par muscle. */}
+      {addOpen ? (
+        <Panel style={{ gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Eyebrow style={{ flex: 1 }}>Ajouter un exercice</Eyebrow>
+            <IconButton label="Fermer l'ajout d'exercice" size={44} onClick={() => { setAddOpen(false); setAddQuery(""); }}>
+              <X size={18} aria-hidden="true" />
+            </IconButton>
+          </div>
+          <TextField value={addQuery} onChange={setAddQuery} placeholder="Chercher un exercice ou un muscle" label="Chercher un exercice" icon={Search} />
+          {addGroups.length ? addGroups.map((g) => (
+            <div key={g.groupe} style={{ display: "grid" }}>
+              <Eyebrow style={{ color: T.c.accent, padding: "6px 0 2px" }}>{g.label}</Eyebrow>
+              {g.items.map((c) => (
+                <button key={c.n} type="button" className="p-tap" onClick={() => addExercise(c)} style={{
+                  display: "flex", alignItems: "center", gap: 10, minHeight: 52, padding: "6px 2px",
+                  background: "none", border: "none", borderBottom: `1px solid ${T.c.lineSoft}`, textAlign: "left", color: T.c.text, fontFamily: "inherit",
+                }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600 }}>{c.n}</span>
+                  <span style={{ ...mono, fontSize: 13, color: T.c.text2, whiteSpace: "nowrap" }}>{c.ex.hsr ? "HSR" : `${c.ex.s} × ${c.ex.r}`}</span>
+                  <Plus size={18} aria-hidden="true" color={T.c.accent} />
+                </button>
+              ))}
+            </div>
+          )) : <div className="p-sec">{sayStable("noExerciseMatch")}</div>}
+        </Panel>
+      ) : (
+        <Button variant="outline" block onClick={() => setAddOpen(true)}>
+          <Plus size={18} aria-hidden="true" />Ajouter un exercice
+        </Button>
+      )}
 
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
         <Button variant="primary" style={{ flex: 1 }} onClick={validate}>

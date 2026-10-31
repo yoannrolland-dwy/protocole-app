@@ -46,6 +46,19 @@ class RestTimerPlugin : Plugin() {
         const val NOTIF_COUNTDOWN = 4202
         const val NOTIF_ALARM = 4201
         private const val ALARM_REQUEST_CODE = 4201
+        // Annonce de Jeffrey après le bip (31/10/2026) : { url, key, speed, chunks, cacheKey }.
+        // Préférences privées de l'app (la clé de la voix n'entre jamais dans l'intent du réveil).
+        private const val VOICE_PREFS = "rest_voice"
+
+        fun storedVoice(context: Context): org.json.JSONObject? =
+            context.getSharedPreferences(VOICE_PREFS, Context.MODE_PRIVATE).getString("voice", null)
+                ?.let { runCatching { org.json.JSONObject(it) }.getOrNull() }
+
+        private fun storeVoice(context: Context, json: String?) {
+            val e = context.getSharedPreferences(VOICE_PREFS, Context.MODE_PRIVATE).edit()
+            if (json == null) e.remove("voice") else e.putString("voice", json)
+            e.apply()
+        }
 
         /** Partagé avec RestAlarmReceiver, qui n'a pas d'instance de Plugin. */
         fun ensureChannels(context: Context) {
@@ -103,6 +116,7 @@ class RestTimerPlugin : Plugin() {
         val endsAt = call.getLong("endsAt") ?: run { call.reject("endsAt requis"); return }
         val exercise = call.getString("exercise") ?: ""
         ensureChannels(context)
+        storeVoice(context, call.getObject("voice")?.toString())
 
         val am = context.getSystemService(AlarmManager::class.java)
         val showIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
@@ -125,6 +139,7 @@ class RestTimerPlugin : Plugin() {
             val am = context.getSystemService(AlarmManager::class.java)
             am.cancel(alarmPendingIntent(context, ""))
         } catch (_: Exception) { /* rien à annuler */ }
+        storeVoice(context, null)
         call.resolve()
     }
 

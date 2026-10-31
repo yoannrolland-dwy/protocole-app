@@ -21,12 +21,13 @@ const bridge = window.BriefBridge;
 
 // Voix (29/10/2026) : Kotlin prépare l'audio du brief (serveur Oracle) juste après la
 // notification et le garde sur le téléphone, pour l'écouter chez soi ou en chemin sans attendre ni
-// réseau. Lu tout de suite seulement pendant une séance (carnet ouvert) ET casque branché — Kotlin
-// vérifie le casque. Réglages lus sans plugin (pas de pont Capacitor dans cette page).
+// réseau. Lu tout de suite dès qu'un casque est branché (31/10/2026, choix de Yoann : casque
+// branché = Jeffrey parle, séance ou pas) — Kotlin vérifie le casque. Réglages lus sans plugin
+// (pas de pont Capacitor dans cette page).
 const voiceFor = (text) => {
   const server = voiceServer();
   const plan = speechPlan(text);
-  return server && plan ? { ...server, ...plan, play: !!getSync("trainingDraft", null)?.type } : undefined;
+  return server && plan ? { ...server, ...plan, play: true } : undefined;
 };
 const finish = (result) => {
   if (bridge) bridge.finish(JSON.stringify(result));
@@ -74,7 +75,7 @@ async function reply() {
   try {
     const r = await runReply({ payload, data: loadData(), ai, transport: bridgeTransport });
     const voice = r.reply ? voiceFor(r.reply) : undefined;
-    return finish({ notify: { kind: "thread", alert: false, spec: todaySpec(), voice: voice && { ...voice, play: false } } });
+    return finish({ notify: { kind: "thread", alert: false, spec: todaySpec(), voice } });
   } catch (e) {
     console.error("réponse", e);
     return finish({ notify: { kind: "thread", alert: false, spec: todaySpec({ me: false, text: sayError(e) }) } });

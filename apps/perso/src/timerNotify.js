@@ -1,4 +1,6 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
+import { voiceServer, speechPlan } from "./lib/voiceConfig.js";
+import { speak } from "./lib/voice.js";
 
 // Minuteur de repos : décompte visible dans la barre d'état + sonnerie de fin.
 //
@@ -17,6 +19,11 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 // No-op sur la PWA/navigateur, où seul le bip Web Audio existe.
 
 const RestTimer = registerPlugin("RestTimer");
+
+// Annonce de Jeffrey après le bip (31/10/2026) : la phrase est préparée en audio dès le lancement
+// du repos (serveur Oracle, gardée sur le téléphone), puis le réveil natif la joue juste après le
+// bip, casque ou haut-parleur (choix de Yoann : toujours). Les réglages de la voix, clé comprise,
+// partent dans les préférences privées de l'app (RestTimerPlugin), jamais dans l'intent du réveil.
 
 // Attention : ne JAMAIS retourner un objet plugin Capacitor depuis une fonction async.
 // L'`await` du côté appelant cherche une méthode `.then()` sur le proxy natif, qui lève
@@ -45,14 +52,18 @@ async function ensureNotificationPermission() {
 }
 
 /** Programme l'alarme de fin de repos et affiche le décompte. `seconds` = durée du repos. */
-export async function scheduleRestAlarm(seconds, exercise = "") {
+export async function scheduleRestAlarm(seconds, exercise = "", speech = "") {
   if (!Capacitor.isNativePlatform() || !(seconds > 0)) return;
 
   try {
     if (!(await ensureNotificationPermission())) return;
 
     const endsAt = Date.now() + seconds * 1000;
-    await RestTimer.scheduleAlarm({ endsAt, exercise });
+    const server = speech ? voiceServer() : null;
+    const plan = server ? speechPlan(speech) : null;
+    const voice = plan ? { ...server, ...plan } : null;
+    await RestTimer.scheduleAlarm({ endsAt, exercise, ...(voice ? { voice } : {}) });
+    if (voice) speak(speech, { play: false }).catch(() => {});
     await RestTimer.showCountdown({ endsAt, exercise });
   } catch (e) {
     console.log("timerNotify: " + (e?.message || e));

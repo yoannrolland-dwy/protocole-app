@@ -9,6 +9,9 @@ import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import java.util.concurrent.atomic.AtomicBoolean
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -53,6 +56,29 @@ class RestAlarmReceiver : BroadcastReceiver() {
         // persistant nous-mêmes plutôt que de compter sur un rappel JS à temps.
         try { NotificationManagerCompat.from(context).cancel(RestTimerPlugin.NOTIF_COUNTDOWN) } catch (_: Exception) { }
 
+        // Annonce de Jeffrey juste après le bip (31/10/2026, choix de Yoann : toujours, casque ou
+        // haut-parleur). Le son est en général déjà sur le téléphone (préparé au lancement du
+        // repos) ; sinon il est demandé au serveur. Jamais par-dessus Jeffrey s'il parle déjà.
+        // goAsync garde le réveil en vie le temps de la phrase (10 s au plus).
+        val voice = RestTimerPlugin.storedVoice(context)
+        val pending = if (voice != null) goAsync() else null
+        val finished = AtomicBoolean(false)
+        val end = { if (finished.compareAndSet(false, true)) pending?.finish() }
+        val spoken = AtomicBoolean(false)
+        val speakNow = speakNow@{
+            if (voice == null || !spoken.compareAndSet(false, true)) return@speakNow
+            if (JeffreySpeech.playing()) { end(); return@speakNow }
+            try {
+                val arr = voice.getJSONArray("chunks")
+                JeffreySpeech.begin(
+                    context, "rest-${System.currentTimeMillis()}",
+                    JeffreySpeech.Config(voice.getString("url").trimEnd('/'), voice.getString("key"), voice.optDouble("speed", 1.2).toFloat()),
+                    true, voice.optString("cacheKey").ifEmpty { null }, (0 until arr.length()).map { arr.getString(it) }, true,
+                ) { end() }
+            } catch (_: Exception) { end() }
+        }
+        if (pending != null) Handler(Looper.getMainLooper()).postDelayed({ end() }, 9_500)
+
         try {
             val player = MediaPlayer()
             val headset = connectedHeadset(context)
@@ -90,11 +116,12 @@ class RestAlarmReceiver : BroadcastReceiver() {
             val afd = context.resources.openRawResourceFd(R.raw.alarm)
             player.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
             afd.close()
-            player.setOnCompletionListener { it.release() }
+            player.setOnCompletionListener { it.release(); speakNow() }
             player.prepare()
             player.start()
         } catch (_: Exception) {
             // La notification et la vibration ci-dessous fonctionnent même si le son échoue.
+            speakNow()
         }
 
         try {
