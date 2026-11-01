@@ -67,15 +67,18 @@ class JeffreyNotifReceiver : BroadcastReceiver() {
 
     private fun listen(context: Context) {
         if (JeffreySpeech.busy()) { JeffreySpeech.stop(); stop(context); return }
+        // Voix en vacances (01/11/2026) : « Écouter » d'une notification postée avant ne fait rien.
+        if (!JeffreySpeech.enabled(context)) return
         val v = BriefRunner.storedSpec(context)?.optJSONObject("listen") ?: return
         val arr = v.optJSONArray("chunks") ?: return
         val chunks = (0 until arr.length()).map { arr.getString(it) }
         if (chunks.isEmpty() || v.optString("url").isBlank() || v.optString("key").isBlank()) return
         keepAlive(context, "Jeffrey vous lit son message, Monsieur.")
-        JeffreySpeech.begin(
+        val started = JeffreySpeech.begin(
             context, "notif-${System.currentTimeMillis()}",
             JeffreySpeech.Config(v.getString("url").trimEnd('/'), v.getString("key"), v.optDouble("speed", 1.2).toFloat()),
             true, v.optString("cacheKey").ifEmpty { null }, chunks, true,
         ) { stop(context) }
+        if (!started) stop(context)
     }
 }

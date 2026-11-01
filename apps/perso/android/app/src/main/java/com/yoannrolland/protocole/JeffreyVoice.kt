@@ -100,6 +100,25 @@ object JeffreySpeech {
 
     @Volatile private var current: Session? = null
 
+    // Interrupteur « Voix de Jeffrey » (01/11/2026), recopié depuis l'app (JeffreyVoice.setEnabled)
+    // et lu ici, au seul point d'entrée de la voix : conversation, brief, notification et fin de
+    // repos passent tous par begin(), app ouverte ou fermée. Absent = activé.
+    private const val PREFS = "jeffrey_voice"
+    fun enabled(context: Context) =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("enabled", true)
+
+    /** Couper : enregistré tout de suite (commit), parole et requête en cours arrêtées, phrases en
+     *  attente jetées, annonce de fin de repos déjà programmée oubliée. Réactiver ne rejoue rien. */
+    @Synchronized
+    fun setEnabled(context: Context, on: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("enabled", on).commit()
+        if (!on) {
+            stopCurrent()
+            RestTimerPlugin.clearStoredVoice(context)
+        }
+        Log.i(TAG, if (on) "voix activée" else "voix en vacances")
+    }
+
     private fun duck(context: Context) {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
         val req = focus ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
@@ -130,7 +149,13 @@ object JeffreySpeech {
      * cache, le fichier est joué et les phrases ignorées.
      */
     @Synchronized
-    fun begin(context: Context, id: String, config: Config, play: Boolean, cacheKey: String?, chunks: List<String>, final: Boolean, onDone: (JSONObject) -> Unit) {
+    fun begin(context: Context, id: String, config: Config, play: Boolean, cacheKey: String?, chunks: List<String>, final: Boolean, onDone: (JSONObject) -> Unit): Boolean {
+        // Voix coupée : ni lecture (cache compris), ni synthèse, ni préparation. onDone n'est pas
+        // appelé : l'appelant traite le refus lui-même.
+        if (!enabled(context)) {
+            Log.i(TAG, "session $id refusée : voix en vacances")
+            return false
+        }
         stopCurrent()
         val s = Session(id, config, play, cacheKey, onDone)
         chunks.forEach { s.queue.offer(it) }
@@ -138,6 +163,7 @@ object JeffreySpeech {
         current = s
         val app = context.applicationContext
         s.thread = Thread({ run(app, s) }, "jeffrey-speech").also { it.start() }
+        return true
     }
 
     fun push(id: String, chunks: List<String>) {
@@ -436,11 +462,24 @@ class JeffreyVoicePlugin : Plugin() {
         val play = call.getBoolean("play", true) ?: true
         if (!play && JeffreySpeech.busy()) return call.resolve(JSObject().put("skipped", true))
         val chunks = runCatching { call.getArray("chunks")?.toList<String>() }.getOrNull() ?: emptyList()
-        JeffreySpeech.begin(
+        val started = JeffreySpeech.begin(
             context, id, JeffreySpeech.Config(url, key, call.getFloat("speed", 1.2f) ?: 1.2f), play,
             call.getString("cacheKey"), chunks, call.getBoolean("final", true) ?: true,
         ) { res -> notifyListeners("speechDone", JSObject(res.toString())) }
+        if (!started) return call.resolve(JSObject().put("skipped", true).put("disabled", true))
         call.resolve()
+    }
+
+    /** Interrupteur « Voix de Jeffrey » : { enabled }. Couper arrête aussi la voix en cours. */
+    @PluginMethod
+    fun setEnabled(call: PluginCall) {
+        JeffreySpeech.setEnabled(context, call.getBoolean("enabled", true) ?: true)
+        call.resolve(JSObject().put("enabled", JeffreySpeech.enabled(context)))
+    }
+
+    @PluginMethod
+    fun isEnabled(call: PluginCall) {
+        call.resolve(JSObject().put("enabled", JeffreySpeech.enabled(context)))
     }
 
     /** Phrases suivantes d'une session en cours (réponse qui s'écrit). */

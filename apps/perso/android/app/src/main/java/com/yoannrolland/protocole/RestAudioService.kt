@@ -96,14 +96,16 @@ object RestEndAudio {
         val spoken = AtomicBoolean(false)
         val speakNow = speakNow@{
             if (!spoken.compareAndSet(false, true)) return@speakNow
+            // Voix en vacances (01/11/2026) : begin() refuse, le bip reste seul.
             if (voice == null || JeffreySpeech.playing()) { end(); return@speakNow }
             try {
                 val arr = voice.getJSONArray("chunks")
-                JeffreySpeech.begin(
+                val started = JeffreySpeech.begin(
                     app, "rest-${System.currentTimeMillis()}",
                     JeffreySpeech.Config(voice.getString("url").trimEnd('/'), voice.getString("key"), voice.optDouble("speed", 1.2).toFloat()),
                     true, voice.optString("cacheKey").ifEmpty { null }, (0 until arr.length()).map { arr.getString(it) }, true,
                 ) { end() }
+                if (!started) end()
             } catch (_: Exception) { end() }
         }
 

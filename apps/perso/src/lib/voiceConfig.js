@@ -4,23 +4,35 @@
 import { speechChunks, speechKey } from "@rawcare/core/coach/speechText";
 import { getSync, store } from "../store.js";
 
-// `jeffreyVoice` (DATA_KEYS) : { speed, url }. Vitesse de LECTURE (le serveur produit à 1,00) ;
-// 1,20 choisie par Yoann. url vide = même adresse que LiteLLM. Les anciens réglages de la voix
-// Android ({ voice, rate, pitch }) sont ignorés.
-export const VOICE_DEFAULTS = { speed: 1.2, url: "" };
+// `jeffreyVoice` (DATA_KEYS) : { speed, url, enabled }. Vitesse de LECTURE (le serveur produit à
+// 1,00) ; 1,20 choisie par Yoann. url vide = même adresse que LiteLLM. Les anciens réglages de la
+// voix Android ({ voice, rate, pitch }) sont ignorés. `enabled` (01/11/2026) : interrupteur « Voix
+// de Jeffrey » ; absent = activé, pour ne rien changer aux installations existantes. Coupé, Jeffrey
+// part en vacances pour sa voix seulement : il écrit toujours tout.
+export const VOICE_DEFAULTS = { speed: 1.2, url: "", enabled: true };
 export function voiceSettings() {
   const s = { ...VOICE_DEFAULTS, ...(getSync("jeffreyVoice", {}) || {}) };
-  return { speed: Number(s.speed) || VOICE_DEFAULTS.speed, url: s.url || "" };
+  return { speed: Number(s.speed) || VOICE_DEFAULTS.speed, url: s.url || "", enabled: s.enabled !== false };
 }
-export const saveVoiceSettings = (v) => store.set("jeffreyVoice", { speed: v.speed, url: v.url || "" });
+/** Enregistre un changement partiel : ce qui n'est pas fourni reste tel quel (l'interrupteur ne
+ *  touche ni l'adresse ni la vitesse, et inversement). */
+export function saveVoiceSettings(patch) {
+  const v = { ...voiceSettings(), ...patch };
+  return store.set("jeffreyVoice", { speed: v.speed, url: v.url || "", enabled: v.enabled !== false });
+}
+/** La voix est-elle activée (interrupteur) ? Indépendant du serveur et de la clé. */
+export const voiceEnabled = () => voiceSettings().enabled;
 
 // Clé dédiée à la voix (`voiceKey`) : hors DATA_KEYS, comme les autres clés, jamais exportée.
 export const voiceKey = () => getSync("voiceKey", "") || "";
 export const saveVoiceKey = (k) => store.set("voiceKey", k);
 
-/** { url, key, speed } si la voix est configurée, sinon null. */
+/** { url, key, speed } si la voix est configurée ET activée, sinon null. Tous les chemins de la
+ *  voix en JS passent par ici (conversation, brief, notification, fin de repos) : voix coupée =
+ *  aucun appel de synthèse ni préparation, et aucune voix confiée au natif. */
 export function voiceServer() {
   const s = voiceSettings();
+  if (!s.enabled) return null;
   const url = (s.url || getSync("litellmUrl", "") || "").trim().replace(/\/+$/, "");
   const key = voiceKey().trim();
   return url && key ? { url, key, speed: s.speed } : null;

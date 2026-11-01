@@ -4,21 +4,21 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 
-/** Réveil du brief du matin (J4.1) : relance la page sans écran (BriefRunner). Non exporté. */
+/** Ancien réveil du brief du matin (J4.1). Depuis le 01/11/2026 (v3.148.0), le brief part dans
+ *  l'app quand Monsieur note son genou : un réveil resté programmé par une version précédente ne
+ *  fait plus rien, il se retire. Gardé pour que ce réveil trouve encore son destinataire. */
 class BriefAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (!BriefScheduler.enabled(context)) return
-        val pending = goAsync()
-        BriefRunner.run(context) { pending.finish() }
+        BriefScheduler.cancel(context)
     }
 }
 
-/** Redémarrage du téléphone ou mise à jour de l'app : Android efface les réveils, on les remet.
+/** Mise à jour de l'app ou redémarrage : retire un ancien réveil du brief s'il en reste un.
  *  Exporté pour recevoir ces diffusions du système (seul le système peut les envoyer). */
 class BriefBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
-            BriefScheduler.schedule(context, BriefScheduler.nextStart())
+            BriefScheduler.cancel(context)
         }
     }
 }

@@ -20,29 +20,24 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import androidx.core.app.RemoteInput
-import androidx.health.connect.client.time.TimeRangeFilter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneId
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Brief du matin de Jeffrey, app fermée (chantier J, J4.1, 29/10/2026 ; architecture validée par
- * J0, voir ROADMAP.md). À chaque réveil : lecture Health Connect (nuit, pesée, FC repos) ici en
- * Kotlin, puis chargement de la page `brief.html` de l'app dans une WebView jamais affichée, à la
- * même origine que l'app (https://localhost, donc même stockage). La page décide et écrit le
- * brief (packages/core/src/coach/brief.js, src/briefPage.js) ; elle rend la main par `finish` avec
- * la notification à afficher et l'heure du prochain réveil. Toute la logique reste en JavaScript.
+ * Page sans écran de Jeffrey (chantier J, architecture validée par J0, voir ROADMAP.md) : la page
+ * `brief.html` de l'app, chargée dans une WebView jamais affichée, à la même origine que l'app
+ * (https://localhost, donc même stockage). Elle répond à Monsieur depuis la notification (J4.3) et
+ * rend la main par `finish` avec la notification à afficher. Toute la logique reste en JavaScript.
+ *
+ * Depuis le 01/11/2026 (v3.148.0), le brief du matin ne passe plus par ici : il part dans l'app,
+ * quand Monsieur note son genou (le genou ne se note que dans l'app). Plus aucun réveil du brief.
  */
 object BriefRunner {
     private const val TAG = "JeffreyBrief"
@@ -56,14 +51,6 @@ object BriefRunner {
     private const val TIMEOUT_MS = 55_000L
     private val pool = Executors.newCachedThreadPool()
 
-    fun run(context: Context, done: () -> Unit) {
-        val app = context.applicationContext
-        CoroutineScope(Dispatchers.Main).launch {
-            val health = withContext(Dispatchers.IO) { readHealth(app) }
-            startPage(app, health, null, done)
-        }
-    }
-
     /** Réponse de Monsieur depuis la notification (J4.3) : la page répond (`?mode=reply`) avec
      *  `payload` ({ kind: text | quick | confirm, … }), puis rend le fil à afficher. */
     fun runReply(context: Context, payload: String, done: () -> Unit) {
@@ -71,27 +58,8 @@ object BriefRunner {
         CoroutineScope(Dispatchers.Main).launch { startPage(app, "{}", payload, done) }
     }
 
-    /** Nuit, pesée et FC repos des deux derniers jours, au format de healthSync.js. "{}" si
-     *  Health Connect est indisponible ou si la lecture en arrière-plan n'est pas accordée. */
-    private suspend fun readHealth(context: Context): String = try {
-        val hc = WidgetStepsRefresher.client(context)
-        if (hc == null || !WidgetStepsRefresher.backgroundSupported(hc) ||
-            WidgetStepsRefresher.BACKGROUND_PERMISSION !in hc.permissionController.getGrantedPermissions()) "{}"
-        else {
-            val zone = ZoneId.systemDefault()
-            val range = TimeRangeFilter.between(LocalDate.now(zone).minusDays(2).atStartOfDay(zone).toInstant(), Instant.now())
-            val out = JSONObject()
-            runCatching { out.put("sleep", HealthReads.sleep(hc, range)) }.onFailure { Log.w(TAG, "nuit", it) }
-            runCatching { out.put("weight", HealthReads.weight(hc, range)) }.onFailure { Log.w(TAG, "pesée", it) }
-            runCatching { out.put("rhr", HealthReads.restingHr(hc, range)) }.onFailure { Log.w(TAG, "FC repos", it) }
-            out.toString()
-        }
-    } catch (e: Exception) {
-        Log.w(TAG, "Health Connect", e); "{}"
-    }
-
     @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
-    private fun startPage(context: Context, health: String, payload: String?, done: () -> Unit) {
+    private fun startPage(context: Context, health: String, payload: String, done: () -> Unit) {
         val handler = Handler(Looper.getMainLooper())
         val finished = AtomicBoolean(false)
         val web = WebView(context)
@@ -99,18 +67,16 @@ object BriefRunner {
             if (finished.compareAndSet(false, true)) {
                 handler.post {
                     val stop = { context.stopService(Intent(context, BriefService::class.java)) }
-                    runCatching { handleResult(context, json) }.onFailure {
-                        Log.e(TAG, "résultat", it)
-                        BriefScheduler.schedule(context, System.currentTimeMillis() + 20 * 60_000)
-                    }
+                    runCatching { handleResult(context, json) }.onFailure { Log.e(TAG, "résultat", it) }
                     web.destroy()
                     // Voix (29/10/2026) : le brief est préparé en audio juste après sa notification
                     // (serveur Oracle), gardé sur le téléphone pour être écouté sans attendre ni
                     // réseau. Lu tout de suite si un casque est branché (31/10/2026 : casque = Jeffrey parle).
                     // Le service au premier plan garde l'app (et le réseau) le temps de la synthèse.
                     val voice = runCatching { voiceOf(json) }.getOrNull()
-                    if (voice != null) {
-                        handler.postDelayed({ stop() }, 150_000)
+                    // Voix coupée (01/11/2026) : la page n'en envoie pas, et begin() refuse de toute
+                    // façon ; le service s'arrête aussitôt, la notification écrite est déjà partie.
+                    val started = voice?.let {
                         val arr = voice.getJSONArray("chunks")
                         val chunks = (0 until arr.length()).map { arr.getString(it) }
                         val play = voice.optBoolean("play") && Headset.connected(context) != null
@@ -119,16 +85,17 @@ object BriefRunner {
                             JeffreySpeech.Config(voice.getString("url").trimEnd('/'), voice.getString("key"), voice.optDouble("speed", 1.2).toFloat()),
                             play, voice.optString("cacheKey").ifEmpty { null }, chunks, true,
                         ) { handler.post { stop() } }
-                    } else stop()
+                    } == true
+                    if (started) handler.postDelayed({ stop() }, 150_000) else stop()
                     done()
                 }
             }
         }
-        handler.postDelayed({ finish("{\"error\":\"délai dépassé\",\"nextAt\":${System.currentTimeMillis() + 5 * 60_000}}") }, TIMEOUT_MS)
+        handler.postDelayed({ finish("{\"error\":\"délai dépassé\"}") }, TIMEOUT_MS)
 
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
-        web.addJavascriptInterface(Bridge(context, health, payload ?: "{}", web, handler, finish), "BriefBridge")
+        web.addJavascriptInterface(Bridge(context, health, payload, web, handler, finish), "BriefBridge")
         web.webViewClient = object : WebViewClient() {
             // Fichiers de l'app servis depuis assets/public (comme Capacitor), à la même origine.
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
@@ -142,7 +109,7 @@ object BriefRunner {
                 }
             }
         }
-        web.loadUrl(if (payload != null) "https://localhost/brief.html?mode=reply" else "https://localhost/brief.html")
+        web.loadUrl("https://localhost/brief.html?mode=reply")
     }
 
     private fun mime(path: String) = when (path.substringAfterLast('.', "")) {
@@ -163,8 +130,8 @@ object BriefRunner {
         return v
     }
 
-    /** Ce que la page rend : { notify: { kind, text, alert, spec?, voice? } | null, nextAt? } ou
-     *  { error, nextAt? }. `spec` : notification de conversation (J4.3, voir postThread). */
+    /** Ce que la page rend : { notify: { kind, text, alert, spec?, voice? } | null } ou { error }.
+     *  `spec` : notification de conversation (J4.3, voir postThread). */
     private fun handleResult(context: Context, json: String) {
         val r = JSONObject(json)
         if (r.has("error")) Log.w(TAG, "page : ${r.optString("error")}")
@@ -173,8 +140,6 @@ object BriefRunner {
         if (spec != null) postThread(context, spec.toString(), n.optBoolean("alert"))
         else if (n != null) post(context, n.optString("text"), n.optBoolean("alert"))
         else if (!r.has("error")) NotificationManagerCompat.from(context).cancel(NOTIF_ID)
-        // Une réponse depuis la notification ne touche pas aux réveils du brief.
-        if (r.has("nextAt")) BriefScheduler.schedule(context, r.optLong("nextAt"))
     }
 
     fun ensureChannel(context: Context) {
@@ -355,6 +320,11 @@ object BriefRunner {
 
 /** Réveils du brief : exacts sans icône de réveil dans la barre d'état (USE_EXACT_ALARM est
  *  déclaré), repli sur setAlarmClock si Android refuse l'exact. */
+/**
+ * Réglage « brief du matin » (Activé / Désactivé) et nettoyage des anciens réveils. Depuis le
+ * 01/11/2026 (v3.148.0), le brief part dans l'app quand Monsieur note son genou : plus aucun
+ * réveil n'est programmé. `cancel` retire celui qu'une version précédente aurait laissé.
+ */
 object BriefScheduler {
     private const val PREFS = "jeffrey_brief"
     private const val REQ = 5051
@@ -363,38 +333,16 @@ object BriefScheduler {
 
     fun setEnabled(context: Context, on: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("enabled", on).apply()
-        if (on) schedule(context, nextStart()) else cancel(context)
     }
 
-    private fun intent(context: Context) = PendingIntent.getBroadcast(
-        context, REQ, Intent(context, BriefAlarmReceiver::class.java),
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-    )
-
-    fun schedule(context: Context, atMillis: Long) {
-        if (!enabled(context)) return
-        val am = context.getSystemService(AlarmManager::class.java)
-        val at = maxOf(atMillis, System.currentTimeMillis() + 1_000)
-        if (Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms()) am.setAlarmClock(AlarmManager.AlarmClockInfo(at, null), intent(context))
-        else am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, intent(context))
-        Log.i("JeffreyBrief", "prochain réveil : ${Instant.ofEpochMilli(at)}")
-    }
-
-    fun cancel(context: Context) = context.getSystemService(AlarmManager::class.java).cancel(intent(context))
-
-    /** Après un redémarrage : avant 5 h 17 → 5 h 17 ; entre 5 h 17 et 10 h → dans une minute (la
-     *  page décide, un brief déjà fait est ignoré) ; après → demain 5 h 17. Mêmes heures que BRIEF
-     *  (packages/core/src/coach/brief.js). */
-    fun nextStart(): Long {
-        val zone = ZoneId.systemDefault()
-        val day = LocalDate.now(zone)
-        val start = day.atTime(LocalTime.of(5, 17)).atZone(zone).toInstant().toEpochMilli()
-        val deadline = day.atTime(LocalTime.of(10, 0)).atZone(zone).toInstant().toEpochMilli()
-        val now = System.currentTimeMillis()
-        return when {
-            now < start -> start
-            now < deadline -> now + 60_000
-            else -> start + 86_400_000L
-        }
+    /** Retire l'ancien réveil du brief (même PendingIntent que les versions avant v3.148.0). */
+    fun cancel(context: Context) {
+        val pi = PendingIntent.getBroadcast(
+            context, REQ, Intent(context, BriefAlarmReceiver::class.java),
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+        ) ?: return
+        context.getSystemService(AlarmManager::class.java).cancel(pi)
+        pi.cancel()
+        Log.i("JeffreyBrief", "ancien réveil du brief retiré")
     }
 }

@@ -1,5 +1,6 @@
-// Brief du matin de Jeffrey (chantier J, J4.1, 29/10/2026) — partagé par la page sans écran que
-// réveille Android (src/briefPage.js) et par l'app ouverte le matin (App.jsx). Règles du matin :
+// Brief du matin de Jeffrey (chantier J, J4.1, 29/10/2026) et réponses depuis la notification
+// (J4.3). Le brief part dans l'app quand Monsieur note son genou (App.jsx, depuis le 01/11/2026) ;
+// la page sans écran (src/briefPage.js) ne sert plus qu'aux réponses. Règles du matin :
 // packages/core/src/coach/brief.js. Spec : ROADMAP.md, « Chantier J », décision 12 et J4.
 import { getSync, store } from "../store.js";
 import { DEFAULT_TARGETS } from "@rawcare/core/targets";
@@ -12,7 +13,7 @@ import { say } from "./jeffrey.js";
 import { fetchWeather } from "./weather.js";
 import { applyActionStored } from "./jeffreyNotify.js";
 
-// Marqueurs du jour { doneDate, appDate, remindedDate, tries: { date, n } }. Hors DATA_KEYS, comme
+// Marqueur du jour { doneDate } (les anciens appDate, remindedDate, tries ne servent plus). Hors DATA_KEYS, comme
 // jeffreyMemoryDate : restaurer une vieille sauvegarde ne doit pas faire croire qu'un brief est fait.
 const STATE_KEY = "jeffreyBrief";
 export const readBriefState = () => getSync(STATE_KEY, {}) || {};
@@ -50,17 +51,19 @@ export const foodContext = () => ({
   pins: getSync("foodPins", []), muted: getSync("foodMuted", []), today: today(),
 });
 
-const ITEM = { nuit: "votre nuit", "pesée": "votre pesée", genou: "votre genou" };
+const ITEM = { nuit: "votre nuit", "pesée": "votre pesée" };
 const list = (xs) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} et ${xs[xs.length - 1]}`);
 
-/** « J'ai votre nuit ; il me manque votre pesée et votre genou. » */
+/** Carte du Bord avant le genou : « J'ai votre nuit ; il me manque votre pesée. » (le genou, qui
+ *  déclenche le brief, est dit par la phrase elle-même). */
 export function missingSentence(missing) {
-  const have = ["nuit", "pesée", "genou"].filter((k) => !missing.includes(k)).map((k) => ITEM[k]);
-  const need = list(missing.map((k) => ITEM[k]));
-  return have.length ? `J'ai ${list(have)} ; il me manque ${need}.` : `Il me manque ${need}.`;
+  const keys = ["nuit", "pesée"];
+  const have = keys.filter((k) => !missing.includes(k)).map((k) => ITEM[k]);
+  const need = keys.filter((k) => missing.includes(k)).map((k) => ITEM[k]);
+  if (!need.length) return `J'ai ${list(have)}.`;
+  return have.length ? `J'ai ${list(have)} ; il me manque ${list(need)}.` : `Il me manque ${list(need)}.`;
 }
-export const missingText = (missing, remind = false) =>
-  say(remind ? "briefRemind" : "briefWaiting", { x: missingSentence(missing) });
+export const missingText = (missing) => say("briefWaiting", { x: missingSentence(missing) });
 
 /** Rappels utiles calculés par l'app (la sauvegarde hors du téléphone en retard). */
 export function briefReminders() {
@@ -71,17 +74,6 @@ export function briefReminders() {
 }
 
 const dateLabel = () => new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
-
-/** Brief sans IA (serveur muet 3 fois) : la date, la séance du recommandeur, ce qui manquait. */
-export function fallbackText(nextSession, missing) {
-  const top = nextSession?.today?.suggestions?.[0];
-  return [
-    say("briefFallback"),
-    `Nous sommes ${dateLabel()}.`,
-    top ? `Séance proposée : ${top.type}${top.reason ? ` (${top.reason})` : ""}.` : nextSession?.today?.note || null,
-    missing.length ? `Il me manquait ${list(missing.map((k) => ITEM[k]))}.` : null,
-  ].filter(Boolean).join(" ");
-}
 
 /** Enregistre la conversation du jour (élagage à 30 jours, comme App.jsx). */
 function saveDay(date, entries) {
@@ -164,14 +156,4 @@ export async function runReply({ payload, data, ai, transport }) {
     if (e.partial) save(e.partial);
     throw e;
   }
-}
-
-/** Repli sans IA : écrit dans la conversation et marque le brief fait. */
-export function saveFallback(nextSession, missing) {
-  const date = today();
-  const text = fallbackText(nextSession, missing);
-  const entries = getSync("jeffreyLog", {})[date] || [];
-  saveDay(date, [...entries, { id: newId(), role: "assistant", at: hhmm(), text, meta: null }]);
-  writeBriefState({ doneDate: date });
-  return text;
 }

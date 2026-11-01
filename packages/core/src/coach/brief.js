@@ -1,25 +1,20 @@
-// Brief du matin de Jeffrey (chantier J, J4.1, 29/10/2026) : quand le préparer, quoi attendre.
-// Pur et testé ; la page sans écran (réveil Android) et l'app ouverte utilisent ces mêmes règles,
-// pour qu'il n'y ait jamais deux briefs payés le même matin.
+// Brief du matin de Jeffrey (chantier J, J4.1, 29/10/2026) : quand le lancer. Pur et testé.
 //
-// Décisions (ROADMAP.md, chantier J, décision 12 et J4) : il attend la nuit, la pesée et le
-// genou ; une relance sonore vers 9 h s'il en manque encore, et à 10 h le brief part avec ce
-// qu'il a. Premier réveil à 5 h 17 (choix de Yoann), puis toutes les 5 minutes : le brief part
-// au plus 5 min après la dernière donnée. Tous les jours.
-// 30/10/2026, retour du premier vrai brief : plus aucune notification « il me manque… » avant
-// 9 h (au réveil, les données arrivent dans les minutes qui suivent, c'était du bruit) ; réveils
-// toutes les 5 min au lieu de 20 (gratuits : aucun appel à l'IA tant qu'il manque une donnée).
+// 01/11/2026 (v3.148.0, demande de Yoann) : le brief part dans l'app, au moment où Monsieur note
+// son genou. C'est toujours sa dernière saisie du matin, et elle ne se fait que dans l'app : la nuit
+// et la pesée sont déjà arrivées. Plus aucun réveil en arrière-plan (5 h 17, boucle de 5 min,
+// relance de 9 h, brief forcé de 10 h) : il ne pouvait pas écrire le brief puisque le genou manquait
+// toujours, et l'app ouverte prenait la main. S'il manque la nuit ou la pesée à ce moment-là, le
+// brief part quand même et Jeffrey le dit. « Le brief tout de suite » (carte du Bord) le lance sans
+// genou. Une seule fenêtre : le matin, de 5 h à midi.
 
 export const BRIEF = {
-  start: [5, 17],
-  stepMin: 5,
-  remind: [9, 0],
-  deadline: [10, 0],
-  retryMin: 5,
-  maxTries: 3,
+  start: [5, 0],
+  end: [12, 0],
 };
 
-const at = (d, [h, m]) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m, 0, 0);
+const minutes = (d) => d.getHours() * 60 + d.getMinutes();
+const mins = ([h, m]) => h * 60 + m;
 
 /** Ce qui manque encore aujourd'hui, dans l'ordre où Jeffrey l'énumère. */
 export function briefMissing({ today, sleep, weight, knee }) {
@@ -28,40 +23,16 @@ export function briefMissing({ today, sleep, weight, knee }) {
 }
 
 /**
- * Que faire à ce réveil ? `state` = { doneDate, appDate, remindedDate } (marqueurs du jour).
- * - skip : brief déjà fait, ou l'app a pris la main ce matin (ouverte avant le brief) ;
- * - wait : trop tôt (réveil en avance), ou il manque quelque chose avant 9 h (rien à afficher) ;
- * - brief : tout est là, ou il est 10 h passées ;
- * - remind : il manque encore quelque chose à 9 h passées, relance sonore pas encore faite ;
- * - update : il manque encore quelque chose après la relance de 9 h, notification mise à jour
- *   sans bruit.
+ * Brief de l'app, à chaque changement (genou noté, synchro, bouton). `state` = { doneDate }.
+ * - done : brief déjà écrit aujourd'hui ;
+ * - off : hors de la fenêtre du matin (avant 5 h, à partir de midi) ;
+ * - brief : genou du jour noté, ou « Le brief tout de suite » (`force`) ;
+ * - wait : le matin, genou pas encore noté (la carte du Bord dit ce qui manque).
  */
-export function briefDecision({ now, today, missing, state = {} }) {
-  if (state.doneDate === today || state.appDate === today) return "skip";
-  if (now < at(now, BRIEF.start)) return "wait";
-  if (!missing.length || now >= at(now, BRIEF.deadline)) return "brief";
-  if (now < at(now, BRIEF.remind)) return "wait";
-  if (state.remindedDate !== today) return "remind";
-  return "update";
-}
-
-/** Heure du prochain réveil. Brief fait (ou 10 h passées) → demain 5 h 17. Sinon toutes les
- *  5 minutes, sans jamais sauter 9 h (la relance) ni 10 h (l'échéance). */
-export function nextBriefAlarm(now, { doneToday = false } = {}) {
-  const start = at(now, BRIEF.start);
-  const remind = at(now, BRIEF.remind);
-  const deadline = at(now, BRIEF.deadline);
-  const tomorrow = new Date(start);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  if (doneToday || now >= deadline) return tomorrow;
-  if (now < start) return start;
-  const step = new Date(now.getTime() + BRIEF.stepMin * 60000);
-  const candidates = [step, remind, deadline].filter((d) => d > now);
-  return new Date(Math.min(...candidates.map((d) => d.getTime())));
-}
-
-/** Après un échec de l'IA : réessayer dans 5 minutes, puis repli sans IA au 3e échec. */
-export function briefRetry(now, tries) {
-  if (tries >= BRIEF.maxTries) return { fallback: true };
-  return { fallback: false, at: new Date(now.getTime() + BRIEF.retryMin * 60000) };
+export function briefInApp({ now, today, knee, state = {}, force = false }) {
+  if (state.doneDate === today) return "done";
+  const m = minutes(now);
+  if (m < mins(BRIEF.start) || m >= mins(BRIEF.end)) return "off";
+  if (force || (knee || []).some((e) => e.date === today)) return "brief";
+  return "wait";
 }

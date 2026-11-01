@@ -54,6 +54,9 @@ class RestTimerPlugin : Plugin() {
             context.getSharedPreferences(VOICE_PREFS, Context.MODE_PRIVATE).getString("voice", null)
                 ?.let { runCatching { org.json.JSONObject(it) }.getOrNull() }
 
+        /** Voix coupée (01/11/2026) : l'annonce d'un repos déjà programmé est oubliée. */
+        fun clearStoredVoice(context: Context) = storeVoice(context, null)
+
         private fun storeVoice(context: Context, json: String?) {
             val e = context.getSharedPreferences(VOICE_PREFS, Context.MODE_PRIVATE).edit()
             if (json == null) e.remove("voice") else e.putString("voice", json)

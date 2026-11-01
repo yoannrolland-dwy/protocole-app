@@ -1,8 +1,8 @@
-// J4.1 — brief du matin : ce qui manque, la décision à chaque réveil, l'heure du prochain
-// réveil ; et la fusion Health Connect partagée par l'app et le brief.
+// J4.1 — brief du matin : ce qui manque, quand l'app le lance (depuis le 01/11/2026 : quand le
+// genou est noté) ; et la fusion Health Connect partagée par l'app et la page sans écran.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BRIEF, briefMissing, briefDecision, nextBriefAlarm, briefRetry } from "../src/coach/brief.js";
+import { BRIEF, briefMissing, briefInApp } from "../src/coach/brief.js";
 import { mergeSteps, mergeSleep, mergeWeight, mergeRhr, mergeNaps } from "../src/healthMerge.js";
 import { jeffreyAsk, effortFor } from "../src/coach/jeffrey.js";
 
@@ -16,38 +16,23 @@ test("briefMissing : nuit, pesée, genou du jour, dans cet ordre", () => {
   assert.deepEqual(briefMissing({ today: D, sleep: [{ date: D }], weight: [{ date: D }], knee: [{ date: D }] }), []);
 });
 
-test("briefDecision : attendre en silence avant 9 h, relancer à 9 h une fois, brief à 10 h ou dès que tout est là", () => {
-  const miss = ["genou"];
-  assert.equal(briefDecision({ now: t(5, 0), today: D, missing: miss }), "wait");
-  // 30/10/2026 : plus de notification « il me manque… » avant 9 h.
-  assert.equal(briefDecision({ now: t(5, 17), today: D, missing: miss }), "wait");
-  assert.equal(briefDecision({ now: t(8, 59), today: D, missing: miss }), "wait");
-  assert.equal(briefDecision({ now: t(6, 40), today: D, missing: [] }), "brief");
-  assert.equal(briefDecision({ now: t(9, 0), today: D, missing: miss }), "remind");
-  assert.equal(briefDecision({ now: t(9, 20), today: D, missing: miss, state: { remindedDate: D } }), "update");
-  assert.equal(briefDecision({ now: t(10, 0), today: D, missing: miss, state: { remindedDate: D } }), "brief");
-  // Déjà fait, ou l'app ouverte a pris la main ce matin : jamais un second brief payé.
-  assert.equal(briefDecision({ now: t(7, 0), today: D, missing: [], state: { doneDate: D } }), "skip");
-  assert.equal(briefDecision({ now: t(7, 0), today: D, missing: [], state: { appDate: D } }), "skip");
-  // Un marqueur de la veille ne compte pas.
-  assert.equal(briefDecision({ now: t(7, 0), today: D, missing: [], state: { doneDate: "2026-10-29", appDate: "2026-10-29" } }), "brief");
-});
-
-test("nextBriefAlarm : 5 h 17, puis toutes les 5 min sans sauter 9 h ni 10 h, puis demain", () => {
-  assert.equal(hm(nextBriefAlarm(t(3, 0))), "30 05:17");
-  assert.equal(hm(nextBriefAlarm(t(5, 17))), "30 05:22");
-  assert.equal(hm(nextBriefAlarm(t(8, 57))), "30 09:00");
-  assert.equal(hm(nextBriefAlarm(t(9, 50))), "30 09:55");
-  assert.equal(hm(nextBriefAlarm(t(9, 57))), "30 10:00");
-  assert.equal(hm(nextBriefAlarm(t(10, 0))), "31 05:17");
-  assert.equal(hm(nextBriefAlarm(t(6, 0), { doneToday: true })), "31 05:17");
-  assert.equal(hm(nextBriefAlarm(t(23, 0))), "31 05:17");
-});
-
-test("briefRetry : 5 min après un échec, repli sans IA au 3e", () => {
-  assert.equal(BRIEF.maxTries, 3);
-  assert.equal(hm(briefRetry(t(6, 0), 1).at), "30 06:05");
-  assert.equal(briefRetry(t(6, 0), 3).fallback, true);
+test("briefInApp : le brief part quand le genou est noté (01/11/2026), le matin seulement", () => {
+  const knee = [{ date: D, pain: 2, baseline: true }];
+  assert.deepEqual(BRIEF, { start: [5, 0], end: [12, 0] });
+  // Genou pas encore noté : on attend, même avec la nuit et la pesée (plus de boucle ni de 10 h).
+  assert.equal(briefInApp({ now: t(6, 30), today: D, knee: [] }), "wait");
+  assert.equal(briefInApp({ now: t(11, 59), today: D, knee: [{ date: "2026-10-29" }] }), "wait");
+  // Genou noté : brief, quelle que soit l'heure du matin.
+  assert.equal(briefInApp({ now: t(5, 0), today: D, knee }), "brief");
+  assert.equal(briefInApp({ now: t(11, 59), today: D, knee }), "brief");
+  // « Le brief tout de suite » : sans genou.
+  assert.equal(briefInApp({ now: t(6, 30), today: D, knee: [], force: true }), "brief");
+  // Hors du matin : rien, même avec le genou ou le bouton.
+  assert.equal(briefInApp({ now: t(4, 59), today: D, knee }), "off");
+  assert.equal(briefInApp({ now: t(12, 0), today: D, knee, force: true }), "off");
+  // Déjà fait aujourd'hui : jamais un second brief payé ; un marqueur de la veille ne compte pas.
+  assert.equal(briefInApp({ now: t(7, 0), today: D, knee, state: { doneDate: D } }), "done");
+  assert.equal(briefInApp({ now: t(7, 0), today: D, knee, state: { doneDate: "2026-10-29" } }), "brief");
 });
 
 test("jeffreyAsk brief : date, ce qui manque, rappels, réflexion courte", () => {

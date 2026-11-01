@@ -90,16 +90,17 @@ export const PHRASES = {
   actionCancelled: ["Bien, Monsieur, je n'en fais rien."],
 
   // --- Brief du matin (J4.1) : {x} = « J'ai votre nuit ; il me manque votre pesée et votre genou. »
-  briefWaiting: ["Bonjour Monsieur. {x}", "Bien le bonjour, Monsieur. {x}"],
-  briefRemind: ["Monsieur, {x} Le brief partira à 10 h, avec ou sans.", "Je me permets d'insister, Monsieur : {x} Le brief part à 10 h quoi qu'il arrive."],
+  briefWaiting: ["Bonjour Monsieur. {x} Le brief part dès que vous aurez noté votre genou.", "Bien le bonjour, Monsieur. {x} Votre genou, et je vous fais le brief."],
   briefPreparing: ["Je prépare votre brief, Monsieur."],
-  briefRetry: ["Un contretemps, Monsieur. Nouvel essai dans cinq minutes."],
-  briefFallback: ["Mon cerveau est en grève ce matin, Monsieur ; voici l'essentiel."],
-  briefTest: ["Dans dix secondes, Monsieur. Fermez l'app si vous voulez voir la notification arriver."],
+  briefRetry: ["Un contretemps, Monsieur : le brief n'est pas parti. « Le brief tout de suite » pour réessayer."],
 
   // --- Voix (serveur Oracle, 29/10/2026) : sans réseau ou sans serveur, il se tait et le dit.
   voiceDown: ["Ma voix ne passe pas pour l'instant, Monsieur : je m'en tiens à l'écrit.", "Je suis enroué, Monsieur ; la réponse reste écrite."],
   voiceMissing: ["Il me faut l'adresse du serveur et la clé de la voix, Monsieur."],
+  // Interrupteur « Voix de Jeffrey » (01/11/2026) : il se tait, il écrit toujours.
+  voiceOff: ["Ma voix part en vacances, Monsieur. Je continue de tout vous écrire.", "Je me tais, Monsieur ; l'écrit reste à votre service."],
+  voiceOn: ["Me revoilà en voix, Monsieur.", "Ma voix reprend du service, Monsieur."],
+  voiceOffNote: ["Voix en vacances, Monsieur : réponses, brief et notifications restent écrits, les bips de repos aussi."],
 
   // --- Fin de repos (31/10/2026) : dite par Jeffrey juste après le bip. {dx} = « de développé
   // incliné » ou « d'élévations latérales » (élision faite par restSpeech.js).

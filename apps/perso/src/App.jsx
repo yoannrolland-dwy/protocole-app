@@ -25,15 +25,15 @@ import { progressColor } from "./lib/progress.js";
 import { COLORS } from "./design/tokens.js";
 import { isMatchWeek, isPostMatchDay, planForDate } from "./lib/plan.js";
 import { makeCoach } from "./lib/coachInputs.js";
-import { BRIEF, briefMissing, nextBriefAlarm } from "@rawcare/core/coach/brief";
-import { readBriefState, writeBriefState, runBrief, missingText } from "./lib/brief.js";
-import { scheduleBrief, cancelBriefNotification, postJeffreyNotification } from "./lib/briefNative.js";
+import { briefMissing, briefInApp } from "@rawcare/core/coach/brief";
+import { readBriefState, runBrief, missingText } from "./lib/brief.js";
+import { cancelBriefAlarm, briefEnabled, postJeffreyNotification } from "./lib/briefNative.js";
 import { notificationSpec } from "./lib/jeffreyNotify.js";
 import { streamTransportFor } from "./lib/jeffreyHttp.js";
 import { aiMissing } from "./lib/ai.js";
 import { say } from "./lib/jeffrey.js";
 import { notePosition } from "./lib/weather.js";
-import { speak, headsetConnected } from "./lib/voice.js";
+import { speak, headsetConnected, syncVoiceEnabled } from "./lib/voice.js";
 import { SettingsPanel } from "./screens/settings/SettingsPanel.jsx";
 import { Dashboard } from "./screens/dashboard/Dashboard.jsx";
 import { WeightTab } from "./screens/WeightTab.jsx";
@@ -127,14 +127,22 @@ export default function App({ silent = false } = {}) {
   // conversation ouverte par-dessus l'écran ({ initialAsk } ou null).
   const [jeffreyMemoryDate, setJeffreyMemoryDateState] = useState(null);
   const [chatOpen, setChatOpen] = useState(null);
-  // Brief du matin dans l'app (J4.1) : phrase d'attente de la carte du Bord, et horloge qui
-  // relance la vérification (un créneau passe 10 h sans aucune nouvelle donnée).
+  // Brief du matin dans l'app (J4.1 ; déclenché par le genou depuis le 01/11/2026) : phrase
+  // d'attente de la carte du Bord, « Le brief tout de suite » (compteur : chaque tap relance),
+  // réglage Activé / Désactivé, et date du genou pour laquelle Health Connect a déjà été relu.
   const [briefWaiting, setBriefWaiting] = useState(null);
   const [briefTick, setBriefTick] = useState(0);
-  const [briefNow, setBriefNow] = useState(false);
+  const [briefNow, setBriefNow] = useState(0);
+  const [briefOn, setBriefOn] = useState(true);
   const briefRunning = useRef(false);
+  const kneeSynced = useRef(null);
+  const briefForced = useRef(0); // dernier tap sur « Le brief tout de suite » déjà servi
   const [lastAutoBackup, setLastAutoBackup] = useState(null);
   const [lastCloudBackup, setLastCloudBackup] = useState(null);
+
+  // Interrupteur « Voix de Jeffrey » recopié vers le natif à chaque lancement (01/11/2026) : le
+  // stockage de l'app fait foi (restauration d'une sauvegarde, installation neuve).
+  useEffect(() => { syncVoiceEnabled(); }, []);
 
   useEffect(() => {
     (async () => {
@@ -289,7 +297,8 @@ export default function App({ silent = false } = {}) {
   // Resynchro à chaque retour au premier plan (pas seulement au lancement à froid)
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
-    // La page du brief (J4.1) a pu écrire dans la conversation pendant que l'app dormait : relue.
+    // Une réponse depuis la notification (J4.3) a pu écrire dans la conversation pendant que l'app
+    // dormait : relue.
     const handle = CapacitorApp.addListener("resume", () => { runHealthSync(); doAutoBackup(); setPalierTick((t) => t + 1); openWidgetTab(); setJeffreyLog(getSync("jeffreyLog", {})); setBriefTick((t) => t + 1); notePosition(); });
     return () => { handle.then((h) => h.remove()); };
   }, []);
@@ -529,50 +538,52 @@ export default function App({ silent = false } = {}) {
       pins: getSync("foodPins", []), muted: getSync("foodMuted", []), today: today(),
     }),
   };
-  // Brief du matin dans l'app (J4.1, choix de Yoann) : ouverte le matin avant que le brief parte,
-  // l'app prend la main (plus aucune notification ce jour-là), la carte du Bord dit ce qui manque,
-  // et Jeffrey écrit le brief dans la conversation dès que nuit, pesée et genou sont là (ou à 10 h,
-  // ou sur « Le brief tout de suite »). Mêmes règles et même requête que la page sans écran.
-  useEffect(() => {
-    const id = setInterval(() => setBriefTick((t) => t + 1), 5 * 60000);
-    return () => clearInterval(id);
-  }, []);
+  // Brief du matin (J4.1 ; 01/11/2026, v3.148.0, demande de Yoann) : il part quand Monsieur note
+  // son genou, sa dernière saisie du matin, toujours dans l'app. Health Connect est relu une fois à
+  // ce moment-là (la pesée vient peut-être d'arriver) ; s'il manque encore la nuit ou la pesée, le
+  // brief part quand même et Jeffrey le dit. Plus aucun réveil en arrière-plan : celui qu'une
+  // ancienne version aurait laissé est retiré au lancement. Règles : core/coach/brief.js.
+  useEffect(() => { if (!silent) cancelBriefAlarm(); }, []);
+  useEffect(() => { if (!showSettings) briefEnabled().then(setBriefOn); }, [showSettings]);
   // Météo du brief (J4.2) : position approximative notée à l'ouverture (et au retour au premier plan).
   useEffect(() => { if (!silent) notePosition(); }, []);
   useEffect(() => {
     if (loading || silent || healthSync.status === "running" || healthSync.at == null) return;
-    const now = new Date();
     const date = today();
-    const st = readBriefState();
-    const done = st.doneDate === date;
-    scheduleBrief(nextBriefAlarm(now, { doneToday: done }).getTime());
-    const h = now.getHours() + now.getMinutes() / 60;
-    if (done || h < BRIEF.start[0] + BRIEF.start[1] / 60 || h >= 12) { setBriefWaiting(null); return; }
-    if (st.appDate !== date) { writeBriefState({ appDate: date }); cancelBriefNotification(); }
+    const decision = briefOn
+      ? briefInApp({ now: new Date(), today: date, knee, state: readBriefState(), force: briefNow > briefForced.current })
+      : "off";
+    if (decision === "done" || decision === "off") { setBriefWaiting(null); return; }
     const missing = briefMissing({ today: date, sleep, weight, knee });
-    if (missing.length && h < BRIEF.deadline[0] && !briefNow) { setBriefWaiting(missingText(missing)); return; }
+    if (decision === "wait") { setBriefWaiting(missingText(missing)); return; }
     if (briefRunning.current || aiMissing(ai)) return;
+    const forced = briefNow > briefForced.current;
+    if (kneeSynced.current !== date && !forced) { kneeSynced.current = date; runHealthSync(); return; }
+    briefForced.current = briefNow;
     briefRunning.current = true;
     setBriefWaiting(say("briefPreparing"));
     runBrief({
       data: { weight, sleep, training, knee, macros, notes, steps, rhr, naps, targets, phase, basketSchedule, targetHistory, palierWeekly, coachProfile, coachJournal, jeffreyPersona },
       ai, transport: streamTransportFor(ai), missing,
     }).then(async (text) => {
+      setBriefWaiting(null);
       if (!text) return;
       // La notification part aussi quand c'est l'app qui écrit le brief (30/10/2026, choix de
       // Yoann), sans bruit. L'audio est préparé tout de suite et gardé sur le téléphone ; lu à
       // voix haute dès qu'un casque est branché (31/10/2026, séance ou pas).
       postJeffreyNotification(notificationSpec(getSync("jeffreyLog", {})[today()] || []));
       speak(text, { play: await headsetConnected() });
-    }).catch((e) => console.error("brief", e)).finally(() => {
+    }).catch((e) => {
+      console.error("brief", e);
+      setBriefWaiting(say("briefRetry"));
+    }).finally(() => {
+      briefRunning.current = false;
       setJeffreyLog(getSync("jeffreyLog", {}));
       setCoachJournalState(getSync("coachJournal", ""));
       setJeffreyMemoryDateState(getSync("jeffreyMemoryDate", null));
-      setBriefWaiting(null);
-      scheduleBrief(nextBriefAlarm(new Date(), { doneToday: readBriefState().doneDate === today() }).getTime());
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, healthSync.at, healthSync.status, sleep, weight, knee, briefTick, briefNow]);
+  }, [loading, healthSync.at, healthSync.status, sleep, weight, knee, briefTick, briefNow, briefOn]);
 
   // Bulle : partout sauf dans Analyse (la conversation y est), les Réglages et un carnet ouvert.
   const bubbleOn = !loading && !showSettings && !chatOpen && tab !== "perf" && !(tab === "train" && getSync("trainingDraft", null)?.type);
@@ -608,7 +619,7 @@ export default function App({ silent = false } = {}) {
           <SettingsPanel {...{ apiKey, setApiKey, model, setModel, aiProvider, setAiProvider, litellmUrl, setLitellmUrl, litellmKey, setLitellmKey, litellmModel, setLitellmModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, jeffreyPersona, setJeffreyPersona, targets, lastAutoBackup, lastCloudBackup, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, lastCloudBackup, basketSchedule, planFor: planForDate(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier, saveKnee: save.knee, onStart: startSession, jeffreyEntries: jeffreyLog[today()] || [], onOpenJeffrey: (initialAsk) => setChatOpen({ initialAsk }), briefWaiting, onBriefNow: briefWaiting && !briefRunning.current ? () => setBriefNow(true) : null }} setTab={goTo} openSettings={() => setShowSettings(true)} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, lastCloudBackup, basketSchedule, planFor: planForDate(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier, saveKnee: save.knee, onStart: startSession, jeffreyEntries: jeffreyLog[today()] || [], onOpenJeffrey: (initialAsk) => setChatOpen({ initialAsk }), briefWaiting, onBriefNow: briefWaiting && !briefRunning.current ? () => setBriefNow((n) => n + 1) : null }} setTab={goTo} openSettings={() => setShowSettings(true)} />}
             {tab === "corps" && (
               <CorpsTab sub={corpsSub} onSub={setCorpsSub}>
                 {corpsSub === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}

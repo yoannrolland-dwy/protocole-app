@@ -15,36 +15,26 @@ import { fmtCost, monthSpend } from "../../lib/ai.js";
 import { widgetBackgroundStatus, requestWidgetBackground } from "../../healthSync.js";
 import { say, sayStable } from "../../lib/jeffrey.js";
 import { JEFFREY_PERSONA } from "@rawcare/core/coach/jeffrey";
-import { briefEnabled, setBriefEnabled, testBrief } from "../../lib/briefNative.js";
-import { writeBriefState } from "../../lib/brief.js";
-import { voiceSettings, saveVoiceSettings, voiceKey, saveVoiceKey, speak, stopSpeaking } from "../../lib/voice.js";
+import { briefEnabled, setBriefEnabled } from "../../lib/briefNative.js";
+import { voiceSettings, saveVoiceSettings, voiceKey, saveVoiceKey, speak, stopSpeaking, setVoiceEnabled } from "../../lib/voice.js";
 import { getSync } from "../../store.js";
 
-// Brief du matin (J4.1), app native seulement (réveils et notification). « Essayer » efface les
-// marqueurs du jour et lance un VRAI brief dans 10 secondes (quelques centimes) : l'app peut être
-// fermée entre-temps pour voir la notification arriver.
+// Brief du matin (J4.1), app native seulement (le réglage vit côté Android). Depuis le
+// 01/11/2026, le brief part dans l'app quand Monsieur note son genou : plus de réveil ni d'essai.
 function BriefCard() {
   const [on, setOn] = useState(true);
-  const [msg, setMsg] = useState("");
   useEffect(() => { briefEnabled().then(setOn); }, []);
   if (!Capacitor.isNativePlatform()) return null;
   return (
     <Card>
       <Label style={{ marginBottom: 8 }}>Jeffrey · brief du matin</Label>
       <Body style={{ fontSize: 13, color: C.dim, marginBottom: 8 }}>
-        À partir de 5 h 17, Jeffrey attend la nuit, la pesée et le genou du jour, puis envoie le brief
-        en notification (10 h au plus tard, relance à 9 h). Si l'app est ouverte avant, il l'écrit
-        dans la conversation et n'envoie rien.
+        Le brief part le matin, dès que vous notez votre genou : Jeffrey relit Health Connect, puis
+        l'écrit dans la conversation et en notification. S'il manque la nuit ou la pesée, il le dit.
+        Sur le Bord, « Le brief tout de suite » le lance sans attendre le genou.
       </Body>
       <Pills options={[{ key: true, label: "Activé" }, { key: false, label: "Désactivé" }]} value={on}
-        onChange={(v) => { setOn(v); setBriefEnabled(v); setMsg(""); }} />
-      {on && (
-        <Btn variant="outline" style={{ width: "100%", marginTop: 8 }}
-          onClick={() => { writeBriefState({ doneDate: null, appDate: null, remindedDate: null, tries: null }); testBrief(10); setMsg(say("briefTest")); }}>
-          Essayer dans 10 secondes
-        </Btn>
-      )}
-      {msg && <Body style={{ fontSize: 13, color: C.text2, marginTop: 6 }}>{msg}</Body>}
+        onChange={(v) => { setOn(v); setBriefEnabled(v); }} />
     </Card>
   );
 }
@@ -52,7 +42,9 @@ function BriefCard() {
 // Voix de Jeffrey (29/10/2026), app native seulement : Pocket TTS sur le serveur Oracle, via
 // LiteLLM. Adresse (vide = celle de LiteLLM), clé dédiée à la voix (jamais exportée), vitesse de
 // lecture (le serveur produit à 1,00, le téléphone accélère sans changer la hauteur). « Tester »
-// joue une phrase sans cache et affiche le délai mesuré jusqu'au premier son.
+// joue une phrase sans cache et affiche le délai mesuré jusqu'au premier son. Interrupteur « Voix de
+// Jeffrey » (01/11/2026) : coupé, il ne parle plus nulle part (natif compris) ; serveur, clé et
+// vitesse restent enregistrés pour la réactivation.
 const VOICE_TEST = "Bonjour Monsieur. Votre séance est prévue à 18h30, et je me permets de vous rappeler le genou : 3/10 hier.";
 function VoiceCard() {
   const [v, setV] = useState(voiceSettings);
@@ -73,7 +65,10 @@ function VoiceCard() {
   return (
     <Card>
       <Label style={{ marginBottom: 8 }}>Jeffrey · voix</Label>
-      <Body style={{ fontSize: 13, color: C.dim, marginBottom: 8 }}>
+      <Pills options={[{ key: true, label: "Activée" }, { key: false, label: "En vacances" }]} value={v.enabled}
+        onChange={(on) => { setV({ ...v, enabled: on }); setTesting(false); setVoiceEnabled(on); setMsg(say(on ? "voiceOn" : "voiceOff")); }} />
+      {!v.enabled && <Body style={{ fontSize: 13, color: C.text2, margin: "8px 0" }}>{sayStable("voiceOffNote")}</Body>}
+      <Body style={{ fontSize: 13, color: C.dim, margin: "8px 0" }}>
         Sa voix vient du serveur, en flux : une question posée au micro reçoit sa réponse à voix
         haute dès la première phrase. Sans réseau, il répond par écrit. Le brief du matin est
         préparé en audio dès qu'il est écrit et se réécoute sans réseau.
@@ -90,8 +85,10 @@ function VoiceCard() {
         <Stepper value={v.speed} set={(x) => set({ speed: Math.round(Math.min(1.6, Math.max(0.8, x)) * 100) / 100 })} step={0.05} min={0.8} max={1.6} />
       </Field>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 8, marginTop: 8 }}>
-        <Btn variant="outline" disabled={testing} onClick={test}>{testing ? "Écoute…" : "Tester"}</Btn>
-        <Btn variant="plain" onClick={() => stopSpeaking()}>Arrêter</Btn>
+        <Btn variant="outline" disabled={testing || !v.enabled} aria-disabled={!v.enabled} onClick={test}>
+          {!v.enabled ? "Tester (voix coupée)" : testing ? "Écoute…" : "Tester"}
+        </Btn>
+        <Btn variant="plain" disabled={!v.enabled} onClick={() => stopSpeaking()}>Arrêter</Btn>
       </div>
       {msg && <Body style={{ fontSize: 13, color: C.text2, marginTop: 8 }}>{msg}</Body>}
       <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>

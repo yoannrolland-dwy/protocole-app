@@ -17,7 +17,7 @@ les pièges identifiés et les tests attendus — ne pas les rouvrir sans raison
 À la fin d'une étape : cocher son état dans le tableau de `ROADMAP.md`, et
 documenter le livré ici, dans CLAUDE.md.
 
-## Jeffrey, état actuel (mis à jour le 31/10/2026, apps/perso v3.146.0)
+## Jeffrey, état actuel (mis à jour le 01/11/2026, apps/perso v3.148.0)
 
 Résumé de référence. Les sections datées plus bas (chantier J, 29-31/10/2026) racontent comment on
 en est arrivé là ; **en cas de désaccord, c'est cette section qui fait foi**. À tenir à jour à
@@ -64,11 +64,12 @@ bas, champ de saisie visible.
   `reprendre_repas` (même repas d'hier), `ajouter_habituel` (quantité de la dernière fois).
 - Mémoire : la conversation d'un jour passé est versée dans le carnet de bord au premier message
   suivant ; les conversations sont gardées 30 jours (`jeffreyLog`).
-- Brief du matin : premier réveil à 5 h 17 puis toutes les 5 min ; il attend la nuit, la pesée et
-  le genou ; aucune notification « il me manque… » avant 9 h ; relance sonore à 9 h ; brief à 10 h
-  au plus tard ; météo Open-Meteo en une phrase si elle change quelque chose (position
-  approximative, jamais envoyée à l'IA). Si l'app est ouverte, c'est elle qui l'écrit et poste la
-  notification sans bruit. Le brief n'a qu'un outil : `proposer_reponses`.
+- Brief du matin (depuis v3.148.0) : **il part dans l'app quand Monsieur note son genou**, entre
+  5 h et midi. L'app relit Health Connect une fois juste avant. S'il manque la nuit ou la pesée,
+  le brief part quand même et Jeffrey le dit. Il est écrit dans la conversation, avec une
+  notification sans bruit. **Aucun réveil en arrière-plan.** « Le brief tout de suite » (carte du
+  Bord) le lance sans genou. Météo Open-Meteo en une phrase si elle change quelque chose (position
+  approximative, jamais envoyée à l'IA). Le brief n'a qu'un outil : `proposer_reponses`.
 - Notification de conversation : Écouter · Répondre · une réponse rapide (ou « Confirmer » si une
   action attend). Une réponse écrite dans la notification fait répondre Jeffrey sans ouvrir l'app.
 - Fin de repos du carnet : après le bip, il annonce la série ou l'exercice suivant.
@@ -113,6 +114,10 @@ bas, champ de saisie visible.
   audio `GAIN_TRANSIENT`). **Android 16 ne l'accorde qu'à une app à l'écran ou dans un service au
   premier plan** : la fin de repos passe donc par `RestAudioService` (v3.146.1, voir en fin de
   fichier) ; le brief et les réponses depuis la notification passent par `BriefService`.
+- **Interrupteur « Voix de Jeffrey »** (Réglages › Jeffrey › voix, v3.147.0) : Activée / En
+  vacances, activée par défaut (`jeffreyVoice.enabled`, absent = activé). En vacances, il ne parle
+  plus nulle part, mais écrit toujours tout ; dictée et bips de repos restent. Voir la section du
+  01/11/2026 en fin de fichier.
 - La dictée (micro dans la conversation) reste celle d'Android, en français, envoi quand Monsieur
   se tait.
 
@@ -127,16 +132,19 @@ bas, champ de saisie visible.
   `lib/jeffreyNotify.js`, `lib/jeffreyHttp.js`, `lib/voice.js`, `lib/voiceConfig.js`,
   `lib/restSpeech.js`, `lib/weather.js`, `lib/ai.js` ; `screens/perf/JeffreyChat.jsx`,
   `screens/dashboard/JeffreyCard.jsx`, `components/JeffreyBubble.jsx`,
-  `components/JeffreyOverlay.jsx` ; page sans écran du brief `brief.html` + `src/briefPage.js`.
+  `components/JeffreyOverlay.jsx` ; page sans écran `brief.html` + `src/briefPage.js` (réponses
+  depuis la notification seulement).
 - Android : `JeffreyVoice.kt` (voix, dictée, casque), `JeffreyHttpPlugin.kt`,
   `JeffreyNotifReceiver.kt`, `BriefRunner.kt`, `BriefService.kt`, `BriefPlugin.kt`,
-  `BriefAlarmReceiver.kt`, `HealthReads.kt`, `RestAlarmReceiver.kt` (voix de fin de repos).
+  `BriefAlarmReceiver.kt` (ne fait plus que retirer un ancien réveil du brief), `HealthReads.kt`,
+  `RestAlarmReceiver.kt` (voix de fin de repos).
 
 **Clés.** Exportées (`DATA_KEYS`) : `jeffreyLog`, `jeffreyPersona`, `jeffreyVoice`, `aiProvider`,
 `litellmUrl`, `litellmModel`, `model`, `aiSpend`, `coachProfile`, `coachJournal`, `noteLog`.
 **Jamais exportées, volontairement** : `apiKey`, `litellmKey`, `voiceKey` (clés secrètes),
 `jeffreyMemoryDate`, `jeffreyBrief` (marqueurs du jour), `lastPosition` (position du téléphone).
-Préférences Android privées : `jeffrey_brief`, `jeffrey_thread`, `rest_voice`.
+Préférences Android privées : `jeffrey_brief` (Activé / Désactivé), `jeffrey_thread`, `rest_voice`, `jeffrey_voice`
+(interrupteur de la voix, recopié depuis l'app).
 
 ## Qui je suis (Yoann)
 
@@ -6194,3 +6202,93 @@ une fois sur deux. Il n'entendait pas Jeffrey.
   ces demandes. C'est la règle d'Android 17 (pas appliquée sur Android 16) : un service démarré
   depuis l'arrière-plan n'y suffira plus pour l'audio. À reprendre si le téléphone passe à
   Android 17.
+
+## Interrupteur « Voix de Jeffrey » : il part en vacances, pour sa voix seulement (01/11/2026, apps/perso v3.147.0)
+
+Demande de Yoann. Coupé, Jeffrey ne parle plus nulle part, mais il écrit toujours tout : réponses,
+point, bilan, cartes, brief et notifications. La dictée reste, et les bips de fin de repos aussi.
+- **Réglage** : `jeffreyVoice.enabled` (dans `DATA_KEYS`, donc exporté ; absent = activé, rien ne
+  change pour une installation existante). `saveVoiceSettings` enregistre désormais un changement
+  partiel : l'interrupteur ne touche ni l'adresse, ni la vitesse, ni la clé `voiceKey`. Carte
+  « Jeffrey · voix » : pastilles **Activée / En vacances**, phrase `voiceOffNote` ; « Tester
+  (voix coupée) » et « Arrêter » sont désactivés.
+- **Verrou côté JS** : `voiceServer()` renvoie `null` quand la voix est coupée. C'est le passage
+  obligé de toute la voix en JS : conversation, « Écouter », brief écrit par l'app, brief et
+  réponses de la page sans écran (`briefPage.js`), bouton Écouter de la notification
+  (`notificationSpec`), annonce de fin de repos (`timerNotify.js`). Résultat : aucun appel de
+  synthèse, aucune préparation en cache, aucune voix confiée au natif. Le flux de la conversation
+  (`createSpeechStream`) relit l'interrupteur à chaque phrase. S'il est coupé pendant une réponse,
+  plus rien ne part, et la fin est signalée « annulée ». Le texte, lui, continue de s'écrire.
+- **Verrou côté natif** : préférence privée `jeffrey_voice` lue par `JeffreySpeech.begin`, point
+  d'entrée unique de la voix (plugin, brief, notification, fin de repos). Voix coupée : `begin`
+  refuse et renvoie `false`, sans lecture (même depuis le cache) ni requête. Chaque appelant
+  arrête alors son service tout de suite. Le plugin répond `{ skipped, disabled }`.
+  `setEnabled(false)` (plugin `JeffreyVoice.setEnabled`) écrit la préférence, coupe la parole en
+  cours, ferme la requête, vide les phrases en attente et oublie l'annonce d'un repos déjà
+  programmé (`RestTimerPlugin.clearStoredVoice`). Réactiver ne rejoue rien.
+- **Synchronisation** : `setVoiceEnabled(on)` écrit le stockage, puis le natif. `syncVoiceEnabled()`
+  recopie le choix au natif à chaque lancement (`App.jsx`), après une restauration ou un appel
+  perdu. Le stockage de l'app fait foi.
+- Tests `apps/perso/test/voiceSwitch.test.mjs`, avec un pont natif simulé et sans réseau :
+  - activée par défaut, même avec l'ancienne forme des réglages ;
+  - coupée : réglages gardés, choix relu et exporté (sans la clé), notification sans Écouter ;
+  - coupée : aucun appel au natif ;
+  - coupée pendant une réponse : parole arrêtée, texte complet ;
+  - refus du natif ;
+  - réactivation sans ancienne phrase ;
+  - synchro au lancement.
+
+  182 tests au total. Builds perso et public propres, Kotlin compilé (`compileDebugKotlin`).
+  Aperçu (natif simulé) : bascule, boutons désactivés, choix gardé après rechargement, retour à
+  Activée, aucune erreur console.
+- **Pas vérifié sur le S25** (rien d'installé) :
+  - couper pendant qu'il parle ;
+  - brief et réponse depuis la notification avec la voix coupée ;
+  - Écouter sur une notification postée avant la coupure ;
+  - bip de repos seul ;
+  - choix gardé après redémarrage du téléphone.
+
+  Limite connue : une notification déjà affichée garde son bouton Écouter jusqu'à sa prochaine
+  mise à jour ; le toucher ne fait rien.
+
+## Le brief part quand le genou est noté, plus aucun réveil (01/11/2026, apps/perso v3.148.0)
+
+Question de Yoann : à quoi sert le réveil de 5 h 17 ? Le genou est toujours sa dernière saisie du
+matin, et il se fait dans l'app. Vérifié dans le code : la boucle en arrière-plan ne pouvait
+presque jamais écrire le brief. Avant le genou, il manquait. Après le genou, l'app ouverte prenait
+la main (`appDate`) et la boucle s'effaçait. Deux défauts trouvés au passage :
+- l'app ouverte ne relisait Health Connect qu'à l'ouverture et au retour au premier plan, donc une
+  pesée arrivée pendant qu'il restait dans l'app n'était pas vue ;
+- genou noté, app refermée, pesée arrivée après : aucun brief de la journée.
+
+Choix de Yoann : le brief part quand le genou est noté, rien d'autre.
+- **Règle** (`briefInApp`, `packages/core/src/coach/brief.js`, testée) :
+  - `done` : brief déjà écrit aujourd'hui ;
+  - `off` : avant 5 h ou à partir de midi ;
+  - `brief` : genou du jour noté, ou « Le brief tout de suite » ;
+  - `wait` : genou pas encore noté.
+
+  `briefDecision`, `nextBriefAlarm` et `briefRetry` sont supprimés.
+- **App** (`App.jsx`) : au genou, Health Connect est relu une fois (`kneeSynced`), puis le brief part
+  avec ce qu'il y a. Le genou se note sur le Bord, dans Corps › Genou ou par Jeffrey.
+  - La carte du Bord, avant le genou, dit « J'ai votre nuit ; il me manque votre pesée. Votre
+    genou, et je vous fais le brief. »
+  - En cas d'échec : `briefRetry`, et « Le brief tout de suite » réessaie. Aucune relance
+    automatique.
+  - Le bouton est ponctuel (`briefForced`) : un tap = un essai.
+  - Le réglage Activé / Désactivé est lu à chaque fermeture des Réglages.
+- **Plus aucun réveil.** `BriefScheduler` ne garde que le réglage et `cancel`. Celui-ci retire
+  l'ancien réveil au lancement (`cancelBriefAlarm`), à la mise à jour de l'app et au redémarrage
+  (`BriefBootReceiver`). `BriefAlarmReceiver` est gardé pour qu'un ancien réveil trouve son
+  destinataire : il ne fait plus que se retirer. `BriefRunner.run` et la lecture de Health
+  Connect en arrière-plan sont supprimés. La page sans écran ne sert plus qu'aux réponses depuis
+  la notification. La carte des Réglages perd « Essayer dans 10 secondes ».
+- Phrases retirées : `briefRemind`, `briefFallback`, `briefTest`. Le repli sans IA
+  (`saveFallback`) est supprimé.
+- Vérifié dans l'aperçu, horloge forcée à 8 h, avec un faux serveur IA injoignable (aucun appel
+  payant) :
+  - genou noté dans Corps › Genou → brief lancé, puis message d'échec sur le Bord ;
+  - « Le brief tout de suite » → un seul nouvel essai ;
+  - genou retiré → la carte attend le genou.
+
+  180 tests. **Pas vérifié** : un vrai brief sur le téléphone (le prochain matin).
