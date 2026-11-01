@@ -4,26 +4,22 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.media.AudioAttributes
-import android.media.AudioDeviceInfo
-import android.media.AudioManager
-import android.media.MediaPlayer
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
-import java.util.concurrent.atomic.AtomicBoolean
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 
 /**
  * Reçoit le réveil programmé par RestTimerPlugin.scheduleAlarm() via AlarmManager.setAlarmClock().
  *
- * Ce n'est PAS une notification qui sonne : c'est ce receiver qui joue le son lui-même, sur le
- * flux ALARME, via MediaPlayer — indépendamment de tout pipeline de notification. C'est le seul
- * mécanisme constaté fiable téléphone en mode silencieux (voir RestTimerPlugin.kt).
+ * Ce n'est PAS une notification qui sonne : le bip est joué par l'app elle-même, sur le flux
+ * ALARME, via MediaPlayer — indépendamment de tout pipeline de notification. C'est le seul
+ * mécanisme constaté fiable téléphone en mode silencieux (voir RestTimerPlugin.kt). Depuis le
+ * 01/11/2026, le bip et la phrase de Jeffrey sont joués par RestAudioService, au premier plan,
+ * pour que la priorité audio soit vraiment accordée (voir RestAudioService.kt).
  */
 /** Fin de repos dans la voix de Jeffrey (lot JT, 29/10/2026) : très court, lu entre deux séries. */
 private val END_TITLES = listOf(
@@ -35,19 +31,8 @@ private val END_TITLES = listOf(
 
 class RestAlarmReceiver : BroadcastReceiver() {
 
-    /**
-     * Cherche un casque filaire ou Bluetooth déjà connecté, pour y envoyer le son au lieu du
-     * haut-parleur — demandé explicitement : sonner à pleine intensité dans toute la salle de
-     * sport gênait tout le monde autour.
-     *
-     * Limite assumée : ceci détecte un appareil CONNECTÉ, pas porté aux oreilles. Un casque
-     * Bluetooth resté connecté mais posé sur un banc rend l'alarme silencieuse pour la pièce —
-     * exactement le compromis demandé (priorité à ne pas déranger, plutôt qu'à être entendu
-     * coûte que coûte).
-     */
-    // Types de casque (USB-C compris : pas de prise jack sur ce téléphone, constaté le
-    // 29/07/2026) : règle partagée avec la voix de Jeffrey, voir Headset dans JeffreyVoice.kt.
-    private fun connectedHeadset(context: Context): AudioDeviceInfo? = Headset.connected(context)
+    // Casque connecté : le bip va dans le casque seul (demande explicite, ne pas gêner toute la
+    // salle). Règle dans Headset (JeffreyVoice.kt), appliquée par RestEndAudio (RestAudioService.kt).
 
     override fun onReceive(context: Context, intent: Intent) {
         val exercise = intent.getStringExtra("exercise") ?: ""
@@ -56,72 +41,16 @@ class RestAlarmReceiver : BroadcastReceiver() {
         // persistant nous-mêmes plutôt que de compter sur un rappel JS à temps.
         try { NotificationManagerCompat.from(context).cancel(RestTimerPlugin.NOTIF_COUNTDOWN) } catch (_: Exception) { }
 
-        // Annonce de Jeffrey juste après le bip (31/10/2026, choix de Yoann : toujours, casque ou
-        // haut-parleur). Le son est en général déjà sur le téléphone (préparé au lancement du
-        // repos) ; sinon il est demandé au serveur. Jamais par-dessus Jeffrey s'il parle déjà.
-        // goAsync garde le réveil en vie le temps de la phrase (10 s au plus).
-        val voice = RestTimerPlugin.storedVoice(context)
-        val pending = if (voice != null) goAsync() else null
-        val finished = AtomicBoolean(false)
-        val end = { if (finished.compareAndSet(false, true)) pending?.finish() }
-        val spoken = AtomicBoolean(false)
-        val speakNow = speakNow@{
-            if (voice == null || !spoken.compareAndSet(false, true)) return@speakNow
-            if (JeffreySpeech.playing()) { end(); return@speakNow }
-            try {
-                val arr = voice.getJSONArray("chunks")
-                JeffreySpeech.begin(
-                    context, "rest-${System.currentTimeMillis()}",
-                    JeffreySpeech.Config(voice.getString("url").trimEnd('/'), voice.getString("key"), voice.optDouble("speed", 1.2).toFloat()),
-                    true, voice.optString("cacheKey").ifEmpty { null }, (0 until arr.length()).map { arr.getString(it) }, true,
-                ) { end() }
-            } catch (_: Exception) { end() }
-        }
-        if (pending != null) Handler(Looper.getMainLooper()).postDelayed({ end() }, 9_500)
-
+        // Bip puis phrase de Jeffrey, dans un service au premier plan (01/11/2026) : sans lui,
+        // Android 16 ignore la demande de priorité audio dès qu'une autre app est à l'écran, et
+        // la musique ou Instagram continuent par-dessus. Si Android refuse le service, on joue
+        // quand même ici (goAsync garde le réveil en vie 10 s), sans garantie de priorité.
         try {
-            val player = MediaPlayer()
-            val headset = connectedHeadset(context)
-            if (headset != null) {
-                // Constaté sur appareil le 29/07/2026, casque filaire USB-C ET Bluetooth : le
-                // flux ALARME force TOUJOURS une diffusion simultanée sur le haut-parleur ET
-                // l'appareil connecté (politique de sécurité d'Android pour les alarmes,
-                // au niveau du gestionnaire audio natif) — setPreferredDevice() n'a aucun effet
-                // dessus, quel que soit le casque. Le flux média, lui, respecte le device
-                // préféré et n'est routé QUE vers lui. Le mode silencieux ne coupe ni l'un ni
-                // l'autre flux (vérifié : ni STREAM_MUSIC ni STREAM_ALARM ne figurent parmi les
-                // flux mis en sourdine par le mode sonnerie) — le contournement du silencieux
-                // n'a donc pas besoin du flux ALARME pour fonctionner ici. Revers assumé :
-                // si le volume média du téléphone est baissé à zéro indépendamment du volume
-                // alarme, ce cas précis serait silencieux.
-                player.setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build()
-                )
-                player.setPreferredDevice(headset)
-            } else {
-                player.setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-            }
-            // Volume divisé par deux (04/08/2026, demande explicite) : le son à pleine
-            // intensité était trop fort en salle. Reste au-dessus du volume alarme/média du
-            // téléphone (ce setVolume() n'est qu'une atténuation relative sur ce flux-là).
-            player.setVolume(0.5f, 0.5f)
-            val afd = context.resources.openRawResourceFd(R.raw.alarm)
-            player.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-            afd.close()
-            player.setOnCompletionListener { it.release(); speakNow() }
-            player.prepare()
-            player.start()
-        } catch (_: Exception) {
-            // La notification et la vibration ci-dessous fonctionnent même si le son échoue.
-            speakNow()
+            ContextCompat.startForegroundService(context, Intent(context, RestAudioService::class.java))
+        } catch (e: Exception) {
+            android.util.Log.w(RestEndAudio.TAG, "service refusé, son joué par le réveil : ${e.javaClass.simpleName}")
+            val pending = goAsync()
+            RestEndAudio.play(context) { pending.finish() }
         }
 
         try {

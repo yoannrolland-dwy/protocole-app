@@ -71,6 +71,12 @@
             android:name=".BriefService"
             android:exported="false"
             android:foregroundServiceType="shortService" />
+        <!-- Fin de repos (01/11/2026) : bip et phrase de Jeffrey au premier plan, sinon Android 16
+             ignore la priorité audio quand une autre app est à l'écran (voir RestAudioService.kt). -->
+        <service
+            android:name=".RestAudioService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
         <receiver
             android:name=".BriefBootReceiver"
             android:exported="true">
@@ -106,6 +112,7 @@
     <!-- Brief du matin (J4.1) : remettre le réveil après un redémarrage du téléphone. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <!-- Météo du brief (J4.2) : position APPROXIMATIVE seulement, lue app ouverte (jamais en
          arrière-plan) ; arrondie à ~1 km, elle ne part qu'à Open-Meteo. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />

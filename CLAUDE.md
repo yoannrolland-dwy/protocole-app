@@ -109,7 +109,10 @@ bas, champ de saisie visible.
   réponses depuis la notification), séance ou pas. Sans casque : seulement si Monsieur lui a
   parlé à la voix ; sinon bouton « Écouter » sous chaque réponse (cache sur le téléphone, 60 Mo).
   Fin de repos : annoncée toujours, casque ou haut-parleur.
-- La musique se met **en pause** pendant qu'il parle, puis reprend.
+- La musique et les vidéos se mettent **en pause** pendant qu'il parle, puis reprennent (priorité
+  audio `GAIN_TRANSIENT`). **Android 16 ne l'accorde qu'à une app à l'écran ou dans un service au
+  premier plan** : la fin de repos passe donc par `RestAudioService` (v3.146.1, voir en fin de
+  fichier) ; le brief et les réponses depuis la notification passent par `BriefService`.
 - La dictée (micro dans la conversation) reste celle d'Android, en français, envoi quand Monsieur
   se tait.
 
@@ -6161,3 +6164,33 @@ La ligne d'habituels sous chaque repas du Journal passe de 3 à **8** aliments (
 épinglés, puis les plus fréquents à CE repas ; ceux déjà dans le repas exclus). La ligne défile
 déjà horizontalement, sa hauteur ne change pas. Vérifié à 360 px : 8 pastilles + « Comme hier »
 sur une ligne de 44 px, pas de débordement de la page.
+
+## Jeffrey passe devant les autres sons à la fin du repos (01/11/2026, apps/perso v3.146.1)
+
+Retour de Yoann : au bip de fin de repos, Instagram ne baissait pas, et la musique s'arrêtait
+une fois sur deux. Il n'entendait pas Jeffrey.
+- **Cause, lue dans `dumpsys audio`** : pendant la séance du 01/11 (7 h 54 → 8 h 13), Android 16 a
+  écrit « AudioHardening focus request … **ignored** for com.yoannrolland.protocole ». Depuis
+  Android 15, une app qui n'est ni à l'écran ni dans un service au premier plan n'obtient plus la
+  priorité audio. La fin de repos était jouée par le réveil (`RestAlarmReceiver`), sans service :
+  dès qu'Instagram ou une autre app était devant, la demande de Jeffrey était jetée ; avec
+  PROTOCOLE à l'écran, elle passait. D'où le côté aléatoire. Le bip, lui, ne demandait même pas
+  la priorité. Instagram demande bien la priorité audio (`GAIN_TRANSIENT_EXCLUSIVE`) : il la rend
+  dès que Jeffrey l'obtient vraiment.
+- **Correctif** : `RestAudioService.kt` (service au premier plan de type `mediaPlayback`,
+  permission `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, notification silencieuse « Fin du repos,
+  Monsieur. »), démarré par le réveil (Android l'autorise : `ALARM_MANAGER_ALARM_CLOCK`).
+  `RestEndAudio.play` prend la priorité **avant le bip**, joue le bip (mêmes règles casque/flux
+  qu'avant, code déplacé tel quel) puis la phrase de Jeffrey, et rend la priorité 300 ms après la
+  fin : les autres apps reprennent. Filet de 9,5 s. Si Android refuse le service, le réveil joue
+  quand même le son lui-même (`goAsync`), sans garantie de priorité. Vibration et notification
+  « Repos terminé » restent dans le réveil. `JeffreySpeech` journalise désormais une priorité
+  refusée (`priorité audio refusée`).
+- **Vérifié sur le téléphone**, app en arrière-plan, réveil réel à 15 s avec une phrase de test :
+  service autorisé, « priorité audio : obtenue » avant le bip, voix accordée elle aussi, phrase
+  lue (2,4 s), priorité rendue à la fin. **Pas vérifié** : avec Instagram ou Spotify en train de
+  jouer (à essayer à la prochaine séance).
+- **À surveiller pour Android 17** : Android écrit encore « would be ignored … level: full » sur
+  ces demandes. C'est la règle d'Android 17 (pas appliquée sur Android 16) : un service démarré
+  depuis l'arrière-plan n'y suffira plus pour l'audio. À reprendre si le téléphone passe à
+  Android 17.

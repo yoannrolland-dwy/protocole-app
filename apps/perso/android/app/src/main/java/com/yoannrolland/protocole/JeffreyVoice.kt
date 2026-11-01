@@ -104,7 +104,10 @@ object JeffreySpeech {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
         val req = focus ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
             .setAudioAttributes(attrs).build().also { focus = it }
-        am.requestAudioFocus(req)
+        // Journalisé (01/11/2026) : hors de l'écran et sans service au premier plan, Android 16
+        // refuse cette demande en silence, et les autres apps continuent par-dessus Jeffrey.
+        val r = am.requestAudioFocus(req)
+        if (r != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) Log.w(TAG, "priorité audio refusée ($r)")
     }
 
     private fun release(context: Context) {
