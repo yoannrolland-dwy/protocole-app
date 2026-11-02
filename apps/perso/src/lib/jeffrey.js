@@ -26,6 +26,14 @@ export const PHRASES = {
   backupFailed: ["La sauvegarde a échoué, Monsieur : {x}"],
   imported: ["Données restaurées, Monsieur. Je recharge…"],
   invalidFile: ["Ce fichier n'est pas une sauvegarde, Monsieur."],
+  // Sauvegarde sur le serveur Oracle (02/11/2026).
+  serverBackupKeySaved: ["C'est noté, Monsieur. Vos données partiront trois fois par jour."],
+  serverBackupKeyRemoved: ["Clé retirée, Monsieur. Plus aucune copie ne part vers le serveur."],
+  serverBackupSaved: ["Copie déposée sur votre serveur, Monsieur."],
+  serverBackupFailed: ["La copie n'est pas partie, Monsieur : {x}."],
+  serverListFailed: ["Impossible de lire la liste des copies, Monsieur : {x}."],
+  serverNoCopy: ["Aucune copie sur le serveur pour l'instant, Monsieur."],
+  serverRestoreFailed: ["Restauration impossible, Monsieur : {x}. Rien n'a été modifié."],
   modelsFailed: ["Je n'ai pas pu lire la liste des modèles, Monsieur : {x}"],
 
   // --- Health Connect

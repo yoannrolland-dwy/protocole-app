@@ -12,6 +12,7 @@ import { jeffreyTurn, newId, hhmm } from "./jeffreyTurn.js";
 import { say } from "./jeffrey.js";
 import { fetchWeather } from "./weather.js";
 import { applyActionStored } from "./jeffreyNotify.js";
+import { lastOffPhoneBackup } from "./serverBackup.js";
 
 // Marqueur du jour { doneDate } (les anciens appDate, remindedDate, tries ne servent plus). Hors DATA_KEYS, comme
 // jeffreyMemoryDate : restaurer une vieille sauvegarde ne doit pas faire croire qu'un brief est fait.
@@ -67,7 +68,7 @@ export const missingText = (missing) => say("briefWaiting", { x: missingSentence
 
 /** Rappels utiles calculés par l'app (la sauvegarde hors du téléphone en retard). */
 export function briefReminders() {
-  const last = getSync("lastCloudBackup", null);
+  const last = lastOffPhoneBackup(getSync("lastCloudBackup", null));
   if (!last) return ["sauvegarde hors du téléphone : jamais faite"];
   const days = daysBetween(last, today());
   return days >= 14 ? [`sauvegarde hors du téléphone : dernière il y a ${days} jours`] : [];

@@ -8,6 +8,7 @@ import { isBackupStale, daysSinceBackup } from "../../cloudBackup.js";
 import { PHASES, kcalFromMacros } from "@rawcare/core/targets";
 import { C, today, fmt, Card, Label, Body, Btn, inputStyle, TextInput, Stepper, Field, Pills, ScreenHeader } from "../../design/compat.jsx";
 import { BasketScheduleCard } from "./BasketScheduleCard.jsx";
+import { ServerBackupCard } from "./ServerBackupCard.jsx";
 import { SubTabs } from "../../components/SubTabs.jsx";
 import { APP_VERSION } from "../../version.js";
 import { listLiteLLMModels } from "@rawcare/core/coach/claudeApi";
@@ -112,7 +113,7 @@ let lastSettingsTab = "objectifs";
 export function SettingsPanel({ apiKey, setApiKey, model, setModel,
                          aiProvider, setAiProvider, litellmUrl, setLitellmUrl, litellmKey, setLitellmKey, litellmModel, setLitellmModel, onClose, healthSync, onHealthSync,
                          coachProfile, setCoachProfile, coachJournal, setCoachJournal, jeffreyPersona, setJeffreyPersona, targets, saveTargets, buildBriefing,
-                         lastAutoBackup, lastCloudBackup, onCloudBackupDone, phase, setPhase,
+                         lastAutoBackup, lastCloudBackup, lastOffPhone, onCloudBackupDone, onServerBackupChange, phase, setPhase,
                          basketSchedule, setBasketSchedule }) {
   const [sub, setSubState] = useState(lastSettingsTab);
   const setSub = (v) => { lastSettingsTab = v; setSubState(v); setMsg(""); };
@@ -429,10 +430,13 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
         )}
       </Card>
 
+      <ServerBackupCard onChange={onServerBackupChange} />
+
       <Card>
         <Label style={{ marginBottom: 8 }}>Sauvegarde des données</Label>
-        {/* Bandeau d'alerte : c'est lui, pas le bouton, qui fait que la sauvegarde a lieu. */}
-        {isBackupStale(lastCloudBackup) && (
+        {/* Bandeau d'alerte : c'est lui, pas le bouton, qui fait que la sauvegarde a lieu. Une copie
+            sur le serveur (02/11/2026) compte comme une sauvegarde hors du téléphone. */}
+        {isBackupStale(lastOffPhone ?? lastCloudBackup) && (
           <div style={{
             background: C.dangerBg, border: `1.5px solid ${C.danger}`, borderRadius: 8,
             padding: "9px 11px", marginBottom: 10,
@@ -441,8 +445,8 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
               ⚠ Sauvegarde hors du téléphone
             </div>
             <Body style={{ color: C.dangerText, fontSize: 13, marginTop: 3 }}>
-              {lastCloudBackup
-                ? `Dernière il y a ${daysSinceBackup(lastCloudBackup)} jours (${fmt(lastCloudBackup)}).`
+              {(lastOffPhone ?? lastCloudBackup)
+                ? `Dernière il y a ${daysSinceBackup(lastOffPhone ?? lastCloudBackup)} jours (${fmt(lastOffPhone ?? lastCloudBackup)}).`
                 : "Jamais faite."} Perdre ou casser le téléphone effacerait tout l'historique.
             </Body>
           </div>

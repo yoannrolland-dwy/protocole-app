@@ -13,12 +13,14 @@ class BriefAlarmReceiver : BroadcastReceiver() {
     }
 }
 
-/** Mise à jour de l'app ou redémarrage : retire un ancien réveil du brief s'il en reste un.
+/** Mise à jour de l'app ou redémarrage : retire un ancien réveil du brief s'il en reste un, et
+ *  remet le réveil de sauvegarde (14 h / 23 h, Backup.kt), qu'Android efface au redémarrage.
  *  Exporté pour recevoir ces diffusions du système (seul le système peut les envoyer). */
 class BriefBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             BriefScheduler.cancel(context)
+            BackupScheduler.scheduleNext(context)
         }
     }
 }

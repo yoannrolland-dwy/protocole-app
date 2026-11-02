@@ -77,6 +77,10 @@
             android:name=".RestAudioService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+        <!-- Sauvegarde sur le serveur Oracle (02/11/2026) : réveils de 14 h et 23 h (Backup.kt). -->
+        <receiver
+            android:name=".BackupAlarmReceiver"
+            android:exported="false" />
         <receiver
             android:name=".BriefBootReceiver"
             android:exported="true">

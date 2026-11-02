@@ -141,9 +141,9 @@ bas, champ de saisie visible.
 
 **Clés.** Exportées (`DATA_KEYS`) : `jeffreyLog`, `jeffreyPersona`, `jeffreyVoice`, `aiProvider`,
 `litellmUrl`, `litellmModel`, `model`, `aiSpend`, `coachProfile`, `coachJournal`, `noteLog`.
-**Jamais exportées, volontairement** : `apiKey`, `litellmKey`, `voiceKey` (clés secrètes),
+**Jamais exportées, volontairement** : `apiKey`, `litellmKey`, `voiceKey`, `backupKey` (clés secrètes),
 `jeffreyMemoryDate`, `jeffreyBrief` (marqueurs du jour), `lastPosition` (position du téléphone).
-Préférences Android privées : `jeffrey_brief` (Activé / Désactivé), `jeffrey_thread`, `rest_voice`, `jeffrey_voice`
+Préférences Android privées : `jeffrey_brief` (Activé / Désactivé), `jeffrey_thread`, `rest_voice`, `protocole_backup` (réveils de sauvegarde actifs ou non), `jeffrey_voice`
 (interrupteur de la voix, recopié depuis l'app).
 
 ## Qui je suis (Yoann)
@@ -4461,7 +4461,8 @@ Vérifié dans l'aperçu : 1:58 → 1:28 après un saut d'horloge de 30 s simul�
    `phase`, `hsrWeek`, `climbScheme`, `basketSchedule`, `apiKey`, `model`, `coachProfile`,
    `coachJournal`, `foodLog`, `foodPins`, `foodMuted`, `foodPortions`, `foodRecipes`,
    `foodOverrides`, `targetHistory`, `palierWeekly`, `aiProvider`, `litellmUrl`, `litellmKey`,
-   `litellmModel`, `aiSpend`, `jeffreyLog`, `jeffreyPersona`, `jeffreyVoice`, `voiceKey` —
+   `litellmModel`, `aiSpend`, `jeffreyLog`, `jeffreyPersona`, `jeffreyVoice`, `voiceKey`, `backupUrl`,
+   `backupKey` —
    préfixées `protocole:` dans `store.js`)
    sans écrire une migration. Casser une clé = perdre l'historique de
    l'utilisateur, ce qui est la pire chose possible ici.
@@ -4478,7 +4479,8 @@ Vérifié dans l'aperçu : 1:58 → 1:28 après un saut d'horloge de 30 s simul�
    l'appareil au moment présent, pas une donnée à restaurer sur un autre appareil ou à une
    autre date — ne jamais l'ajouter à `DATA_KEYS`.
    **Autres clés volontairement hors `DATA_KEYS`, à ne jamais y ajouter** : les clés secrètes
-   `apiKey`, `litellmKey`, `voiceKey` (jamais dans un export) ; les marqueurs du jour de Jeffrey
+   `apiKey`, `litellmKey`, `voiceKey`, `backupKey` (jamais dans un export) ; `serverBackup` (marqueur
+   de la dernière copie serveur, même raison que `lastCloudBackup`) ; les marqueurs du jour de Jeffrey
    `jeffreyMemoryDate` et `jeffreyBrief` (les restaurer ferait sauter un brief ou une mise en
    mémoire) ; `lastPosition` (position du téléphone, propre à l'appareil). `climbScheme` reste
    dans `DATA_KEYS` mais n'est plus lu depuis le 08/10/2026 (même cas qu'`elbowLog`).
@@ -6292,3 +6294,70 @@ Choix de Yoann : le brief part quand le genou est noté, rien d'autre.
   - genou retiré → la carte attend le genou.
 
   180 tests. **Pas vérifié** : un vrai brief sur le téléphone (le prochain matin).
+
+## Sauvegarde automatique sur le serveur Oracle (02/11/2026, apps/perso v3.149.0)
+
+Demande de Yoann : la copie hors du téléphone se faisait à la main (feuille de partage → Drive).
+Choix de Yoann :
+- son serveur Oracle ;
+- **trois copies par jour** : après le brief, à 14 h et à 23 h ;
+- le serveur garde **les 21 dernières, plus la dernière de chaque mois pendant un an**.
+
+La partie serveur a été faite par la session Oracle (dépôt `LiteLLM_Oracle`, `protocole-backup/`).
+Le prompt qui la demandait : `docs/sauvegarde-oracle/PROMPT_SESSION_ORACLE.md`. Ici, seulement l'app.
+
+- **Contrat** (`https://141.253.109.120/protocole-backup`, `Authorization: Bearer <clé>`) :
+  - `PUT /v1/backup`, avec l'en-tête `X-Backup-Slot` = `matin`, `14h`, `23h` ou `manuel` → 201 ;
+  - `GET /v1/backup` : la liste, la plus récente d'abord ;
+  - `GET /v1/backup/{id}`, `GET /v1/backup/latest`, `GET /v1/health`.
+
+  Limites du serveur : 20 Mo par envoi, 6 envois par minute (sinon 429), pas d'idempotence.
+- **Module** `src/lib/serverBackup.js` (testé, `test/serverBackup.test.mjs`) :
+  - `sendBackup(slot, request)` envoie l'export de l'app (`exportData`, donc sans aucune clé
+    secrète). **Jamais de reprise automatique** : un envoi coupé a pu être enregistré quand
+    même, et le créneau suivant suffit.
+  - `listBackups` donne la liste des copies. `fetchBackup` vérifie `app == "PROTOCOLE"` et
+    `data` avant toute restauration.
+  - `lastOffPhoneBackup` renvoie la dernière copie hors du téléphone, serveur ou manuelle. C'est
+    elle qui pilote désormais le bandeau de 14 jours (Bord et Réglages), le rappel hebdomadaire
+    4242 et le rappel du brief : une copie serveur du jour les fait taire.
+- **Requêtes** : client HTTP natif (`Backup.kt`, `BackupHttp`), TLS vérifié normalement, pas de
+  CORS.
+  - Dans l'app : plugin `Backup` (`lib/backupNative.js`, repli `fetch` dans l'aperçu).
+  - Dans la page sans écran : pont `request`.
+  - Le journal Android ne contient que la méthode, le chemin et le code de réponse.
+- **Quand** :
+  - **matin** : juste après un brief réussi (App.jsx) ;
+  - **14 h et 23 h** : réveils exacts (`BackupScheduler`, `BackupAlarmReceiver`). Ils lancent la
+    page sans écran en mode `?mode=backup&slot=…`, qui démarre `BriefService` pour garder le
+    réseau (une notification silencieuse « Sauvegarde de vos données, Monsieur. » le temps de
+    l'envoi), puis programment le réveil suivant ;
+  - **manuel** : bouton des Réglages.
+
+  Les réveils ne sont actifs que si une clé est posée : l'app le dit au natif à chaque lancement
+  (préférences `protocole_backup`). `BriefBootReceiver` les remet après un redémarrage ou une
+  mise à jour.
+- **Clés** :
+  - `backupUrl` est dans `DATA_KEYS` (vide = adresse par défaut) ;
+  - `backupKey` est hors export, **saisie par Yoann lui-même**, jamais affichée en clair ;
+  - `serverBackup` = `{ okAt, okId, slot, errorAt, error }`, hors export.
+- **Réglages › Appareil › « Sauvegarde automatique · serveur »** (`ServerBackupCard.jsx`) :
+  - dernière copie et dernier échec ;
+  - clé (champ masqué) et adresse ;
+  - « Sauvegarder maintenant » ;
+  - « Restaurer depuis le serveur » : liste des copies (date, créneau, taille). Un premier tap
+    arme la ligne pendant 4 s, un second restaure. Restaurer remplace toutes les données du
+    téléphone ; les clés restent ;
+  - « Retirer la clé ».
+
+  La sauvegarde manuelle vers Drive reste, en secours.
+- `BriefRunner.handleResult` n'efface plus la notification de Jeffrey quand la page ne rend rien
+  (sinon chaque sauvegarde de 14 h et 23 h l'aurait fait disparaître).
+- Vérifié :
+  - 186 tests ;
+  - build et compilation Kotlin ;
+  - dans l'aperçu (375 px, clé factice, adresse injoignable puis serveur simulé) : échec affiché,
+    liste des copies, restauration armée puis refusée pour une copie invalide, sans débordement.
+
+  **Pas vérifié sur le téléphone** : envoi réel, réveils de 14 h et 23 h app fermée,
+  restauration réelle. Cela demande que Yoann pose la clé.

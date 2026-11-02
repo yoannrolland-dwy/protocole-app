@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
 import { store, getSync } from "./store.js";
@@ -28,6 +28,8 @@ import { makeCoach } from "./lib/coachInputs.js";
 import { briefMissing, briefInApp } from "@rawcare/core/coach/brief";
 import { readBriefState, runBrief, missingText } from "./lib/brief.js";
 import { cancelBriefAlarm, briefEnabled, postJeffreyNotification } from "./lib/briefNative.js";
+import { sendBackup, backupReady, lastOffPhoneBackup } from "./lib/serverBackup.js";
+import { backupRequest, setServerBackupAlarms } from "./lib/backupNative.js";
 import { notificationSpec } from "./lib/jeffreyNotify.js";
 import { streamTransportFor } from "./lib/jeffreyHttp.js";
 import { aiMissing } from "./lib/ai.js";
@@ -139,6 +141,11 @@ export default function App({ silent = false } = {}) {
   const briefForced = useRef(0); // dernier tap sur « Le brief tout de suite » déjà servi
   const [lastAutoBackup, setLastAutoBackup] = useState(null);
   const [lastCloudBackup, setLastCloudBackup] = useState(null);
+  // Sauvegarde serveur (02/11/2026) : relue à chaque retour au premier plan (les réveils de 14 h et
+  // 23 h écrivent le marqueur pendant que l'app dort) et après chaque envoi.
+  const [serverBackupTick, setServerBackupTick] = useState(0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const lastOffPhone = useMemo(() => lastOffPhoneBackup(lastCloudBackup), [lastCloudBackup, serverBackupTick]);
 
   // Interrupteur « Voix de Jeffrey » recopié vers le natif à chaque lancement (01/11/2026) : le
   // stockage de l'app fait foi (restauration d'une sauvegarde, installation neuve).
@@ -284,10 +291,13 @@ export default function App({ silent = false } = {}) {
   // Rappel de sauvegarde externe : reprogrammé au démarrage ET après chaque sauvegarde
   // (la date change ⇒ l'échéance recule). Sans la dépendance à `lastCloudBackup`, un export
   // fait aujourd'hui laisserait le rappel de la semaine dernière sonner quand même.
+  // Depuis le 02/11/2026, une copie sur le serveur compte autant qu'une sauvegarde manuelle.
   useEffect(() => {
     if (loading) return;
-    scheduleBackupReminder(lastCloudBackup);
-  }, [loading, lastCloudBackup]);
+    scheduleBackupReminder(lastOffPhone);
+  }, [loading, lastOffPhone]);
+  // Réveils de 14 h et 23 h : actifs seulement quand la clé de sauvegarde est posée.
+  useEffect(() => { if (!loading && !silent) setServerBackupAlarms(backupReady()); }, [loading, serverBackupTick]);
   const markCloudBackup = () => {
     const d = today();
     setLastCloudBackup(d);
@@ -299,7 +309,7 @@ export default function App({ silent = false } = {}) {
     if (!Capacitor.isNativePlatform()) return;
     // Une réponse depuis la notification (J4.3) a pu écrire dans la conversation pendant que l'app
     // dormait : relue.
-    const handle = CapacitorApp.addListener("resume", () => { runHealthSync(); doAutoBackup(); setPalierTick((t) => t + 1); openWidgetTab(); setJeffreyLog(getSync("jeffreyLog", {})); setBriefTick((t) => t + 1); notePosition(); });
+    const handle = CapacitorApp.addListener("resume", () => { runHealthSync(); doAutoBackup(); setPalierTick((t) => t + 1); openWidgetTab(); setJeffreyLog(getSync("jeffreyLog", {})); setBriefTick((t) => t + 1); setServerBackupTick((t) => t + 1); notePosition(); });
     return () => { handle.then((h) => h.remove()); };
   }, []);
 
@@ -573,6 +583,9 @@ export default function App({ silent = false } = {}) {
       // voix haute dès qu'un casque est branché (31/10/2026, séance ou pas).
       postJeffreyNotification(notificationSpec(getSync("jeffreyLog", {})[today()] || []));
       speak(text, { play: await headsetConnected() });
+      // Copie du matin sur le serveur (02/11/2026) : juste après le brief, donc avec la nuit, la
+      // pesée et le genou du jour. Sans clé, rien ne part.
+      sendBackup("matin", backupRequest).finally(() => setServerBackupTick((t) => t + 1));
     }).catch((e) => {
       console.error("brief", e);
       setBriefWaiting(say("briefRetry"));
@@ -616,10 +629,10 @@ export default function App({ silent = false } = {}) {
       <div style={{ flex: 1, minHeight: 0, position: "relative", display: "flex", flexDirection: "column" }}>
       <main ref={mainRef} style={{ flex: 1, overflowY: "auto", padding: bubbleOn ? "14px 16px 88px" : "14px 16px 24px" }}>
         {loading ? <Empty>Chargement…</Empty> : showSettings ? (
-          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, aiProvider, setAiProvider, litellmUrl, setLitellmUrl, litellmKey, setLitellmKey, litellmModel, setLitellmModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, jeffreyPersona, setJeffreyPersona, targets, lastAutoBackup, lastCloudBackup, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
+          <SettingsPanel {...{ apiKey, setApiKey, model, setModel, aiProvider, setAiProvider, litellmUrl, setLitellmUrl, litellmKey, setLitellmKey, litellmModel, setLitellmModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, jeffreyPersona, setJeffreyPersona, targets, lastAutoBackup, lastCloudBackup, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} lastOffPhone={lastOffPhone} onServerBackupChange={() => setServerBackupTick((t) => t + 1)} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (
           <>
-            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, lastCloudBackup, basketSchedule, planFor: planForDate(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier, saveKnee: save.knee, onStart: startSession, jeffreyEntries: jeffreyLog[today()] || [], onOpenJeffrey: (initialAsk) => setChatOpen({ initialAsk }), briefWaiting, onBriefNow: briefWaiting && !briefRunning.current ? () => setBriefNow((n) => n + 1) : null }} setTab={goTo} openSettings={() => setShowSettings(true)} />}
+            {tab === "dash" && <Dashboard {...{ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, lastCloudBackup: lastOffPhone, basketSchedule, planFor: planForDate(basketSchedule), palier: palierWeekly, onApplyPalier: applyPalier, saveKnee: save.knee, onStart: startSession, jeffreyEntries: jeffreyLog[today()] || [], onOpenJeffrey: (initialAsk) => setChatOpen({ initialAsk }), briefWaiting, onBriefNow: briefWaiting && !briefRunning.current ? () => setBriefNow((n) => n + 1) : null }} setTab={goTo} openSettings={() => setShowSettings(true)} />}
             {tab === "corps" && (
               <CorpsTab sub={corpsSub} onSub={setCorpsSub}>
                 {corpsSub === "weight" && <WeightTab {...{ weight, targets, save, phase }} />}

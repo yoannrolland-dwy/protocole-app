@@ -68,6 +68,9 @@ export const DATA_KEYS = [
   "targets", "phase", "hsrWeek", "model", "climbScheme", "basketSchedule",
   // Fournisseur IA (26/10/2026). La clé LiteLLM, comme la clé Anthropic, reste hors export.
   "aiProvider", "litellmUrl", "litellmModel",
+  // Adresse du serveur de sauvegarde (02/11/2026, vide = adresse par défaut). Sa clé, `backupKey`,
+  // reste hors export comme les autres clés secrètes ; le marqueur `serverBackup` aussi.
+  "backupUrl",
   // Historique des paliers de cibles (chantier R, R2, 02/10/2026) : le Coach IA et le
   // "Palier de la semaine" (R3) ont besoin de savoir QUAND les kcal ont changé.
   "targetHistory",

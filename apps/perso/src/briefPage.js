@@ -4,6 +4,8 @@
 // WebView. Les appels à l'IA passent par le relais HTTP natif du pont (`window.BriefBridge`).
 // Le brief du matin, lui, ne passe plus par ici depuis le 01/11/2026 : il part dans l'app quand
 // Monsieur note son genou (App.jsx).
+// 02/11/2026 : la même page envoie aussi la sauvegarde de 14 h et 23 h (`?mode=backup&slot=…`,
+// réveils de Backup.kt), par le pont `request` (client HTTP natif).
 import { createSSEParser } from "@rawcare/core/coach/stream";
 import { today } from "@rawcare/core/dateUtils";
 import { aiMissing } from "./lib/ai.js";
@@ -11,6 +13,7 @@ import { sayError } from "./lib/jeffrey.js";
 import { getSync } from "./store.js";
 import { voiceServer, speechPlan } from "./lib/voiceConfig.js";
 import { loadData, aiFromSettings, runReply } from "./lib/brief.js";
+import { sendBackup } from "./lib/serverBackup.js";
 import { notificationSpec } from "./lib/jeffreyNotify.js";
 
 const bridge = window.BriefBridge;
@@ -50,6 +53,13 @@ const bridgeTransport = ({ url, headers, body, onEvent }) => new Promise((resolv
   bridge.http(id, url, JSON.stringify(headers), JSON.stringify(body));
 });
 
+// Requête vers le serveur de sauvegarde par le pont natif (PUT ou GET, réponse entière).
+const bridgeRequest = ({ method, url, headers = {}, body }) => new Promise((resolve) => {
+  const id = String(++seq);
+  pending.set(id, (status, text) => resolve({ status, text }));
+  bridge.request(id, method, url, JSON.stringify(headers), body ?? null);
+});
+
 // Notification de conversation (J4.3) : le fil du jour, les boutons Écouter / Répondre / réponse
 // rapide ou Confirmer. Kotlin la construit (BriefRunner.postThread).
 const todaySpec = (extra) => {
@@ -76,4 +86,15 @@ async function reply() {
   }
 }
 
-reply().catch((e) => finish({ error: String(e?.message || e) }));
+// Sauvegarde de 14 h ou 23 h : le service au premier plan garde le réseau le temps de l'envoi
+// (économie d'énergie) ; rien à afficher ensuite, l'état est dans le marqueur `serverBackup`.
+async function backup(slot) {
+  if (!bridge) return finish({});
+  bridge.preparing("Sauvegarde de vos données, Monsieur.");
+  const r = await sendBackup(slot, bridgeRequest);
+  return finish(r.ok || r.skipped ? {} : { error: `sauvegarde : ${r.error}` });
+}
+
+const params = new URLSearchParams(location.search);
+if (params.get("mode") === "backup") backup(params.get("slot") || "manuel").catch((e) => finish({ error: String(e?.message || e) }));
+else reply().catch((e) => finish({ error: String(e?.message || e) }));

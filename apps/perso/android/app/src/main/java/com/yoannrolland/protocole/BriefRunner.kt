@@ -55,11 +55,18 @@ object BriefRunner {
      *  `payload` ({ kind: text | quick | confirm, … }), puis rend le fil à afficher. */
     fun runReply(context: Context, payload: String, done: () -> Unit) {
         val app = context.applicationContext
-        CoroutineScope(Dispatchers.Main).launch { startPage(app, "{}", payload, done) }
+        CoroutineScope(Dispatchers.Main).launch { startPage(app, payload, "mode=reply", done) }
+    }
+
+    /** Sauvegarde sur le serveur (02/11/2026, réveils de 14 h et 23 h) : la page exporte les
+     *  données et les envoie (`?mode=backup`), sans notification à afficher. */
+    fun runBackup(context: Context, slot: String, done: () -> Unit) {
+        val app = context.applicationContext
+        CoroutineScope(Dispatchers.Main).launch { startPage(app, "{}", "mode=backup&slot=${java.net.URLEncoder.encode(slot, "UTF-8")}", done) }
     }
 
     @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
-    private fun startPage(context: Context, health: String, payload: String, done: () -> Unit) {
+    private fun startPage(context: Context, payload: String, query: String, done: () -> Unit) {
         val handler = Handler(Looper.getMainLooper())
         val finished = AtomicBoolean(false)
         val web = WebView(context)
@@ -95,7 +102,7 @@ object BriefRunner {
 
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
-        web.addJavascriptInterface(Bridge(context, health, payload, web, handler, finish), "BriefBridge")
+        web.addJavascriptInterface(Bridge(context, payload, web, handler, finish), "BriefBridge")
         web.webViewClient = object : WebViewClient() {
             // Fichiers de l'app servis depuis assets/public (comme Capacitor), à la même origine.
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
@@ -109,7 +116,7 @@ object BriefRunner {
                 }
             }
         }
-        web.loadUrl("https://localhost/brief.html?mode=reply")
+        web.loadUrl("https://localhost/brief.html?$query")
     }
 
     private fun mime(path: String) = when (path.substringAfterLast('.', "")) {
@@ -139,7 +146,6 @@ object BriefRunner {
         val spec = n?.optJSONObject("spec")
         if (spec != null) postThread(context, spec.toString(), n.optBoolean("alert"))
         else if (n != null) post(context, n.optString("text"), n.optBoolean("alert"))
-        else if (!r.has("error")) NotificationManagerCompat.from(context).cancel(NOTIF_ID)
     }
 
     fun ensureChannel(context: Context) {
@@ -270,12 +276,10 @@ object BriefRunner {
 
     /** Pont exposé à la page sous `window.BriefBridge`. */
     private class Bridge(
-        private val context: Context, private val health: String, private val payload: String, private val web: WebView,
+        private val context: Context, private val payload: String, private val web: WebView,
         private val handler: Handler, private val onFinish: (String) -> Unit,
     ) {
-        @JavascriptInterface fun health(): String = health
-
-        /** Réponse de Monsieur depuis la notification (J4.3), "{}" pour le brief. */
+        /** Réponse de Monsieur depuis la notification (J4.3), "{}" pour une sauvegarde. */
         @JavascriptInterface fun payload(): String = payload
 
         // Service au premier plan le temps de l'appel (BriefService : rend le réseau quand
@@ -315,11 +319,18 @@ object BriefRunner {
                 }
             }
         }
+
+        /** Requête vers le serveur de sauvegarde (02/11/2026) : PUT ou GET, réponse entière. */
+        @JavascriptInterface fun request(id: String, method: String, url: String, headersJson: String, body: String?) {
+            BackupHttp.async(method, url, JSONObject(headersJson), body) { status, text ->
+                handler.post {
+                    web.evaluateJavascript("window.__briefHttpDone(${JSONObject.quote(id)}, $status, ${JSONObject.quote(text)})", null)
+                }
+            }
+        }
     }
 }
 
-/** Réveils du brief : exacts sans icône de réveil dans la barre d'état (USE_EXACT_ALARM est
- *  déclaré), repli sur setAlarmClock si Android refuse l'exact. */
 /**
  * Réglage « brief du matin » (Activé / Désactivé) et nettoyage des anciens réveils. Depuis le
  * 01/11/2026 (v3.148.0), le brief part dans l'app quand Monsieur note son genou : plus aucun
