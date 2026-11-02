@@ -114,7 +114,9 @@ désactivées (comptes créés à la main dans Authentication › Users).
 
 ## Ce qui a été perdu à l'arrêt
 
-- Les données stockées dans Supabase (les essais de Yoann et ceux d'éventuels bêta-testeurs),
-  supprimées avec le projet.
+Le 02/11/2026, Yoann a supprimé le site Netlify (`joyful-syrniki-a1a3e2`) et le projet Supabase
+`rawCARE` (il était le seul utilisateur, aucun bêta-testeur à prévenir).
+
+- Les données stockées dans Supabase (uniquement les essais de Yoann), supprimées avec le projet.
 - L'adresse du site Netlify.
 - Rien d'autre : code, décisions et architecture sont ici et dans Git.
