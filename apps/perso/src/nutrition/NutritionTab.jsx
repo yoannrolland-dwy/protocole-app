@@ -12,7 +12,7 @@
 // modifiable au clavier numérique (Entrée = Enregistrer).
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { Plus, Trash2, ChevronDown, ChevronRight, ChevronLeft, Droplet, Zap, Copy, Search, Check, History, ScanBarcode } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight, ChevronLeft, Droplet, Zap, Copy, Search, Check, History, ScanBarcode, Camera } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { today, fmt, longDate, upsert, shiftDateKey } from "../ui.jsx";
 import { T, COLORS } from "../design/tokens.js";
@@ -250,6 +250,8 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
   // Scanner direct (31/10/2026, demande de Yoann) : ouvre la même feuille et lance le scan
   // tout de suite ; annulé, on reste sur la recherche.
   const [scanFirst, setScanFirst] = useState(false);
+  // Photo d'un plat directe (04/11/2026, demande de Yoann), même principe que le scan.
+  const [photoFirst, setPhotoFirst] = useState(false);
   const [copyMeal, setCopyMeal] = useState(null);
   const [yesterdayMeal, setYesterdayMeal] = useState(null);
   const [duplicating, setDuplicating] = useState(false);
@@ -373,7 +375,11 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
       q: 100,
     })));
   };
-  const closeSearch = () => { setOpenMeal(null); setQuickAdd(false); setScanFirst(false); };
+  const closeSearch = () => { setOpenMeal(null); setQuickAdd(false); setScanFirst(false); setPhotoFirst(false); };
+  // Ouvre la feuille d'un repas : recherche, ou directement scan / photo d'un plat / macro rapide.
+  const openSheet = (mealKey, how) => {
+    setOpenMeal(mealKey); setQuickAdd(how === "quick"); setScanFirst(how === "scan"); setPhotoFirst(how === "photo");
+  };
 
   const copyFrom = (mealKey, fromDate) => {
     const entries = food.log.filter((e) => e.date === fromDate && e.meal === mealKey);
@@ -590,16 +596,21 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
                     ))}
                   </div>
                 )}
-                <div style={{ display: "flex", gap: 8 }}>
-                  <Button variant="outline" style={{ flex: 1 }} onClick={() => { setOpenMeal(meal.key); setQuickAdd(false); setScanFirst(false); }}>
-                    <Search size={18} aria-hidden="true" />Chercher
+                <div style={{ display: "flex", gap: 6 }}>
+                  {/* Loupe seule (04/11/2026) : avec Scanner et Photo, le mot « Chercher » ne tient
+                      plus à 360 px ; le bouton reste le plus large de la rangée. */}
+                  <Button variant="outline" style={{ flex: 1, minWidth: 0, paddingInline: 8 }} aria-label={`Chercher un aliment · ${meal.label}`} onClick={() => openSheet(meal.key)}>
+                    <Search size={22} aria-hidden="true" />
                   </Button>
                   {Capacitor.isNativePlatform() && (
-                    <IconButton label={`Scanner un code-barres · ${meal.label}`} tone="accent" size={52} onClick={() => { setOpenMeal(meal.key); setQuickAdd(false); setScanFirst(true); }}>
+                    <IconButton label={`Scanner un code-barres · ${meal.label}`} tone="accent" size={52} onClick={() => openSheet(meal.key, "scan")}>
                       <ScanBarcode size={20} aria-hidden="true" />
                     </IconButton>
                   )}
-                  <IconButton label={`Macro rapide · ${meal.label}`} size={52} onClick={() => { setOpenMeal(meal.key); setQuickAdd(true); setScanFirst(false); }}>
+                  <IconButton label={`Photo d'un plat · ${meal.label}`} tone="accent" size={52} onClick={() => openSheet(meal.key, "photo")}>
+                    <Camera size={20} aria-hidden="true" />
+                  </IconButton>
+                  <IconButton label={`Macro rapide · ${meal.label}`} size={52} onClick={() => openSheet(meal.key, "quick")}>
                     <Zap size={20} aria-hidden="true" />
                   </IconButton>
                   <IconButton label={`Copier ${meal.label} depuis un autre jour`} size={52} onClick={() => { setCopyMeal(meal.key); setYesterdayMeal(null); }}>
@@ -655,6 +666,7 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
           onClose={closeSearch}
           startFree={quickAdd}
           startScan={scanFirst}
+          startPhoto={photoFirst}
         />
       )}
     </div>

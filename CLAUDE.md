@@ -5376,3 +5376,21 @@ Le prompt qui la demandait : `docs/sauvegarde-oracle/PROMPT_SESSION_ORACLE.md`. 
 
   **Pas vérifié sur le téléphone** : envoi réel, réveils de 14 h et 23 h app fermée,
   restauration réelle. Cela demande que Yoann pose la clé.
+
+## Nutrition : « + » sur les recettes, bouton Photo d'un plat sous chaque repas (04/11/2026, apps/perso v3.150.0)
+
+Deux demandes de Yoann.
+- **« + » sur « Vos recettes »** (feuille de recherche d'un repas) : ajoute **une portion**
+  (`recipeAsFood(r).defaultQ`, tout le lot pour une recette en 1 portion), sans ouvrir la recette,
+  feuille laissée ouverte (même `QuickAddButton` que les habituels).
+- **Bouton Photo d'un plat** (icône appareil photo, citron) sous chaque repas du Journal, entre
+  Scanner et Macro rapide : ouvre directement « Photo d'un plat » (`startPhoto` de `FoodSearch`) ;
+  « Ajouter » referme la feuille et ramène au Journal, « Retour » ramène à la recherche (comme le
+  scan). Visible aussi hors app native (sélecteur de fichier HTML).
+- **« Chercher » devient une loupe seule** (`aria-label` « Chercher un aliment · <repas> »), bouton
+  le plus large de la rangée : avec Scanner et Photo il ne restait que 62 px à 360 px, il en faut
+  114 pour le mot. Écart entre les boutons 8 → 6 px. `openSheet(repas, "scan"|"photo"|"quick")`
+  remplace les quatre jeux d'états recopiés sur chaque bouton.
+- Vérifié dans l'aperçu (360 px) : rangée sans débordement, Photo ouvert directement puis Retour,
+  « + » sur une recette en 4 portions → 200 g dans `foodLog`, aucune erreur console. Estimation
+  par l'IA non lancée (appel payant).

@@ -671,7 +671,7 @@ export default function FoodSearch({
   onAdd, onTogglePin, onMute, onSavePortion, onRemovePortion, onCreateRecipe, onRemoveRecipe, onUpdateRecipe,
   onSaveOverride, onClearOverride,
   ai, remaining, onLogDishes,
-  onClose, startFree = false, startScan = false,
+  onClose, startFree = false, startScan = false, startPhoto = false,
 }) {
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(null);
@@ -684,7 +684,9 @@ export default function FoodSearch({
   const [resto, setResto] = useState(false);
   // Photo d'un plat (05/08/2026) : logge ce qui est SERVI (une seule photo suffit, pas de
   // menu à lire) — même registre que Carte resto mais un plat unique, pas de suggestions.
-  const [photoMode, setPhotoMode] = useState(false);
+  // Bouton photo d'un repas (04/11/2026) : ouvre directement ici ; l'ajout ramène au Journal.
+  const [photoMode, setPhotoMode] = useState(startPhoto);
+  const [photoEntry, setPhotoEntry] = useState(startPhoto);
   // Recette en cours de modification (V8) — `null` = on en crée une nouvelle.
   const [editingRecipe, setEditingRecipe] = useState(null);
   // idle | scanning | lookup | notfound | error — distinct de offState : le scan peut
@@ -714,7 +716,7 @@ export default function FoodSearch({
   // Bouton « Scanner » d'un repas : scan lancé à l'ouverture, sans ouvrir le clavier dessous.
   useEffect(() => {
     if (startScan) scan();
-    else if (!startFree) inputRef.current?.focus();
+    else if (!startFree && !startPhoto) inputRef.current?.focus();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const showSugg = q.trim().length < 2;
@@ -782,7 +784,8 @@ export default function FoodSearch({
           <RestaurantMenu ai={ai} remaining={remaining} meal={meal}
             onLogDishes={onLogDishes} onBack={() => setResto(false)} />
         ) : photoMode ? (
-          <PhotoDish ai={ai} onAdd={onAdd} onBack={() => setPhotoMode(false)} />
+          <PhotoDish ai={ai} onAdd={(f, q) => { onAdd(f, q); if (photoEntry) onClose(); }}
+            onBack={() => { setPhotoMode(false); setPhotoEntry(false); }} />
         ) : sel ? (
           <QtyPanel food={selFood} initialQ={selFood.portions > 1 ? selFood.portionGrams : sel.lastQ ?? sel.defaultQ}
             portions={portionsFor(portions, sel.ref)} onSavePortion={onSavePortion} onRemovePortion={onRemovePortion}
@@ -844,7 +847,8 @@ export default function FoodSearch({
                   <Row key={`recipe:${r.id}`} food={recipeAsFood(r)}
                     onClick={() => setSel(recipeAsFood(r))}
                     onEdit={() => { setEditingRecipe(r); setBuilding(true); }}
-                    onRemove={() => onRemoveRecipe(r.id)} />
+                    onRemove={() => onRemoveRecipe(r.id)}
+                    onQuickAdd={() => { const f = recipeAsFood(r); onAdd(f, f.defaultQ); }} />
                 ))}
               </>
             )}
