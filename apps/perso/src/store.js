@@ -87,6 +87,10 @@ export const DATA_KEYS = [
   // Coût de l'IA du mois en cours (J1.3) : { month: "AAAA-MM", cents }.
   "aiSpend",
   "foodLog", "foodPins", "foodMuted", "foodPortions", "foodRecipes", "foodOverrides",
+  // Favoris et masqués PAR REPAS (04/11/2026) : { [repas]: [{ ref, name, per100 }] } et
+  // { [repas]: [ref] }. Remplacent `foodPins`/`foodMuted` (plus lus, gardés ici pour ne pas
+  // perdre ce qu'un ancien export contient, comme `elbowLog`).
+  "foodMealPins", "foodMealMuted",
 ];
 
 export function exportData() {

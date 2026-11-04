@@ -49,7 +49,7 @@ export function aiFromSettings() {
 /** Journal alimentaire lu au moment de la réponse (actions J2b). */
 export const foodContext = () => ({
   foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}),
-  pins: getSync("foodPins", []), muted: getSync("foodMuted", []), today: today(),
+  mealPins: getSync("foodMealPins", {}), mealMuted: getSync("foodMealMuted", {}), today: today(),
 });
 
 const ITEM = { nuit: "votre nuit", "pesée": "votre pesée" };

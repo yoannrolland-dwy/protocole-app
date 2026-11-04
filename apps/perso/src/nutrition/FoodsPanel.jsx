@@ -5,7 +5,7 @@
 import { useMemo } from "react";
 import { T } from "../design/tokens.js";
 import { Panel, Eyebrow, Button } from "../design/primitives.jsx";
-import { refNames, MACROS } from "./foodStore.js";
+import { refNames, MACROS, MEALS } from "./foodStore.js";
 import { sayStable } from "../lib/jeffrey.js";
 
 const mono = { fontFamily: T.f.num, fontVariantNumeric: "tabular-nums" };
@@ -37,24 +37,28 @@ export default function FoodsPanel({ food }) {
   const nameOf = (ref) => names.get(ref) ?? "Aliment introuvable";
   const portionRefs = Object.keys(food.portions || {}).filter((r) => food.portions[r]?.length);
   const fixed = Object.keys(food.overrides || {});
-  const empty = !food.pins.length && !food.muted.length && !portionRefs.length && !fixed.length;
+  // Favoris et masqués par repas (04/11/2026) : une ligne par repas et par aliment.
+  const byMeal = (map) => MEALS.flatMap((m) => (map?.[m.key] || []).map((p) => ({ meal: m, ref: typeof p === "string" ? p : p.ref, name: typeof p === "object" ? p.name : null })));
+  const pinned = byMeal(food.mealPins);
+  const hidden = byMeal(food.mealMuted);
+  const empty = !pinned.length && !hidden.length && !portionRefs.length && !fixed.length;
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12 }}>
       {empty && <div className="p-sec" style={{ textAlign: "center", padding: "8px 0" }}>{sayStable("noFoodSettings")}</div>}
 
-      {food.pins.length > 0 && (
-        <Section title="Épinglés" count={food.pins.length}>
-          {food.pins.map((ref, k) => (
-            <Line key={ref} first={!k} name={nameOf(ref)} detail="Toujours en tête de ses repas habituels" action="Désépingler" onAction={() => food.togglePin(ref)} />
+      {pinned.length > 0 && (
+        <Section title="Favoris" count={pinned.length}>
+          {pinned.map(({ meal, ref, name }, k) => (
+            <Line key={`${meal.key}|${ref}`} first={!k} name={names.get(ref) ?? name ?? "Aliment introuvable"} detail={`En tête de ${meal.label}`} action="Retirer" onAction={() => food.togglePin(meal.key, { ref })} />
           ))}
         </Section>
       )}
 
-      {food.muted.length > 0 && (
-        <Section title="Masqués" count={food.muted.length}>
-          {food.muted.map((ref, k) => (
-            <Line key={ref} first={!k} name={nameOf(ref)} detail="Absent de « Vos aliments habituels »" action="Réafficher" onAction={() => food.unmute(ref)} />
+      {hidden.length > 0 && (
+        <Section title="Masqués" count={hidden.length}>
+          {hidden.map(({ meal, ref }, k) => (
+            <Line key={`${meal.key}|${ref}`} first={!k} name={nameOf(ref)} detail={`Absent de ${meal.label}`} action="Réafficher" onAction={() => food.unmute(meal.key, ref)} />
           ))}
         </Section>
       )}

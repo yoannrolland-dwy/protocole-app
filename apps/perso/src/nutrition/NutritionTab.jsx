@@ -20,7 +20,7 @@ import { progressColor, MACRO_KIND } from "../lib/progress.js";
 import { Panel, Eyebrow, Button, IconButton, Chip, NumberField } from "../design/primitives.jsx";
 import {
   MEALS, useFoodLog, makeEntry, amounts, entriesFor, totals, isQuickRef, newQuickRef,
-  copySourceCandidates, copyEntries, deriveMacroLog, suggestions,
+  copySourceCandidates, copyEntries, deriveMacroLog, suggestions, pinsForMeal, mutedForMeal, allMealPins,
 } from "./foodStore.js";
 import FoodSearch from "./FoodSearch.jsx";
 import RecipesPanel from "./RecipesPanel.jsx";
@@ -538,7 +538,7 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
         // 8 habituels de CE repas (3 jusqu'au 31/10/2026) (même classement que la recherche), sans ceux déjà
         // présents dans le repas du jour affiché.
         const present = new Set(entries.map((e) => e.ref));
-        const habits = suggestions(food.log, { meal: meal.key, pins: food.pins, muted: food.muted, date })
+        const habits = suggestions(food.log, { meal: meal.key, pins: pinsForMeal(food.mealPins, meal.key), muted: mutedForMeal(food.mealMuted, meal.key), date })
           .filter((s) => !present.has(s.ref)).slice(0, 8);
         const panelOpen = copyMeal === meal.key || yesterdayMeal === meal.key;
         return (
@@ -645,16 +645,17 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
           mealLabel={MEALS.find((m) => m.key === openMeal).label}
           date={date}
           log={food.log}
-          pins={food.pins}
-          muted={food.muted}
+          pins={pinsForMeal(food.mealPins, openMeal)}
+          muted={mutedForMeal(food.mealMuted, openMeal)}
+          allPins={allMealPins(food.mealPins)}
           portions={food.portions}
           recipes={food.recipes}
           overrides={food.overrides}
           onAdd={add}
           onSaveOverride={food.saveOverride}
           onClearOverride={food.clearOverride}
-          onTogglePin={food.togglePin}
-          onMute={food.muteFromSuggestions}
+          onTogglePin={(f) => food.togglePin(openMeal, f)}
+          onMute={(ref) => food.muteFromSuggestions(openMeal, ref)}
           onSavePortion={food.savePortion}
           onRemovePortion={food.removePortion}
           onCreateRecipe={food.addRecipe}

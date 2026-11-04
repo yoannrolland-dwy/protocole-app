@@ -667,7 +667,7 @@ const ACTION = { flex: "1 1 calc(50% - 4px)", fontSize: 15, padding: "0 10px", w
 
 /* ---------- feuille principale ---------- */
 export default function FoodSearch({
-  meal, mealLabel, date, log, pins, muted, portions, recipes, overrides,
+  meal, mealLabel, date, log, pins = [], muted = [], allPins = [], portions, recipes, overrides,
   onAdd, onTogglePin, onMute, onSavePortion, onRemovePortion, onCreateRecipe, onRemoveRecipe, onUpdateRecipe,
   onSaveOverride, onClearOverride,
   ai, remaining, onLogDishes,
@@ -735,22 +735,28 @@ export default function FoodSearch({
     const { portions: n, portionGrams, totalWeight, grp } = recipeAsFood(r);
     return { ...sel, portions: n, portionGrams, totalWeight, grp };
   }, [sel, recipes]);
+  // En tapant (04/11/2026) : tout ce qui a déjà été mangé, à n'importe quel repas, masqués
+  // compris — c'est là qu'on retrouve un aliment pour l'étoiler dans CE repas.
+  const known = useMemo(() => (showSugg ? [] : suggestions(log, { pins, date })), [log, pins, date, showSugg]);
   const favMatches = useMemo(() => {
     if (showSugg) return [];
     const nq = normalize(q);
-    return sugg.filter((f) => normalize(f.name).includes(nq));
-  }, [sugg, q, showSugg]);
+    return known.filter((f) => normalize(f.name).includes(nq));
+  }, [known, q, showSugg]);
+  const pinnedRefs = useMemo(() => new Set(pins.map((p) => (typeof p === "string" ? p : p.ref))), [pins]);
   // CIQUAL/OFF ne répètent jamais un aliment déjà remonté en favori/récent juste au-dessus.
   const favRefs = useMemo(() => new Set(favMatches.map((f) => f.ref)), [favMatches]);
   const list = showSugg ? sugg : results.filter((f) => !favRefs.has(f.ref));
   // Recettes : jamais de réseau ni de debounce, juste un filtre local — la liste est
   // toujours courte. Toutes affichées sans frappe, filtrées par nom sinon.
+  // Recettes = aliments comme les autres (04/11/2026, demande de Yoann) : la liste de départ ne
+  // montre que celles mangées à ce repas ou étoilées pour lui (elles viennent des habituels).
+  // En tapant, toutes celles dont le nom correspond et qui ne sont pas déjà plus haut.
   const matchedRecipes = useMemo(() => {
-    if (!recipes?.length) return [];
-    if (showSugg) return recipes;
+    if (!recipes?.length || showSugg) return [];
     const nq = normalize(q);
-    return recipes.filter((r) => normalize(r.name).includes(nq));
-  }, [recipes, q, showSugg]);
+    return recipes.filter((r) => normalize(r.name).includes(nq) && !favRefs.has(`recipe:${r.id}`));
+  }, [recipes, q, showSugg, favRefs]);
 
   return (
     <div style={{
@@ -768,7 +774,7 @@ export default function FoodSearch({
 
       <div style={{ flex: 1, overflowY: "auto", padding: 16, fontFamily: T.f.body }}>
         {building ? (
-          <RecipeBuilder recipe={editingRecipe} log={log} pins={pins} muted={muted}
+          <RecipeBuilder recipe={editingRecipe} log={log} pins={allPins} muted={[]}
             onBack={() => { setBuilding(false); setEditingRecipe(null); }}
             onSave={(name, ingredients, nPortions) => {
               const r = compileRecipe(name, ingredients, editingRecipe, nPortions);
@@ -846,8 +852,9 @@ export default function FoodSearch({
                 {matchedRecipes.map((r) => (
                   <Row key={`recipe:${r.id}`} food={recipeAsFood(r)}
                     onClick={() => setSel(recipeAsFood(r))}
+                    pinned={pinnedRefs.has(`recipe:${r.id}`)}
+                    onPin={() => onTogglePin(recipeAsFood(r))}
                     onEdit={() => { setEditingRecipe(r); setBuilding(true); }}
-                    onRemove={() => onRemoveRecipe(r.id)}
                     onQuickAdd={() => { const f = recipeAsFood(r); onAdd(f, f.defaultQ); }} />
                 ))}
               </>
@@ -859,8 +866,7 @@ export default function FoodSearch({
                 {favMatches.map((f) => (
                   <Row key={f.ref + f.name} food={f} pinned={f.pinned}
                     onClick={() => setSel(f)}
-                    onPin={() => onTogglePin(f.ref)}
-                    onRemove={() => onMute(f.ref)}
+                    onPin={() => onTogglePin(f)}
                     onQuickAdd={() => onAdd(f, f.lastQ ?? f.defaultQ ?? 100)} />
                 ))}
               </>
@@ -874,9 +880,9 @@ export default function FoodSearch({
               <Empty>{showSugg ? sayStable("searchHint") : sayStable("noCiqual")}</Empty>
             ) : (
               list.map((f) => (
-                <Row key={f.ref + f.name} food={f} pinned={f.pinned}
+                <Row key={f.ref + f.name} food={f} pinned={showSugg ? f.pinned : pinnedRefs.has(f.ref)}
                   onClick={() => setSel(f)}
-                  onPin={showSugg ? () => onTogglePin(f.ref) : undefined}
+                  onPin={() => onTogglePin(f)}
                   onRemove={showSugg ? () => onMute(f.ref) : undefined}
                   onQuickAdd={showSugg ? () => onAdd(f, f.lastQ ?? f.defaultQ ?? 100) : undefined} />
               ))

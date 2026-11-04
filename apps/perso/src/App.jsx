@@ -545,7 +545,7 @@ export default function App({ silent = false } = {}) {
     // habituel qui existe vraiment.
     foodContext: () => ({
       foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}),
-      pins: getSync("foodPins", []), muted: getSync("foodMuted", []), today: today(),
+      mealPins: getSync("foodMealPins", {}), mealMuted: getSync("foodMealMuted", {}), today: today(),
     }),
   };
   // Brief du matin (J4.1 ; 01/11/2026, v3.148.0, demande de Yoann) : il part quand Monsieur note

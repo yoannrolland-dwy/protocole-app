@@ -8,7 +8,7 @@ import { T } from "../design/tokens.js";
 import { Panel, Eyebrow, Button, IconButton, Chip, TextField } from "../design/primitives.jsx";
 import { fmt } from "../ui.jsx";
 import { normalize } from "@rawcare/core/nutrition/ciqual";
-import { MEALS, makeEntry, compileRecipe, recipeAsFood, recipeSheet, sortRecipes, lastUseByRef } from "./foodStore.js";
+import { MEALS, makeEntry, compileRecipe, recipeAsFood, recipeSheet, sortRecipes, lastUseByRef, allMealPins } from "./foodStore.js";
 import { RecipeBuilder } from "./FoodSearch.jsx";
 import { say, sayStable } from "../lib/jeffrey.js";
 
@@ -118,7 +118,7 @@ export default function RecipesPanel({ food, date, dayLabel, onAdded }) {
     const { recipe = null, copy = false } = building === "new" ? {} : building;
     const editing = copy ? null : recipe;
     return (
-      <RecipeBuilder recipe={recipe} copy={copy} log={food.log} pins={food.pins} muted={food.muted}
+      <RecipeBuilder recipe={recipe} copy={copy} log={food.log} pins={allMealPins(food.mealPins)} muted={[]}
         onBack={() => setBuilding(null)}
         onSave={(name, ingredients, portions) => {
           const r = compileRecipe(name, ingredients, editing, portions);

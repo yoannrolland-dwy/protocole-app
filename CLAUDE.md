@@ -3554,7 +3554,7 @@ Vérifié dans l'aperçu : 1:58 → 1:28 après un saut d'horloge de 30 s simul�
    `trainingLog`, `kneeLog`, `elbowLog`, `rhrLog`, `napLog`, `macroLog`, `noteLog`, `stepsLog`, `targets`,
    `phase`, `hsrWeek`, `climbScheme`, `basketSchedule`, `apiKey`, `model`, `coachProfile`,
    `coachJournal`, `foodLog`, `foodPins`, `foodMuted`, `foodPortions`, `foodRecipes`,
-   `foodOverrides`, `targetHistory`, `palierWeekly`, `aiProvider`, `litellmUrl`, `litellmKey`,
+   `foodOverrides`, `foodMealPins`, `foodMealMuted`, `targetHistory`, `palierWeekly`, `aiProvider`, `litellmUrl`, `litellmKey`,
    `litellmModel`, `aiSpend`, `jeffreyLog`, `jeffreyPersona`, `jeffreyVoice`, `voiceKey`, `backupUrl`,
    `backupKey` —
    préfixées `protocole:` dans `store.js`)
@@ -3565,6 +3565,8 @@ Vérifié dans l'aperçu : 1:58 → 1:28 après un saut d'horloge de 30 s simul�
    prochaine restauration. **Deux exceptions volontaires**, à ne pas « corriger » :
    `lastAutoBackupDate` et `lastCloudBackup` sont des marqueurs de sauvegarde —
    les restaurer ferait croire à l'app qu'une sauvegarde vient d'avoir lieu.
+   `foodPins` et `foodMuted` sont dans le même cas depuis le 04/11/2026 (remplacés par
+   `foodMealPins`/`foodMealMuted`, plus lus, gardés dans `DATA_KEYS`).
    `elbowLog` est un troisième cas particulier depuis le 05/09/2026 : le coude a été
    retiré (plus aucun code ne le lit/l'écrit, voir plus bas), la clé reste dans
    `DATA_KEYS` uniquement pour ne pas perdre l'historique déjà exporté.
@@ -5394,3 +5396,31 @@ Deux demandes de Yoann.
 - Vérifié dans l'aperçu (360 px) : rangée sans débordement, Photo ouvert directement puis Retour,
   « + » sur une recette en 4 portions → 200 g dans `foodLog`, aucune erreur console. Estimation
   par l'IA non lancée (appel payant).
+
+## Favoris et aliments masqués par repas, recettes comme les autres aliments (04/11/2026, apps/perso v3.151.0)
+
+Demande de Yoann : « si je supprime un favori ou habituel dans goûter ça ne doit pas le supprimer
+dans déjeuner ou dîner », et les recettes doivent être des aliments comme les autres. Choix tranchés
+par question : **repartir à zéro**, une étoile suffit pour qu'un aliment apparaisse dans un repas,
+recettes trouvables en tapant.
+- **Nouvelles clés** (dans `DATA_KEYS`) : `foodMealPins` = `{ [repas]: [{ ref, name, per100 }] }`
+  (la copie de l'aliment sert quand il n'est pas dans le journal, sinon la dernière ligne du
+  journal fait foi) et `foodMealMuted` = `{ [repas]: [ref] }`. **Les anciennes `foodPins` /
+  `foodMuted` ne sont plus lues** (gardées dans l'export, comme `elbowLog`) : aucun favori ni masqué
+  au départ.
+- **Core** (`nutrition/foodStore.js`, testé dans `mealPins.test.mjs`) : `pinsForMeal`,
+  `mutedForMeal`, `allMealPins` (sans repas : tous les favoris, une fois), `togglePinIn`, `muteIn`
+  (masque dans ce repas et y retire l'étoile), `unmuteIn`. `suggestions` garde un favori du repas
+  même jamais mangé à ce repas ; sans favori, toujours le filtre strict du 17/09/2026.
+- **Recherche d'un repas** : la section « Vos recettes » ne s'affiche plus dans la liste de départ
+  (une recette y vient comme les autres aliments : mangée à ce repas ou étoilée pour lui). En
+  tapant : « Favoris et récents » cherche dans **tout** ce qui a été mangé (60 jours, tous repas,
+  masqués compris), avec l'étoile pour CE repas ; puis les recettes dont le nom correspond (étoile,
+  crayon, « + » une portion, plus de corbeille qui supprimait la recette) ; puis CIQUAL, avec
+  l'étoile. La corbeille ne reste que dans la liste de départ (masquer dans ce repas).
+- **Ailleurs** : pastilles sous chaque repas du Journal et Jeffrey (`ajouter_habituel`, contexte
+  `mealPins`/`mealMuted`) par repas ; éditeur de recette (ingrédients) : tous les favoris, rien de
+  masqué ; onglet Aliments : « Favoris » et « Masqués » avec le repas sur chaque ligne.
+- Vérifié dans l'aperçu (360 px) : anciennes clés ignorées ; skyr masqué au goûter et toujours au
+  dîner ; recette mangée au dîner trouvée en tapant au goûter, étoilée, puis en pastille du goûter
+  seulement ; onglet Aliments par repas ; aucune erreur console. 191 tests.

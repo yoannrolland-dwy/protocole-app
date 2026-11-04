@@ -435,19 +435,27 @@ const score = (s) => s.freq + 2 * s.mealFreq + Math.max(0, 14 - s.days);
  * disponible via la recherche classique. Sans `meal` (sélecteur d'ingrédients de
  * recette, `IngredientPicker` — un ingrédient n'est pas lié à un repas), comportement
  * strictement inchangé : épinglés d'abord, puis le reste par fréquence globale.
+ *
+ * **Favoris et masqués par repas (04/11/2026, demande de Yoann)** : l'appelant passe les
+ * favoris et masqués DU repas (`pinsForMeal`/`mutedForMeal`). Un favori de ce repas y
+ * apparaît même s'il n'y a jamais été mangé (une étoile posée au goûter suffit). Un favori
+ * est un `ref` ou un `{ ref, name, per100 }` : la copie sert quand l'aliment n'est pas (ou
+ * plus) dans le journal, sinon c'est la dernière ligne du journal qui fait foi.
  */
 export function suggestions(log, { meal, pins = [], muted = [], limit = Infinity, date = todayKey() } = {}) {
   const stats = usageStats(log, { meal, date });
-  const pinned = new Set(pins);
+  const pinned = new Set(pins.map(pinRef));
   const hidden = new Set(muted);
-  for (const ref of pinned) {
+  for (const p of pins) {
+    const ref = pinRef(p);
     if (stats.has(ref) || hidden.has(ref)) continue;
     const last = [...log].reverse().find((e) => e.ref === ref);
-    if (last) stats.set(ref, { ref, name: last.name, per100: last.per100, freq: 0, mealFreq: 0, days: Infinity, lastQ: last.q });
+    const src = last ? { name: last.name, per100: last.per100, lastQ: last.q } : typeof p === "object" && p.per100 ? { name: p.name, per100: p.per100, lastQ: p.lastQ } : null;
+    if (src) stats.set(ref, { ref, ...src, freq: 0, mealFreq: 0, days: Infinity });
   }
   return [...stats.values()]
     .filter((s) => !hidden.has(s.ref))
-    .filter((s) => !meal || s.mealFreq > 0)
+    .filter((s) => !meal || s.mealFreq > 0 || pinned.has(s.ref))
     .map((s) => ({ ...s, _s: score(s) + (pinned.has(s.ref) ? 1000 : 0) }))
     .sort((a, b) => {
       const tier = (s) => (pinned.has(s.ref) ? 0 : meal && s.mealFreq > 0 ? 1 : 2);
@@ -457,6 +465,34 @@ export function suggestions(log, { meal, pins = [], muted = [], limit = Infinity
     .slice(0, limit)
     .map((s) => ({ ref: s.ref, name: s.name, per100: s.per100, lastQ: s.lastQ, pinned: pinned.has(s.ref) }));
 }
+
+// Favoris et masqués par repas (04/11/2026) : `foodMealPins` = { [repas]: [{ ref, name, per100 }] },
+// `foodMealMuted` = { [repas]: [ref] }. Masquer ou épingler au goûter ne touche que le goûter.
+const pinRef = (p) => (typeof p === "string" ? p : p?.ref);
+export const pinsForMeal = (byMeal, meal) => (byMeal && byMeal[meal]) || [];
+export const mutedForMeal = (byMeal, meal) => (byMeal && byMeal[meal]) || [];
+/** Sans repas (ingrédients d'une recette) : tous les favoris, une fois chacun ; rien de masqué. */
+export function allMealPins(byMeal) {
+  const seen = new Map();
+  for (const list of Object.values(byMeal || {})) for (const p of list) if (!seen.has(pinRef(p))) seen.set(pinRef(p), p);
+  return [...seen.values()];
+}
+/** Étoile d'un repas : ajoute la copie de l'aliment, ou la retire si elle y est déjà. */
+export function togglePinIn(byMeal, meal, food) {
+  const list = pinsForMeal(byMeal, meal);
+  const on = list.some((p) => pinRef(p) === food.ref);
+  const next = on ? list.filter((p) => pinRef(p) !== food.ref) : [...list, { ref: food.ref, name: food.name, per100: food.per100 }];
+  return { ...byMeal, [meal]: next };
+}
+/** Corbeille d'un repas : masque l'aliment dans CE repas, et le retire de ses favoris. */
+export function muteIn(mutedByMeal, pinsByMeal, meal, ref) {
+  const m = mutedForMeal(mutedByMeal, meal);
+  return {
+    muted: m.includes(ref) ? mutedByMeal : { ...mutedByMeal, [meal]: [...m, ref] },
+    pins: { ...pinsByMeal, [meal]: pinsForMeal(pinsByMeal, meal).filter((p) => pinRef(p) !== ref) },
+  };
+}
+export const unmuteIn = (mutedByMeal, meal, ref) => ({ ...mutedByMeal, [meal]: mutedForMeal(mutedByMeal, meal).filter((r) => r !== ref) });
 
 /**
  * Bonus à injecter dans searchCiqual : fait remonter ce que l'utilisateur mange vraiment.

@@ -296,7 +296,7 @@ test("J2b : reprendre le repas d'hier et ajouter un habituel, mêmes écritures 
     { id: "d", date: "2026-10-26", meal: "gouter", ref: "off:3", name: "Skyr vanille", q: 100, per100: skyr },
     { id: "e", date: "2026-10-29", meal: "petitdej", ref: "off:4", name: "Café", q: 200, per100: { kcal: 1, prot: 0, gluc: 0, lip: 0, fib: 0 } },
   ];
-  const ctx = { foodLog: log, overrides: {}, pins: [], muted: [], today: "2026-10-29" };
+  const ctx = { foodLog: log, overrides: {}, mealPins: {}, mealMuted: {}, today: "2026-10-29" };
   assert.deepEqual(JEFFREY_ACTION_TOOLS.map((t) => t.name).slice(-2), ["reprendre_repas", "ajouter_habituel"]);
 
   // Repas d'hier : tous ses aliments, mêmes quantités, vers aujourd'hui ; rien n'est effacé.

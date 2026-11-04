@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { store } from "../store.js";
-import { resolveLog } from "@rawcare/core/nutrition/foodStore";
+import { resolveLog, togglePinIn, muteIn, unmuteIn } from "@rawcare/core/nutrition/foodStore";
 
 export * from "@rawcare/core/nutrition/foodStore";
 
@@ -24,8 +24,10 @@ export function useFoodLog() {
   // la première modification d'une ligne figerait la valeur corrigée dans le journal et la
   // correction cesserait d'être réversible.
   const [raw, setLog] = useState([]);
-  const [pins, setPins] = useState([]);
-  const [muted, setMuted] = useState([]);
+  // Favoris et masqués par repas (04/11/2026) : { [repas]: [...] }. Les anciennes clés globales
+  // `foodPins`/`foodMuted` ne sont plus lues (choix de Yoann : repartir à zéro, repas par repas).
+  const [mealPins, setMealPins] = useState({});
+  const [mealMuted, setMealMuted] = useState({});
   const [portions, setPortions] = useState({});
   const [recipes, setRecipes] = useState([]);
   const [overrides, setOverrides] = useState({});
@@ -34,8 +36,8 @@ export function useFoodLog() {
   useEffect(() => {
     (async () => {
       setLog(await store.get("foodLog", []));
-      setPins(await store.get("foodPins", []));
-      setMuted(await store.get("foodMuted", []));
+      setMealPins(await store.get("foodMealPins", {}));
+      setMealMuted(await store.get("foodMealMuted", {}));
       setPortions(await store.get("foodPortions", {}));
       setRecipes(await store.get("foodRecipes", []));
       setOverrides(await store.get("foodOverrides", {}));
@@ -55,8 +57,8 @@ export function useFoodLog() {
   return {
     log,
     overrides,
-    pins,
-    muted,
+    mealPins,
+    mealMuted,
     portions,
     recipes,
     ready,
@@ -91,29 +93,25 @@ export function useFoodLog() {
       setOverrides(next);
       store.set("foodOverrides", next);
     },
-    togglePin: (ref) => {
-      const next = pins.includes(ref) ? pins.filter((r) => r !== ref) : [...pins, ref];
-      setPins(next);
-      store.set("foodPins", next);
+    // Étoile d'un repas : ne vaut que pour ce repas. `food` = { ref, name, per100 } (copie gardée
+    // pour un favori jamais mangé).
+    togglePin: (meal, food) => {
+      const next = togglePinIn(mealPins, meal, food);
+      setMealPins(next);
+      store.set("foodMealPins", next);
     },
-    // Épinglé et masqué sont mutuellement exclusifs : masquer un aliment qu'on avait
-    // épinglé par erreur doit aussi le désépingler, sinon il resterait invisible malgré
-    // un score artificiellement forcé en tête.
-    muteFromSuggestions: (ref) => {
-      const nextMuted = muted.includes(ref) ? muted : [...muted, ref];
-      setMuted(nextMuted);
-      store.set("foodMuted", nextMuted);
-      if (pins.includes(ref)) {
-        const nextPins = pins.filter((r) => r !== ref);
-        setPins(nextPins);
-        store.set("foodPins", nextPins);
-      }
+    // Corbeille d'un repas : masque l'aliment dans CE repas seulement, et retire son étoile de ce
+    // repas (épinglé et masqué restent exclusifs).
+    muteFromSuggestions: (meal, ref) => {
+      const { muted: m, pins: p } = muteIn(mealMuted, mealPins, meal, ref);
+      setMealMuted(m); store.set("foodMealMuted", m);
+      setMealPins(p); store.set("foodMealPins", p);
     },
-    // Onglet Aliments (31/10/2026) : remettre un aliment masqué dans « Vos aliments habituels ».
-    unmute: (ref) => {
-      const next = muted.filter((r) => r !== ref);
-      setMuted(next);
-      store.set("foodMuted", next);
+    // Onglet Aliments : remettre un aliment masqué dans les habituels de ce repas.
+    unmute: (meal, ref) => {
+      const next = unmuteIn(mealMuted, meal, ref);
+      setMealMuted(next);
+      store.set("foodMealMuted", next);
     },
     savePortion: (ref, label, grams) => {
       const list = portions[ref] || [];

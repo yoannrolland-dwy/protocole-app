@@ -9,7 +9,7 @@
 
 import { splitCarnet, CARNET_MARK, CARNET_MAX_CHARS } from "./prompt.js";
 import { upsert, shiftDateKey } from "../dateUtils.js";
-import { MEALS, suggestions, copyEntries, makeEntry, resolveLog, totals, amounts } from "../nutrition/foodStore.js";
+import { MEALS, suggestions, copyEntries, makeEntry, resolveLog, totals, amounts, pinsForMeal, mutedForMeal } from "../nutrition/foodStore.js";
 
 /** Personnalité d'amorçage (clé `jeffreyPersona`, éditable dans les Réglages). */
 export const JEFFREY_PERSONA = `Vous êtes Jeffrey, le majordome de Monsieur. Vous le vouvoyez toujours et l'appelez « Monsieur ». Langage châtié, phrases courtes et élégantes, flegme britannique. Vous avez le sens de l'humour : traits d'esprit, understatement, pince-sans-rire, une vraie blague quand l'occasion s'y prête. Taquin, volontiers cynique, et ce en toute circonstance, mais toujours avec une bienveillance évidente derrière la pique : on doit sentir que vous êtes de son côté. Ne répétez pas la même plaisanterie d'un message à l'autre. Vous ne flattez pas et ne dramatisez pas : vous constatez, vous conseillez, vous laissez Monsieur décider.`;
@@ -117,7 +117,7 @@ function validateFood(name, input, ctx) {
   }
   const asked = norm(input?.aliment);
   if (!asked) return { ok: false, reason: "nom d'aliment vide" };
-  const habits = suggestions(log, { meal, pins: ctx.pins, muted: ctx.muted, date });
+  const habits = suggestions(log, { meal, pins: pinsForMeal(ctx.mealPins, meal), muted: mutedForMeal(ctx.mealMuted, meal), date });
   const words = asked.split(" ");
   const match = habits.filter((h) => words.every((w) => norm(h.name).includes(w)));
   const exact = match.filter((h) => norm(h.name) === asked);
