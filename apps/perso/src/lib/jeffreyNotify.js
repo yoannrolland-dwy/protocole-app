@@ -11,6 +11,9 @@ import { applyWater, applyKnee, appendNote, foodEntriesFor } from "@rawcare/core
 import { deriveMacroLog, resolveLog } from "@rawcare/core/nutrition/foodStore";
 import { today, upsert, byDate } from "@rawcare/core/dateUtils";
 import { getSync, store } from "../store.js";
+import { TEMPLATES } from "@rawcare/core/session/templates";
+import { newSessionDraft } from "@rawcare/core/session/voiceSession";
+import { writeDraft } from "./sessionDraft.js";
 import { voiceServer, speechPlan } from "./voiceConfig.js";
 
 const MAX_MESSAGES = 6;
@@ -66,7 +69,18 @@ export function applyActionStored(act) {
   // G4-A : séance faite sans carnet (même ligne que la séance « sport » de l'onglet Séance) ;
   // séance à démarrer : l'app ouverte la prend en charge (consumeJeffreyStart, App.jsx).
   if (act.kind === "seance") store.set("trainingLog", [...getSync("trainingLog", []), act.row].sort(byDate));
-  if (act.kind === "demarrer") store.set(JEFFREY_START_KEY, { type: act.type, at: Date.now() });
+  // G4-C3 : une séance de carnet démarrée à la voix existe tout de suite (brouillon), même app
+  // fermée ; l'app l'ouvre ensuite telle quelle (`resume`).
+  if (act.kind === "demarrer") {
+    const carnet = TEMPLATES[act.type]?.kind === "muscu";
+    if (carnet) {
+      writeDraft(newSessionDraft({
+        type: act.type, training: getSync("trainingLog", []), hsrWeek: getSync("hsrWeek", 1),
+        date, start: new Date().toTimeString().slice(0, 5),
+      }));
+    }
+    store.set(JEFFREY_START_KEY, { type: act.type, at: Date.now(), ...(carnet ? { resume: true } : {}) });
+  }
   if (act.kind === "note") {
     const notes = getSync("noteLog", []);
     const text = appendNote(notes.find((n) => n.date === date)?.text || "", act.text);

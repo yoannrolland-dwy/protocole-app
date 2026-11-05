@@ -84,6 +84,9 @@ export default function App({ silent = false } = {}) {
   // Consommé par TrainTab à son montage, puis remis à null.
   const [startType, setStartType] = useState(null);
   const startSession = (type) => { setStartType(type); setTab("train"); };
+  // G4-C3 : séance de carnet déjà préparée par la voix (brouillon) : ouverte telle quelle.
+  const [resumeTick, setResumeTick] = useState(0);
+  const resumeSession = () => { setResumeTick((t) => t + 1); setTab("train"); };
   // FC repos (Health Connect, natif seulement — 05/09/2026, score d'énergie) : `{date, bpm}`,
   // même famille que weightLog/stepsLog. Vide sur la PWA (jamais synchronisée), le score
   // d'énergie affiche alors "pas assez de données" plutôt qu'un chiffre inventé.
@@ -320,7 +323,16 @@ export default function App({ silent = false } = {}) {
     const s = getSync(JEFFREY_START_KEY, null);
     if (!s) return;
     store.set(JEFFREY_START_KEY, null);
-    if (Date.now() - (s.at || 0) > JEFFREY_START_MS || !TEMPLATES[s.type] || getSync("trainingDraft", null)?.type) return;
+    if (Date.now() - (s.at || 0) > JEFFREY_START_MS || !TEMPLATES[s.type]) return;
+    const draft = getSync("trainingDraft", null);
+    // G4-C3 : séance de carnet créée par la voix → ouverte telle quelle, jamais effacée.
+    if (s.resume) {
+      if (draft?.type !== s.type) return;
+      setShowSettings(false); setChatOpen(null);
+      resumeSession();
+      return;
+    }
+    if (draft?.type) return;
     setShowSettings(false); setChatOpen(null);
     startSession(s.type);
   };
@@ -712,7 +724,7 @@ export default function App({ silent = false } = {}) {
                 {corpsSub === "pain" && <PainTab {...{ knee, save, hsrWeek }} />}
               </CorpsTab>
             )}
-            {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, startType }} onStartConsumed={() => setStartType(null)} />}
+            {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, startType, resumeTick }} onStartConsumed={() => setStartType(null)} />}
             {tab === "perf" && <PerformanceTab {...{ macros, targets, training, weight, phase, coach }} jeffrey={jeffreyChat} />}
             {tab === "macro" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} ai={ai} />}
           </>

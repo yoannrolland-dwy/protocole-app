@@ -14,6 +14,7 @@ import { lastPerf, lastExerciseSets, medianTarget } from "./perf.js";
 import { EXERCISE_LIBRARY } from "./exercises.js";
 import { catalogEntry } from "./exoCatalog.js";
 import { round } from "../dateUtils.js";
+import { beats } from "../training.js";
 
 const hsrReps = (hsrWeek) => hsrParse(hsrForWeek(hsrWeek).scheme).reps;
 
@@ -237,3 +238,37 @@ export function sessionRecord({ id, date, type, start, duration, rpe, exos }) {
     })).filter((e) => e.series.length),
   };
 }
+
+/** Séries qui battent le record au moment où elles sont cochées : la référence (`ref`, meilleure
+ *  série de l'historique hors séance en cours) avance au fil des séries. Aucune la 1re fois.
+ *  (Sorti du carnet en C3, même calcul que l'étoile ★ à l'écran.) */
+export function recordSetIndexes(e, ref) {
+  let run = ref;
+  const out = new Set();
+  if (!run) return out;
+  e.series.forEach((s, i) => {
+    if (!s.fait) return;
+    const cur = { poids: +s.poids || 0, val: +s.val || 0 };
+    if (!(cur.poids > 0 || cur.val > 0)) return;
+    if (beats(cur, run, e.mode)) { run = cur; out.add(i); }
+  });
+  return out;
+}
+
+/** Nom d'exercice lisible à voix haute : sans parenthèses, « @60° » → « à 60° », tiret → virgule.
+ *  (Déplacé de lib/restSpeech.js en C3.) */
+export function spokenName(nom) {
+  const s = String(nom || "")
+    .replace(/\s*\([^)]*\)/g, "")
+    .replace(/@\s*/g, "à ")
+    .replace(/\s+[—–-]\s+/g, ", ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return s ? s[0].toLowerCase() + s.slice(1) : s;
+}
+
+/** « de développé incliné » / « d'élévations latérales ». */
+export const ofName = (nom) => {
+  const x = spokenName(nom);
+  return /^[aeiouyàâéèêëîïôûü]/i.test(x) ? `d'${x}` : `de ${x}`;
+};

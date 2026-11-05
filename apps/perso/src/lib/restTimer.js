@@ -72,7 +72,10 @@ const persist = () => {
 /** Minuteur écrit ailleurs dans le brouillon : on s'y recale (le réveil natif est l'affaire de
  *  celui qui l'a écrit). Sans effet si rien n'a changé. */
 export function syncRestFromDraft() {
-  const r = readDraft()?.rest;
+  const d = readDraft();
+  // Séance finie ailleurs (G4-C3) : plus de décompte affiché.
+  if (!d) { if (state.endAt) { stopTicking(); set({ endAt: null, remaining: state.secs }); } return; }
+  const r = d.rest;
   if (!r) return;
   if (r.endAt === state.endAt && r.secs === state.secs && (r.endAt != null || r.remaining === state.remaining)) return;
   stopTicking();
@@ -136,6 +139,8 @@ export const restTimer = {
   },
 };
 
+/** État courant du minuteur (lecture seule). */
+export const restState = () => state;
 const subscribe = (f) => { subs.add(f); return () => subs.delete(f); };
 const snapshot = () => state;
 /** `{ secs, remaining, running, label }`, mis à jour à chaque seconde pendant un décompte. */

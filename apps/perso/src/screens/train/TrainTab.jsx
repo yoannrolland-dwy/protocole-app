@@ -26,7 +26,7 @@ const TRAIN_TABS = [
 ];
 let lastTrainTab = "seance";
 
-export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType, onStartConsumed }) {
+export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType, resumeTick, onStartConsumed }) {
   // Séance dont la suppression est « armée » (1er tap sur la corbeille), voir Dernières séances.
   const [armed, setArmed] = useState(null);
   const armTimer = useRef(null);
@@ -57,6 +57,18 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
   useEffect(() => {
     if (startType && TEMPLATES[startType]) { setSub("seance"); pickType(startType, true); onStartConsumed?.(); }
   }, [startType]);
+  // G4-C3 : séance préparée par la voix (brouillon déjà écrit) → ouverte telle quelle, sans rien
+  // effacer. Sans effet si ce carnet est déjà ouvert.
+  useEffect(() => {
+    if (!resumeTick) return;
+    const d = getSync("trainingDraft", null);
+    if (!d?.type || !TEMPLATES[d.type] || (open === d.type && date === d.date)) return;
+    setSub("seance");
+    setEditing(d.editingId ? (training.find((t) => t.id === d.editingId) ?? null) : null);
+    setDate(d.date);
+    setStartTime(d.start ?? new Date().toTimeString().slice(0, 5));
+    setOpen(d.type);
+  }, [resumeTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pickType = (type, force = false) => {
     const sel = !force && open === type;

@@ -7,20 +7,20 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Check, Play, Pause, RotateCcw, Timer, Repeat, Plus, Minus, TrendingUp, Search, X } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { store } from "../../store.js";
-import { exerciseSessions, setLabel, beats, recordToBeat, progressiveOverloadSuggestion } from "@rawcare/core/training";
+import { exerciseSessions, setLabel, recordToBeat, progressiveOverloadSuggestion } from "@rawcare/core/training";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { TEMPLATES, parseSecs } from "@rawcare/core/session/templates";
 import { perfHistory } from "@rawcare/core/session/perf";
 import { catalogGroups } from "@rawcare/core/session/exoCatalog";
 import {
   makeAddedExercise, buildExercises, updateSet, toggleSet, addSet, lastRemovable, removeLastSet, setRir,
-  appendExercise, removeExercise, substitutionCandidates, substituteExercise, doneExercises, sessionRecord,
+  appendExercise, removeExercise, substitutionCandidates, substituteExercise, doneExercises, sessionRecord, recordSetIndexes,
 } from "@rawcare/core/session/engine";
 import { fmt, today } from "../../ui.jsx";
 import { T } from "../../design/tokens.js";
 import { Panel, Eyebrow, Button, IconButton, Chip, NumberField, TextField } from "../../design/primitives.jsx";
 import { mmss } from "../../lib/helpers.js";
-import { restTimer, useRestTimer } from "../../lib/restTimer.js";
+import { restTimer, useRestTimer, syncRestFromDraft, restState } from "../../lib/restTimer.js";
 import { readDraft, writeDraft, patchDraft, isForeign, acknowledge, DRAFT_EVENT } from "../../lib/sessionDraft.js";
 import { sayStable } from "../../lib/jeffrey.js";
 import { restAnnouncement, holdAnnouncement, genericAnnouncement } from "../../lib/restSpeech.js";
@@ -117,6 +117,8 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   useEffect(() => {
     const onDraft = () => {
       const d = readDraft();
+      // G4-C3 : séance enregistrée ou abandonnée à la voix → le carnet se ferme.
+      if (!d) { onCancel(); return; }
       if (!matches(d) || !isForeign(d)) return;
       acknowledge(d);
       setExos(d.exos); setStart(d.start); setDuration(String(d.duration)); setRpe(String(d.rpe));
@@ -130,7 +132,12 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   const [lastTimerByExo, setLastTimerByExo] = useState({});
   // Au premier affichage d'une séance neuve, le minuteur se règle sur le repos du premier
   // exercice — sauf s'il tourne déjà (on revient sur l'onglet pendant un repos).
-  useEffect(() => { if (!timer.running && timer.remaining === timer.secs) restTimer.set(exos[0]?.rest ?? 120); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // G4-C3 : un repos déjà rangé dans le brouillon (lancé à la voix, app fermée) est repris tel quel.
+  useEffect(() => {
+    syncRestFromDraft();
+    const st = restState();
+    if (!readDraft()?.rest && !st.endAt && st.remaining === st.secs) restTimer.set(exos[0]?.rest ?? 120);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Les notifications système doublent le décompte JS : elles seules sont fiables
   // écran verrouillé. `openName` sert à afficher l'exercice concerné dans la notif.
@@ -229,18 +236,7 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   }, [training, exos.map((e) => e.nom).join("|")]);
   // Indices des séries qui battent le record au moment où elles sont cochées : la référence
   // avance au fil des séries, donc seules les vraies améliorations successives ressortent.
-  const recordIdx = (e) => {
-    let run = refRecords[e.nom];
-    const out = new Set();
-    if (!run) return out; // 1re fois sur cet exercice : une référence, pas un record
-    e.series.forEach((s, i) => {
-      if (!s.fait) return;
-      const cur = { poids: +s.poids || 0, val: +s.val || 0 };
-      if (!(cur.poids > 0 || cur.val > 0)) return;
-      if (beats(cur, run, e.mode)) { run = cur; out.add(i); }
-    });
-    return out;
-  };
+  const recordIdx = (e) => recordSetIndexes(e, refRecords[e.nom]);
 
   // Entrée sur les reps → champ poids de la même série.
   const poidsRefs = useRef({});

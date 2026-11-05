@@ -15,6 +15,12 @@ import { makeCoach } from "./coachInputs.js";
 import { checkAgir, doneSummary, paramsKey } from "@rawcare/core/coach/bridgeActions";
 import { searchCiqual, getCiqual } from "@rawcare/core/nutrition/ciqual";
 import { applyActionStored } from "./jeffreyNotify.js";
+import { readDraft, writeDraft } from "./sessionDraft.js";
+import { restAnnouncement } from "./restSpeech.js";
+import { voiceServer, speechPlan } from "./voiceConfig.js";
+import { readSession, logSet, undoLastSet, goToExercise, nextExercise, restAction, finishCheck, abandonCheck } from "@rawcare/core/session/voiceSession";
+import { currentSet } from "@rawcare/core/session/engine";
+import { byDate } from "@rawcare/core/dateUtils";
 import { briefAfterKnee } from "@rawcare/core/coach/brief";
 import { jeffreyTurn, newId, hhmm } from "./jeffreyTurn.js";
 import { aiMissing } from "./ai.js";
@@ -26,6 +32,8 @@ export const bridgeVersion = () => ({ pont: BRIDGE_VERSION, appli: APP_VERSION }
 
 /** `lire {sujet}` → { date, regles, faits, manque }. Rien n'est écrit. */
 export function readSubject(sujet) {
+  // G4-C3 : la séance en cours (brouillon), pour la séance à la voix.
+  if (sujet === "seance") return { date: today(), ...readSession(readDraft(), sessionCtx(Date.now())) };
   if (!BRIDGE_SUBJECTS.includes(sujet)) throw fail("inconnu");
   const data = loadData();
   const date = today();
@@ -120,13 +128,16 @@ export async function runAgir(args, { now = Date.now(), ctx = agirContext() } = 
   const action = args?.action;
   const parametres = args?.parametres && typeof args.parametres === "object" ? args.parametres : {};
   const key = paramsKey(action, parametres);
+  // G4-C3 : gestes de séance notés tout de suite (choix de Yoann), sans relecture ni jeton.
+  if (SESSION_NOW.has(action)) return runSessionNow(action, parametres, { now, write: args?.verifier === false });
+  const check = SESSION_CONFIRM.has(action) ? () => sessionConfirmCheck(action, parametres, now) : () => checkAgir(action, parametres, ctx);
   if (args?.verifier !== false) {
-    const res = await checkAgir(action, parametres, ctx);
+    const res = await check();
     if (!res.ok) return res;
     const jeton = newJeton();
     const kept = Object.entries(pendingAgir(now)).sort((a, b) => b[1].exp - a[1].exp).slice(0, AGIR_MAX - 1);
     store.set(AGIR_KEY, Object.fromEntries([...kept, [jeton, { key, resume: res.resume, exp: now + AGIR_TTL_MS }]]));
-    return { ok: true, resume: res.resume, jeton };
+    return { ok: true, resume: res.resume, ...(res.question ? { question: res.question } : {}), jeton };
   }
   const pending = pendingAgir(now);
   const p = args?.jeton ? pending[args.jeton] : null;
@@ -136,9 +147,10 @@ export async function runAgir(args, { now = Date.now(), ctx = agirContext() } = 
   // Jeton à usage unique : retiré avant l'écriture.
   delete pending[args.jeton];
   store.set(AGIR_KEY, pending);
-  const res = await checkAgir(action, parametres, ctx);
+  const res = await check();
   if (!res.ok) return { fait: false, raison: res.raison };
   if (res.resume !== p.resume) return { fait: false, raison: `les données ont changé depuis la relecture ; relisez à Monsieur : ${res.resume}` };
+  if (res.apply) { res.apply(); return { fait: true, resume: res.done }; }
   const change = applyActionStored(res.act);
   const out = { fait: true, resume: doneSummary(res.act, change) };
   // G4-A : séance démarrée → JEFFREY ouvre PROTOCOLE (le service ne peut pas lancer une activité
@@ -155,6 +167,87 @@ export async function runAgir(args, { now = Date.now(), ctx = agirContext() } = 
     if (b) out.brief_du_jour = b;
   }
   return out;
+}
+
+// --- G4-C3 : la séance à la voix (05/11/2026) ----------------------------------------------------
+// Règles pures : packages/core/src/session/voiceSession.js ; ici, l'écriture du brouillon, le
+// réveil de fin de repos (natif, par la page) et l'enregistrement de la séance.
+const SESSION_NOW = new Set(["noter_serie", "annuler_serie", "aller_a", "exercice_suivant", "repos"]);
+const SESSION_CONFIRM = new Set(["terminer_seance", "annuler_seance"]);
+
+function sessionCtx(now) {
+  return { training: getSync("trainingLog", []), knee: getSync("kneeLog", []), now };
+}
+
+/** Réveil de fin de repos (natif) : programmé à `rest.endAt`, ou retiré. Hors app native : rien. */
+function nativeRest(rest) {
+  const page = typeof window !== "undefined" ? window.JeffreyBridgePage : null;
+  if (!page?.restAlarm) return;
+  if (!rest?.endAt) { page.restAlarm(JSON.stringify({ endAt: null })); return; }
+  const server = rest.speech ? voiceServer() : null;
+  const plan = server ? speechPlan(rest.speech) : null;
+  page.restAlarm(JSON.stringify({ endAt: rest.endAt, label: rest.label || "", voice: plan ? { ...server, ...plan } : null }));
+}
+
+/** Geste de séance immédiat. `write: false` : décrit sans rien écrire. */
+export function runSessionNow(action, p, { now = Date.now(), write = true } = {}) {
+  const d = readDraft();
+  const ctx = sessionCtx(now);
+  let r;
+  if (action === "noter_serie") r = logSet(d, p, ctx);
+  else if (action === "annuler_serie") r = undoLastSet(d);
+  else if (action === "aller_a") r = goToExercise(d, p, ctx);
+  else if (action === "exercice_suivant") r = nextExercise(d, ctx);
+  else r = restAction(d, p?.action, now);
+  if (!r.ok) {
+    const out = { fait: false, raison: r.raison };
+    if (r.choix) out.choix = r.choix;
+    if (r.besoin) out.besoin = r.besoin;
+    return out;
+  }
+  let draft = r.draft;
+  // Série notée : repos de l'exercice lancé, avec la phrase de fin de repos du carnet.
+  if (action === "noter_serie") {
+    const secs = r.restSecs;
+    draft = { ...draft, rest: { secs, remaining: secs, endAt: now + secs * 1000, label: draft.exos[r.ei].nom, speech: restAnnouncement(draft.exos, r.ei, r.si) } };
+  }
+  if (action === "annuler_serie" && draft.rest?.endAt) draft = { ...draft, rest: { ...draft.rest, endAt: null, remaining: draft.rest.secs } };
+  if (action === "repos" && p?.action === "lancer") {
+    const cur = currentSet(draft.exos, { ei: draft.courant });
+    if (cur) draft = { ...draft, rest: { ...draft.rest, speech: restAnnouncement(draft.exos, cur.ei, -1) } };
+  }
+  const out = { fait: true, resume: r.phrase };
+  if (r.record) out.record = true;
+  if (r.plateau) out.plateau = r.plateau;
+  if (!write) return { ok: true, resume: r.phrase, immediat: true };
+  writeDraft(draft);
+  if (action === "noter_serie" || action === "annuler_serie" || action === "repos") nativeRest(draft.rest);
+  return out;
+}
+
+/** Fin ou abandon de la séance : relecture (résumé, question), puis écriture après « oui ». */
+function sessionConfirmCheck(action, p, now) {
+  const d = readDraft();
+  if (action === "terminer_seance") {
+    const r = finishCheck(d, p, { nowMs: now });
+    if (!r.ok) return r;
+    return {
+      ok: true, resume: r.resume, question: r.question, done: `Séance ${d.type} enregistrée, Monsieur.`,
+      apply: () => {
+        const log = getSync("trainingLog", []);
+        const next = r.editingId ? log.map((t) => (t.id === r.editingId ? r.record : t)) : [...log, r.record];
+        store.set("trainingLog", next.sort(byDate));
+        store.set("trainingDraft", null);
+        nativeRest(null);
+      },
+    };
+  }
+  const r = abandonCheck(d);
+  if (!r.ok) return r;
+  return {
+    ok: true, resume: r.resume, question: r.question, done: `Séance ${d.type} abandonnée : rien n'a été enregistré.`,
+    apply: () => { store.set("trainingDraft", null); nativeRest(null); },
+  };
 }
 
 /**

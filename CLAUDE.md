@@ -17,7 +17,7 @@ les pièges identifiés et les tests attendus — ne pas les rouvrir sans raison
 À la fin d'une étape : cocher son état dans le tableau de `ROADMAP.md`, et
 documenter le livré ici, dans CLAUDE.md.
 
-## Jeffrey, état actuel (mis à jour le 05/11/2026, apps/perso v3.156.0)
+## Jeffrey, état actuel (mis à jour le 05/11/2026, apps/perso v3.157.0)
 
 Résumé de référence. Les sections datées plus bas (chantier J, 29-31/10/2026) racontent comment on
 en est arrivé là ; **en cas de désaccord, c'est cette section qui fait foi**. À tenir à jour à
@@ -149,6 +149,20 @@ PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
   - Le minuteur range son état dans `rest` (`secs, remaining, endAt, label, speech`) à chaque
     geste, et s'y recale quand une autre page l'écrit (`syncRestFromDraft`). Le réveil natif
     est inchangé.
+- **G4-C3, séance à la voix (v3.157.0)** : règles pures dans
+  `packages/core/src/session/voiceSession.js`, écriture dans `lib/bridge.js`.
+  - `lire { sujet: "seance" }` : où en est la séance.
+  - **Gestes immédiats** de `agir`, sans relecture : `noter_serie` (série notée tout de suite, repos
+    lancé, record ou plateau annoncés), `annuler_serie`, `aller_a`, `exercice_suivant`, `repos`.
+  - **Avec relecture et jeton** : `terminer_seance` (résumé ; pour le Basket, durée puis effort),
+    `annuler_seance`.
+  - Une séance de carnet démarrée à la voix crée le brouillon tout de suite, même app fermée
+    (`jeffreyStart.resume`). L'app l'ouvre telle quelle (`resumeSession`, `resumeTick` de
+    TrainTab) et ferme le carnet quand la séance est enregistrée à la voix.
+  - Le pont programme le réveil de fin de repos sans l'app : `restAlarm` de la page du pont →
+    `RestTimerPlugin.scheduleFromBridge` / `cancelFromBridge`.
+  - Brouillon : `courant` (exercice nommé) et `voix.last` (pour « annule »).
+  - Catalogue : `G4-C3-protocole-seance-voix-catalogue.md`.
 - **Relecture dans l'app ouverte (G3)** : après toute écriture d'une page sans écran (pont,
   notification, brief de secours), l'app relit poids, genou, macros, note, journal alimentaire,
   conversation, carnet, marqueur de mémoire et séances (G4-A) avant son prochain enregistrement. Trois
@@ -5709,3 +5723,35 @@ fonction locale s'appelle maintenant `dropExercise`, et c'est vérifié.
 - ajout puis retrait d'un exercice : bon nombre d'exercices ;
 - tests : `apps/perso/test/sessionDraft.test.mjs` (3) — 234 au total.
 - **Pas vérifié sur le téléphone.**
+
+## Pont vers l'appli JEFFREY, étape G4-C3 : la séance à la voix (05/11/2026, apps/perso v3.157.0)
+
+Toute une séance de carnet peut se faire aux écouteurs, en parlant à JEFFREY : démarrer, noter les
+séries, changer d'exercice, régler le repos, annuler une série, terminer. Choix de Yoann et contrat
+dans « Jeffrey, état actuel ».
+
+**Aucune règle métier nouvelle.** Tout passe par le moteur de séance (C1), le brouillon (C2), les
+records (V4) et les plateaux du carnet ; la phrase de fin de repos est celle du carnet.
+
+**Fichiers** :
+- `packages/core/src/session/voiceSession.js` (nouveau) ;
+- `engine.js` : `recordSetIndexes`, `spokenName` et `ofName` y déménagent ;
+- `lib/bridge.js`, `lib/jeffreyNotify.js`, `lib/restTimer.js` (`restState`, fin de séance venue
+  d'ailleurs) ;
+- `MuscuLogger.jsx` : fermeture quand la séance est finie ailleurs ; repos repris du brouillon à
+  l'ouverture ;
+- `TrainTab.jsx`, `App.jsx` (`resumeSession`) ;
+- Android : `RestTimerPlugin.kt` (`countdown`, `scheduleFromBridge`, `cancelFromBridge`) et la
+  page du pont (`restAlarm`).
+
+**Vérifications** :
+- capture du carnet : 62 états identiques entre la version installée (C2) et C3 ;
+- séance complète par le pont dans l'aperçu, app ouverte :
+  - le carnet s'ouvre seul ;
+  - série notée → cochée, minuteur lancé, record annoncé ;
+  - rowing, annule, +30 s, exercice suivant ;
+  - terminer → enregistrée, carnet fermé ;
+- tests : `voiceSession.test.mjs` (8) — 242 au total ;
+- compilation Android faite.
+- **Pas vérifié sur le téléphone** : le réveil programmé par le pont app fermée, et une séance
+  démarrée app fermée puis ouverte.

@@ -3,27 +3,10 @@
 // sinon qu'il ne reste qu'à valider. Calculée au moment où la série est cochée (le réveil natif
 // la joue, app fermée ou non) ; textes fixes du recueil, aucun appel à l'IA.
 import { say } from "./jeffrey.js";
-import { nextAfter } from "@rawcare/core/session/engine";
-
-/** Nom d'exercice lisible à voix haute : sans parenthèses, « @60° » → « à 60° », tiret → virgule. */
-export function spokenName(nom) {
-  const s = String(nom || "")
-    .replace(/\s*\([^)]*\)/g, "")
-    .replace(/@\s*/g, "à ")
-    .replace(/\s+[—–-]\s+/g, ", ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return s ? s[0].toLowerCase() + s.slice(1) : s;
-}
-
-/** « de développé incliné » / « d'élévations latérales ». */
-export const ofName = (nom) => {
-  const x = spokenName(nom);
-  return /^[aeiouyàâéèêëîïôûü]/i.test(x) ? `d'${x}` : `de ${x}`;
-};
+import { nextAfter, spokenName, ofName } from "@rawcare/core/session/engine";
 
 /** Ce qui vient après une série : `nextAfter` du moteur de séance (G4-C1), ré-exporté ici. */
-export { nextAfter };
+export { nextAfter, spokenName, ofName };
 
 const SIDE = { G: "côté gauche", D: "côté droit" };
 

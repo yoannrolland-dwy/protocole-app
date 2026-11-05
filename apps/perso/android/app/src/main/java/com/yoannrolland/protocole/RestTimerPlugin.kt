@@ -57,6 +57,62 @@ class RestTimerPlugin : Plugin() {
         /** Voix coupée (01/11/2026) : l'annonce d'un repos déjà programmé est oubliée. */
         fun clearStoredVoice(context: Context) = storeVoice(context, null)
 
+        /** Décompte persistant dans la barre d'état (partagé avec le pont, G4-C3). */
+        fun countdown(context: Context, endsAt: Long, exercise: String) {
+            ensureChannels(context)
+            val open = context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
+                android.app.PendingIntent.getActivity(
+                    context, 0, it,
+                    android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
+                )
+            }
+
+            val n = NotificationCompat.Builder(context, CHANNEL_COUNTDOWN)
+                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setContentTitle("Repos en cours, Monsieur")
+                .setContentText(if (exercise.isEmpty()) "Je vous préviens à la fin du décompte." else exercise)
+                // Chronomètre décroissant animé par le système : pas de mise à jour à faire.
+                .setUsesChronometer(true)
+                .setChronometerCountDown(true)
+                .setWhen(endsAt)
+                .setShowWhen(true)
+                .setOngoing(true)          // non balayable tant que le repos court
+                // Sans ça, une notification `ongoing` resterait bloquée si le repos se termine
+                // app fermée (aucun JS pour l'annuler) : Android la retire lui-même à échéance.
+                .setTimeoutAfter(maxOf(1000L, endsAt - System.currentTimeMillis() + 500L))
+                .setOnlyAlertOnce(true)
+                .setSilent(true)
+                .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setContentIntent(open)
+                .build()
+            NotificationManagerCompat.from(context).notify(NOTIF_COUNTDOWN, n)
+        }
+
+        /**
+         * G4-C3 (05/11/2026) : repos lancé par l'appli JEFFREY (page du pont), app fermée ou non.
+         * Même réveil que le carnet (`setAlarmClock` → RestAlarmReceiver : bip puis phrase de
+         * Jeffrey), même décompte. `voiceJson` : voix de la phrase de fin, ou null.
+         */
+        fun scheduleFromBridge(context: Context, endsAt: Long, exercise: String, voiceJson: String?) {
+            ensureChannels(context)
+            storeVoice(context, voiceJson)
+            val am = context.getSystemService(AlarmManager::class.java)
+            val show = context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
+                PendingIntent.getActivity(context, 0, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            }
+            am.setAlarmClock(AlarmManager.AlarmClockInfo(endsAt, show), alarmPendingIntent(context, exercise))
+            runCatching { countdown(context, endsAt, exercise) }
+        }
+
+        /** G4-C3 : repos arrêté par l'appli JEFFREY (ou séance finie) : réveil et décompte retirés. */
+        fun cancelFromBridge(context: Context) {
+            runCatching { context.getSystemService(AlarmManager::class.java).cancel(alarmPendingIntent(context, "")) }
+            storeVoice(context, null)
+            runCatching { NotificationManagerCompat.from(context).cancel(NOTIF_COUNTDOWN) }
+        }
+
         private fun storeVoice(context: Context, json: String?) {
             val e = context.getSharedPreferences(VOICE_PREFS, Context.MODE_PRIVATE).edit()
             if (json == null) e.remove("voice") else e.putString("voice", json)
@@ -153,36 +209,8 @@ class RestTimerPlugin : Plugin() {
         val endsAt = call.getLong("endsAt") ?: run { call.reject("endsAt requis"); return }
         val exercise = call.getString("exercise") ?: ""
 
-        val open = context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
-            android.app.PendingIntent.getActivity(
-                context, 0, it,
-                android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
-            )
-        }
-
-        val n = NotificationCompat.Builder(context, CHANNEL_COUNTDOWN)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("Repos en cours, Monsieur")
-            .setContentText(if (exercise.isEmpty()) "Je vous préviens à la fin du décompte." else exercise)
-            // Chronomètre décroissant animé par le système : pas de mise à jour à faire.
-            .setUsesChronometer(true)
-            .setChronometerCountDown(true)
-            .setWhen(endsAt)
-            .setShowWhen(true)
-            .setOngoing(true)          // non balayable tant que le repos court
-            // Sans ça, une notification `ongoing` resterait bloquée si le repos se termine
-            // app fermée (aucun JS pour l'annuler) : Android la retire lui-même à échéance.
-            .setTimeoutAfter(maxOf(1000L, endsAt - System.currentTimeMillis() + 500L))
-            .setOnlyAlertOnce(true)
-            .setSilent(true)
-            .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setContentIntent(open)
-            .build()
-
         try {
-            NotificationManagerCompat.from(context).notify(NOTIF_COUNTDOWN, n)
+            countdown(context, endsAt, exercise)
             call.resolve()
         } catch (e: SecurityException) {
             call.reject("Notifications non autorisées : ${e.message}")

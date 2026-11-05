@@ -171,6 +171,19 @@ object BridgePage {
 
         @JavascriptInterface fun finish(result: String) = complete(result)
 
+        /** G4-C3 : repos lancé à la voix. `json` = { endAt, label, voice? } ; endAt null = arrêter. */
+        @JavascriptInterface fun restAlarm(json: String) {
+            try {
+                val o = JSONObject(json)
+                if (o.isNull("endAt")) com.yoannrolland.protocole.RestTimerPlugin.cancelFromBridge(context)
+                else com.yoannrolland.protocole.RestTimerPlugin.scheduleFromBridge(
+                    context, o.getLong("endAt"), o.optString("label"), if (o.isNull("voice")) null else o.optJSONObject("voice")?.toString(),
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "repos non programmé : ${e.javaClass.simpleName}")
+            }
+        }
+
         /** G3 : réglage « brief du matin » Activé / Désactivé (genou noté par JEFFREY). */
         @JavascriptInterface fun briefEnabled(): Boolean = com.yoannrolland.protocole.BriefScheduler.enabled(context)
 
