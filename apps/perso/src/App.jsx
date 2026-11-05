@@ -24,9 +24,9 @@ import { progressColor } from "./lib/progress.js";
 import { COLORS } from "./design/tokens.js";
 import { isMatchWeek, isPostMatchDay, planForDate } from "./lib/plan.js";
 import { makeCoach } from "./lib/coachInputs.js";
-import { briefMissing, briefInApp } from "@rawcare/core/coach/brief";
-import { readBriefState, runBrief, missingText } from "./lib/brief.js";
-import { cancelBriefAlarm, briefEnabled, postJeffreyNotification } from "./lib/briefNative.js";
+import { briefMissing, briefInApp, briefHandoff, jeffreyBackupDue } from "@rawcare/core/coach/brief";
+import { readBriefState, writeBriefState, runBrief, missingText, claimBrief, releaseClaim } from "./lib/brief.js";
+import { cancelBriefAlarm, briefEnabled, postJeffreyNotification, signalJeffrey } from "./lib/briefNative.js";
 import { sendBackup, backupReady, lastOffPhoneBackup } from "./lib/serverBackup.js";
 import { backupRequest, setServerBackupAlarms } from "./lib/backupNative.js";
 import { notificationSpec } from "./lib/jeffreyNotify.js";
@@ -545,18 +545,48 @@ export default function App({ silent = false } = {}) {
   useEffect(() => { if (!showSettings) briefEnabled().then(setBriefOn); }, [showSettings]);
   // Météo du brief (J4.2) : position approximative notée à l'ouverture (et au retour au premier plan).
   useEffect(() => { if (!silent) notePosition(); }, []);
+  // G2 (pont JEFFREY, 05/11/2026, « secours seulement ») : au moment du brief, PROTOCOLE prévient
+  // d'abord l'appli JEFFREY ; si elle ne confirme pas (`brief_fait`) dans la minute, PROTOCOLE fait
+  // son brief comme avant. App à l'écran : c'est cet effet qui attend (relecture toutes les 5 s) ;
+  // app quittée : le contrôle natif de la minute lance la page sans écran (briefPage.js, mode
+  // « signal »). Une réservation (claimBrief) empêche deux briefs. Règles : core/coach/brief.js.
   useEffect(() => {
     if (loading || silent || healthSync.status === "running" || healthSync.at == null) return;
     const date = today();
+    const state = readBriefState();
     const decision = briefOn
-      ? briefInApp({ now: new Date(), today: date, knee, state: readBriefState(), force: briefNow > briefForced.current })
+      ? briefInApp({ now: new Date(), today: date, knee, state, force: briefNow > briefForced.current })
       : "off";
-    if (decision === "done" || decision === "off") { setBriefWaiting(null); return; }
+    if (decision === "done" || decision === "off") {
+      setBriefWaiting(null);
+      // Brief dit par JEFFREY : la copie du matin part quand même, une fois.
+      if (jeffreyBackupDue({ today: date, state })) {
+        writeBriefState({ backupDate: date });
+        sendBackup("matin", backupRequest).finally(() => setServerBackupTick((t) => t + 1));
+      }
+      return;
+    }
     const missing = briefMissing({ today: date, sleep, weight, knee });
     if (decision === "wait") { setBriefWaiting(missingText(missing)); return; }
-    if (briefRunning.current || aiMissing(ai)) return;
+    if (briefRunning.current) return;
     const forced = briefNow > briefForced.current;
     if (kneeSynced.current !== date && !forced) { kneeSynced.current = date; runHealthSync(); return; }
+    const handoff = briefHandoff({ nowMs: Date.now(), today: date, state, force: forced });
+    if (handoff.step === "done") return;
+    if (handoff.step === "signal") {
+      briefRunning.current = true;
+      signalJeffrey({ date, manque: missing })
+        .then((sent) => writeBriefState({ signal: { date, at: Date.now(), sent } }))
+        .finally(() => { briefRunning.current = false; setBriefTick((t) => t + 1); });
+      return;
+    }
+    if (handoff.step === "wait") {
+      setBriefWaiting(say("briefHandoff"));
+      const id = setTimeout(() => setBriefTick((t) => t + 1), Math.min(handoff.leftMs, 5000) + 100);
+      return () => clearTimeout(id);
+    }
+    // Secours : seulement à l'écran (en arrière-plan, le contrôle natif de la minute s'en charge).
+    if (document.visibilityState !== "visible" || aiMissing(ai) || !claimBrief(date)) return;
     briefForced.current = briefNow;
     briefRunning.current = true;
     setBriefWaiting(say("briefPreparing"));
@@ -576,6 +606,7 @@ export default function App({ silent = false } = {}) {
       sendBackup("matin", backupRequest).finally(() => setServerBackupTick((t) => t + 1));
     }).catch((e) => {
       console.error("brief", e);
+      releaseClaim();
       setBriefWaiting(say("briefRetry"));
     }).finally(() => {
       briefRunning.current = false;

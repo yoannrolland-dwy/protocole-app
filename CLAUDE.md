@@ -17,7 +17,7 @@ les pièges identifiés et les tests attendus — ne pas les rouvrir sans raison
 À la fin d'une étape : cocher son état dans le tableau de `ROADMAP.md`, et
 documenter le livré ici, dans CLAUDE.md.
 
-## Jeffrey, état actuel (mis à jour le 05/11/2026, apps/perso v3.152.0)
+## Jeffrey, état actuel (mis à jour le 05/11/2026, apps/perso v3.153.0)
 
 Résumé de référence. Les sections datées plus bas (chantier J, 29-31/10/2026) racontent comment on
 en est arrivé là ; **en cas de désaccord, c'est cette section qui fait foi**. À tenir à jour à
@@ -69,6 +69,8 @@ bas, champ de saisie visible.
   notification sans bruit. **Aucun réveil en arrière-plan.** « Le brief tout de suite » (carte du
   Bord) le lance sans genou. Météo Open-Meteo en une phrase si elle change quelque chose (position
   approximative, jamais envoyée à l'IA). Le brief n'a qu'un outil : `proposer_reponses`.
+  **Depuis v3.153.0 (G2), il passe d'abord par l'appli JEFFREY** : PROTOCOLE la prévient et
+  n'écrit son brief qu'en secours, si JEFFREY ne confirme pas dans la minute (voir le pont).
 - Notification de conversation : Écouter · Répondre · une réponse rapide (ou « Confirmer » si une
   action attend). Une réponse écrite dans la notification fait répondre Jeffrey sans ouvrir l'app.
 - Fin de repos du carnet : après le bip, il annonce la série ou l'exercice suivant.
@@ -97,7 +99,34 @@ PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
   le bilan d'ici (même demande, même tour, configuration IA des Réglages, donc Opus), écrit dans la
   conversation du jour, carnet de bord mis à jour.
 - Jamais par le pont : aucune clé, aucun réglage d'IA, aucun export complet, aucune écriture hors
-  du point/bilan. Pas encore : `agir`, `brief_fait`, signal « brief prêt » (étapes G2, G3).
+  du point/bilan et de `brief_fait`. Pas encore : `agir` (étape G3).
+- **G2, brief du matin (v3.153.0, décision de Yoann : « secours seulement »)**. Quand la règle du
+  brief le lance (genou noté, 5 h–midi, une fois par jour), PROTOCOLE envoie une diffusion
+  explicite à `fr.yrolland.jeffrey/.protocole.BriefSignalReceiver`, action
+  `fr.yrolland.jeffrey.action.PROTOCOLE_BRIEF_READY`, extra `json` = `{ date, manque }`
+  (`JeffreySignal.kt`). Il faut la permission `fr.yrolland.jeffrey.permission.PROTOCOLE_SIGNAL`
+  (signature, **déclarée par JEFFREY** : installer JEFFREY d'abord, puis PROTOCOLE, sinon Android
+  ne l'accorde pas). JEFFREY appelle l'op `brief_fait { date }` **avant** de parler :
+  `{ fait: true }` (jour marqué fait par JEFFREY), `{ fait: false, deja: true }` (déjà fait ou
+  réservé par PROTOCOLE), `{ fait: false }` (autre date). Sans confirmation dans la minute,
+  JEFFREY absent, sans récepteur ou permission refusée : brief de PROTOCOLE comme avant. App à
+  l'écran : l'app attend (relecture toutes les 5 s, carte « Votre brief part chez JEFFREY ») ;
+  app quittée : réveil exact à +62 s (`BriefSignalCheckReceiver`, rien si l'app est à l'écran,
+  `AppVisibility`) → page sans écran `brief.html?mode=signal`. Jamais deux briefs : PROTOCOLE
+  **réserve** le jour (`claimDate`, `claimAt`) juste avant d'écrire, et `brief_fait` refuse un jour
+  réservé. Après un échec, la réservation reste (JEFFREY ne reprend pas la main) mais « Le brief
+  tout de suite » peut réessayer. « Le brief tout de suite » ne passe jamais par JEFFREY. Brief dit
+  par JEFFREY : la copie du matin sur le serveur part quand même, une fois (`backupDate`). Règles
+  pures et testées : `briefHandoff`, `claimPatch`, `briefDoneByJeffrey`, `jeffreyBackupDue`
+  (`packages/core/src/coach/brief.js`). Marqueur `jeffreyBrief` = `{ doneDate, by, claimDate,
+  claimAt, signal: { date, at, sent }, backupDate }`, toujours hors `DATA_KEYS`.
+- **Essai sans toucher au vrai brief** : `adb shell am broadcast -n
+  com.yoannrolland.protocole/.BriefSignalTestReceiver [--es manque '["pesée"]']` envoie le signal
+  avec `essai: true` (date du jour) ; `brief_fait { date, essai: true }` répond `{ fait: true,
+  essai: true }` sans rien marquer ; aucun contrôle de la minute, aucun brief de secours. Le
+  récepteur est exporté mais protégé par `android.permission.DUMP` (shell d'adb seulement).
+- Règles du sujet `brief` du pont : mêmes consignes de forme que le brief d'ici (ordre, 150 mots,
+  texte simple, première phrase courte, donnée manquante dite et jamais inventée), test à l'appui.
 - Limites connues : le pont lit le stockage tel que l'app l'a laissé (pas de relecture de Health
   Connect : une nuit ou une pesée pas encore synchronisée par l'app apparaît dans `manque`) ; une
   analyse faite par le pont pendant que l'app est ouverte peut être écrasée à l'écran jusqu'au
@@ -156,7 +185,8 @@ PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
   `coach/stream.js` (lecture du flux), `coach/claudeApi.js` (`streamClaude`, reprise, coût),
   `coach/speechText.js` (texte découpé et écrit en toutes lettres pour la voix),
   `coach/prompt.js` (les données), `weather.js`, `healthMerge.js`.
-- Pont JEFFREY : `packages/core/src/coach/bridge.js`, `apps/perso/src/lib/bridge.js`,
+- Pont JEFFREY : `packages/core/src/coach/bridge.js`, `apps/perso/src/lib/bridge.js`, Android
+  `JeffreySignal.kt` (G2 : signal, contrôle de la minute, essai),
   `src/bridgePage.js` + `bridge.html`, `lib/pageHttp.js` (relais HTTP partagé avec `briefPage.js`),
   Android `bridge/JeffreyBridgeService.kt`.
 - App (`apps/perso/src/`) : `lib/jeffrey.js` (phrases fixes), `lib/jeffreyTurn.js` (un tour de
@@ -5481,3 +5511,21 @@ Détail et contrat dans « Jeffrey, état actuel » (en tête) et dans le cadrag
 - **Pas vérifié sur le téléphone** : liaison réelle depuis JEFFREY, `analyse` réelle (réseau
   en économie d'énergie : la page tente le service au premier plan `BriefService`, sans garantie
   qu'Android l'autorise depuis un service lié).
+
+## Pont vers l'appli JEFFREY, étape G2 : brief du matin en secours (05/11/2026, apps/perso v3.153.0)
+
+Décision de Yoann : « secours seulement ». Le brief passe d'abord par l'appli JEFFREY ; PROTOCOLE
+ne le fait que si JEFFREY ne confirme pas dans la minute. Jamais deux briefs, jamais de matin sans
+brief. Détail et contrat dans « Jeffrey, état actuel » (en tête).
+- **Aucune règle métier nouvelle** : la règle qui lance le brief (`briefInApp`) et le brief lui-même
+  (`runBrief`) ne changent pas. Seuls s'ajoutent le signal, l'attente, la réservation et l'op
+  `brief_fait`. Le brief part même sans fournisseur IA configuré ici (le signal ne demande rien),
+  le secours exige toujours une IA.
+- **Limite connue** : si Android repousse le réveil de la minute (économie d'énergie très
+  stricte), le secours part plus tard, ou au prochain retour dans l'app.
+- Tests : `packages/core/test/briefHandoff.test.mjs` (8 tests) et règles du brief du pont dans
+  `bridge.test.mjs` — 209 au total. Aperçu (horloge forcée à 9 h, faux serveur IA injoignable) :
+  attente affichée, `brief_fait` → plus rien et copie du matin marquée ; signal de 55 s → secours
+  au bout de la minute, échec réseau → « Le brief tout de suite » et réservation libérée ;
+  `brief_fait` d'essai sans rien marquer. Compilation Kotlin et manifeste fusionné vérifiés
+  (permission, `<queries>`, deux récepteurs). **Pas vérifié sur le téléphone** (un matin réel).

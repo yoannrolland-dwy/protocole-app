@@ -7,6 +7,7 @@ import { DEFAULT_TARGETS } from "@rawcare/core/targets";
 import { SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
 import { JEFFREY_PERSONA, jeffreyAsk, withMemory, pendingMemoryDate, decideAction } from "@rawcare/core/coach/jeffrey";
 import { today, shiftDateKey, daysBetween } from "@rawcare/core/dateUtils";
+import { claimPatch, briefDoneByJeffrey } from "@rawcare/core/coach/brief";
 import { makeCoach } from "./coachInputs.js";
 import { jeffreyTurn, newId, hhmm } from "./jeffreyTurn.js";
 import { say } from "./jeffrey.js";
@@ -14,11 +15,31 @@ import { fetchWeather } from "./weather.js";
 import { applyActionStored } from "./jeffreyNotify.js";
 import { lastOffPhoneBackup } from "./serverBackup.js";
 
-// Marqueur du jour { doneDate } (les anciens appDate, remindedDate, tries ne servent plus). Hors DATA_KEYS, comme
+// Marqueur du jour { doneDate, by, claimDate, claimAt, signal, backupDate } (G2 : voir
+// core/coach/brief.js ; les anciens appDate, remindedDate, tries ne servent plus). Hors DATA_KEYS, comme
 // jeffreyMemoryDate : restaurer une vieille sauvegarde ne doit pas faire croire qu'un brief est fait.
 const STATE_KEY = "jeffreyBrief";
 export const readBriefState = () => getSync(STATE_KEY, {}) || {};
 export const writeBriefState = (patch) => store.set(STATE_KEY, { ...readBriefState(), ...patch });
+
+// Étape G2 (pont JEFFREY, 05/11/2026) : règles dans core/coach/brief.js. Lecture et écriture dans
+// la même tâche synchrone : l'app, la page du brief et la page du pont partagent ce stockage.
+/** Réserve le brief du jour pour PROTOCOLE → true, ou false (déjà fait, ou tentative en cours). */
+export function claimBrief(date) {
+  const patch = claimPatch({ nowMs: Date.now(), today: date, state: readBriefState() });
+  if (!patch) return false;
+  writeBriefState(patch);
+  return true;
+}
+/** Échec du brief de PROTOCOLE : la réservation reste (JEFFREY ne reprend pas la main), mais un
+ *  nouvel essai est permis tout de suite. */
+export const releaseClaim = () => writeBriefState({ claimAt: 0 });
+/** Opération `brief_fait` du pont. */
+export function briefDoneFromJeffrey(args) {
+  const { result, patch } = briefDoneByJeffrey({ date: args?.date, essai: args?.essai === true }, { today: today(), state: readBriefState() });
+  if (patch) writeBriefState(patch);
+  return result;
+}
 
 /** Données telles que l'app les charge (mêmes défauts, mêmes fusions), sans rien écrire. */
 export function loadData() {

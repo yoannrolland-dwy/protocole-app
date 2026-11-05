@@ -24,6 +24,20 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
     }
 
+    // Pont JEFFREY, G2 (05/11/2026) : à l'écran, c'est l'app qui gère la minute d'attente du
+    // brief ; sinon, le contrôle natif (BriefSignalCheckReceiver).
+    @Override
+    public void onResume() {
+        super.onResume();
+        AppVisibility.setResumed(true);
+    }
+
+    @Override
+    public void onPause() {
+        AppVisibility.setResumed(false);
+        super.onPause();
+    }
+
     // L'app est en singleTask : un tap sur une tuile du widget quand elle tourne déjà arrive ici,
     // pas dans onCreate. On garde ce nouvel intent pour que WidgetBridge.consumeOpenTab le lise.
     @Override

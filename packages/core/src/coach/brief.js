@@ -36,3 +36,63 @@ export function briefInApp({ now, today, knee, state = {}, force = false }) {
   if (force || (knee || []).some((e) => e.date === today)) return "brief";
   return "wait";
 }
+
+// ── Étape G2 du pont JEFFREY (05/11/2026, décision de Yoann : « secours seulement ») ──────────
+// Quand la règle ci-dessus lance le brief, PROTOCOLE prévient d'abord l'appli JEFFREY (diffusion
+// PROTOCOLE_BRIEF_READY). JEFFREY confirme par l'opération `brief_fait` du pont AVANT de parler.
+// Sans confirmation dans la minute (JEFFREY absent, permission refusée, appli muette), PROTOCOLE
+// fait son brief exactement comme avant. Jamais deux briefs : PROTOCOLE « réserve » le brief du
+// jour (claimDate) juste avant de l'écrire, et `brief_fait` refuse un jour réservé ou fait.
+// État (clé jeffreyBrief, hors DATA_KEYS) : { doneDate, by, claimDate, claimAt, signal: { date, at,
+// sent }, backupDate }.
+
+export const SIGNAL_WAIT_MS = 60_000;
+// Une réservation en cours bloque une seconde tentative pendant ce temps (un brief tient en moins
+// d'une minute) ; au-delà, ou après un échec (claimAt remis à 0), PROTOCOLE peut réessayer.
+export const CLAIM_HOLD_MS = 90_000;
+
+/**
+ * Brief à lancer (briefInApp a dit « brief ») : que faire de JEFFREY ?
+ * - { step: "done" } : brief du jour déjà fait (par l'un ou l'autre) ;
+ * - { step: "signal" } : prévenir JEFFREY (pas encore fait aujourd'hui) ;
+ * - { step: "wait", leftMs } : JEFFREY prévenu, il a encore `leftMs` pour confirmer ;
+ * - { step: "fallback" } : brief de PROTOCOLE (bouton forcé, JEFFREY injoignable, minute passée,
+ *   ou brief déjà réservé par PROTOCOLE et à réessayer).
+ */
+export function briefHandoff({ nowMs, today, state = {}, force = false }) {
+  if (state.doneDate === today) return { step: "done" };
+  if (force || state.claimDate === today) return { step: "fallback" };
+  const s = state.signal;
+  if (!s || s.date !== today) return { step: "signal" };
+  if (!s.sent) return { step: "fallback" };
+  const leftMs = SIGNAL_WAIT_MS - (nowMs - (s.at || 0));
+  return leftMs > 0 ? { step: "wait", leftMs } : { step: "fallback" };
+}
+
+/** Réserver le brief du jour pour PROTOCOLE → patch à écrire, ou null (déjà fait, ou une
+ *  tentative est en cours). À lire et écrire dans la même tâche synchrone. */
+export function claimPatch({ nowMs, today, state = {} }) {
+  if (state.doneDate === today) return null;
+  if (state.claimDate === today && state.claimAt && nowMs - state.claimAt < CLAIM_HOLD_MS) return null;
+  return { claimDate: today, claimAt: nowMs };
+}
+
+/**
+ * Opération `brief_fait` du pont, appelée par JEFFREY avant de parler ou de notifier.
+ * → { result, patch } : `patch` à écrire dans l'état (null = rien).
+ * - autre date que le jour : { fait: false } ;
+ * - essai (`essai: true`, signal envoyé par la commande de test) : { fait: true, essai: true }, rien
+ *   n'est marqué ;
+ * - brief déjà fait ou réservé par PROTOCOLE : { fait: false, deja: true } ;
+ * - sinon : { fait: true }, brief du jour marqué fait par JEFFREY.
+ */
+export function briefDoneByJeffrey({ date, essai = false }, { today, state = {} }) {
+  if (date !== today) return { result: { fait: false }, patch: null };
+  if (essai) return { result: { fait: true, essai: true }, patch: null };
+  if (state.doneDate === today || state.claimDate === today) return { result: { fait: false, deja: true }, patch: null };
+  return { result: { fait: true }, patch: { doneDate: today, by: "jeffrey" } };
+}
+
+/** Copie du matin sur le serveur après un brief dit par JEFFREY (PROTOCOLE l'envoie déjà juste
+ *  après son propre brief) : une seule fois par jour. */
+export const jeffreyBackupDue = ({ today, state = {} }) => state.doneDate === today && state.by === "jeffrey" && state.backupDate !== today;

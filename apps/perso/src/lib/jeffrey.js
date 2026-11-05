@@ -100,6 +100,8 @@ export const PHRASES = {
   // --- Brief du matin (J4.1) : {x} = « J'ai votre nuit ; il me manque votre pesée et votre genou. »
   briefWaiting: ["Bonjour Monsieur. {x} Le brief part dès que vous aurez noté votre genou.", "Bien le bonjour, Monsieur. {x} Votre genou, et je vous fais le brief."],
   briefPreparing: ["Je prépare votre brief, Monsieur."],
+  // G2 (05/11/2026) : le brief passe d'abord par l'appli JEFFREY ; secours ici au bout d'une minute.
+  briefHandoff: ["Votre brief part chez JEFFREY, Monsieur. S'il ne répond pas dans la minute, je m'en charge."],
   briefRetry: ["Un contretemps, Monsieur : le brief n'est pas parti. « Le brief tout de suite » pour réessayer."],
 
   // --- Voix (serveur Oracle, 29/10/2026) : sans réseau ou sans serveur, il se tait et le dit.

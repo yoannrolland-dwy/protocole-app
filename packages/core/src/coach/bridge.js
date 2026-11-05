@@ -24,7 +24,9 @@ const MACROS = "MACROS : « reste » = cible du jour moins consommé ; une valeu
  */
 export function bridgeRules(coachSystem, sujet) {
   const parts = [COMPETENCES, `CONTEXTE DU COACH (contraintes permanentes) : ${coachSystem}`, JEFFREY_RULES, DONNEES, SEANCES, ALERTES, MACROS];
-  if (sujet === "brief") parts.push(`BRIEF DU MATIN : dans cet ordre, ${BRIEF_ORDER}. S'il manque la nuit, la pesée ou le genou, dites-le en une phrase.`);
+  // Mêmes consignes de forme que le brief de PROTOCOLE (jeffreyAsk « brief ») : ordre, 150 mots,
+  // texte simple, première phrase courte, donnée absente dite et jamais inventée (G2, 05/11/2026).
+  if (sujet === "brief") parts.push(`BRIEF DU MATIN : dans cet ordre, 150 mots au plus, texte simple (pas de titres, de gras ni de listes) : ${BRIEF_ORDER}. La première phrase est courte : c'est elle qu'on voit ou qu'on entend d'abord. S'il manque la nuit, la pesée ou le genou (« manque »), dites-le en une phrase et n'inventez jamais la valeur absente. Les rappels sont dans « rappels ». PROTOCOLE ne fournit pas la météo : sans météo de votre côté, n'en dites rien.`);
   return parts.join("\n\n");
 }
 

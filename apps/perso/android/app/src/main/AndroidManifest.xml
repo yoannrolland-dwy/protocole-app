@@ -97,6 +97,16 @@
             android:exported="true"
             android:permission="com.yoannrolland.protocole.permission.JEFFREY_BRIDGE" />
 
+        <!-- Pont JEFFREY, étape G2 (05/11/2026) : contrôle de la minute après le signal « brief
+             prêt » (non exporté), et signal d'essai réservé au shell d'adb (permission DUMP). -->
+        <receiver
+            android:name=".BriefSignalCheckReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".BriefSignalTestReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -115,6 +125,10 @@
         android:protectionLevel="signature" />
 
     <!-- Permissions -->
+
+    <!-- Pont JEFFREY, G2 : prévenir l'appli JEFFREY que le brief est prêt (permission déclarée par
+         JEFFREY, niveau signature) ; et la voir (Android 11+, <queries> plus bas). -->
+    <uses-permission android:name="fr.yrolland.jeffrey.permission.PROTOCOLE_SIGNAL" />
 
     <uses-permission android:name="android.permission.INTERNET" />
 
@@ -144,6 +158,7 @@
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
+        <package android:name="fr.yrolland.jeffrey" />
     </queries>
 
     <!-- Widget (28/10/2026) : relit les pas toutes les 30 min sans ouvrir l'app

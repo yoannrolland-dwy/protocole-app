@@ -37,7 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * - réponse (`what` = 2) : Bundle { id, ok, json } ou { id, ok = false, erreur } — un code court
  *   (occupe, inconnu, delai, ia_absente, ia_echec, interne, trop_long), jamais un texte technique
  *   ni une donnée. Réponse de 200 000 caractères au plus (sinon `trop_long`).
- * Opérations G1 : `version`, `lire` (20 s), `analyse` (90 s). Une seule requête à la fois
+ * Opérations : `version`, `lire` (20 s), `analyse` (90 s) — G1 ; `brief_fait` (20 s) — G2. Une seule requête à la fois
  * (sinon `occupe`). Tout le calcul se fait en JavaScript, dans la page sans écran `bridge.html`
  * (même origine que l'app, donc même stockage, même code `packages/core`).
  */
@@ -46,7 +46,7 @@ class JeffreyBridgeService : Service() {
         const val MSG_QUESTION = 1
         const val MSG_REPONSE = 2
         private const val TAG = "JeffreyBridge"
-        private val OPS = setOf("version", "lire", "analyse")
+        private val OPS = setOf("version", "lire", "analyse", "brief_fait")
         private const val LIRE_MS = 20_000L
         private const val ANALYSE_MS = 90_000L
         // Limite du Binder : au-delà, `trop_long` plutôt qu'une transaction qui échoue.

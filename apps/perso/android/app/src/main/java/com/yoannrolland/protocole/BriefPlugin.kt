@@ -44,6 +44,13 @@ class BriefPlugin : Plugin() {
         call.resolve()
     }
 
+    /** G2 : prévient JEFFREY que le brief est prêt (`json` = { date, manque }) → { sent }. */
+    @PluginMethod
+    fun signalJeffrey(call: PluginCall) {
+        val json = call.getString("json") ?: return call.reject("json manquant")
+        call.resolve(JSObject().put("sent", JeffreySignal.send(context, json, check = true)))
+    }
+
     @PluginMethod
     fun isEnabled(call: PluginCall) {
         call.resolve(JSObject().put("enabled", BriefScheduler.enabled(context)))

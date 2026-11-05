@@ -65,6 +65,13 @@ object BriefRunner {
         CoroutineScope(Dispatchers.Main).launch { startPage(app, "{}", "mode=backup&slot=${java.net.URLEncoder.encode(slot, "UTF-8")}", done) }
     }
 
+    /** G2 (05/11/2026) : une minute après le signal envoyé à JEFFREY, app quittée. La page relit
+     *  l'état (`?mode=signal`) : JEFFREY a confirmé → copie du matin ; sinon brief de PROTOCOLE. */
+    fun runSignalCheck(context: Context, done: () -> Unit) {
+        val app = context.applicationContext
+        CoroutineScope(Dispatchers.Main).launch { startPage(app, "{}", "mode=signal", done) }
+    }
+
     @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
     private fun startPage(context: Context, payload: String, query: String, done: () -> Unit) {
         val handler = Handler(Looper.getMainLooper())

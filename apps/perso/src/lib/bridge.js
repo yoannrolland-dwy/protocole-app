@@ -10,7 +10,7 @@ import { briefMissing } from "@rawcare/core/coach/brief";
 import { buildReading, BRIDGE_VERSION, BRIDGE_SUBJECTS, BRIDGE_ERRORS } from "@rawcare/core/coach/bridge";
 import { jeffreyAsk, withMemory, pendingMemoryDate } from "@rawcare/core/coach/jeffrey";
 import { APP_VERSION } from "../version.js";
-import { loadData, briefReminders, aiFromSettings, foodContext, saveDay } from "./brief.js";
+import { loadData, briefReminders, aiFromSettings, foodContext, saveDay, briefDoneFromJeffrey } from "./brief.js";
 import { makeCoach } from "./coachInputs.js";
 import { jeffreyTurn, newId, hhmm } from "./jeffreyTurn.js";
 import { aiMissing } from "./ai.js";
@@ -79,7 +79,7 @@ export async function runAnalyse({ type, transport }) {
 
 /**
  * Une requête du pont → { ok: true, json } ou { ok: false, erreur }. `json` : texte JSON de la
- * question ({ sujet } ou { type }). Opérations G1 : version, lire, analyse.
+ * question ({ sujet }, { type } ou { date }). Opérations : version, lire, analyse (G1), brief_fait (G2).
  */
 export async function handleBridgeRequest(op, json, { transport } = {}) {
   try {
@@ -88,6 +88,8 @@ export async function handleBridgeRequest(op, json, { transport } = {}) {
     if (op === "version") return { ok: true, json: bridgeVersion() };
     if (op === "lire") return { ok: true, json: readSubject(args?.sujet) };
     if (op === "analyse") return { ok: true, json: await runAnalyse({ type: args?.type, transport }) };
+    // G2 : JEFFREY confirme qu'il fait le brief du jour, avant de parler ou de notifier.
+    if (op === "brief_fait") return { ok: true, json: briefDoneFromJeffrey(args) };
     return { ok: false, erreur: "inconnu" };
   } catch (e) {
     // Seulement un code connu : jamais un message d'erreur qui pourrait porter une donnée.

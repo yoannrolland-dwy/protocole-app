@@ -18,3 +18,15 @@ export async function briefEnabled() {
   if (!native()) return true;
   try { return (await Brief.isEnabled()).enabled !== false; } catch { return true; }
 }
+
+/**
+ * Étape G2 (05/11/2026) : prévient l'appli JEFFREY que le brief du jour est prêt (diffusion
+ * protégée par sa permission PROTOCOLE_SIGNAL). → true si le signal est parti ; false si JEFFREY
+ * n'est pas installé, n'a pas encore le récepteur, ou si la permission n'est pas accordée (et
+ * toujours hors app native). Quand il part, Kotlin programme aussi le contrôle de la minute
+ * (BriefSignalCheckReceiver) : le brief de secours part même si l'app a été quittée.
+ */
+export async function signalJeffrey({ date, manque }) {
+  if (!native()) return false;
+  try { return (await Brief.signalJeffrey({ json: JSON.stringify({ date, manque }) })).sent === true; } catch (e) { console.warn("brief", e); return false; }
+}

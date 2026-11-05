@@ -4,7 +4,7 @@ import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import { buildCoachPrompt, buildBilanPrompt } from "../src/coach/prompt.js";
 import { buildReading, bridgeRules, BRIDGE_SUBJECTS } from "../src/coach/bridge.js";
-import { JEFFREY_PERSONA, JEFFREY_RULES, BRIEF_ORDER } from "../src/coach/jeffrey.js";
+import { JEFFREY_PERSONA, JEFFREY_RULES, BRIEF_ORDER, jeffreyAsk } from "../src/coach/jeffrey.js";
 import { briefMissing } from "../src/coach/brief.js";
 import { computeEnergyScore } from "../src/energy.js";
 import { computeBilanFacts } from "../src/bilan.js";
@@ -110,6 +110,12 @@ test("brief : forme + séance + rappels, ordre du brief dans les règles", () =>
   assert.ok(!bridgeRules("x", "macros").includes(BRIEF_ORDER));
   assert.ok(r.faits.nuit && r.faits.seance.aujourdhui && r.faits.seance.seances_autorisees);
   assert.equal(r.faits.rappels.length, 1);
+  // G2 : mêmes consignes de forme que le brief de PROTOCOLE (jeffreyAsk « brief »).
+  const own = jeffreyAsk("brief", { missing: ["pesée"] }).apiText;
+  for (const bit of ["150 mots au plus", "texte simple", "première phrase est courte", "n'inventez jamais la valeur absente"]) {
+    assert.ok(own.toLowerCase().includes(bit.toLowerCase()), `brief de PROTOCOLE : ${bit}`);
+    assert.ok(r.regles.toLowerCase().includes(bit.toLowerCase()), `règles du pont : ${bit}`);
+  }
 });
 
 test("point : bloc complet (temps réel, résumé 14 j, progression, notes, carnet)", () => {
