@@ -142,7 +142,8 @@ export function foodEntriesFor(action, log, date) {
     const ids = new Set(action.entryIds);
     return copyEntries((log || []).filter((e) => ids.has(e.id)), { date, meal: action.meal });
   }
-  if (action.kind === "habituel") return [makeEntry({ date, meal: action.meal, food: action.food, q: action.q })];
+  // « aliment » : aliment nommé à JEFFREY par le pont (G3, 05/11/2026), même écriture qu'un habituel.
+  if (action.kind === "habituel" || action.kind === "aliment") return [makeEntry({ date, meal: action.meal, food: action.food, q: action.q })];
   return [];
 }
 

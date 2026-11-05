@@ -17,7 +17,7 @@ les pièges identifiés et les tests attendus — ne pas les rouvrir sans raison
 À la fin d'une étape : cocher son état dans le tableau de `ROADMAP.md`, et
 documenter le livré ici, dans CLAUDE.md.
 
-## Jeffrey, état actuel (mis à jour le 05/11/2026, apps/perso v3.153.0)
+## Jeffrey, état actuel (mis à jour le 05/11/2026, apps/perso v3.154.0)
 
 Résumé de référence. Les sections datées plus bas (chantier J, 29-31/10/2026) racontent comment on
 en est arrivé là ; **en cas de désaccord, c'est cette section qui fait foi**. À tenir à jour à
@@ -99,7 +99,34 @@ PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
   le bilan d'ici (même demande, même tour, configuration IA des Réglages, donc Opus), écrit dans la
   conversation du jour, carnet de bord mis à jour.
 - Jamais par le pont : aucune clé, aucun réglage d'IA, aucun export complet, aucune écriture hors
-  du point/bilan et de `brief_fait`. Pas encore : `agir` (étape G3).
+  du point/bilan, de `brief_fait` et des actions de `agir`.
+- **G3, actions à la voix (v3.154.0)** : op `agir { action, parametres, verifier, jeton }` (20 s).
+  - **Deux temps.** `verifier: true` n'écrit rien. Il rend `{ ok, resume, jeton }` : JEFFREY relit
+    `resume` à Monsieur. Un refus rend `{ ok: false, raison }`, avec si besoin `choix` (5 aliments
+    au plus, `{ ref, nom }`) ou `besoin` (`grammes`, `retour_base`). `verifier: false` exige le
+    jeton (3 min, usage unique, mêmes paramètres). L'action est revérifiée et n'est écrite que si
+    la phrase n'a pas changé. Il rend `{ fait, resume }` ou `{ fait: false, raison }`.
+  - **Sept actions**, vérifiées par `checkAgir` (`packages/core/src/coach/bridgeActions.js`) :
+    - les cinq de Jeffrey, via `validateAction` ;
+    - `noter_poids` : saisie manuelle de l'onglet Poids, refusée si la balance a déjà pesé
+      aujourd'hui ;
+    - `ajouter_aliment` : ses recettes et ses aliments sur 60 jours, puis CIQUAL, sans Open Food
+      Facts. Sans quantité : recette = 1 portion, aliment déjà mangé = la dernière fois, sinon
+      `besoin: grammes`.
+  - **Jour** : `jour: demain` seulement pour les trois actions de repas.
+  - **Genou noté par JEFFREY** : si la règle du brief le lancerait maintenant (`briefAfterKnee`,
+    `brief.js`), la réponse porte `brief_du_jour: "a_faire"`, même app fermée. Conditions : 5 h
+    à midi, brief activé (lu par le natif, `briefEnabled`), pas encore fait ni réservé. JEFFREY
+    enchaîne, `brief_fait` d'abord, comme en G2.
+  - **Écriture** : `applyActionStored`, mêmes écritures que les écrans, avec maintenant une date,
+    le poids et l'aliment.
+  - Jetons en attente : clé `jeffreyAgir`, hors `DATA_KEYS`.
+  - Catalogue donné à JEFFREY : notes de la session, `G3-protocole-agir-catalogue.md`.
+- **Relecture dans l'app ouverte (G3)** : après toute écriture d'une page sans écran (pont,
+  notification, brief de secours), l'app relit poids, genou, macros, note, journal alimentaire,
+  conversation, carnet et marqueur de mémoire avant son prochain enregistrement. Trois
+  déclencheurs : l'événement `storage`, l'événement natif `protocole:external`
+  (`ExternalWrites.kt`) et le retour au premier plan (avant la synchro Health Connect).
 - **G2, brief du matin (v3.153.0, décision de Yoann : « secours seulement »)**. Quand la règle du
   brief le lance (genou noté, 5 h–midi, une fois par jour), PROTOCOLE envoie une diffusion
   explicite à `fr.yrolland.jeffrey/.protocole.BriefSignalReceiver`, action
@@ -127,10 +154,12 @@ PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
   récepteur est exporté mais protégé par `android.permission.DUMP` (shell d'adb seulement).
 - Règles du sujet `brief` du pont : mêmes consignes de forme que le brief d'ici (ordre, 150 mots,
   texte simple, première phrase courte, donnée manquante dite et jamais inventée), test à l'appui.
-- Limites connues : le pont lit le stockage tel que l'app l'a laissé (pas de relecture de Health
-  Connect : une nuit ou une pesée pas encore synchronisée par l'app apparaît dans `manque`) ; une
-  analyse faite par le pont pendant que l'app est ouverte peut être écrasée à l'écran jusqu'au
-  prochain retour au premier plan (même limite que les réponses depuis la notification).
+- Limites connues :
+  - le pont lit le stockage tel que l'app l'a laissé. Il ne relit pas Health Connect : une nuit ou
+    une pesée pas encore synchronisée par l'app apparaît dans `manque`, et `noter_poids` passe
+    alors, puis la balance reprend la main à la synchro suivante ;
+  - l'écrasement de l'app ouverte (point, réponses depuis la notification) est corrigé par la
+    relecture de G3.
 
 **Modèle et fournisseur.**
 - Un seul modèle pour toute l'IA de l'app (Jeffrey, Carte resto, Photo d'un plat) : **Claude
@@ -188,7 +217,8 @@ PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
 - Pont JEFFREY : `packages/core/src/coach/bridge.js`, `apps/perso/src/lib/bridge.js`, Android
   `JeffreySignal.kt` (G2 : signal, contrôle de la minute, essai),
   `src/bridgePage.js` + `bridge.html`, `lib/pageHttp.js` (relais HTTP partagé avec `briefPage.js`),
-  Android `bridge/JeffreyBridgeService.kt`.
+  Android `bridge/JeffreyBridgeService.kt` ; G3 : `packages/core/src/coach/bridgeActions.js`,
+  Android `ExternalWrites.kt`.
 - App (`apps/perso/src/`) : `lib/jeffrey.js` (phrases fixes), `lib/jeffreyTurn.js` (un tour de
   conversation), `lib/coachInputs.js`, `lib/brief.js`, `lib/briefNative.js`,
   `lib/jeffreyNotify.js`, `lib/jeffreyHttp.js`, `lib/voice.js`, `lib/voiceConfig.js`,
@@ -3641,7 +3671,7 @@ Vérifié dans l'aperçu : 1:58 → 1:28 après un saut d'horloge de 30 s simul�
    `apiKey`, `litellmKey`, `voiceKey`, `backupKey` (jamais dans un export) ; `serverBackup` (marqueur
    de la dernière copie serveur, même raison que `lastCloudBackup`) ; les marqueurs du jour de Jeffrey
    `jeffreyMemoryDate` et `jeffreyBrief` (les restaurer ferait sauter un brief ou une mise en
-   mémoire) ; `lastPosition` (position du téléphone, propre à l'appareil). `climbScheme` reste
+   mémoire) ; `jeffreyAgir` (jetons de relecture du pont, valables 3 minutes) ; `lastPosition` (position du téléphone, propre à l'appareil). `climbScheme` reste
    dans `DATA_KEYS` mais n'est plus lu depuis le 08/10/2026 (même cas qu'`elbowLog`).
 2. **Toujours vérifier que le build passe** (`npm run build --workspace=apps/perso`,
    depuis la racine du monorepo) **et que `npm test` est vert** avant de considérer une
@@ -5529,3 +5559,39 @@ brief. Détail et contrat dans « Jeffrey, état actuel » (en tête).
   au bout de la minute, échec réseau → « Le brief tout de suite » et réservation libérée ;
   `brief_fait` d'essai sans rien marquer. Compilation Kotlin et manifeste fusionné vérifiés
   (permission, `<queries>`, deux récepteurs). **Pas vérifié sur le téléphone** (un matin réel).
+
+## Pont vers l'appli JEFFREY, étape G3 : actions à la voix (05/11/2026, apps/perso v3.154.0)
+
+JEFFREY agit dans PROTOCOLE à la voix. Il relit l'action, attend un « oui », puis demande
+l'écriture. Détail et contrat dans « Jeffrey, état actuel » (en tête) et dans la note
+`G3-protocole-agir-catalogue.md` de la session JEFFREY.
+
+**Choix de Yoann (05/11/2026)** :
+- **poids** : refusé si la balance a déjà pesé aujourd'hui ;
+- **aliment sans quantité** : comme l'app ;
+- **recherche** : ses aliments, puis CIQUAL ;
+- **date** : « demain aussi », compris comme demain pour les trois actions de repas seulement.
+  C'est la règle de l'app : seul Nutrition accepte une date future ;
+- **brief** : un genou noté par JEFFREY, même app fermée, lui dit que le brief du jour est à
+  faire (`brief_du_jour`), selon la même règle que l'app.
+
+Le jeton de relecture est un choix technique : ce qui est écrit est toujours ce que Monsieur a
+entendu.
+
+**Aucune règle métier nouvelle.** Les actions de Jeffrey gardent `validateAction`. Le poids reprend
+la saisie manuelle de l'onglet Poids, l'aliment les quantités proposées par l'écran d'ajout.
+
+**Vérifications** :
+- Tests : `packages/core/test/bridgeActions.test.mjs` (12 tests) — 221 au total.
+- Aperçu, avec une page séparée qui écrit pendant que l'app est ouverte :
+  - l'eau passe de 1250 à 1750 (JEFFREY), puis à 2000 avec +250 dans l'app. Avant la relecture,
+    on serait retombé à 1500 ;
+  - les lignes de repas restent après un ajout dans l'app ;
+  - le poids est à jour sur le Bord ;
+  - le jeton est refusé sans relecture et à la deuxième utilisation ;
+  - avec la vraie table CIQUAL : choix de bananes et de lentilles, chili en portions, repas
+    repris pour demain.
+- Compilation Kotlin et Java faite.
+- **Pas vérifié sur le téléphone** : l'événement `storage` entre la WebView du pont et celle de
+  l'app (le filet natif et le retour au premier plan le couvrent), et une vraie action de
+  JEFFREY.

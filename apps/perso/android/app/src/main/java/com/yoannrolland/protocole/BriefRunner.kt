@@ -83,6 +83,8 @@ object BriefRunner {
                     val stop = { context.stopService(Intent(context, BriefService::class.java)) }
                     runCatching { handleResult(context, json) }.onFailure { Log.e(TAG, "résultat", it) }
                     web.destroy()
+                    // G3 : réponse depuis la notification, brief de secours… l'app ouverte relit ses données.
+                    ExternalWrites.notifyApp()
                     // Voix (29/10/2026) : le brief est préparé en audio juste après sa notification
                     // (serveur Oracle), gardé sur le téléphone pour être écouté sans attendre ni
                     // réseau. Lu tout de suite si un casque est branché (31/10/2026 : casque = Jeffrey parle).

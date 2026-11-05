@@ -12,6 +12,10 @@ import { jeffreyAsk, withMemory, pendingMemoryDate } from "@rawcare/core/coach/j
 import { APP_VERSION } from "../version.js";
 import { loadData, briefReminders, aiFromSettings, foodContext, saveDay, briefDoneFromJeffrey } from "./brief.js";
 import { makeCoach } from "./coachInputs.js";
+import { checkAgir, doneSummary, paramsKey } from "@rawcare/core/coach/bridgeActions";
+import { searchCiqual, getCiqual } from "@rawcare/core/nutrition/ciqual";
+import { applyActionStored } from "./jeffreyNotify.js";
+import { briefAfterKnee } from "@rawcare/core/coach/brief";
 import { jeffreyTurn, newId, hhmm } from "./jeffreyTurn.js";
 import { aiMissing } from "./ai.js";
 
@@ -77,9 +81,76 @@ export async function runAnalyse({ type, transport }) {
   return { texte };
 }
 
+// --- G3 : agir (05/11/2026) ---------------------------------------------------------------------
+// Relecture d'abord (`verifier: true`) : rien n'est écrit, PROTOCOLE rend la phrase à relire et un
+// jeton. L'écriture (`verifier: false`) exige ce jeton, pour exactement les mêmes paramètres, dans
+// les 3 minutes, une seule fois ; l'action est revérifiée sur les données du moment et n'est écrite
+// que si sa phrase n'a pas changé. Ainsi ce qui est écrit est toujours ce que Monsieur a entendu.
+// Jetons en attente : clé `jeffreyAgir`, hors DATA_KEYS (marqueur du moment, jamais exporté).
+const AGIR_KEY = "jeffreyAgir";
+const AGIR_TTL_MS = 3 * 60_000;
+const AGIR_MAX = 5;
+
+/** Données lues au moment de la demande (mêmes clés que les écrans). */
+export function agirContext() {
+  return {
+    today: today(),
+    weight: getSync("weightLog", []), knee: getSync("kneeLog", []), macros: getSync("macroLog", []),
+    foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}),
+    mealPins: getSync("foodMealPins", {}), mealMuted: getSync("foodMealMuted", {}),
+    recipes: getSync("foodRecipes", []),
+    ciqual: { search: (q, limit) => searchCiqual(q, { limit }), get: getCiqual },
+  };
+}
+
+const pendingAgir = (now) => Object.fromEntries(Object.entries(getSync(AGIR_KEY, {}) || {}).filter(([, v]) => v?.exp > now));
+const newJeton = () => Math.random().toString(36).slice(2, 8);
+
+/**
+ * `agir { action, parametres, verifier, jeton? }`.
+ * verifier: true → { ok: true, resume, jeton } ou { ok: false, raison, choix?, besoin? }.
+ * verifier: false → { fait: true, resume, brief_du_jour? } ou { fait: false, raison }.
+ * `brief_du_jour: "a_faire"` : genou noté et brief du jour à faire (voir briefAfterKnee).
+ */
+export async function runAgir(args, { now = Date.now(), ctx = agirContext() } = {}) {
+  const action = args?.action;
+  const parametres = args?.parametres && typeof args.parametres === "object" ? args.parametres : {};
+  const key = paramsKey(action, parametres);
+  if (args?.verifier !== false) {
+    const res = await checkAgir(action, parametres, ctx);
+    if (!res.ok) return res;
+    const jeton = newJeton();
+    const kept = Object.entries(pendingAgir(now)).sort((a, b) => b[1].exp - a[1].exp).slice(0, AGIR_MAX - 1);
+    store.set(AGIR_KEY, Object.fromEntries([...kept, [jeton, { key, resume: res.resume, exp: now + AGIR_TTL_MS }]]));
+    return { ok: true, resume: res.resume, jeton };
+  }
+  const pending = pendingAgir(now);
+  const p = args?.jeton ? pending[args.jeton] : null;
+  if (!p || p.key !== key) {
+    return { fait: false, raison: "rien n'a été relu à Monsieur pour cette demande (jeton absent, périmé ou paramètres différents) : relisez-la d'abord" };
+  }
+  // Jeton à usage unique : retiré avant l'écriture.
+  delete pending[args.jeton];
+  store.set(AGIR_KEY, pending);
+  const res = await checkAgir(action, parametres, ctx);
+  if (!res.ok) return { fait: false, raison: res.raison };
+  if (res.resume !== p.resume) return { fait: false, raison: `les données ont changé depuis la relecture ; relisez à Monsieur : ${res.resume}` };
+  const change = applyActionStored(res.act);
+  const out = { fait: true, resume: doneSummary(res.act, change) };
+  // Genou noté : si la règle du brief le lancerait maintenant, JEFFREY enchaîne sur le brief (même
+  // app fermée). Réglage Activé / Désactivé lu par le natif ; absent (aperçu) = activé.
+  if (res.act.kind === "genou") {
+    const enabled = window.JeffreyBridgePage?.briefEnabled ? window.JeffreyBridgePage.briefEnabled() : true;
+    const b = briefAfterKnee({ now: new Date(now), today: ctx.today, knee: getSync("kneeLog", []), state: getSync("jeffreyBrief", {}) || {}, enabled });
+    if (b) out.brief_du_jour = b;
+  }
+  return out;
+}
+
 /**
  * Une requête du pont → { ok: true, json } ou { ok: false, erreur }. `json` : texte JSON de la
- * question ({ sujet }, { type } ou { date }). Opérations : version, lire, analyse (G1), brief_fait (G2).
+ * question ({ sujet }, { type }, { date } ou { action, parametres, verifier, jeton }). Opérations :
+ * version, lire, analyse (G1), brief_fait (G2), agir (G3).
  */
 export async function handleBridgeRequest(op, json, { transport } = {}) {
   try {
@@ -90,6 +161,8 @@ export async function handleBridgeRequest(op, json, { transport } = {}) {
     if (op === "analyse") return { ok: true, json: await runAnalyse({ type: args?.type, transport }) };
     // G2 : JEFFREY confirme qu'il fait le brief du jour, avant de parler ou de notifier.
     if (op === "brief_fait") return { ok: true, json: briefDoneFromJeffrey(args) };
+    // G3 : action relue puis écrite (voir runAgir).
+    if (op === "agir") return { ok: true, json: await runAgir(args) };
     return { ok: false, erreur: "inconnu" };
   } catch (e) {
     // Seulement un code connu : jamais un message d'erreur qui pourrait porter une donnée.

@@ -41,12 +41,14 @@ export function notificationSpec(entries) {
 }
 
 /**
- * Écrit une action confirmée depuis la notification (app fermée) : mêmes écritures que les
- * écrans et que `onAction` d'App.jsx, directement dans le stockage. → changement d'eau
- * { before, after } ou null.
+ * Écrit une action confirmée depuis la notification (app fermée) ou demandée par l'appli JEFFREY
+ * (pont, G3) : mêmes écritures que les écrans et que `onAction` d'App.jsx, directement dans le
+ * stockage. `act.date` : jour visé (aujourd'hui par défaut ; demain pour un repas, G3). Kinds :
+ * eau, genou, note, repas, habituel, et pour le pont poids (saisie manuelle de l'onglet Poids)
+ * et aliment (aliment nommé). → changement d'eau { before, after } ou null.
  */
 export function applyActionStored(act) {
-  const date = today();
+  const date = act.date || today();
   const macros = getSync("macroLog", []);
   if (act.kind === "eau") {
     const before = macros.find((m) => m.date === date)?.water ?? 0;
@@ -55,12 +57,13 @@ export function applyActionStored(act) {
     return { before, after: next.find((m) => m.date === date).water };
   }
   if (act.kind === "genou") store.set("kneeLog", applyKnee(getSync("kneeLog", []), date, act.pain, act.baseline));
+  if (act.kind === "poids") store.set("weightLog", upsert(getSync("weightLog", []), { date, kg: act.kg, source: "manual" }));
   if (act.kind === "note") {
     const notes = getSync("noteLog", []);
     const text = appendNote(notes.find((n) => n.date === date)?.text || "", act.text);
     store.set("noteLog", [...notes.filter((n) => n.date !== date), { date, text }].sort(byDate));
   }
-  if (act.kind === "repas" || act.kind === "habituel") {
+  if (act.kind === "repas" || act.kind === "habituel" || act.kind === "aliment") {
     const raw = getSync("foodLog", []);
     const added = foodEntriesFor(act, raw, date);
     if (!added.length) return null;

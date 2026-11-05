@@ -37,6 +37,19 @@ export function briefInApp({ now, today, knee, state = {}, force = false }) {
   return "wait";
 }
 
+/**
+ * Pont JEFFREY, G3 (05/11/2026, demande de Yoann) : genou noté par JEFFREY (`agir`), app peut-être
+ * fermée. Même règle que l'app (`briefInApp`) : si elle lancerait le brief maintenant, on le dit à
+ * JEFFREY, qui enchaîne (`brief_fait` d'abord, comme en G2). Rien si le brief est désactivé dans
+ * les Réglages, déjà fait, ou déjà réservé par PROTOCOLE aujourd'hui (`brief_fait` répondrait
+ * « deja »). → "a_faire" ou null.
+ */
+export function briefAfterKnee({ now, today, knee, state = {}, enabled = true }) {
+  if (enabled === false) return null;
+  if (state.claimDate === today) return null;
+  return briefInApp({ now, today, knee, state }) === "brief" ? "a_faire" : null;
+}
+
 // ── Étape G2 du pont JEFFREY (05/11/2026, décision de Yoann : « secours seulement ») ──────────
 // Quand la règle ci-dessus lance le brief, PROTOCOLE prévient d'abord l'appli JEFFREY (diffusion
 // PROTOCOLE_BRIEF_READY). JEFFREY confirme par l'opération `brief_fait` du pont AVANT de parler.

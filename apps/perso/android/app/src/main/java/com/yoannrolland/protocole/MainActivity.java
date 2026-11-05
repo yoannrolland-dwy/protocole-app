@@ -22,6 +22,8 @@ public class MainActivity extends BridgeActivity {
         // Voix de Jeffrey : dictée et lecture à voix haute (voir JeffreyVoice.kt)
         registerPlugin(JeffreyVoicePlugin.class);
         super.onCreate(savedInstanceState);
+        // Pont JEFFREY, G3 : une page sans écran qui écrit prévient l'app ouverte (ExternalWrites.kt).
+        ExternalWrites.attach(this);
     }
 
     // Pont JEFFREY, G2 (05/11/2026) : à l'écran, c'est l'app qui gère la minute d'attente du

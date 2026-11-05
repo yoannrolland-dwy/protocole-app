@@ -2,7 +2,8 @@
 // une WebView jamais affichée, à la même origine que l'app (donc même stockage), pour UNE requête de
 // l'appli JEFFREY : `window.JeffreyBridgePage.request()` donne { op, json }, `finish` rend
 // { ok, json } ou { ok, erreur }. Aucun plugin Capacitor ici ; les appels à l'IA (analyse) passent
-// par le relais HTTP natif (`http`). Lecture seule : rien d'autre que le point/bilan n'écrit.
+// par le relais HTTP natif (`http`). Écritures : le point/bilan (G1), `brief_fait` (G2) et les
+// actions relues puis confirmées par Monsieur (`agir`, G3).
 import { handleBridgeRequest } from "./lib/bridge.js";
 import { pageTransport } from "./lib/pageHttp.js";
 

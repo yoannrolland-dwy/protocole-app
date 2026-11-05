@@ -37,7 +37,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  * - réponse (`what` = 2) : Bundle { id, ok, json } ou { id, ok = false, erreur } — un code court
  *   (occupe, inconnu, delai, ia_absente, ia_echec, interne, trop_long), jamais un texte technique
  *   ni une donnée. Réponse de 200 000 caractères au plus (sinon `trop_long`).
- * Opérations : `version`, `lire` (20 s), `analyse` (90 s) — G1 ; `brief_fait` (20 s) — G2. Une seule requête à la fois
+ * Opérations : `version`, `lire` (20 s), `analyse` (90 s) — G1 ; `brief_fait` (20 s) — G2 ; `agir` (20 s) — G3.
+ * Une seule requête à la fois
  * (sinon `occupe`). Tout le calcul se fait en JavaScript, dans la page sans écran `bridge.html`
  * (même origine que l'app, donc même stockage, même code `packages/core`).
  */
@@ -46,7 +47,7 @@ class JeffreyBridgeService : Service() {
         const val MSG_QUESTION = 1
         const val MSG_REPONSE = 2
         private const val TAG = "JeffreyBridge"
-        private val OPS = setOf("version", "lire", "analyse", "brief_fait")
+        private val OPS = setOf("version", "lire", "analyse", "brief_fait", "agir")
         private const val LIRE_MS = 20_000L
         private const val ANALYSE_MS = 90_000L
         // Limite du Binder : au-delà, `trop_long` plutôt qu'une transaction qui échoue.
@@ -78,6 +79,8 @@ class JeffreyBridgeService : Service() {
         val t0 = SystemClock.elapsedRealtime()
         BridgePage.run(applicationContext, op, json, if (op == "analyse") ANALYSE_MS else LIRE_MS) { result ->
             busy = false
+            // G3 : la page a pu écrire (agir, analyse, brief_fait) ; l'app ouverte relit ses données.
+            com.yoannrolland.protocole.ExternalWrites.notifyApp()
             val r = runCatching { JSONObject(result) }.getOrNull()
             val ok = r?.optBoolean("ok") == true
             val code = if (ok) null else (r?.optString("erreur")?.ifEmpty { null } ?: "interne")
@@ -167,6 +170,9 @@ object BridgePage {
         @JavascriptInterface fun request(): String = JSONObject().put("op", op).put("json", json).toString()
 
         @JavascriptInterface fun finish(result: String) = complete(result)
+
+        /** G3 : réglage « brief du matin » Activé / Désactivé (genou noté par JEFFREY). */
+        @JavascriptInterface fun briefEnabled(): Boolean = com.yoannrolland.protocole.BriefScheduler.enabled(context)
 
         /** Analyse : service au premier plan le temps de l'appel (réseau en économie
          *  d'énergie). Refusé par Android : on continue sans, l'appli JEFFREY est au premier plan. */

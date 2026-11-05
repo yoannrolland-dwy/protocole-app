@@ -303,12 +303,47 @@ export default function App({ silent = false } = {}) {
     store.set("lastCloudBackup", d);
   };
 
+  // Pont JEFFREY, G3 (05/11/2026) : relecture des données qu'une page sans écran a pu écrire
+  // pendant que l'app est ouverte (action de JEFFREY, réponse depuis la notification, point, brief
+  // de secours). Sans elle, l'enregistrement suivant de l'app repartirait de son état en mémoire et
+  // effacerait ce qui vient d'être écrit. Trois déclencheurs : l'événement `storage` du navigateur
+  // (une autre page de la même origine a écrit), l'événement natif `protocole:external`
+  // (ExternalWrites.kt, après chaque page sans écran) et le retour au premier plan. Plusieurs
+  // écritures d'affilée = une seule relecture. Seules les clés qu'une page sans écran écrit.
+  const EXTERNAL_KEYS = ["weightLog", "kneeLog", "macroLog", "noteLog", "foodLog", "jeffreyLog", "coachJournal", "jeffreyMemoryDate"];
+  const reloadTimer = useRef(null);
+  const reloadExternal = () => {
+    setWeight(getSync("weightLog", []));
+    setKnee(getSync("kneeLog", []));
+    setMacros(getSync("macroLog", []));
+    setNotes(getSync("noteLog", []));
+    setJeffreyLog(getSync("jeffreyLog", {}));
+    setCoachJournalState(getSync("coachJournal", ""));
+    setJeffreyMemoryDateState(getSync("jeffreyMemoryDate", null));
+    // Journal alimentaire : relu par chaque écran qui l'utilise (useFoodLog).
+    window.dispatchEvent(new Event(FOOD_LOG_EVENT));
+  };
+  useEffect(() => {
+    const later = () => {
+      clearTimeout(reloadTimer.current);
+      reloadTimer.current = setTimeout(reloadExternal, 50);
+    };
+    const onStorage = (e) => { if (e.key == null || EXTERNAL_KEYS.some((k) => e.key === `protocole:${k}`)) later(); };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("protocole:external", later);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("protocole:external", later);
+      clearTimeout(reloadTimer.current);
+    };
+  }, []);
+
   // Resynchro à chaque retour au premier plan (pas seulement au lancement à froid)
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
-    // Une réponse depuis la notification (J4.3) a pu écrire dans la conversation pendant que l'app
-    // dormait : relue.
-    const handle = CapacitorApp.addListener("resume", () => { runHealthSync(); doAutoBackup(); setPalierTick((t) => t + 1); openWidgetTab(); setJeffreyLog(getSync("jeffreyLog", {})); setBriefTick((t) => t + 1); setServerBackupTick((t) => t + 1); notePosition(); });
+    // Une réponse depuis la notification (J4.3) ou une action de JEFFREY (G3) a pu écrire pendant
+    // que l'app dormait : relue AVANT la synchro Health Connect, qui part de l'état en mémoire.
+    const handle = CapacitorApp.addListener("resume", () => { reloadExternal(); runHealthSync(); doAutoBackup(); setPalierTick((t) => t + 1); openWidgetTab(); setBriefTick((t) => t + 1); setServerBackupTick((t) => t + 1); notePosition(); });
     return () => { handle.then((h) => h.remove()); };
   }, []);
 
