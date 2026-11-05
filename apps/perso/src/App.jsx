@@ -31,6 +31,7 @@ import { sendBackup, backupReady, lastOffPhoneBackup } from "./lib/serverBackup.
 import { backupRequest, setServerBackupAlarms } from "./lib/backupNative.js";
 import { notificationSpec, JEFFREY_START_KEY, JEFFREY_START_MS } from "./lib/jeffreyNotify.js";
 import { TEMPLATES } from "@rawcare/core/session/templates";
+import { DRAFT_EVENT } from "./lib/sessionDraft.js";
 import { streamTransportFor } from "./lib/jeffreyHttp.js";
 import { aiMissing } from "./lib/ai.js";
 import { say } from "./lib/jeffrey.js";
@@ -311,7 +312,7 @@ export default function App({ silent = false } = {}) {
   // (une autre page de la même origine a écrit), l'événement natif `protocole:external`
   // (ExternalWrites.kt, après chaque page sans écran) et le retour au premier plan. Plusieurs
   // écritures d'affilée = une seule relecture. Seules les clés qu'une page sans écran écrit.
-  const EXTERNAL_KEYS = ["weightLog", "kneeLog", "macroLog", "noteLog", "foodLog", "jeffreyLog", "coachJournal", "jeffreyMemoryDate", "trainingLog", JEFFREY_START_KEY];
+  const EXTERNAL_KEYS = ["weightLog", "kneeLog", "macroLog", "noteLog", "foodLog", "jeffreyLog", "coachJournal", "jeffreyMemoryDate", "trainingLog", JEFFREY_START_KEY, "trainingDraft"];
   const reloadTimer = useRef(null);
   // G4-A : séance demandée par JEFFREY (`demarrer_seance`) → même chemin que « Démarrer ». Jamais
   // par-dessus une séance en cours (le carnet effacerait son brouillon) ; périmée au bout de 10 min.
@@ -335,6 +336,8 @@ export default function App({ silent = false } = {}) {
     setJeffreyMemoryDateState(getSync("jeffreyMemoryDate", null));
     // Journal alimentaire : relu par chaque écran qui l'utilise (useFoodLog).
     window.dispatchEvent(new Event(FOOD_LOG_EVENT));
+    // Séance en cours (G4-C2) : relue par le carnet et le minuteur si elle a changé ailleurs.
+    window.dispatchEvent(new Event(DRAFT_EVENT));
   };
   useEffect(() => {
     const later = () => {

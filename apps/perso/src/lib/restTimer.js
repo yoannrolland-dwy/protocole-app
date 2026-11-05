@@ -9,6 +9,7 @@
 import { useSyncExternalStore } from "react";
 import { Capacitor } from "@capacitor/core";
 import { scheduleRestAlarm, cancelRestAlarm, hideRestCountdown } from "../timerNotify.js";
+import { readDraft, writeDraft, DRAFT_EVENT } from "./sessionDraft.js";
 
 // endAt != null ⇔ décompte en cours. `remaining` = secondes affichées (figées en pause).
 // `speech` (31/10/2026) : phrase que Jeffrey dit après le bip, gardée pour la pause/reprise et +30 s.
@@ -59,6 +60,31 @@ function finish() {
   hideRestCountdown();
 }
 
+// G4-C2 (05/11/2026) : l'état du minuteur est rangé dans le brouillon de la séance (`rest`), pour
+// qu'une autre page (l'appli JEFFREY, en C3) le connaisse et puisse le régler. Seulement pendant un
+// carnet ouvert (brouillon avec exercices) ; jamais à chaque seconde, seulement aux gestes.
+const persist = () => {
+  const d = readDraft();
+  if (!d?.type || !Array.isArray(d.exos)) return;
+  const { secs, remaining, endAt, label, speech } = state;
+  writeDraft({ ...d, rest: { secs, remaining, endAt, label, speech } });
+};
+/** Minuteur écrit ailleurs dans le brouillon : on s'y recale (le réveil natif est l'affaire de
+ *  celui qui l'a écrit). Sans effet si rien n'a changé. */
+export function syncRestFromDraft() {
+  const r = readDraft()?.rest;
+  if (!r) return;
+  if (r.endAt === state.endAt && r.secs === state.secs && (r.endAt != null || r.remaining === state.remaining)) return;
+  stopTicking();
+  if (r.endAt && r.endAt > now()) {
+    set({ ...r, remaining: Math.max(0, Math.ceil((r.endAt - now()) / 1000)) });
+    startTicking();
+  } else {
+    set({ ...r, endAt: null, remaining: r.endAt ? 0 : r.remaining });
+  }
+}
+if (typeof window !== "undefined") window.addEventListener(DRAFT_EVENT, syncRestFromDraft);
+
 export const restTimer = {
   /** Lance un décompte de `secs` secondes (coche d'une série, bouton repos/maintien).
    *  `speech` : phrase de Jeffrey à la fin (app native, voix configurée). */
@@ -67,6 +93,7 @@ export const restTimer = {
     set({ secs, remaining: secs, endAt: now() + secs * 1000, label, speech });
     startTicking();
     scheduleRestAlarm(secs, label, speech);
+    persist();
   },
   /** Pause / reprise ; relance depuis la durée réglée si le décompte était fini. */
   toggle(label, speech) {
@@ -74,6 +101,7 @@ export const restTimer = {
       const r = left();
       stopTicking(); set({ endAt: null, remaining: r });
       cancelRestAlarm();
+      persist();
       return;
     }
     const secs = state.remaining > 0 ? state.remaining : state.secs;
@@ -81,11 +109,13 @@ export const restTimer = {
     set({ remaining: secs, endAt: now() + secs * 1000, label: label ?? state.label, speech: speech ?? state.speech });
     startTicking();
     scheduleRestAlarm(secs, label ?? state.label, state.speech);
+    persist();
   },
   /** Règle la durée sans lancer (pastilles 2:00…0:30, remise à zéro). Arrête un décompte. */
   set(secs) {
     stopTicking(); set({ secs, remaining: secs, endAt: null });
     cancelRestAlarm();
+    persist();
   },
   /** Ajoute du temps (+30 s) ; reprogramme le réveil natif, qui remplace le précédent. */
   add(secs) {
@@ -96,11 +126,13 @@ export const restTimer = {
     } else {
       set({ remaining: state.remaining + secs });
     }
+    persist();
   },
   /** Fin de séance (validée ou annulée) : plus aucun décompte ni réveil. */
   stop() {
     stopTicking(); set({ endAt: null, remaining: state.secs });
     cancelRestAlarm();
+    persist();
   },
 };
 

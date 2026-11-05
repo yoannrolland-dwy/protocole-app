@@ -6,7 +6,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Check, Play, Pause, RotateCcw, Timer, Repeat, Plus, Minus, TrendingUp, Search, X } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
-import { store, getSync } from "../../store.js";
+import { store } from "../../store.js";
 import { exerciseSessions, setLabel, beats, recordToBeat, progressiveOverloadSuggestion } from "@rawcare/core/training";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { TEMPLATES, parseSecs } from "@rawcare/core/session/templates";
@@ -21,6 +21,7 @@ import { T } from "../../design/tokens.js";
 import { Panel, Eyebrow, Button, IconButton, Chip, NumberField, TextField } from "../../design/primitives.jsx";
 import { mmss } from "../../lib/helpers.js";
 import { restTimer, useRestTimer } from "../../lib/restTimer.js";
+import { readDraft, writeDraft, patchDraft, isForeign, acknowledge, DRAFT_EVENT } from "../../lib/sessionDraft.js";
 import { sayStable } from "../../lib/jeffrey.js";
 import { restAnnouncement, holdAnnouncement, genericAnnouncement } from "../../lib/restSpeech.js";
 
@@ -61,10 +62,13 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   // d'onglet, ce qui effaçait la séance en cours avant ce correctif). Calculé une seule fois
   // au montage (`useState` paresseux) : ne matche que si type/date/séance éditée coïncident,
   // sinon on reconstruit normalement depuis l'historique.
+  // G4-C2 (05/11/2026) : le brouillon stocké EST la séance en cours (lib/sessionDraft.js).
+  const matches = (d) => !!d && d.type === type && d.date === date && (d.editingId ?? null) === (initial?.id ?? null) && Array.isArray(d.exos);
   const [savedDraft] = useState(() => {
-    const d = getSync("trainingDraft", null);
-    const match = d && d.type === type && d.date === date && (d.editingId ?? null) === (initial?.id ?? null) && Array.isArray(d.exos);
-    return match ? d : null;
+    const d = readDraft();
+    if (!matches(d)) return null;
+    acknowledge(d);
+    return d;
   });
   const [start, setStart] = useState(() => savedDraft?.start ?? initial?.start ?? new Date().toTimeString().slice(0, 5));
   // Durée + RPE (04/09/2026) : seuls les types marqués `withMeta` (Basket, désormais un
@@ -84,21 +88,49 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   const [addOpen, setAddOpen] = useState(false);
   const [addQuery, setAddQuery] = useState("");
 
+  // Séance neuve : le brouillon est écrit dès l'ouverture (avant le réglage du minuteur, qui y
+  // range son état).
+  useEffect(() => {
+    if (!matches(readDraft())) writeDraft({ type, date, editingId: initial?.id ?? null, start, duration: Number(duration) || 0, rpe: Number(rpe) || 0, exos });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Chaque geste part du brouillon STOCKÉ (pas de l'état affiché), l'enregistre, puis l'affiche :
+  // une série écrite par une autre page n'est jamais écrasée.
+  const exosRef = useRef(exos);
+  exosRef.current = exos;
+  const currentExos = () => { const d = readDraft(); return matches(d) ? d.exos : exosRef.current; };
+  const mutate = (op) => {
+    const next = op(currentExos());
+    const d = readDraft();
+    writeDraft(matches(d) ? { ...d, exos: next }
+      : { type, date, editingId: initial?.id ?? null, start, duration: Number(duration) || 0, rpe: Number(rpe) || 0, exos: next });
+    setExos(next);
+    return next;
+  };
+  const setStartW = (v) => { setStart(v); patchDraft({ start: v }); };
+  const setDurationW = (v) => { setDuration(v); patchDraft({ duration: Number(v) || 0 }); };
+  const setRpeW = (v) => { setRpe(v); patchDraft({ rpe: Number(v) || 0 }); };
+  // La date peut changer en cours de séance (champ Date) : le brouillon la suit.
+  const firstDate = useRef(true);
+  useEffect(() => { if (firstDate.current) { firstDate.current = false; return; } patchDraft({ date }); }, [date]);
+  // Écrit ailleurs (l'appli JEFFREY par le pont, en C3) : relu, affiché tel quel.
+  useEffect(() => {
+    const onDraft = () => {
+      const d = readDraft();
+      if (!matches(d) || !isForeign(d)) return;
+      acknowledge(d);
+      setExos(d.exos); setStart(d.start); setDuration(String(d.duration)); setRpe(String(d.rpe));
+    };
+    window.addEventListener(DRAFT_EVENT, onDraft);
+    return () => window.removeEventListener(DRAFT_EVENT, onDraft);
+  }, [type, date, initial]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ---- minuteur (repos + maintien), partagé avec la barre « Séance en cours » ----
   const timer = useRestTimer();
   const [lastTimerByExo, setLastTimerByExo] = useState({});
   // Au premier affichage d'une séance neuve, le minuteur se règle sur le repos du premier
   // exercice — sauf s'il tourne déjà (on revient sur l'onglet pendant un repos).
   useEffect(() => { if (!timer.running && timer.remaining === timer.secs) restTimer.set(exos[0]?.rest ?? 120); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Écrit le brouillon à chaque changement (série cochée, poids/reps modifiés, minuteur
-  // réglé...) — pas seulement à la validation finale. `type`/`date`/`initial` sont stables
-  // pour la durée de vie de ce composant (remonté via `key` par TrainTab si l'un d'eux
-  // change vraiment), sauf `date` qui peut changer en cours de séance : incluse pour que le
-  // brouillon reste rattaché à la bonne date.
-  useEffect(() => {
-    store.set("trainingDraft", { type, date, editingId: initial?.id ?? null, start, duration: Number(duration) || 0, rpe: Number(rpe) || 0, exos });
-  }, [type, date, initial, start, duration, rpe, exos]);
 
   // Les notifications système doublent le décompte JS : elles seules sont fiables
   // écran verrouillé. `openName` sert à afficher l'exercice concerné dans la notif.
@@ -115,42 +147,45 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   };
 
   // ---- mutateurs ----
-  const upd = (ei, si, field, value) => setExos((p) => updateSet(p, ei, si, field, value));
+  const upd = (ei, si, field, value) => mutate((p) => updateSet(p, ei, si, field, value));
   const toggle = (ei, si) => {
-    setExos((p) => toggleSet(p, ei, si));
+    const base = currentExos();
+    mutate(() => toggleSet(base, ei, si));
     // coche = fin de série → relance le minuteur sur le dernier temps utilisé pour cet exercice (fin de série uniquement, pas décoche)
-    if (!exos[ei].series[si].fait) {
+    if (!base[ei].series[si].fait) {
       // Fin de repos dite par Jeffrey (31/10/2026) : la série ou l'exercice qui vient.
-      restTimer.start(lastTimerByExo[ei] ?? exos[ei].rest, exos[ei].nom, restAnnouncement(exos, ei, si));
+      restTimer.start(lastTimerByExo[ei] ?? base[ei].rest, base[ei].nom, restAnnouncement(base, ei, si));
       // Haptique (T5, 04/10/2026) : impulsion brève au cochage, natif seulement — jamais
       // bloquant, une erreur du plugin est ignorée.
       if (Capacitor.isNativePlatform()) Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
     }
   };
-  const addSetTo = (ei, leg) => setExos((p) => addSet(p, ei, leg));
+  const addSetTo = (ei, leg) => mutate((p) => addSet(p, ei, leg));
   // « − série » (U3, choix de Yoann) remplace le × collé à la case de validation : retire la
   // DERNIÈRE série non cochée de la jambe/liste — jamais une série déjà faite.
-  const rmLastSet = (ei, leg) => setExos((p) => removeLastSet(p, ei, leg));
+  const rmLastSet = (ei, leg) => mutate((p) => removeLastSet(p, ei, leg));
   // Ajout d'un exercice déjà dans l'application (31/10/2026) : prescription de sa définition
   // d'origine, ouvert tout de suite. Retrait possible tant qu'aucune série n'est cochée.
   const addExercise = (c) => {
     const item = makeAdded(c);
-    setExos((p) => appendExercise(p, item));
-    setOpen(exos.length);
+    const at = currentExos().length;
+    mutate((p) => appendExercise(p, item));
+    setOpen(at);
     setSubOpen(null);
     setAddOpen(false);
     setAddQuery("");
     if (!timer.running) restTimer.set(item.rest);
   };
-  const removeExercise = (ei) => {
-    setExos((p) => removeExercise(p, ei));
+  // (Nom distinct de `removeExercise` du moteur : en C1 la fonction locale s'appelait elle-même.)
+  const dropExercise = (ei) => {
+    mutate((p) => removeExercise(p, ei));
     setLastTimerByExo((m) => Object.fromEntries(Object.entries(m).filter(([k]) => +k !== ei).map(([k, v]) => [+k > ei ? +k - 1 : +k, v])));
     setOpen(-1);
   };
   const addGroups = useMemo(() => (addOpen ? catalogGroups({ exclude: exos.map((e) => e.nom), query: addQuery }) : []), [addOpen, addQuery, exos]);
 
   // T4 : RIR par exercice (0/1/2/3+ → 0/1/2/3), re-tap = désélection (optionnel, jamais imposé).
-  const setRirOf = (ei, v) => setExos((p) => setRir(p, ei, v));
+  const setRirOf = (ei, v) => mutate((p) => setRir(p, ei, v));
 
   // Substitue un exercice par une alternative de la bibliothèque (même groupe/mouvement,
   // donc même sollicitation tendon — voir CLAUDE.md). Le NOM/materiel/tendon/consigne
@@ -160,14 +195,15 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   // d'historique/poids par défaut sous le nouveau nom — série toutes remises à zéro (les
   // valeurs cochées de l'ancien exercice n'ont aucun sens sous le nouveau nom).
   const substitute = (ei, lib) => {
-    setExos((p) => substituteExercise(p, ei, lib, engineCtx));
+    mutate((p) => substituteExercise(p, ei, lib, engineCtx));
     setSubOpen(null);
   };
 
   const validate = () => {
+    const final = currentExos();
     store.set("trainingDraft", null);
     restTimer.stop();
-    onSave(sessionRecord({ id: initial?.id ?? `${date}-${type}-${Date.now()}`, date, type, start, duration, rpe, exos }));
+    onSave(sessionRecord({ id: initial?.id ?? `${date}-${type}-${Date.now()}`, date, type, start, duration, rpe, exos: final }));
   };
   const cancel = () => { store.set("trainingDraft", null); restTimer.stop(); onCancel(); };
 
@@ -295,13 +331,13 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
         {field("Date", <input type="date" className="p-field" value={date} max={today()}
           onChange={(e) => e.target.value && onDate(e.target.value)} aria-label="Date de la séance" style={{ fontFamily: T.f.num }} />)}
-        {field("Début", <input type="time" className="p-field" value={start} onChange={(e) => setStart(e.target.value)} aria-label="Heure de début" />)}
+        {field("Début", <input type="time" className="p-field" value={start} onChange={(e) => setStartW(e.target.value)} aria-label="Heure de début" />)}
       </div>
 
       {template.withMeta && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
-          {field("Durée", <NumberField value={duration} onChange={setDuration} unit="min" inputMode="numeric" label="Durée en minutes" />)}
-          {field("RPE", <NumberField value={rpe} onChange={setRpe} inputMode="numeric" label="RPE sur 10" />)}
+          {field("Durée", <NumberField value={duration} onChange={setDurationW} unit="min" inputMode="numeric" label="Durée en minutes" />)}
+          {field("RPE", <NumberField value={rpe} onChange={setRpeW} inputMode="numeric" label="RPE sur 10" />)}
         </div>
       )}
 
@@ -461,7 +497,7 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
                 )}
 
                 {e.added && !e.series.some((s) => s.fait) && (
-                  <button type="button" className="p-tap" onClick={() => removeExercise(ei)} style={{
+                  <button type="button" className="p-tap" onClick={() => dropExercise(ei)} style={{
                     display: "flex", alignItems: "center", gap: 8, minHeight: 44, padding: 0,
                     background: "none", border: "none", color: T.c.text2, fontSize: 14, fontFamily: "inherit", textDecoration: "underline",
                   }}>

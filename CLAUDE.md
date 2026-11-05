@@ -17,7 +17,7 @@ les pièges identifiés et les tests attendus — ne pas les rouvrir sans raison
 À la fin d'une étape : cocher son état dans le tableau de `ROADMAP.md`, et
 documenter le livré ici, dans CLAUDE.md.
 
-## Jeffrey, état actuel (mis à jour le 05/11/2026, apps/perso v3.155.1)
+## Jeffrey, état actuel (mis à jour le 05/11/2026, apps/perso v3.156.0)
 
 Résumé de référence. Les sections datées plus bas (chantier J, 29-31/10/2026) racontent comment on
 en est arrivé là ; **en cas de désaccord, c'est cette section qui fait foi**. À tenir à jour à
@@ -139,8 +139,16 @@ PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
   `packages/core/src/session/engine.js`. On y trouve la construction des exercices (HSR,
   superset, prérempli, réouverture), les opérations sur les séries, `nextAfter`, `currentSet` et
   `sessionRecord`. `MuscuLogger.jsx` n'en est plus que l'affichage, sans changement visible.
-  Pas encore exposé par le pont. Plan C2 (brouillon = source de vérité) et C3 (séance à la voix)
-  dans les notes de la session, `G4-C1-protocole-moteur-de-seance.md`.
+  Pas encore exposé par le pont. Plan C3 (séance à la voix) dans les notes de la session,
+  `G4-C1-protocole-moteur-de-seance.md`.
+- **G4-C2, brouillon = séance en cours (v3.156.0)** : `trainingDraft` (`lib/sessionDraft.js`,
+  `{ …, exos, rev, rest? }`) est la seule vérité. Chaque geste du carnet applique le moteur au
+  brouillon **stocké**, l'enregistre aussitôt (`rev` + 1), puis l'affiche.
+  - Une autre page qui l'écrit est relue : `DRAFT_EVENT`, envoyé par la relecture de G3 ; le
+    carnet relit si `rev` n'est pas le sien.
+  - Le minuteur range son état dans `rest` (`secs, remaining, endAt, label, speech`) à chaque
+    geste, et s'y recale quand une autre page l'écrit (`syncRestFromDraft`). Le réveil natif
+    est inchangé.
 - **Relecture dans l'app ouverte (G3)** : après toute écriture d'une page sans écran (pont,
   notification, brief de secours), l'app relit poids, genou, macros, note, journal alimentaire,
   conversation, carnet, marqueur de mémoire et séances (G4-A) avant son prochain enregistrement. Trois
@@ -5675,3 +5683,29 @@ cochées. Yoann a choisi de laisser ainsi (05/11/2026).
   la voix d'abord ;
 - **annonces** : records battus (jamais genou hors base) et plateaux seulement ;
 - **douleur** : la noter, la séance continue.
+
+## Pont vers l'appli JEFFREY, étape G4-C2 : le brouillon de séance devient la séance en cours (05/11/2026, apps/perso v3.156.0)
+
+**Ce qui change.** Le carnet n'écrit plus son brouillon « après coup », dans un effet qui aurait
+écrasé une écriture venue d'ailleurs. Chaque geste part du brouillon stocké :
+- saisie, coche, ± série, RIR ;
+- ajout, retrait ou remplacement d'un exercice ;
+- début, durée, RPE, date.
+
+Fichiers : `lib/sessionDraft.js`, `MuscuLogger.jsx`, `lib/restTimer.js` (`persist`,
+`syncRestFromDraft`), `App.jsx` (`trainingDraft` relu, `DRAFT_EVENT`). Toujours rien par le pont
+(C3).
+
+**Correctif de C1 au passage.** Le bouton « retirer un exercice ajouté » appelait sa propre
+fonction au lieu du moteur (même nom, `removeExercise`). Il ne retirait plus rien en 3.155.1. La
+fonction locale s'appelle maintenant `dropExercise`, et c'est vérifié.
+
+**Vérifications** :
+- même capture automatique qu'en C1, élargie à 62 états (durée du Basket modifiée, brouillon
+  effacé après validation et après annulation) : identiques avant/après, sans `rev` ni `rest` ;
+- essai « une autre page écrit pendant que le carnet est ouvert » : série 1 à 32 kg × 8 et repos
+  de 90 s écrits depuis une autre page. Le carnet les affiche aussitôt et le minuteur démarre ;
+  la série 2 cochée ensuite à l'écran garde la série 1 ;
+- ajout puis retrait d'un exercice : bon nombre d'exercices ;
+- tests : `apps/perso/test/sessionDraft.test.mjs` (3) — 234 au total.
+- **Pas vérifié sur le téléphone.**
