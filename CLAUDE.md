@@ -17,7 +17,7 @@ les pièges identifiés et les tests attendus — ne pas les rouvrir sans raison
 À la fin d'une étape : cocher son état dans le tableau de `ROADMAP.md`, et
 documenter le livré ici, dans CLAUDE.md.
 
-## Jeffrey, état actuel (mis à jour le 05/11/2026, apps/perso v3.155.0)
+## Jeffrey, état actuel (mis à jour le 05/11/2026, apps/perso v3.155.1)
 
 Résumé de référence. Les sections datées plus bas (chantier J, 29-31/10/2026) racontent comment on
 en est arrivé là ; **en cas de désaccord, c'est cette section qui fait foi**. À tenir à jour à
@@ -134,9 +134,13 @@ PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
   - `noter_seance_faite { type, duree, rpe, debut?, gene? }` : Escalade, Basket ou Mobilité
     seulement. Même ligne `trainingLog` que la séance « sport » de l'onglet Séance ; la gêne ne
     vaut que pour l'escalade. Les carnets de musculation sont refusés.
-  - Catalogue donné à JEFFREY : notes de la session, `G4-protocole-seances-catalogue.md`. Suite
-    prévue (C, choix de Yoann) : sortir le moteur de séance de `MuscuLogger` sans changement
-    visible, puis séance entière à la voix (séries notées tout de suite, « annule »).
+  - Catalogue donné à JEFFREY : notes de la session, `G4-protocole-seances-catalogue.md`.
+- **G4-C1, moteur de séance (v3.155.1)** : la logique du carnet de musculation vit dans
+  `packages/core/src/session/engine.js`. On y trouve la construction des exercices (HSR,
+  superset, prérempli, réouverture), les opérations sur les séries, `nextAfter`, `currentSet` et
+  `sessionRecord`. `MuscuLogger.jsx` n'en est plus que l'affichage, sans changement visible.
+  Pas encore exposé par le pont. Plan C2 (brouillon = source de vérité) et C3 (séance à la voix)
+  dans les notes de la session, `G4-C1-protocole-moteur-de-seance.md`.
 - **Relecture dans l'app ouverte (G3)** : après toute écriture d'une page sans écran (pont,
   notification, brief de secours), l'app relit poids, genou, macros, note, journal alimentaire,
   conversation, carnet, marqueur de mémoire et séances (G4-A) avant son prochain enregistrement. Trois
@@ -5641,3 +5645,33 @@ Séance.
   - avertissements « créneau passé » et « genou hors base » ;
   - escalade notée, visible dans l'historique.
 - **Pas vérifié sur le téléphone** : le lancement par JEFFREY, et le téléphone verrouillé.
+
+## Pont vers l'appli JEFFREY, étape G4-C1 : moteur de séance sorti du carnet (05/11/2026, apps/perso v3.155.1)
+
+Première étape de C (choix de Yoann : « A, puis C »).
+
+**Ce qui change dans le code.** La logique du carnet de musculation sort de `MuscuLogger.jsx`,
+recopiée à l'identique, dans le module pur `packages/core/src/session/engine.js`.
+- `nextAfter` y déménage depuis `lib/restSpeech.js`, qui le ré-exporte.
+- `currentSet` est nouveau : il donne la série en cours, pour la voix (C3).
+- Le brouillon `trainingDraft` reste une copie de secours, et rien ne passe par le pont.
+
+**Aucun changement visible, prouvé** par une capture automatique dans l'aperçu, avant puis après,
+avec les mêmes gestes : Upper A, Lower C, Mobilité, Basket, réouverture d'une séance remplacée et
+d'une séance jambe par jambe. **57 états identiques** au caractère près : HTML de l'écran,
+brouillon et ligne `trainingLog` enregistrée. Tests : `sessionEngine.test.mjs` (7) — 231 au
+total.
+
+**Point relevé, pas changé.** Plus haut dans ce fichier (Mobilité, 04/09/2026), on lit qu'« un
+exercice non coché n'est pas persisté ». En réalité, une série préremplie mais non cochée est
+enregistrée avec `fait: false`. Les records, le volume et la progression ne lisent que les séries
+cochées. Yoann a choisi de laisser ainsi (05/11/2026).
+
+**Décisions de Yoann pour la suite (05/11/2026)** :
+- **série en cours** : toujours dans l'ordre de la liste. Un exercice optionnel jamais commencé
+  est sauté ; « passe à … » fixe l'exercice courant. C'est `currentSet(exos, { ei })`, adapté
+  avant tout usage ;
+- **fin de séance** : résumé, puis « oui » ; pour le Basket, la durée et le RPE sont demandés à
+  la voix d'abord ;
+- **annonces** : records battus (jamais genou hors base) et plateaux seulement ;
+- **douleur** : la noter, la séance continue.

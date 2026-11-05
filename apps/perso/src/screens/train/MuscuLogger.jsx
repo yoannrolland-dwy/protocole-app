@@ -9,11 +9,14 @@ import { Capacitor } from "@capacitor/core";
 import { store, getSync } from "../../store.js";
 import { exerciseSessions, setLabel, beats, recordToBeat, progressiveOverloadSuggestion } from "@rawcare/core/training";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
-import { TEMPLATES, DEFAULT_WEIGHTS, hsrForWeek, hsrParse, parseSecs, exoSeriesCount } from "@rawcare/core/session/templates";
-import { lastPerf, perfHistory, lastExerciseSets, medianTarget } from "@rawcare/core/session/perf";
-import { EXERCISE_LIBRARY } from "@rawcare/core/session/exercises";
-import { catalogGroups, catalogEntry } from "@rawcare/core/session/exoCatalog";
-import { fmt, round, today } from "../../ui.jsx";
+import { TEMPLATES, parseSecs } from "@rawcare/core/session/templates";
+import { perfHistory } from "@rawcare/core/session/perf";
+import { catalogGroups } from "@rawcare/core/session/exoCatalog";
+import {
+  makeAddedExercise, buildExercises, updateSet, toggleSet, addSet, lastRemovable, removeLastSet, setRir,
+  appendExercise, removeExercise, substitutionCandidates, substituteExercise, doneExercises, sessionRecord,
+} from "@rawcare/core/session/engine";
+import { fmt, today } from "../../ui.jsx";
 import { T } from "../../design/tokens.js";
 import { Panel, Eyebrow, Button, IconButton, Chip, NumberField, TextField } from "../../design/primitives.jsx";
 import { mmss } from "../../lib/helpers.js";
@@ -45,81 +48,12 @@ function SetField({ value, onChange, unit, inputMode, placeholder, label, inputR
    ============================================================ */
 export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, initial, painRed = false }) {
   const template = TEMPLATES[type];
-  const hp = hsrParse(hsrForWeek(hsrWeek).scheme);
 
-  // Exercice neuf (suggestions tirées de l'historique). `tpl` : gabarit qui le prescrit (séries
-  // d'un HSR ou d'un superset), null pour une variante de la bibliothèque.
-  const makeExo = (ex, tpl) => {
-    const nSeries = exoSeriesCount(tpl, ex, hsrWeek);
-    const last = lastPerf(training, ex.n);
-    const lastSets = lastExerciseSets(training, ex.n);
-    const target = ex.hsr ? `${hp.reps}` : ex.r;
-    const def = DEFAULT_WEIGHTS[ex.n];
-    const medVal = medianTarget(target);
-    const pick = (leg, k) => {
-      if (!lastSets) return null;
-      const pool = leg == null ? lastSets : lastSets.filter((s) => s.leg === leg);
-      return pool[k] || null;
-    };
-    const mk = (leg, k) => {
-      const prev = pick(leg, k);
-      return {
-        poids: prev?.poids ?? last?.poids ?? def ?? "",
-        val: prev?.val ?? (medVal === "" ? "" : medVal),
-        fait: false, leg,
-      };
-    };
-    const series = ex.perLeg
-      ? [...Array(nSeries)].map((_, k) => mk("G", k)).concat([...Array(nSeries)].map((_, k) => mk("D", k)))
-      : [...Array(nSeries)].map((_, k) => mk(null, k));
-    return { nom: ex.n, mode: ex.mode, perLeg: !!ex.perLeg, opt: !!ex.opt, rest: ex.rest,
-      target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${nSeries} × ${ex.r}`, consigne: ex.c, def, last,
-      groupe: ex.groupe, mouvement: ex.mouvement, materiel: ex.materiel, tendon: ex.tendon, famille: ex.famille, rir: null, series };
-  };
-  // Exercice ajouté en cours de séance (31/10/2026) : prescription de sa définition d'origine.
-  const makeAdded = (c) => ({ ...makeExo(c.ex, c.type ? TEMPLATES[c.type] : null), opt: false, added: true });
-
-  const buildExos = () => template.exos.map((ex) => {
-    const target = ex.hsr ? `${hp.reps}` : ex.r;
-    const last = lastPerf(training, ex.n);
-    const def = DEFAULT_WEIGHTS[ex.n];
-
-    // Édition d'une séance déjà enregistrée : on réaffiche les séries telles
-    // qu'elles ont été sauvegardées (valeurs réelles), pas des suggestions
-    // basées sur l'historique. Un exercice substitué (bibliothèque, 01/09/2026) est
-    // enregistré sous un AUTRE nom que celui du gabarit — sans `origine`, ce match par
-    // nom échouait silencieusement et la substitution disparaissait à la réouverture
-    // (bug trouvé et corrigé le 01/09/2026). `e.origine` porte le nom d'origine du
-    // gabarit posé par `substitute()` au moment de la sauvegarde.
-    const savedEx = initial?.exercices?.find((e) => e.nom === ex.n || e.origine === ex.n);
-    if (savedEx) {
-      const wasSubstituted = savedEx.nom !== ex.n;
-      const lib = wasSubstituted ? EXERCISE_LIBRARY.find((l) => l.n === savedEx.nom) : null;
-      const savedLast = wasSubstituted ? lastPerf(training, savedEx.nom) : last;
-      const savedDef = wasSubstituted ? DEFAULT_WEIGHTS[savedEx.nom] : def;
-      return { nom: savedEx.nom, mode: savedEx.mode ?? ex.mode, perLeg: !!savedEx.perLeg, opt: !!ex.opt, rest: ex.rest,
-        target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${exoSeriesCount(template, ex, hsrWeek)} × ${ex.r}`,
-        consigne: lib ? lib.c : ex.c, def: savedDef, last: savedLast,
-        groupe: lib ? lib.groupe : ex.groupe, mouvement: lib ? lib.mouvement : ex.mouvement,
-        materiel: lib ? lib.materiel : ex.materiel, tendon: lib ? lib.tendon : ex.tendon,
-        famille: ex.famille, origine: wasSubstituted ? ex.n : undefined, rir: savedEx.rir ?? null,
-        series: savedEx.series.map((s) => ({ poids: s.poids, val: s.val, fait: s.fait, leg: s.leg })) };
-    }
-
-    return makeExo(ex, template);
-  }).concat(addedFromInitial());
-
-  // Réouverture d'une séance : les exercices enregistrés qui ne viennent pas du gabarit (ni
-  // directement ni par substitution) ont été ajoutés en cours de séance ; on les remet à la fin.
-  function addedFromInitial() {
-    const names = new Set(template.exos.map((x) => x.n));
-    return (initial?.exercices || []).filter((e) => !names.has(e.nom) && !names.has(e.origine)).map((se) => {
-      const c = catalogEntry(se.nom);
-      const base = c ? makeAdded(c) : { nom: se.nom, mode: se.mode, rest: 90, target: "", scheme: "", consigne: "", last: lastPerf(training, se.nom), added: true };
-      return { ...base, nom: se.nom, mode: se.mode ?? base.mode, perLeg: !!se.perLeg, origine: se.origine, rir: se.rir ?? null,
-        series: se.series.map((s) => ({ poids: s.poids, val: s.val, fait: s.fait, leg: s.leg })) };
-    });
-  }
+  // Moteur de séance (G4-C1, 05/11/2026) : construction des exercices et opérations sur les
+  // séries dans packages/core/src/session/engine.js, à l'identique de ce qui vivait ici.
+  const engineCtx = { training, hsrWeek };
+  const makeAdded = (c) => makeAddedExercise(c, engineCtx);
+  const buildExos = () => buildExercises({ type, training, hsrWeek, initial });
 
   // Brouillon auto-sauvegardé (localStorage, hors DATA_KEYS — voir Règles absolues #1) :
   // capture la séance en cours dès qu'une série est cochée, pour survivre à un changement
@@ -181,9 +115,9 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   };
 
   // ---- mutateurs ----
-  const upd = (ei, si, field, value) => setExos((p) => p.map((e, i) => i !== ei ? e : { ...e, series: e.series.map((s, j) => j !== si ? s : { ...s, [field]: value }) }));
+  const upd = (ei, si, field, value) => setExos((p) => updateSet(p, ei, si, field, value));
   const toggle = (ei, si) => {
-    setExos((p) => p.map((e, i) => i !== ei ? e : { ...e, series: e.series.map((s, j) => j !== si ? s : { ...s, fait: !s.fait }) }));
+    setExos((p) => toggleSet(p, ei, si));
     // coche = fin de série → relance le minuteur sur le dernier temps utilisé pour cet exercice (fin de série uniquement, pas décoche)
     if (!exos[ei].series[si].fait) {
       // Fin de repos dite par Jeffrey (31/10/2026) : la série ou l'exercice qui vient.
@@ -193,31 +127,15 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
       if (Capacitor.isNativePlatform()) Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
     }
   };
-  const addSet = (ei, leg) => setExos((p) => p.map((e, i) => {
-    if (i !== ei) return e;
-    const sameLeg = e.series.filter((s) => s.leg === leg);
-    const proto = sameLeg[sameLeg.length - 1] || {};
-    return { ...e, series: [...e.series, { poids: proto.poids ?? "", val: proto.val ?? medianTarget(e.target), fait: false, leg }] };
-  }));
+  const addSetTo = (ei, leg) => setExos((p) => addSet(p, ei, leg));
   // « − série » (U3, choix de Yoann) remplace le × collé à la case de validation : retire la
   // DERNIÈRE série non cochée de la jambe/liste — jamais une série déjà faite.
-  const lastRemovable = (e, leg) => {
-    for (let j = e.series.length - 1; j >= 0; j--) {
-      const s = e.series[j];
-      if ((leg == null || s.leg === leg) && !s.fait) return j;
-    }
-    return -1;
-  };
-  const rmLastSet = (ei, leg) => setExos((p) => p.map((e, i) => {
-    if (i !== ei) return e;
-    const j = lastRemovable(e, leg);
-    return j < 0 ? e : { ...e, series: e.series.filter((_, k) => k !== j) };
-  }));
+  const rmLastSet = (ei, leg) => setExos((p) => removeLastSet(p, ei, leg));
   // Ajout d'un exercice déjà dans l'application (31/10/2026) : prescription de sa définition
   // d'origine, ouvert tout de suite. Retrait possible tant qu'aucune série n'est cochée.
   const addExercise = (c) => {
     const item = makeAdded(c);
-    setExos((p) => [...p, item]);
+    setExos((p) => appendExercise(p, item));
     setOpen(exos.length);
     setSubOpen(null);
     setAddOpen(false);
@@ -225,14 +143,14 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
     if (!timer.running) restTimer.set(item.rest);
   };
   const removeExercise = (ei) => {
-    setExos((p) => p.filter((_, i) => i !== ei));
+    setExos((p) => removeExercise(p, ei));
     setLastTimerByExo((m) => Object.fromEntries(Object.entries(m).filter(([k]) => +k !== ei).map(([k, v]) => [+k > ei ? +k - 1 : +k, v])));
     setOpen(-1);
   };
   const addGroups = useMemo(() => (addOpen ? catalogGroups({ exclude: exos.map((e) => e.nom), query: addQuery }) : []), [addOpen, addQuery, exos]);
 
   // T4 : RIR par exercice (0/1/2/3+ → 0/1/2/3), re-tap = désélection (optionnel, jamais imposé).
-  const setRir = (ei, v) => setExos((p) => p.map((e, i) => i !== ei ? e : { ...e, rir: e.rir === v ? null : v }));
+  const setRirOf = (ei, v) => setExos((p) => setRir(p, ei, v));
 
   // Substitue un exercice par une alternative de la bibliothèque (même groupe/mouvement,
   // donc même sollicitation tendon — voir CLAUDE.md). Le NOM/materiel/tendon/consigne
@@ -242,54 +160,18 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   // d'historique/poids par défaut sous le nouveau nom — série toutes remises à zéro (les
   // valeurs cochées de l'ancien exercice n'ont aucun sens sous le nouveau nom).
   const substitute = (ei, lib) => {
-    setExos((p) => p.map((e, i) => {
-      if (i !== ei) return e;
-      const last = lastPerf(training, lib.n);
-      const lastSets = lastExerciseSets(training, lib.n);
-      const def = DEFAULT_WEIGHTS[lib.n];
-      const medVal = medianTarget(e.target);
-      const nSeries = e.perLeg ? e.series.filter((s) => s.leg === "G").length : e.series.length;
-      const mk = (leg, k) => {
-        const pool = lastSets ? (leg == null ? lastSets : lastSets.filter((s) => s.leg === leg)) : null;
-        const prev = pool?.[k] || null;
-        return { poids: prev?.poids ?? last?.poids ?? def ?? "", val: prev?.val ?? (medVal === "" ? "" : medVal), fait: false, leg };
-      };
-      const series = e.perLeg
-        ? [...Array(nSeries)].map((_, k) => mk("G", k)).concat([...Array(nSeries)].map((_, k) => mk("D", k)))
-        : [...Array(nSeries)].map((_, k) => mk(null, k));
-      // `origine` garde le nom du gabarit d'ORIGINE (pas le précédent remplacement) à
-      // travers plusieurs substitutions successives — c'est lui qui permet de
-      // retrouver le bon exercice à la réouverture de la séance (voir buildExos).
-      // Retour à l'exercice d'origine (17/10/2026) : `lib` est alors l'exercice du gabarit
-      // lui-même, et `origine` redevient absent (plus de substitution).
-      const origin = e.origine ?? e.nom;
-      return { ...e, rir: null, nom: lib.n, consigne: lib.c, groupe: lib.groupe, mouvement: lib.mouvement,
-        materiel: lib.materiel, tendon: lib.tendon, famille: lib.famille, def, last, series,
-        origine: lib.n === origin ? undefined : origin };
-    }));
+    setExos((p) => substituteExercise(p, ei, lib, engineCtx));
     setSubOpen(null);
   };
 
   const validate = () => {
     store.set("trainingDraft", null);
     restTimer.stop();
-    onSave({
-      id: initial?.id ?? `${date}-${type}-${Date.now()}`,
-      date, type, start,
-      ...(template.withMeta ? { duration: round(Number(duration) || 0), rpe: Number(rpe) || 0 } : {}),
-      exercices: exos.map((e) => ({
-        nom: e.nom, mode: e.mode, perLeg: e.perLeg, origine: e.origine,
-        // T4 : reps en réserve par exercice, optionnel — clé absente si non renseigné (additif).
-        ...(e.rir != null ? { rir: e.rir } : {}),
-        series: e.series
-          .filter((s) => s.poids !== "" || s.val !== "" || s.fait)
-          .map((s) => ({ poids: s.poids === "" ? 0 : +s.poids, val: s.val === "" ? 0 : +s.val, fait: s.fait, leg: s.leg })),
-      })).filter((e) => e.series.length),
-    });
+    onSave(sessionRecord({ id: initial?.id ?? `${date}-${type}-${Date.now()}`, date, type, start, duration, rpe, exos }));
   };
   const cancel = () => { store.set("trainingDraft", null); restTimer.stop(); onCancel(); };
 
-  const doneCount = exos.filter((e) => e.series.some((s) => s.fait)).length;
+  const doneCount = doneExercises(exos);
   const GRID = "28px minmax(0, 1fr) minmax(0, 1fr) 52px";
 
   // ---- records (V4) ----
@@ -364,7 +246,7 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   };
   const setButtons = (e, ei, leg) => (
     <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-      <button type="button" className="p-tap" style={setBtnStyle} onClick={() => addSet(ei, leg)}>
+      <button type="button" className="p-tap" style={setBtnStyle} onClick={() => addSetTo(ei, leg)}>
         <Plus size={16} aria-hidden="true" />Série{leg ? ` ${leg}` : ""}
       </button>
       <button type="button" className="p-tap" style={setBtnStyle} disabled={lastRemovable(e, leg) < 0} onClick={() => rmLastSet(ei, leg)}
@@ -488,13 +370,8 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
                     cuisses" et "Iso leg extension" partagent groupe+mouvement mais sont des
                     exercices mécaniquement différents. Invisible si aucun candidat. */}
                 {(() => {
-                  const candidates = e.famille
-                    ? EXERCISE_LIBRARY.filter((l) => l.famille === e.famille && l.n !== e.nom && l.n !== e.origine)
-                    : [];
-                  // Retour à l'exercice d'origine : l'exercice du gabarit n'est pas forcément
-                  // dans la bibliothèque, on le prend donc directement dans le gabarit.
-                  const original = e.origine ? (template.exos.find((x) => x.n === e.origine) ?? catalogEntry(e.origine)?.ex) : null;
-                  if (original) candidates.unshift({ ...original, isOriginal: true });
+                  // Retour à l'exercice d'origine compris (engine.js).
+                  const candidates = substitutionCandidates(e, template);
                   if (!candidates.length) return null;
                   return subOpen === ei ? (
                     <div style={{ background: T.c.field, border: `1px solid ${T.c.line}`, borderRadius: 12, padding: 12, display: "grid", gap: 2 }}>
@@ -547,7 +424,7 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
                     <Eyebrow>Reps en réserve</Eyebrow>
                     <div style={{ display: "flex", gap: 6 }}>
                       {[0, 1, 2, 3].map((v) => (
-                        <Chip key={v} on={e.rir === v} onClick={() => setRir(ei, v)} style={{ flex: 1, justifyContent: "center" }}>
+                        <Chip key={v} on={e.rir === v} onClick={() => setRirOf(ei, v)} style={{ flex: 1, justifyContent: "center" }}>
                           <span style={mono}>{v === 3 ? "3+" : v}</span>
                         </Chip>
                       ))}
