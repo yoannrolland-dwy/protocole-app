@@ -15,6 +15,8 @@ export default defineConfig({
       input: {
         main: fileURLToPath(new URL("./index.html", import.meta.url)),
         brief: fileURLToPath(new URL("./brief.html", import.meta.url)),
+        // Pont JEFFREY (G1, 05/11/2026), chargé par JeffreyBridgeService.kt.
+        bridge: fileURLToPath(new URL("./bridge.html", import.meta.url)),
       },
     },
   },

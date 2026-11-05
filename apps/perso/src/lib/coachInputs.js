@@ -5,7 +5,9 @@ import { getSync } from "../store.js";
 import { today } from "../ui.jsx";
 import { computeEnergyScore } from "@rawcare/core/energy";
 import { nextSessions } from "@rawcare/core/nextSession";
-import { buildCoachPrompt } from "@rawcare/core/coach/prompt";
+import { buildCoachPrompt, buildBilanPrompt } from "@rawcare/core/coach/prompt";
+import { computeBilanFacts } from "@rawcare/core/bilan";
+import { tdeeNow, targetsForDate, kcalFromMacros } from "@rawcare/core/targets";
 import { buildJeffreyRequest } from "@rawcare/core/coach/jeffrey";
 import { familiesForToday, isMatchWeek, isPostMatchDay, planForDate } from "./plan.js";
 
@@ -35,5 +37,15 @@ export function makeCoach(d) {
   });
   // Verdict Aujourd'hui/Demain seul (brief sans IA, J4.1).
   const nextSession = () => next(energy());
-  return { buildPrompt, jeffreyRequest, nextSession };
+  // Bilan long terme (07/09/2026, déplacé d'App.jsx le 05/11/2026 pour être partagé avec le pont
+  // JEFFREY) : faits sur 90 jours calculés par `computeBilanFacts`, même calcul TDEE que la carte
+  // Macros (lecture fraîche foodLog/overrides).
+  const buildBilan = () => {
+    const tdeeResult = tdeeNow({ foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}), macros: d.macros, weight: d.weight, targets: d.targets });
+    const atToday = targetsForDate(today(), d.targets);
+    const kcalTargetToday = Math.round(kcalFromMacros(atToday.protein, atToday.carbs, atToday.fat, atToday.fiber));
+    const facts = computeBilanFacts({ training: d.training, weight: d.weight, macros: d.macros, sleep: d.sleep, rhr: d.rhr, steps: d.steps, knee: d.knee, targets: d.targets, tdeeResult, kcalTargetToday, todayDate: today() });
+    return buildBilanPrompt({ facts, phase: d.phase, targets: d.targets, profile: d.coachProfile, notes: d.notes });
+  };
+  return { buildPrompt, jeffreyRequest, nextSession, buildBilan };
 }

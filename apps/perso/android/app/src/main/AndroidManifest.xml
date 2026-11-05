@@ -90,6 +90,13 @@
             </intent-filter>
         </receiver>
 
+        <!-- Pont privé vers l'appli JEFFREY (étape G1, lecture seule, 05/11/2026) : service lié,
+             réservé aux applis signées par la même clé (permission « signature » ci-dessous). -->
+        <service
+            android:name=".bridge.JeffreyBridgeService"
+            android:exported="true"
+            android:permission="com.yoannrolland.protocole.permission.JEFFREY_BRIDGE" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -100,6 +107,12 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
     </application>
+
+    <!-- Porte du pont JEFFREY : seule une appli signée par la même clé peut la demander. -->
+    <permission
+        android:name="com.yoannrolland.protocole.permission.JEFFREY_BRIDGE"
+        android:label="Accès de Jeffrey à PROTOCOLE"
+        android:protectionLevel="signature" />
 
     <!-- Permissions -->
 

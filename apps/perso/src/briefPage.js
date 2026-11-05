@@ -6,7 +6,7 @@
 // Monsieur note son genou (App.jsx).
 // 02/11/2026 : la même page envoie aussi la sauvegarde de 14 h et 23 h (`?mode=backup&slot=…`,
 // réveils de Backup.kt), par le pont `request` (client HTTP natif).
-import { createSSEParser } from "@rawcare/core/coach/stream";
+import { pageTransport, pageRequest } from "./lib/pageHttp.js";
 import { today } from "@rawcare/core/dateUtils";
 import { aiMissing } from "./lib/ai.js";
 import { sayError } from "./lib/jeffrey.js";
@@ -31,34 +31,9 @@ const finish = (result) => {
   else console.log("brief", result);
 };
 
-// Relais HTTP natif : même contrat que fetchStreamTransport, mais le corps arrive en entier (SSE
-// relu d'un bloc). Le serveur LiteLLM ne répond pas au CORS, et cette WebView n'a pas CapacitorHttp.
-let seq = 0;
-const pending = new Map();
-window.__briefHttpDone = (id, status, text) => { pending.get(id)?.(status, text); pending.delete(id); };
-const bridgeTransport = ({ url, headers, body, onEvent }) => new Promise((resolve) => {
-  const id = String(++seq);
-  pending.set(id, (status, text) => {
-    if (status < 200 || status >= 300) {
-      let data = null;
-      try { data = JSON.parse(text); } catch { /* corps non JSON */ }
-      resolve({ ok: false, status, data, header: () => null });
-      return;
-    }
-    const parser = createSSEParser(onEvent);
-    parser.push(text);
-    parser.end();
-    resolve({ ok: true, status, header: () => null });
-  });
-  bridge.http(id, url, JSON.stringify(headers), JSON.stringify(body));
-});
-
-// Requête vers le serveur de sauvegarde par le pont natif (PUT ou GET, réponse entière).
-const bridgeRequest = ({ method, url, headers = {}, body }) => new Promise((resolve) => {
-  const id = String(++seq);
-  pending.set(id, (status, text) => resolve({ status, text }));
-  bridge.request(id, method, url, JSON.stringify(headers), body ?? null);
-});
+// Relais HTTP natif (lib/pageHttp.js, partagé avec la page du pont JEFFREY).
+const bridgeTransport = pageTransport(bridge);
+const bridgeRequest = pageRequest(bridge);
 
 // Notification de conversation (J4.3) : le fil du jour, les boutons Écouter / Répondre / réponse
 // rapide ou Confirmer. Kotlin la construit (BriefRunner.postThread).

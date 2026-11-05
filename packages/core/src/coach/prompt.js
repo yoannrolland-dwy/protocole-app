@@ -423,7 +423,13 @@ Puis, APRÈS ta conclusion, écris la ligne \`${CARNET_MARK}\` seule, et en dess
 
   // `facts` (chantier J, J1.1) : les mêmes données, sans les consignes de sortie de l'analyse,
   // pour la conversation avec Jeffrey (`coach/jeffrey.js`). Additif : system/user inchangés.
-  return { system, user, facts: { system, realtime, summary, exoProgress: exoProgressData, autresSeances, notesTxt, journal: (journal || "").trim() } };
+  // `cibles_du_jour` (pont JEFFREY, G1, 05/11/2026) : cibles du jour même quand rien n'est encore
+  // saisi (le reste des macros se calcule contre elles). Additif : system/user inchangés.
+  const ciblesDuJour = {
+    kcal: Math.round(kcalFromMacros(atToday.protein, atToday.carbs, atToday.fat, atToday.fiber)),
+    proteines: atToday.protein, glucides: atToday.carbs, lipides: atToday.fat, fibres: atToday.fiber, eau_ml: waterTgtToday,
+  };
+  return { system, user, facts: { system, realtime, summary, exoProgress: exoProgressData, autresSeances, notesTxt, journal: (journal || "").trim(), cibles_du_jour: ciblesDuJour } };
 }
 
 /**
@@ -522,7 +528,8 @@ Rédige un bilan de fond, structuré ainsi :
 3. **Ce qu'il faut ajuster** pour les semaines à venir, concrètement.
 Sois direct, chiffré, sans réciter les données brutes (cite seulement ce qui appuie un conseil).${tendinopathiesClause ? " Priorité absolue à la sécurité tendineuse si un signal genou ressort des faits." : ""} Limite stricte : 600 mots maximum, termine toujours par une conclusion complète. Ce n'est pas un avis médical.`;
 
-  return { system, user };
+  // `faits` et `notes` (pont JEFFREY, G1) : les mêmes faits sans les consignes de rédaction.
+  return { system, user, faits, notes: notesTxt };
 }
 
 /**

@@ -4,10 +4,9 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { store, getSync } from "./store.js";
 import { scheduleBackupReminder } from "./cloudBackup.js";
 import { computeEnergyScore, scoreLabel } from "@rawcare/core/energy";
-import { computeBilanFacts } from "@rawcare/core/bilan";
-import { PHASES, DEFAULT_TARGETS, targetsForDate, kcalFromMacros, kcalOfEntry, tdeeNow, buildKcalByDate, weightTrend7, recompWindows } from "@rawcare/core/targets";
+import { PHASES, DEFAULT_TARGETS, targetsForDate, kcalFromMacros, kcalOfEntry, buildKcalByDate, weightTrend7, recompWindows } from "@rawcare/core/targets";
 import { recommendTargets, palierWeekOf, loggedRateLastDays } from "@rawcare/core/palier";
-import { buildCoachBriefing, buildBilanPrompt, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
+import { buildCoachBriefing, SEED_COACH_PROFILE } from "@rawcare/core/coach/prompt";
 import { JEFFREY_PERSONA, pendingMemoryDate, applyWater, applyKnee, foodEntriesFor } from "@rawcare/core/coach/jeffrey";
 import { deriveMacroLog, resolveLog, FOOD_LOG_EVENT } from "./nutrition/foodStore.js";
 import { JeffreyBubble } from "./components/JeffreyBubble.jsx";
@@ -493,18 +492,7 @@ export default function App({ silent = false } = {}) {
         foodLog: getSync("foodLog", []), foodOverrides: getSync("foodOverrides", {}),
         profile: coachProfile, journal: coachJournal,
       }),
-    // Bilan long terme (point 4 du chantier IA, 07/09/2026) : mêmes données que l'analyse
-    // quotidienne, mais résumées sur 90 jours par `computeBilanFacts` (packages/core/src/
-    // bilan.js) — le JS calcule les corrélations, `buildBilanPrompt` ne fait que les mettre
-    // en mots. Même calcul TDEE que la carte Macros/point 1 (lecture fraîche foodLog/
-    // overrides), jamais un chiffre différent pour la même réalité.
-    buildBilan: () => {
-      const tdeeResult = tdeeNow({ foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}), macros, weight, targets });
-      const atToday = targetsForDate(today(), targets);
-      const kcalTargetToday = Math.round(kcalFromMacros(atToday.protein, atToday.carbs, atToday.fat, atToday.fiber));
-      const facts = computeBilanFacts({ training, weight, macros, sleep, rhr, steps, knee, targets, tdeeResult, kcalTargetToday, todayDate: today() });
-      return buildBilanPrompt({ facts, phase, targets, profile: coachProfile, notes });
-    },
+    // Bilan long terme : lib/coachInputs.js (buildBilan, partagé avec le pont JEFFREY).
     ai,
   };
 

@@ -17,7 +17,7 @@ les pièges identifiés et les tests attendus — ne pas les rouvrir sans raison
 À la fin d'une étape : cocher son état dans le tableau de `ROADMAP.md`, et
 documenter le livré ici, dans CLAUDE.md.
 
-## Jeffrey, état actuel (mis à jour le 01/11/2026, apps/perso v3.148.0)
+## Jeffrey, état actuel (mis à jour le 05/11/2026, apps/perso v3.152.0)
 
 Résumé de référence. Les sections datées plus bas (chantier J, 29-31/10/2026) racontent comment on
 en est arrivé là ; **en cas de désaccord, c'est cette section qui fait foi**. À tenir à jour à
@@ -73,6 +73,36 @@ bas, champ de saisie visible.
   action attend). Une réponse écrite dans la notification fait répondre Jeffrey sans ouvrir l'app.
 - Fin de repos du carnet : après le bip, il annonce la série ou l'exercice suivant.
 
+**Pont vers l'appli JEFFREY (étape G1, lecture seule, v3.152.0).** L'appli Android JEFFREY
+(`fr.yrolland.jeffrey`, assistant vocal, autre dépôt `jeffrey-app`) remplacera à terme ce Jeffrey :
+PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
+`docs/cadrage/ETAPE_G_PONT_PROTOCOLE.md` (§6).
+- Porte : service lié exporté `com.yoannrolland.protocole/.bridge.JeffreyBridgeService`, protégé
+  par la permission `com.yoannrolland.protocole.permission.JEFFREY_BRIDGE` (niveau `signature` :
+  les deux applis sont signées par la clé de développement du Mac, empreinte vérifiée identique le
+  05/11/2026) ; l'appelant est revérifié (`checkSignatures`). `Messenger` : question `what = 1`,
+  Bundle `{ op, id, json }` ; réponse `what = 2`, `{ id, ok, json }` ou `{ id, ok = false, erreur }`
+  (code court : `occupe`, `inconnu` — op, sujet, type ou JSON —, `delai`, `ia_absente`, `ia_echec`,
+  `interne`, `trop_long` au-delà de 200 000 caractères). Une requête à la fois ; 20 s
+  pour `version`/`lire`, 90 s pour `analyse`. Le journal Android ne note que l'opération, l'issue
+  et la durée.
+- Calcul : page sans écran `bridge.html` (`src/bridgePage.js`, `lib/bridge.js`), même origine que
+  l'app donc même stockage, même code (`loadData` + `makeCoach`). Mise en forme :
+  `packages/core/src/coach/bridge.js` (`buildReading`), sans aucune règle métier nouvelle.
+- Opérations : `version` → `{ pont: 1, appli }` ; `lire { sujet }` (`sport_du_jour`, `macros`,
+  `forme`, `brief`, `point`, `bilan`) → `{ date, regles, faits, manque }` — `regles` = contexte du
+  coach + `JEFFREY_RULES` + données, séances autorisées, alertes d'abord, **sans la personnalité** ;
+  `macros` donne le **reste du jour** (cible − consommé, eau comprise ; négatif = dépassé) ;
+  `manque` = `briefMissing`. `analyse { type: point|bilan }` → `{ texte }` : exactement le point ou
+  le bilan d'ici (même demande, même tour, configuration IA des Réglages, donc Opus), écrit dans la
+  conversation du jour, carnet de bord mis à jour.
+- Jamais par le pont : aucune clé, aucun réglage d'IA, aucun export complet, aucune écriture hors
+  du point/bilan. Pas encore : `agir`, `brief_fait`, signal « brief prêt » (étapes G2, G3).
+- Limites connues : le pont lit le stockage tel que l'app l'a laissé (pas de relecture de Health
+  Connect : une nuit ou une pesée pas encore synchronisée par l'app apparaît dans `manque`) ; une
+  analyse faite par le pont pendant que l'app est ouverte peut être écrasée à l'écran jusqu'au
+  prochain retour au premier plan (même limite que les réponses depuis la notification).
+
 **Modèle et fournisseur.**
 - Un seul modèle pour toute l'IA de l'app (Jeffrey, Carte resto, Photo d'un plat) : **Claude
   Opus 5.5** choisi par Yoann le 26/10/2026. Le modèle et le fournisseur se règlent dans Réglages ›
@@ -126,6 +156,9 @@ bas, champ de saisie visible.
   `coach/stream.js` (lecture du flux), `coach/claudeApi.js` (`streamClaude`, reprise, coût),
   `coach/speechText.js` (texte découpé et écrit en toutes lettres pour la voix),
   `coach/prompt.js` (les données), `weather.js`, `healthMerge.js`.
+- Pont JEFFREY : `packages/core/src/coach/bridge.js`, `apps/perso/src/lib/bridge.js`,
+  `src/bridgePage.js` + `bridge.html`, `lib/pageHttp.js` (relais HTTP partagé avec `briefPage.js`),
+  Android `bridge/JeffreyBridgeService.kt`.
 - App (`apps/perso/src/`) : `lib/jeffrey.js` (phrases fixes), `lib/jeffreyTurn.js` (un tour de
   conversation), `lib/coachInputs.js`, `lib/brief.js`, `lib/briefNative.js`,
   `lib/jeffreyNotify.js`, `lib/jeffreyHttp.js`, `lib/voice.js`, `lib/voiceConfig.js`,
@@ -5424,3 +5457,27 @@ recettes trouvables en tapant.
 - Vérifié dans l'aperçu (360 px) : anciennes clés ignorées ; skyr masqué au goûter et toujours au
   dîner ; recette mangée au dîner trouvée en tapant au goûter, étoilée, puis en pastille du goûter
   seulement ; onglet Aliments par repas ; aucune erreur console. 191 tests.
+
+## Pont privé vers l'appli JEFFREY, étape G1 : lecture seule (05/11/2026, apps/perso v3.152.0)
+
+Décision de Yoann (05/11/2026) : l'appli Android JEFFREY (`fr.yrolland.jeffrey`) remplacera le
+Jeffrey de PROTOCOLE ; PROTOCOLE fournit les faits, JEFFREY parle. G1 ne fait que lire ; les
+écritures (G3) attendront un correctif du rechargement de l'état React dans l'appli ouverte.
+Détail et contrat dans « Jeffrey, état actuel » (en tête) et dans le cadrage du dépôt `jeffrey-app`.
+- **Ajouts sans effet sur les textes envoyés à l'IA** : `facts.cibles_du_jour` (cibles du jour même
+  sans saisie) dans `buildCoachPrompt`, `faits` et `notes` dans le retour de `buildBilanPrompt`,
+  constante `BRIEF_ORDER` (même texte qu'avant dans la demande du brief). Captures datées
+  inchangées.
+- **`buildBilan` déplacé d'`App.jsx` vers `lib/coachInputs.js`** (`makeCoach`), même calcul,
+  pour que l'app et le pont n'aient qu'une façon de le construire.
+- **Relais HTTP des pages sans écran extrait** dans `lib/pageHttp.js` (logique inchangée),
+  utilisé par `briefPage.js` et `bridgePage.js`.
+- Tests : `packages/core/test/bridge.test.mjs` (10 tests : forme de la réponse, pas de
+  personnalité ni de clé, reste des macros, rien de saisi, dépassement, verdict identique à
+  `nextSessions`, forme, brief, point complet, bilan) — 201 au total. Vérifié dans l'aperçu avec des
+  données inventées : les six sujets, les erreurs, `analyse` point et bilan avec une fausse réponse
+  d'IA (Opus, réflexion « medium », carnet mis à jour, conversation écrite), coupure réseau →
+  `ia_echec`. APK construit ; manifeste fusionné vérifié (permission et service).
+- **Pas vérifié sur le téléphone** : liaison réelle depuis JEFFREY, `analyse` réelle (réseau
+  en économie d'énergie : la page tente le service au premier plan `BriefService`, sans garantie
+  qu'Android l'autorise depuis un service lié).

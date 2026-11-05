@@ -77,7 +77,7 @@ export function briefReminders() {
 const dateLabel = () => new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 
 /** Enregistre la conversation du jour (élagage à 30 jours, comme App.jsx). */
-function saveDay(date, entries) {
+export function saveDay(date, entries) {
   const oldest = shiftDateKey(today(), -30);
   const log = { ...getSync("jeffreyLog", {}), [date]: entries };
   store.set("jeffreyLog", Object.fromEntries(Object.entries(log).filter(([d]) => d >= oldest)));
