@@ -22,6 +22,8 @@ import { shiftDateKey, round } from "../dateUtils.js";
 import {
   MEALS, usageStats, recipeAsFood, recipePortions, resolveLog, amounts,
 } from "../nutrition/foodStore.js";
+import { TEMPLATES } from "../session/templates.js";
+import { GENE_ZONES } from "../sessionLoad.js";
 
 export const MEAL_ACTIONS = new Set(["reprendre_repas", "ajouter_habituel", "ajouter_aliment"]);
 
@@ -29,7 +31,79 @@ export const MEAL_ACTIONS = new Set(["reprendre_repas", "ajouter_habituel", "ajo
 export const AGIR_ACTIONS = [
   "ajouter_eau", "noter_genou", "ecrire_note", "noter_poids",
   "reprendre_repas", "ajouter_habituel", "ajouter_aliment",
+  // G4-A (05/11/2026) : séances.
+  "demarrer_seance", "noter_seance_faite",
 ];
+
+// --- G4-A : séances (05/11/2026) ---------------------------------------------------------------
+// Choix de Yoann : JEFFREY peut démarrer n'importe quelle séance, mais la relecture dit quand elle
+// va contre le recommandeur ; refus si une séance est déjà en cours (carnet ou brouillon). Une
+// séance « faite » se note sans carnet pour l'escalade, le basket et la mobilité (mêmes champs que
+// la séance « sport » de l'onglet Séance) ; une séance de musculation se note dans son carnet.
+export const DONE_TYPES = ["Escalade", "Basket", "Mobilité"];
+const SESSION_NAME = { Escalade: "d'escalade", Basket: "de basket", "Mobilité": "de mobilité" };
+const noDot = (s) => String(s || "").trim().replace(/[.\s]+$/, "");
+
+/** Avertissement de la relecture quand la séance va contre le recommandeur d'aujourd'hui
+ *  (`nextSessions().today`). Proposée → rien ; moins prioritaire → « à savoir » ; sinon la raison. */
+export function startWarning(type, today) {
+  if (!today) return "";
+  if ((today.suggestions || []).some((s) => s.type === type)) return "";
+  const np = (today.notProposed || []).find((n) => n.type === type);
+  if (np?.kind === "priority") {
+    const top = today.suggestions?.[0]?.type;
+    return top ? ` — à savoir : le recommandeur propose plutôt ${top}` : "";
+  }
+  const reason = np?.reason || today.note || "non proposée par le recommandeur";
+  return ` — attention, non recommandée aujourd'hui : ${noDot(reason)}`;
+}
+
+function checkStart(p, ctx, date) {
+  const type = p.type;
+  if (!TEMPLATES[type]) return fail(`séance inconnue : ${type} (séances : ${Object.keys(TEMPLATES).join(", ")})`);
+  if (ctx.draft?.type) return fail(`une séance est déjà en cours dans PROTOCOLE (${ctx.draft.type}) : il faut la terminer ou l'annuler d'abord`);
+  const warning = startWarning(type, ctx.nextSession?.()?.today);
+  return { ok: true, act: { kind: "demarrer", date, type }, resume: `Démarrer ${type} maintenant${warning}` };
+}
+
+const hm = (mins) => `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+
+function checkDone(p, ctx, date) {
+  const type = p.type;
+  if (!TEMPLATES[type]) return fail(`séance inconnue : ${type} (séances notées sans carnet : ${DONE_TYPES.join(", ")})`);
+  if (!DONE_TYPES.includes(type)) return fail(`${type} se note dans son carnet de séance : démarrez-la plutôt (demarrer_seance)`);
+  if (ctx.draft?.type === type) return fail(`le carnet ${type} est ouvert dans PROTOCOLE : il faut le valider là`);
+  const duree = Math.round(num(p.duree));
+  if (!Number.isFinite(duree) || duree < 5 || duree > 300) return fail("durée hors de 5 à 300 minutes");
+  const rpe = Math.round(num(p.rpe));
+  if (!Number.isFinite(rpe) || rpe < 1 || rpe > 10) return fail("effort ressenti (RPE) hors de 1 à 10");
+  let start;
+  if (p.debut != null) {
+    const m = /^(\d{1,2})[:h](\d{2})$/.exec(String(p.debut).trim());
+    if (!m || +m[1] > 23 || +m[2] > 59) return fail("heure de début illisible (HH:MM)");
+    start = hm(+m[1] * 60 + +m[2]);
+  } else {
+    const now = ctx.now || new Date();
+    start = hm(Math.max(0, now.getHours() * 60 + now.getMinutes() - duree));
+  }
+  let gene = null;
+  if (p.gene != null) {
+    if (type !== "Escalade") return fail("la gêne ne se note que pour l'escalade");
+    if (typeof p.gene !== "object") return fail("gêne illisible");
+    gene = {};
+    for (const [zone, v] of Object.entries(p.gene)) {
+      if (!GENE_ZONES.some((z) => z.key === zone)) return fail(`zone de gêne inconnue : ${zone} (${GENE_ZONES.map((z) => z.key).join(", ")})`);
+      const n = Math.round(num(v));
+      if (!Number.isFinite(n) || n < 0 || n > 10) return fail("gêne hors de 0 à 10");
+      if (n > 0) gene[zone] = n;
+    }
+    if (!Object.keys(gene).length) gene = null;
+  }
+  const row = { id: `${date}-${type}-${ctx.nowMs ?? Date.now()}`, date, type, start, duration: duree, rpe, ...(gene ? { gene } : {}) };
+  const geneText = gene ? `, gêne ${Object.entries(gene).map(([z, n]) => `${z} ${n} sur 10`).join(", ")}` : "";
+  const already = (ctx.training || []).some((t) => t.date === date && t.type === type) ? ` (il y a déjà une séance ${SESSION_NAME[type]} notée aujourd'hui)` : "";
+  return { ok: true, act: { kind: "seance", date, row }, resume: `Noter une séance ${SESSION_NAME[type]} faite aujourd'hui : ${duree} min, effort ${rpe} sur 10, début ${start}${geneText}${already}` };
+}
 
 const CHOICES_MAX = 5;
 const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -152,8 +226,9 @@ const namesOf = (items) => {
  * Vérifie une action demandée par JEFFREY, sans rien écrire.
  * → { ok: true, act, resume } (`act` : ce que `applyActionStored` écrira, avec sa date ;
  *   `resume` : la phrase que JEFFREY relit à Monsieur) ou { ok: false, raison, choix?, besoin? }.
- * `ctx` = { today, weight, knee, macros, foodLog (brut), overrides, mealPins, mealMuted,
- *   recipes, ciqual: { search(q, limit), get(code) } }.
+ * `ctx` = { today, now, nowMs, weight, knee, macros, training, draft (trainingDraft), foodLog (brut),
+ *   overrides, mealPins, mealMuted, recipes, ciqual: { search(q, limit), get(code) },
+ *   nextSession: () => nextSessions(...) (verdict de la carte du Bord, demandé seulement au besoin) }.
  * Lève `{ code: "inconnu" }` pour une action hors catalogue.
  */
 export async function checkAgir(action, parametres, ctx) {
@@ -165,6 +240,8 @@ export async function checkAgir(action, parametres, ctx) {
 
   if (action === "noter_poids") return checkWeight(p, { weight: ctx.weight, date });
   if (action === "ajouter_aliment") return checkFood(p, ctx, d);
+  if (action === "demarrer_seance") return checkStart(p, ctx, date);
+  if (action === "noter_seance_faite") return checkDone(p, ctx, date);
 
   const foodCtx = { foodLog: ctx.foodLog, overrides: ctx.overrides, mealPins: ctx.mealPins, mealMuted: ctx.mealMuted, today: date };
   const v = validateAction(action, p, foodCtx);
@@ -199,6 +276,8 @@ export function doneSummary(act, change) {
   if (act.kind === "genou") return `Genou noté à ${act.pain} sur 10, ${act.baseline ? "revenu à la base" : "pas revenu à la base"}`;
   if (act.kind === "note") return `Note du jour complétée : « ${act.text} »`;
   if (act.kind === "poids") return `${kgText(act.kg)} notés aujourd'hui`;
+  if (act.kind === "demarrer") return `${act.type} s'ouvre dans PROTOCOLE`;
+  if (act.kind === "seance") return `Séance ${SESSION_NAME[act.row.type]} notée : ${act.row.duration} min, effort ${act.row.rpe} sur 10`;
   if (act.kind === "repas") return `${act.items.length} aliment${act.items.length > 1 ? "s" : ""} ajouté${act.items.length > 1 ? "s" : ""} (${act.kcal} kcal)`;
   return `${act.food.name}, ${act.q} g, ajouté${act.kcal != null ? ` (${act.kcal} kcal)` : ""}`;
 }

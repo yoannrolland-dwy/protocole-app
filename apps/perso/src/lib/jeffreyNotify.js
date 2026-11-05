@@ -15,6 +15,11 @@ import { voiceServer, speechPlan } from "./voiceConfig.js";
 
 const MAX_MESSAGES = 6;
 
+/** G4-A : séance que JEFFREY a demandé de démarrer, prise en charge par l'app à son prochain
+ *  passage au premier plan (hors DATA_KEYS, valable `JEFFREY_START_MS`). */
+export const JEFFREY_START_KEY = "jeffreyStart";
+export const JEFFREY_START_MS = 10 * 60_000;
+
 /**
  * Contenu de la notification d'après la conversation du jour. Le fil commence au brief du jour
  * (son message de demande n'est pas montré). → { messages: [{ me, text }], text, quick, confirm,
@@ -58,6 +63,10 @@ export function applyActionStored(act) {
   }
   if (act.kind === "genou") store.set("kneeLog", applyKnee(getSync("kneeLog", []), date, act.pain, act.baseline));
   if (act.kind === "poids") store.set("weightLog", upsert(getSync("weightLog", []), { date, kg: act.kg, source: "manual" }));
+  // G4-A : séance faite sans carnet (même ligne que la séance « sport » de l'onglet Séance) ;
+  // séance à démarrer : l'app ouverte la prend en charge (consumeJeffreyStart, App.jsx).
+  if (act.kind === "seance") store.set("trainingLog", [...getSync("trainingLog", []), act.row].sort(byDate));
+  if (act.kind === "demarrer") store.set(JEFFREY_START_KEY, { type: act.type, at: Date.now() });
   if (act.kind === "note") {
     const notes = getSync("noteLog", []);
     const text = appendNote(notes.find((n) => n.date === date)?.text || "", act.text);

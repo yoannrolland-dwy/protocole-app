@@ -29,7 +29,8 @@ import { readBriefState, writeBriefState, runBrief, missingText, claimBrief, rel
 import { cancelBriefAlarm, briefEnabled, postJeffreyNotification, signalJeffrey } from "./lib/briefNative.js";
 import { sendBackup, backupReady, lastOffPhoneBackup } from "./lib/serverBackup.js";
 import { backupRequest, setServerBackupAlarms } from "./lib/backupNative.js";
-import { notificationSpec } from "./lib/jeffreyNotify.js";
+import { notificationSpec, JEFFREY_START_KEY, JEFFREY_START_MS } from "./lib/jeffreyNotify.js";
+import { TEMPLATES } from "@rawcare/core/session/templates";
 import { streamTransportFor } from "./lib/jeffreyHttp.js";
 import { aiMissing } from "./lib/ai.js";
 import { say } from "./lib/jeffrey.js";
@@ -310,9 +311,21 @@ export default function App({ silent = false } = {}) {
   // (une autre page de la même origine a écrit), l'événement natif `protocole:external`
   // (ExternalWrites.kt, après chaque page sans écran) et le retour au premier plan. Plusieurs
   // écritures d'affilée = une seule relecture. Seules les clés qu'une page sans écran écrit.
-  const EXTERNAL_KEYS = ["weightLog", "kneeLog", "macroLog", "noteLog", "foodLog", "jeffreyLog", "coachJournal", "jeffreyMemoryDate"];
+  const EXTERNAL_KEYS = ["weightLog", "kneeLog", "macroLog", "noteLog", "foodLog", "jeffreyLog", "coachJournal", "jeffreyMemoryDate", "trainingLog", JEFFREY_START_KEY];
   const reloadTimer = useRef(null);
+  // G4-A : séance demandée par JEFFREY (`demarrer_seance`) → même chemin que « Démarrer ». Jamais
+  // par-dessus une séance en cours (le carnet effacerait son brouillon) ; périmée au bout de 10 min.
+  const consumeJeffreyStart = () => {
+    const s = getSync(JEFFREY_START_KEY, null);
+    if (!s) return;
+    store.set(JEFFREY_START_KEY, null);
+    if (Date.now() - (s.at || 0) > JEFFREY_START_MS || !TEMPLATES[s.type] || getSync("trainingDraft", null)?.type) return;
+    setShowSettings(false); setChatOpen(null);
+    startSession(s.type);
+  };
   const reloadExternal = () => {
+    setTraining(getSync("trainingLog", []));
+    consumeJeffreyStart();
     setWeight(getSync("weightLog", []));
     setKnee(getSync("kneeLog", []));
     setMacros(getSync("macroLog", []));
@@ -352,6 +365,7 @@ export default function App({ silent = false } = {}) {
   // « jeffrey » : tap sur la notification du brief (BriefRunner.kt) → la conversation.
   const openWidgetTab = () => consumeWidgetTab().then((t) => { if (t === "jeffrey") setChatOpen({}); else if (t) goTo(t); });
   useEffect(() => { if (!silent) openWidgetTab(); }, []);
+  useEffect(() => { if (!loading) consumeJeffreyStart(); }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Widget d'écran d'accueil (Android) : 5 valeurs des tuiles du tableau de bord
   // (Poids, Calories, Énergie, Pas, Eau), reformatées pour l'affichage natif — la 6e

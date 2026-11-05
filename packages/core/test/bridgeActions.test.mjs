@@ -35,8 +35,8 @@ const base = (over = {}) => ({
   overrides: {}, mealPins: {}, mealMuted: {}, recipes: [recipe], ciqual, ...over,
 });
 
-test("catalogue : action inconnue → code « inconnu » ; les sept actions", async () => {
-  assert.deepEqual(AGIR_ACTIONS, ["ajouter_eau", "noter_genou", "ecrire_note", "noter_poids", "reprendre_repas", "ajouter_habituel", "ajouter_aliment"]);
+test("catalogue : action inconnue → code « inconnu » ; les neuf actions", async () => {
+  assert.deepEqual(AGIR_ACTIONS, ["ajouter_eau", "noter_genou", "ecrire_note", "noter_poids", "reprendre_repas", "ajouter_habituel", "ajouter_aliment", "demarrer_seance", "noter_seance_faite"]);
   await assert.rejects(() => checkAgir("supprimer_tout", {}, base()), (e) => e.code === "inconnu");
 });
 
@@ -161,4 +161,54 @@ test("genou noté par JEFFREY : brief à faire selon la règle de l'app (même a
   assert.equal(briefAfterKnee({ now: at(7), today: T0, knee, state: { signal: { date: T0, at: 1, sent: true } } }), "a_faire");
   // Brief d'hier : sans effet aujourd'hui.
   assert.equal(briefAfterKnee({ now: at(7), today: T0, knee, state: { doneDate: d(1), claimDate: d(1) } }), "a_faire");
+});
+
+// --- G4-A : séances ---
+const ns = (today) => () => ({ today });
+const todayOpen = {
+  status: "open",
+  suggestions: [{ type: "Upper A" }, { type: "Mobilité" }],
+  notProposed: [
+    { type: "Escalade", kind: "priority", reason: "Moins prioritaire (score 39)." },
+    { type: "Lower A", kind: "avoid", reason: "Genou hors base." },
+  ],
+};
+
+test("démarrer : n'importe quel gabarit, avertissement quand il va contre le recommandeur (choix de Yoann)", async () => {
+  const ok = await checkAgir("demarrer_seance", { type: "Upper A" }, base({ nextSession: ns(todayOpen) }));
+  assert.equal(ok.resume, "Démarrer Upper A maintenant");
+  assert.deepEqual(ok.act, { kind: "demarrer", date: T0, type: "Upper A" });
+  const low = await checkAgir("demarrer_seance", { type: "Escalade" }, base({ nextSession: ns(todayOpen) }));
+  assert.equal(low.resume, "Démarrer Escalade maintenant — à savoir : le recommandeur propose plutôt Upper A");
+  const bad = await checkAgir("demarrer_seance", { type: "Lower A" }, base({ nextSession: ns(todayOpen) }));
+  assert.equal(bad.resume, "Démarrer Lower A maintenant — attention, non recommandée aujourd'hui : Genou hors base");
+  const closed = await checkAgir("demarrer_seance", { type: "Upper B" }, base({ nextSession: ns({ status: "closed", suggestions: [], notProposed: [], note: "Séance du jour faite : journée terminée." }) }));
+  assert.match(closed.resume, /attention, non recommandée aujourd'hui : Séance du jour faite : journée terminée$/);
+  assert.equal((await checkAgir("demarrer_seance", { type: "Zumba" }, base())).ok, false);
+  assert.equal((await checkAgir("demarrer_seance", { type: "Upper A", jour: "demain" }, base())).ok, false);
+});
+
+test("démarrer : refusé si une séance est en cours (choix de Yoann)", async () => {
+  const r = await checkAgir("demarrer_seance", { type: "Upper A" }, base({ draft: { type: "Lower C", exos: [] }, nextSession: ns(todayOpen) }));
+  assert.equal(r.ok, false);
+  assert.match(r.raison, /déjà en cours dans PROTOCOLE \(Lower C\)/);
+});
+
+test("séance faite : escalade, basket, mobilité seulement ; même ligne que l'onglet Séance", async () => {
+  const now = new Date(2026, 9, 4, 12, 30);
+  const r = await checkAgir("noter_seance_faite", { type: "Escalade", duree: 90, rpe: 7, gene: { coudes: 3, doigts: 0 } }, base({ now, nowMs: 1 }));
+  assert.equal(r.resume, "Noter une séance d'escalade faite aujourd'hui : 90 min, effort 7 sur 10, début 11:00, gêne coudes 3 sur 10");
+  assert.deepEqual(r.act.row, { id: `${T0}-Escalade-1`, date: T0, type: "Escalade", start: "11:00", duration: 90, rpe: 7, gene: { coudes: 3 } });
+  const b = await checkAgir("noter_seance_faite", { type: "Basket", duree: 120, rpe: 8, debut: "19h30" }, base({ training: [{ date: T0, type: "Basket" }] }));
+  assert.equal(b.resume, "Noter une séance de basket faite aujourd'hui : 120 min, effort 8 sur 10, début 19:30 (il y a déjà une séance de basket notée aujourd'hui)");
+  assert.equal(b.act.row.gene, undefined);
+  assert.equal(doneSummary(b.act), "Séance de basket notée : 120 min, effort 8 sur 10");
+  // Refus : carnet de musculation, carnet ouvert, bornes, gêne hors escalade, zone inconnue.
+  assert.match((await checkAgir("noter_seance_faite", { type: "Upper A", duree: 60, rpe: 7 }, base())).raison, /carnet/);
+  assert.equal((await checkAgir("noter_seance_faite", { type: "Mobilité", duree: 20, rpe: 3 }, base({ draft: { type: "Mobilité" } }))).ok, false);
+  assert.equal((await checkAgir("noter_seance_faite", { type: "Escalade", duree: 2, rpe: 7 }, base())).ok, false);
+  assert.equal((await checkAgir("noter_seance_faite", { type: "Escalade", duree: 60, rpe: 11 }, base())).ok, false);
+  assert.equal((await checkAgir("noter_seance_faite", { type: "Basket", duree: 60, rpe: 7, gene: { coudes: 2 } }, base())).ok, false);
+  assert.equal((await checkAgir("noter_seance_faite", { type: "Escalade", duree: 60, rpe: 7, gene: { genou: 2 } }, base())).ok, false);
+  assert.equal((await checkAgir("noter_seance_faite", { type: "Escalade", duree: 60, rpe: 7, debut: "25:00" }, base())).ok, false);
 });

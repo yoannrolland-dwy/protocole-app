@@ -17,7 +17,7 @@ les pièges identifiés et les tests attendus — ne pas les rouvrir sans raison
 À la fin d'une étape : cocher son état dans le tableau de `ROADMAP.md`, et
 documenter le livré ici, dans CLAUDE.md.
 
-## Jeffrey, état actuel (mis à jour le 05/11/2026, apps/perso v3.154.0)
+## Jeffrey, état actuel (mis à jour le 05/11/2026, apps/perso v3.155.0)
 
 Résumé de référence. Les sections datées plus bas (chantier J, 29-31/10/2026) racontent comment on
 en est arrivé là ; **en cas de désaccord, c'est cette section qui fait foi**. À tenir à jour à
@@ -122,9 +122,24 @@ PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
     le poids et l'aliment.
   - Jetons en attente : clé `jeffreyAgir`, hors `DATA_KEYS`.
   - Catalogue donné à JEFFREY : notes de la session, `G3-protocole-agir-catalogue.md`.
+- **G4-A, séances à la voix (v3.155.0)** : deux actions de plus dans `agir` (`bridgeActions.js`).
+  - `demarrer_seance { type }` : n'importe quel gabarit (choix de Yoann). La relecture dit quand
+    la séance va contre le recommandeur d'aujourd'hui (`startWarning` : « à savoir » si elle est
+    seulement moins prioritaire, « attention, non recommandée aujourd'hui : <raison> » sinon).
+    Refus si une séance est déjà en cours (`trainingDraft`).
+  - L'écriture dépose `jeffreyStart` = `{ type, at }` (hors `DATA_KEYS`, 10 min) et rend `ouvrir`
+    (activité de PROTOCOLE + `open_tab: train`), que JEFFREY lance. L'app fait alors exactement
+    « Démarrer » (`consumeJeffreyStart`, App.jsx) : au lancement, au retour au premier plan ou
+    par la relecture. Jamais par-dessus une séance en cours ; l'extra seul n'ouvre que l'onglet.
+  - `noter_seance_faite { type, duree, rpe, debut?, gene? }` : Escalade, Basket ou Mobilité
+    seulement. Même ligne `trainingLog` que la séance « sport » de l'onglet Séance ; la gêne ne
+    vaut que pour l'escalade. Les carnets de musculation sont refusés.
+  - Catalogue donné à JEFFREY : notes de la session, `G4-protocole-seances-catalogue.md`. Suite
+    prévue (C, choix de Yoann) : sortir le moteur de séance de `MuscuLogger` sans changement
+    visible, puis séance entière à la voix (séries notées tout de suite, « annule »).
 - **Relecture dans l'app ouverte (G3)** : après toute écriture d'une page sans écran (pont,
   notification, brief de secours), l'app relit poids, genou, macros, note, journal alimentaire,
-  conversation, carnet et marqueur de mémoire avant son prochain enregistrement. Trois
+  conversation, carnet, marqueur de mémoire et séances (G4-A) avant son prochain enregistrement. Trois
   déclencheurs : l'événement `storage`, l'événement natif `protocole:external`
   (`ExternalWrites.kt`) et le retour au premier plan (avant la synchro Health Connect).
 - **G2, brief du matin (v3.153.0, décision de Yoann : « secours seulement »)**. Quand la règle du
@@ -3671,7 +3686,8 @@ Vérifié dans l'aperçu : 1:58 → 1:28 après un saut d'horloge de 30 s simul�
    `apiKey`, `litellmKey`, `voiceKey`, `backupKey` (jamais dans un export) ; `serverBackup` (marqueur
    de la dernière copie serveur, même raison que `lastCloudBackup`) ; les marqueurs du jour de Jeffrey
    `jeffreyMemoryDate` et `jeffreyBrief` (les restaurer ferait sauter un brief ou une mise en
-   mémoire) ; `jeffreyAgir` (jetons de relecture du pont, valables 3 minutes) ; `lastPosition` (position du téléphone, propre à l'appareil). `climbScheme` reste
+   mémoire) ; `jeffreyAgir` (jetons de relecture du pont, valables 3 minutes) ; `jeffreyStart` (séance à
+   ouvrir demandée par JEFFREY, valable 10 minutes) ; `lastPosition` (position du téléphone, propre à l'appareil). `climbScheme` reste
    dans `DATA_KEYS` mais n'est plus lu depuis le 08/10/2026 (même cas qu'`elbowLog`).
 2. **Toujours vérifier que le build passe** (`npm run build --workspace=apps/perso`,
    depuis la racine du monorepo) **et que `npm test` est vert** avant de considérer une
@@ -5595,3 +5611,33 @@ la saisie manuelle de l'onglet Poids, l'aliment les quantités proposées par l'
 - **Pas vérifié sur le téléphone** : l'événement `storage` entre la WebView du pont et celle de
   l'app (le filet natif et le retour au premier plan le couvrent), et une vraie action de
   JEFFREY.
+
+## Pont vers l'appli JEFFREY, étape G4-A : démarrer une séance et noter une séance faite (05/11/2026, apps/perso v3.155.0)
+
+État des lieux préalable : `G4-protocole-etat-des-lieux.md` (notes de la session JEFFREY).
+
+**Choix de Yoann :**
+- périmètre : A maintenant, puis C par étapes ;
+- séances : n'importe laquelle, avec un avertissement si elle va contre le recommandeur ;
+- séance déjà en cours : refus ;
+- séries de C : notées tout de suite, avec « annule ».
+
+Détail dans « Jeffrey, état actuel ».
+
+**Aucune règle métier nouvelle.** L'avertissement reprend les raisons de `nextSessions`.
+L'ouverture suit le chemin de « Démarrer ». La séance faite écrit la même ligne que l'onglet
+Séance.
+
+**Ouverture du carnet.** Le service du pont ne peut pas lancer une activité depuis l'arrière-plan
+(règles Android). C'est JEFFREY qui ouvre PROTOCOLE ; la demande passe par le stockage
+(`jeffreyStart`), pour qu'aucune autre appli ne puisse effacer une séance en lançant l'activité.
+
+**Vérifications :**
+- Tests : 224 au vert (`bridgeActions.test.mjs` : démarrer, avertissements, refus, séance faite,
+  bornes, gêne).
+- Aperçu :
+  - démarrage depuis une page séparée → le carnet Upper A s'ouvre seul, app ouverte sur le Bord ;
+  - un deuxième démarrage est refusé ;
+  - avertissements « créneau passé » et « genou hors base » ;
+  - escalade notée, visible dans l'historique.
+- **Pas vérifié sur le téléphone** : le lancement par JEFFREY, et le téléphone verrouillé.

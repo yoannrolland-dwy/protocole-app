@@ -100,6 +100,10 @@ export function agirContext() {
     mealPins: getSync("foodMealPins", {}), mealMuted: getSync("foodMealMuted", {}),
     recipes: getSync("foodRecipes", []),
     ciqual: { search: (q, limit) => searchCiqual(q, { limit }), get: getCiqual },
+    // G4-A : séances.
+    now: new Date(), nowMs: Date.now(),
+    training: getSync("trainingLog", []), draft: getSync("trainingDraft", null),
+    nextSession: () => makeCoach(loadData()).nextSession(),
   };
 }
 
@@ -109,7 +113,7 @@ const newJeton = () => Math.random().toString(36).slice(2, 8);
 /**
  * `agir { action, parametres, verifier, jeton? }`.
  * verifier: true → { ok: true, resume, jeton } ou { ok: false, raison, choix?, besoin? }.
- * verifier: false → { fait: true, resume, brief_du_jour? } ou { fait: false, raison }.
+ * verifier: false → { fait: true, resume, brief_du_jour?, ouvrir? } ou { fait: false, raison }.
  * `brief_du_jour: "a_faire"` : genou noté et brief du jour à faire (voir briefAfterKnee).
  */
 export async function runAgir(args, { now = Date.now(), ctx = agirContext() } = {}) {
@@ -137,6 +141,12 @@ export async function runAgir(args, { now = Date.now(), ctx = agirContext() } = 
   if (res.resume !== p.resume) return { fait: false, raison: `les données ont changé depuis la relecture ; relisez à Monsieur : ${res.resume}` };
   const change = applyActionStored(res.act);
   const out = { fait: true, resume: doneSummary(res.act, change) };
+  // G4-A : séance démarrée → JEFFREY ouvre PROTOCOLE (le service ne peut pas lancer une activité
+  // depuis l'arrière-plan). L'app ouvre le carnet d'elle-même (clé jeffreyStart) ; l'extra
+  // open_tab l'amène simplement sur l'onglet Séance.
+  if (res.act.kind === "demarrer") {
+    out.ouvrir = { paquet: "com.yoannrolland.protocole", activite: "com.yoannrolland.protocole.MainActivity", extras: { open_tab: "train" } };
+  }
   // Genou noté : si la règle du brief le lancerait maintenant, JEFFREY enchaîne sur le brief (même
   // app fermée). Réglage Activé / Désactivé lu par le natif ; absent (aperçu) = activé.
   if (res.act.kind === "genou") {
