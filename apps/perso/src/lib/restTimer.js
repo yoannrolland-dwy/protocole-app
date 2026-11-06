@@ -13,7 +13,9 @@ import { readDraft, writeDraft, DRAFT_EVENT } from "./sessionDraft.js";
 
 // endAt != null ⇔ décompte en cours. `remaining` = secondes affichées (figées en pause).
 // `speech` (31/10/2026) : phrase que Jeffrey dit après le bip, gardée pour la pause/reprise et +30 s.
-let state = { secs: 120, remaining: 120, endAt: null, label: "", speech: "" };
+// `source` (06/11/2026) : "jeffrey" si le repos a été lancé par l'appli JEFFREY (pont) ; il reste
+// alors silencieux côté PROTOCOLE (bip seul) même réglé à l'écran (+30 s, reprise).
+let state = { secs: 120, remaining: 120, endAt: null, label: "", speech: "", source: "" };
 const subs = new Set();
 const set = (patch) => { state = { ...state, ...patch }; subs.forEach((f) => f()); };
 const now = () => Date.now();
@@ -66,8 +68,8 @@ function finish() {
 const persist = () => {
   const d = readDraft();
   if (!d?.type || !Array.isArray(d.exos)) return;
-  const { secs, remaining, endAt, label, speech } = state;
-  writeDraft({ ...d, rest: { secs, remaining, endAt, label, speech } });
+  const { secs, remaining, endAt, label, speech, source } = state;
+  writeDraft({ ...d, rest: { secs, remaining, endAt, label, speech, ...(source ? { source } : {}) } });
 };
 /** Minuteur écrit ailleurs dans le brouillon : on s'y recale (le réveil natif est l'affaire de
  *  celui qui l'a écrit). Sans effet si rien n'a changé. */
@@ -77,23 +79,26 @@ export function syncRestFromDraft() {
   if (!d) { if (state.endAt) { stopTicking(); set({ endAt: null, remaining: state.secs }); } return; }
   const r = d.rest;
   if (!r) return;
-  if (r.endAt === state.endAt && r.secs === state.secs && (r.endAt != null || r.remaining === state.remaining)) return;
+  const source = r.source || "";
+  if (r.endAt === state.endAt && r.secs === state.secs && source === state.source && (r.endAt != null || r.remaining === state.remaining)) return;
   stopTicking();
   if (r.endAt && r.endAt > now()) {
-    set({ ...r, remaining: Math.max(0, Math.ceil((r.endAt - now()) / 1000)) });
+    set({ ...r, source, remaining: Math.max(0, Math.ceil((r.endAt - now()) / 1000)) });
     startTicking();
   } else {
-    set({ ...r, endAt: null, remaining: r.endAt ? 0 : r.remaining });
+    set({ ...r, source, endAt: null, remaining: r.endAt ? 0 : r.remaining });
   }
 }
 if (typeof window !== "undefined") window.addEventListener(DRAFT_EVENT, syncRestFromDraft);
+
+const quietOpts = () => ({ quiet: state.source === "jeffrey" });
 
 export const restTimer = {
   /** Lance un décompte de `secs` secondes (coche d'une série, bouton repos/maintien).
    *  `speech` : phrase de Jeffrey à la fin (app native, voix configurée). */
   start(secs, label = "", speech = "") {
     ensureAudio();
-    set({ secs, remaining: secs, endAt: now() + secs * 1000, label, speech });
+    set({ secs, remaining: secs, endAt: now() + secs * 1000, label, speech, source: "" });
     startTicking();
     scheduleRestAlarm(secs, label, speech);
     persist();
@@ -109,9 +114,10 @@ export const restTimer = {
     }
     const secs = state.remaining > 0 ? state.remaining : state.secs;
     ensureAudio();
-    set({ remaining: secs, endAt: now() + secs * 1000, label: label ?? state.label, speech: speech ?? state.speech });
+    // « Lancer » à l'écran (phrase fournie) = repos de l'app ; reprise après pause : même origine.
+    set({ remaining: secs, endAt: now() + secs * 1000, label: label ?? state.label, speech: speech ?? state.speech, source: speech !== undefined ? "" : state.source });
     startTicking();
-    scheduleRestAlarm(secs, label ?? state.label, state.speech);
+    scheduleRestAlarm(secs, label ?? state.label, state.speech, quietOpts());
     persist();
   },
   /** Règle la durée sans lancer (pastilles 2:00…0:30, remise à zéro). Arrête un décompte. */
@@ -125,7 +131,7 @@ export const restTimer = {
     if (state.endAt) {
       set({ endAt: state.endAt + secs * 1000 });
       const r = left(); set({ remaining: r });
-      scheduleRestAlarm(r, state.label, state.speech);
+      scheduleRestAlarm(r, state.label, state.speech, quietOpts());
     } else {
       set({ remaining: state.remaining + secs });
     }

@@ -17,7 +17,7 @@ les pièges identifiés et les tests attendus — ne pas les rouvrir sans raison
 À la fin d'une étape : cocher son état dans le tableau de `ROADMAP.md`, et
 documenter le livré ici, dans CLAUDE.md.
 
-## Jeffrey, état actuel (mis à jour le 05/11/2026, apps/perso v3.157.0)
+## Jeffrey, état actuel (mis à jour le 06/11/2026, apps/perso v3.157.1)
 
 Résumé de référence. Les sections datées plus bas (chantier J, 29-31/10/2026) racontent comment on
 en est arrivé là ; **en cas de désaccord, c'est cette section qui fait foi**. À tenir à jour à
@@ -163,6 +163,11 @@ PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
     `RestTimerPlugin.scheduleFromBridge` / `cancelFromBridge`.
   - Brouillon : `courant` (exercice nommé) et `voix.last` (pour « annule »).
   - Catalogue : `G4-C3-protocole-seance-voix-catalogue.md`.
+  - **Repos lancé par JEFFREY = PROTOCOLE se tait (v3.157.1, choix de Yoann : « bip sans
+    couper »)** : à la fin, le bip seul, sans priorité audio ni phrase (`quiet`, `lib/bridgeRest.js`,
+    `RestEndAudio`), vibration gardée. Le repos porte `rest.source: "jeffrey"` ; +30 s et reprise à
+    l'écran le gardent silencieux, « Lancer » ou une série cochée à l'écran le rendent à l'app.
+    Fin ou abandon de séance par JEFFREY : réveil retiré et bip en cours arrêté.
 - **Relecture dans l'app ouverte (G3)** : après toute écriture d'une page sans écran (pont,
   notification, brief de secours), l'app relit poids, genou, macros, note, journal alimentaire,
   conversation, carnet, marqueur de mémoire et séances (G4-A) avant son prochain enregistrement. Trois
@@ -5755,3 +5760,29 @@ records (V4) et les plateaux du carnet ; la phrase de fin de repos est celle du 
 - compilation Android faite.
 - **Pas vérifié sur le téléphone** : le réveil programmé par le pont app fermée, et une séance
   démarrée app fermée puis ouverte.
+
+## Pont vers l'appli JEFFREY : PROTOCOLE se tait pendant un repos lancé par JEFFREY (06/11/2026, apps/perso v3.157.1)
+
+**Constat (historique audio du S25, 06/11 à 17 h 56).** Après une séance de Mobilité menée à la voix,
+c'est le réveil de fin de repos de PROTOCOLE qui a sonné. Il a pris la priorité audio (usage
+« assistant ») avant le bip, puis l'a reprise pour dire sa phrase. JEFFREY a perdu le son et fermé
+sa conversation. Ce n'était pas propre à la fin de séance : chaque repos lancé par `noter_serie`
+programmait le réveil de PROTOCOLE avec sa voix. Le reste du pont (démarrer, aller à, terminer,
+annuler) ne fait aucun son. Pourquoi le réveil a sonné 14 s après le « oui » n'est pas établi
+(journal écrasé) : le plus probable est que la fin a été écrite après le bip.
+
+**Choix de Yoann : « bip sans couper ».**
+- `lib/bridgeRest.js` : `markJeffreyRest` (repos de `noter_serie` / `repos` marqué
+  `rest.source: "jeffrey"`) et `nativeRest` (réveil sans voix, `quiet: true`).
+- Natif : `scheduleFromBridge(..., quiet)` et `scheduleAlarm({ quiet })` rangent `quiet` avec la
+  voix (préférences `rest_voice`). `RestEndAudio.play` : `quiet` → aucune priorité audio, aucune
+  phrase, le bip seul (mêlé au son en cours), vibration inchangée.
+- App ouverte (`restTimer.js`) : `source` suit le brouillon ; +30 s et reprise après pause restent
+  silencieux, « Lancer » à l'écran ou une série cochée à l'écran redeviennent un repos de l'app (avec
+  la phrase).
+- `cancelFromBridge` (fin ou abandon par JEFFREY, pause) arrête aussi un bip ou une phrase de fin de
+  repos en cours (`RestEndAudio.stop`).
+- Tests : `apps/perso/test/jeffreyQuietRest.test.mjs` (4) — 246 au total. Kotlin compilé.
+- **Pas vérifié sur le téléphone** : un repos de 30 s lancé par JEFFREY, casque branché, doit
+  laisser `dumpsys audio` sans aucune prise de priorité par PROTOCOLE, et le bip doit s'entendre.
+

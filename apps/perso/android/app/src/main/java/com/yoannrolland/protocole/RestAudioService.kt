@@ -69,20 +69,37 @@ object RestEndAudio {
         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
         .build()
 
+    /** Fin de repos en cours (bip ou phrase), pour l'arrêter : `stop()`. */
+    @Volatile private var stopCurrent: (() -> Unit)? = null
+
+    /** Séance terminée ou abandonnée par JEFFREY (06/11/2026) : le bip et la phrase en cours se taisent. */
+    fun stop() {
+        val s = stopCurrent ?: return
+        Handler(Looper.getMainLooper()).post { s() }
+    }
+
     fun play(context: Context, onFinished: () -> Unit) {
         val app = context.applicationContext
         val am = app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        // Repos lancé par JEFFREY (06/11/2026) : le bip seul, mêlé au son en cours, sans priorité
+        // audio (sinon JEFFREY perd la parole et coupe sa conversation) et sans phrase.
+        val quiet = RestTimerPlugin.storedQuiet(app)
         val focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).setAudioAttributes(focusAttrs).build()
-        val granted = am?.requestAudioFocus(focus)
-        Log.i(TAG, "priorité audio : ${if (granted == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) "obtenue" else "refusée ($granted)"}")
+        if (quiet) {
+            Log.i(TAG, "repos de JEFFREY : bip sans priorité audio")
+        } else {
+            val granted = am?.requestAudioFocus(focus)
+            Log.i(TAG, "priorité audio : ${if (granted == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) "obtenue" else "refusée ($granted)"}")
+        }
 
         val main = Handler(Looper.getMainLooper())
         val finished = AtomicBoolean(false)
         val end = {
             if (finished.compareAndSet(false, true)) {
+                stopCurrent = null
                 // Petite marge : la fin de la phrase sort du haut-parleur avant que les autres reprennent.
                 main.postDelayed({
-                    runCatching { am?.abandonAudioFocusRequest(focus) }
+                    if (!quiet) runCatching { am?.abandonAudioFocusRequest(focus) }
                     onFinished()
                 }, 300)
             }
@@ -92,8 +109,17 @@ object RestEndAudio {
         // Annonce de Jeffrey juste après le bip (31/10/2026, choix de Yoann : toujours, casque ou
         // haut-parleur). Le son est en général déjà sur le téléphone (préparé au lancement du
         // repos) ; sinon il est demandé au serveur. Jamais par-dessus Jeffrey s'il parle déjà.
-        val voice = RestTimerPlugin.storedVoice(app)
+        val voice = if (quiet) null else RestTimerPlugin.storedVoice(app)
         val spoken = AtomicBoolean(false)
+        val speaking = AtomicBoolean(false)
+        var player: MediaPlayer? = null
+        stopCurrent = {
+            spoken.set(true)
+            runCatching { player?.let { it.stop(); it.release() } }
+            player = null
+            if (speaking.get()) runCatching { JeffreySpeech.stop() }
+            end()
+        }
         val speakNow = speakNow@{
             if (!spoken.compareAndSet(false, true)) return@speakNow
             // Voix en vacances (01/11/2026) : begin() refuse, le bip reste seul.
@@ -104,13 +130,14 @@ object RestEndAudio {
                     app, "rest-${System.currentTimeMillis()}",
                     JeffreySpeech.Config(voice.getString("url").trimEnd('/'), voice.getString("key"), voice.optDouble("speed", 1.2).toFloat()),
                     true, voice.optString("cacheKey").ifEmpty { null }, (0 until arr.length()).map { arr.getString(it) }, true,
-                ) { end() }
-                if (!started) end()
+                ) { speaking.set(false); end() }
+                if (!started) end() else speaking.set(true)
             } catch (_: Exception) { end() }
         }
 
         try {
-            val player = MediaPlayer()
+            val mp = MediaPlayer()
+            player = mp
             val headset = Headset.connected(app)
             if (headset != null) {
                 // Constaté sur appareil le 29/07/2026, casque filaire USB-C ET Bluetooth : le
@@ -124,15 +151,15 @@ object RestEndAudio {
                 // n'a donc pas besoin du flux ALARME pour fonctionner ici. Revers assumé :
                 // si le volume média du téléphone est baissé à zéro indépendamment du volume
                 // alarme, ce cas précis serait silencieux.
-                player.setAudioAttributes(
+                mp.setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_MEDIA)
                         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                         .build()
                 )
-                player.setPreferredDevice(headset)
+                mp.setPreferredDevice(headset)
             } else {
-                player.setAudioAttributes(
+                mp.setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -142,13 +169,13 @@ object RestEndAudio {
             // Volume divisé par deux (04/08/2026, demande explicite) : le son à pleine
             // intensité était trop fort en salle. Reste au-dessus du volume alarme/média du
             // téléphone (ce setVolume() n'est qu'une atténuation relative sur ce flux-là).
-            player.setVolume(0.5f, 0.5f)
+            mp.setVolume(0.5f, 0.5f)
             val afd = app.resources.openRawResourceFd(R.raw.alarm)
-            player.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+            mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
             afd.close()
-            player.setOnCompletionListener { it.release(); speakNow() }
-            player.prepare()
-            player.start()
+            mp.setOnCompletionListener { it.release(); player = null; speakNow() }
+            mp.prepare()
+            mp.start()
         } catch (_: Exception) {
             speakNow()
         }

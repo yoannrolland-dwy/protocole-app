@@ -17,7 +17,7 @@ import { searchCiqual, getCiqual } from "@rawcare/core/nutrition/ciqual";
 import { applyActionStored } from "./jeffreyNotify.js";
 import { readDraft, writeDraft } from "./sessionDraft.js";
 import { restAnnouncement } from "./restSpeech.js";
-import { voiceServer, speechPlan } from "./voiceConfig.js";
+import { nativeRest, markJeffreyRest } from "./bridgeRest.js";
 import { readSession, logSet, undoLastSet, goToExercise, nextExercise, restAction, finishCheck, abandonCheck } from "@rawcare/core/session/voiceSession";
 import { currentSet } from "@rawcare/core/session/engine";
 import { byDate } from "@rawcare/core/dateUtils";
@@ -179,16 +179,6 @@ function sessionCtx(now) {
   return { training: getSync("trainingLog", []), knee: getSync("kneeLog", []), now };
 }
 
-/** Réveil de fin de repos (natif) : programmé à `rest.endAt`, ou retiré. Hors app native : rien. */
-function nativeRest(rest) {
-  const page = typeof window !== "undefined" ? window.JeffreyBridgePage : null;
-  if (!page?.restAlarm) return;
-  if (!rest?.endAt) { page.restAlarm(JSON.stringify({ endAt: null })); return; }
-  const server = rest.speech ? voiceServer() : null;
-  const plan = server ? speechPlan(rest.speech) : null;
-  page.restAlarm(JSON.stringify({ endAt: rest.endAt, label: rest.label || "", voice: plan ? { ...server, ...plan } : null }));
-}
-
 /** Geste de séance immédiat. `write: false` : décrit sans rien écrire. */
 export function runSessionNow(action, p, { now = Date.now(), write = true } = {}) {
   const d = readDraft();
@@ -220,6 +210,7 @@ export function runSessionNow(action, p, { now = Date.now(), write = true } = {}
   if (r.record) out.record = true;
   if (r.plateau) out.plateau = r.plateau;
   if (!write) return { ok: true, resume: r.phrase, immediat: true };
+  draft = markJeffreyRest(draft, action);
   writeDraft(draft);
   if (action === "noter_serie" || action === "annuler_serie" || action === "repos") nativeRest(draft.rest);
   return out;

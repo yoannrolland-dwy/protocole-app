@@ -54,6 +54,14 @@ class RestTimerPlugin : Plugin() {
             context.getSharedPreferences(VOICE_PREFS, Context.MODE_PRIVATE).getString("voice", null)
                 ?.let { runCatching { org.json.JSONObject(it) }.getOrNull() }
 
+        /**
+         * Repos lancé par l'appli JEFFREY (06/11/2026, choix de Yoann : « bip sans couper ») : à la
+         * fin, le bip seul, SANS prendre la priorité audio et sans phrase — JEFFREY parle, PROTOCOLE
+         * ne lui coupe jamais la parole. Rangé avec la voix, retiré avec elle.
+         */
+        fun storedQuiet(context: Context): Boolean =
+            context.getSharedPreferences(VOICE_PREFS, Context.MODE_PRIVATE).getBoolean("quiet", false)
+
         /** Voix coupée (01/11/2026) : l'annonce d'un repos déjà programmé est oubliée. */
         fun clearStoredVoice(context: Context) = storeVoice(context, null)
 
@@ -95,9 +103,9 @@ class RestTimerPlugin : Plugin() {
          * Même réveil que le carnet (`setAlarmClock` → RestAlarmReceiver : bip puis phrase de
          * Jeffrey), même décompte. `voiceJson` : voix de la phrase de fin, ou null.
          */
-        fun scheduleFromBridge(context: Context, endsAt: Long, exercise: String, voiceJson: String?) {
+        fun scheduleFromBridge(context: Context, endsAt: Long, exercise: String, voiceJson: String?, quiet: Boolean = false) {
             ensureChannels(context)
-            storeVoice(context, voiceJson)
+            storeVoice(context, if (quiet) null else voiceJson, quiet)
             val am = context.getSystemService(AlarmManager::class.java)
             val show = context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
                 PendingIntent.getActivity(context, 0, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
@@ -111,11 +119,14 @@ class RestTimerPlugin : Plugin() {
             runCatching { context.getSystemService(AlarmManager::class.java).cancel(alarmPendingIntent(context, "")) }
             storeVoice(context, null)
             runCatching { NotificationManagerCompat.from(context).cancel(NOTIF_COUNTDOWN) }
+            // 06/11/2026 : un bip (ou une phrase de fin de repos) déjà en train de sonner s'arrête.
+            RestEndAudio.stop()
         }
 
-        private fun storeVoice(context: Context, json: String?) {
+        private fun storeVoice(context: Context, json: String?, quiet: Boolean = false) {
             val e = context.getSharedPreferences(VOICE_PREFS, Context.MODE_PRIVATE).edit()
             if (json == null) e.remove("voice") else e.putString("voice", json)
+            e.putBoolean("quiet", quiet)
             e.apply()
         }
 
@@ -175,7 +186,9 @@ class RestTimerPlugin : Plugin() {
         val endsAt = call.getLong("endsAt") ?: run { call.reject("endsAt requis"); return }
         val exercise = call.getString("exercise") ?: ""
         ensureChannels(context)
-        storeVoice(context, call.getObject("voice")?.toString())
+        // `quiet` (06/11/2026) : repos lancé par JEFFREY puis réglé à l'écran (+30 s, reprise).
+        val quiet = call.getBoolean("quiet", false) == true
+        storeVoice(context, if (quiet) null else call.getObject("voice")?.toString(), quiet)
 
         val am = context.getSystemService(AlarmManager::class.java)
         val showIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {

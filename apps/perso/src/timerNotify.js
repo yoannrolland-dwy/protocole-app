@@ -51,18 +51,19 @@ async function ensureNotificationPermission() {
   return perm.display === "granted";
 }
 
-/** Programme l'alarme de fin de repos et affiche le décompte. `seconds` = durée du repos. */
-export async function scheduleRestAlarm(seconds, exercise = "", speech = "") {
+/** Programme l'alarme de fin de repos et affiche le décompte. `seconds` = durée du repos.
+ *  `quiet` (06/11/2026) : repos lancé par JEFFREY → bip seul, sans priorité audio ni phrase. */
+export async function scheduleRestAlarm(seconds, exercise = "", speech = "", { quiet = false } = {}) {
   if (!Capacitor.isNativePlatform() || !(seconds > 0)) return;
 
   try {
     if (!(await ensureNotificationPermission())) return;
 
     const endsAt = Date.now() + seconds * 1000;
-    const server = speech ? voiceServer() : null;
+    const server = speech && !quiet ? voiceServer() : null;
     const plan = server ? speechPlan(speech) : null;
     const voice = plan ? { ...server, ...plan } : null;
-    await RestTimer.scheduleAlarm({ endsAt, exercise, ...(voice ? { voice } : {}) });
+    await RestTimer.scheduleAlarm({ endsAt, exercise, ...(voice ? { voice } : {}), ...(quiet ? { quiet: true } : {}) });
     if (voice) speak(speech, { play: false }).catch(() => {});
     await RestTimer.showCountdown({ endsAt, exercise });
   } catch (e) {
