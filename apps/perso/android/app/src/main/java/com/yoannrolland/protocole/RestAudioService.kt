@@ -5,8 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
-import android.media.AudioFocusRequest
-import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Build
 import android.os.Handler
@@ -17,7 +15,8 @@ import androidx.core.app.NotificationCompat
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Fin de repos : le bip puis la phrase de Jeffrey, au premier plan (01/11/2026).
+ * Fin de repos : le bip, au premier plan (01/11/2026 ; bip seul depuis le 07/11/2026, plus de phrase
+ * ni de priorité audio, voir RestEndAudio.play).
  *
  * Constaté sur le téléphone (dumpsys audio, séance du 01/11 de 7 h 54 à 8 h 13) : Android 16 jette
  * les demandes de priorité audio d'une app qui n'est ni à l'écran ni dans un service au premier
@@ -26,10 +25,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * avec PROTOCOLE à l'écran, ça marchait. D'où le côté aléatoire remonté par Yoann.
  *
  * Ce service, démarré par le réveil de fin de repos (setAlarmClock : Android autorise alors un
- * service au premier plan depuis l'arrière-plan), met l'app au premier plan le temps du bip et de la
- * phrase. La priorité audio est prise AVANT le bip (les autres apps se mettent en pause) et rendue
- * après la phrase (elles reprennent). Type mediaPlayback : le seul accepté pour l'audio à partir
- * d'Android 17, où shortService ne suffira plus.
+ * service au premier plan depuis l'arrière-plan), garde l'app en vie le temps du bip. Jusqu'au
+ * 06/11/2026 il prenait aussi la priorité audio et jouait une phrase de Jeffrey : retiré le
+ * 07/11/2026 (le bip coupait JEFFREY et la musique). Type mediaPlayback : le seul accepté pour
+ * l'audio à partir d'Android 17.
  */
 class RestAudioService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
@@ -58,81 +57,43 @@ class RestAudioService : Service() {
     }
 }
 
-/** Le bip et la phrase, encadrés par la priorité audio. Utilisé par le service, et par le réveil
- *  lui-même si Android refuse le service (sans garantie de priorité dans ce cas). */
+/** Le bip seul. Utilisé par le service, et par le réveil lui-même si Android refuse le service. */
 object RestEndAudio {
     const val TAG = "RestEndAudio"
     private const val SAFETY_MS = 9_500L // le réveil garde la main 10 s au plus (goAsync)
 
-    private val focusAttrs = AudioAttributes.Builder()
-        .setUsage(AudioAttributes.USAGE_ASSISTANT)
-        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-        .build()
-
-    /** Fin de repos en cours (bip ou phrase), pour l'arrêter : `stop()`. */
+    /** Bip en cours, pour l'arrêter : `stop()`. */
     @Volatile private var stopCurrent: (() -> Unit)? = null
 
-    /** Séance terminée ou abandonnée par JEFFREY (06/11/2026) : le bip et la phrase en cours se taisent. */
+    /** Séance terminée ou abandonnée par JEFFREY (06/11/2026) : le bip en cours se tait. */
     fun stop() {
         val s = stopCurrent ?: return
         Handler(Looper.getMainLooper()).post { s() }
     }
 
+    /**
+     * Fin de repos = le bip seul, quelle que soit l'origine du repos (07/11/2026, demande de Yoann :
+     * « Je ne veux plus que Jeffrey me parle à la fin du minuteur », « le bip se suffit à lui-même »,
+     * « quand le bip sonne ça ne doit pas arrêter Jeffrey s'il est actif »). Aucune phrase, et AUCUNE
+     * priorité audio : le bip se mêle au son en cours (JEFFREY, musique, vidéo) sans le couper.
+     */
     fun play(context: Context, onFinished: () -> Unit) {
         val app = context.applicationContext
-        val am = app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-        // Repos lancé par JEFFREY (06/11/2026) : le bip seul, mêlé au son en cours, sans priorité
-        // audio (sinon JEFFREY perd la parole et coupe sa conversation) et sans phrase.
-        val quiet = RestTimerPlugin.storedQuiet(app)
-        val focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).setAudioAttributes(focusAttrs).build()
-        if (quiet) {
-            Log.i(TAG, "repos de JEFFREY : bip sans priorité audio")
-        } else {
-            val granted = am?.requestAudioFocus(focus)
-            Log.i(TAG, "priorité audio : ${if (granted == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) "obtenue" else "refusée ($granted)"}")
-        }
-
         val main = Handler(Looper.getMainLooper())
         val finished = AtomicBoolean(false)
         val end = {
             if (finished.compareAndSet(false, true)) {
                 stopCurrent = null
-                // Petite marge : la fin de la phrase sort du haut-parleur avant que les autres reprennent.
-                main.postDelayed({
-                    if (!quiet) runCatching { am?.abandonAudioFocusRequest(focus) }
-                    onFinished()
-                }, 300)
+                main.post { onFinished() }
             }
         }
         main.postDelayed({ end() }, SAFETY_MS)
 
-        // Annonce de Jeffrey juste après le bip (31/10/2026, choix de Yoann : toujours, casque ou
-        // haut-parleur). Le son est en général déjà sur le téléphone (préparé au lancement du
-        // repos) ; sinon il est demandé au serveur. Jamais par-dessus Jeffrey s'il parle déjà.
-        val voice = if (quiet) null else RestTimerPlugin.storedVoice(app)
-        val spoken = AtomicBoolean(false)
-        val speaking = AtomicBoolean(false)
         var player: MediaPlayer? = null
         stopCurrent = {
-            spoken.set(true)
             runCatching { player?.let { it.stop(); it.release() } }
             player = null
-            if (speaking.get()) runCatching { JeffreySpeech.stop() }
             end()
-        }
-        val speakNow = speakNow@{
-            if (!spoken.compareAndSet(false, true)) return@speakNow
-            // Voix en vacances (01/11/2026) : begin() refuse, le bip reste seul.
-            if (voice == null || JeffreySpeech.playing()) { end(); return@speakNow }
-            try {
-                val arr = voice.getJSONArray("chunks")
-                val started = JeffreySpeech.begin(
-                    app, "rest-${System.currentTimeMillis()}",
-                    JeffreySpeech.Config(voice.getString("url").trimEnd('/'), voice.getString("key"), voice.optDouble("speed", 1.2).toFloat()),
-                    true, voice.optString("cacheKey").ifEmpty { null }, (0 until arr.length()).map { arr.getString(it) }, true,
-                ) { speaking.set(false); end() }
-                if (!started) end() else speaking.set(true)
-            } catch (_: Exception) { end() }
         }
 
         try {
@@ -173,11 +134,11 @@ object RestEndAudio {
             val afd = app.resources.openRawResourceFd(R.raw.alarm)
             mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
             afd.close()
-            mp.setOnCompletionListener { it.release(); player = null; speakNow() }
+            mp.setOnCompletionListener { it.release(); player = null; end() }
             mp.prepare()
             mp.start()
         } catch (_: Exception) {
-            speakNow()
+            end()
         }
     }
 }

@@ -78,3 +78,12 @@ test("séance terminée par JEFFREY : réveil retiré", () => {
   nativeRest(null);
   assert.deepEqual(alarms, [{ endAt: null }]);
 });
+
+// 07/11/2026 (demande de Yoann : « Je ne veux plus que Jeffrey me parle à la fin du minuteur ») :
+// toute fin de repos, même lancée dans PROTOCOLE, ne demande plus au réveil natif qu'un bip.
+test("repos lancé dans PROTOCOLE : le réveil ne reçoit aucune voix", async () => {
+  const { alarmRequest } = await import("../src/timerNotify.js");
+  const req = alarmRequest(123456, "Rowing");
+  assert.deepEqual(req, { endsAt: 123456, exercise: "Rowing" });
+  assert.equal("voice" in req, false);
+});

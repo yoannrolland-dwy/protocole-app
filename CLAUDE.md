@@ -17,7 +17,7 @@ les pièges identifiés et les tests attendus — ne pas les rouvrir sans raison
 À la fin d'une étape : cocher son état dans le tableau de `ROADMAP.md`, et
 documenter le livré ici, dans CLAUDE.md.
 
-## Jeffrey, état actuel (mis à jour le 06/11/2026, apps/perso v3.157.1)
+## Jeffrey, état actuel (mis à jour le 07/11/2026, apps/perso v3.157.2)
 
 Résumé de référence. Les sections datées plus bas (chantier J, 29-31/10/2026) racontent comment on
 en est arrivé là ; **en cas de désaccord, c'est cette section qui fait foi**. À tenir à jour à
@@ -73,7 +73,7 @@ bas, champ de saisie visible.
   n'écrit son brief qu'en secours, si JEFFREY ne confirme pas dans la minute (voir le pont).
 - Notification de conversation : Écouter · Répondre · une réponse rapide (ou « Confirmer » si une
   action attend). Une réponse écrite dans la notification fait répondre Jeffrey sans ouvrir l'app.
-- Fin de repos du carnet : après le bip, il annonce la série ou l'exercice suivant.
+- Fin de repos du carnet : **le bip seul**, plus aucune phrase depuis v3.157.2 (07/11/2026).
 
 **Pont vers l'appli JEFFREY (étape G1, lecture seule, v3.152.0).** L'appli Android JEFFREY
 (`fr.yrolland.jeffrey`, assistant vocal, autre dépôt `jeffrey-app`) remplacera à terme ce Jeffrey :
@@ -168,6 +168,9 @@ PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
     `RestEndAudio`), vibration gardée. Le repos porte `rest.source: "jeffrey"` ; +30 s et reprise à
     l'écran le gardent silencieux, « Lancer » ou une série cochée à l'écran le rendent à l'app.
     Fin ou abandon de séance par JEFFREY : réveil retiré et bip en cours arrêté.
+  - **Depuis v3.157.2 (07/11/2026), c'est vrai de TOUT repos**, lancé dans PROTOCOLE ou par
+    JEFFREY : voir la section du 07/11/2026 en fin de fichier. `quiet` et `rest.source` sont encore
+    écrits mais n'ont plus d'effet.
 - **Relecture dans l'app ouverte (G3)** : après toute écriture d'une page sans écran (pont,
   notification, brief de secours), l'app relit poids, genou, macros, note, journal alimentaire,
   conversation, carnet, marqueur de mémoire et séances (G4-A) avant son prochain enregistrement. Trois
@@ -242,11 +245,11 @@ PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
 - Quand il parle : **casque branché → il dit toutes ses réponses** (conversation, brief,
   réponses depuis la notification), séance ou pas. Sans casque : seulement si Monsieur lui a
   parlé à la voix ; sinon bouton « Écouter » sous chaque réponse (cache sur le téléphone, 60 Mo).
-  Fin de repos : annoncée toujours, casque ou haut-parleur.
+  Fin de repos : le bip seul, jamais de phrase (v3.157.2).
 - La musique et les vidéos se mettent **en pause** pendant qu'il parle, puis reprennent (priorité
   audio `GAIN_TRANSIENT`). **Android 16 ne l'accorde qu'à une app à l'écran ou dans un service au
-  premier plan** : la fin de repos passe donc par `RestAudioService` (v3.146.1, voir en fin de
-  fichier) ; le brief et les réponses depuis la notification passent par `BriefService`.
+  premier plan** : le brief et les réponses depuis la notification passent par `BriefService`. La
+  fin de repos ne prend plus la priorité audio (v3.157.2) : son bip se mêle au son en cours.
 - **Interrupteur « Voix de Jeffrey »** (Réglages › Jeffrey › voix, v3.147.0) : Activée / En
   vacances, activée par défaut (`jeffreyVoice.enabled`, absent = activé). En vacances, il ne parle
   plus nulle part, mais écrit toujours tout ; dictée et bips de repos restent. Voir la section du
@@ -5786,3 +5789,23 @@ annuler) ne fait aucun son. Pourquoi le réveil a sonné 14 s après le « oui �
 - **Pas vérifié sur le téléphone** : un repos de 30 s lancé par JEFFREY, casque branché, doit
   laisser `dumpsys audio` sans aucune prise de priorité par PROTOCOLE, et le bip doit s'entendre.
 
+## Fin de repos : le bip seul, quelle que soit l'origine du repos (07/11/2026, apps/perso v3.157.2)
+
+Demande de Yoann, relayée par la session JEFFREY : « Je ne veux plus que Jeffrey me parle à la fin du
+minuteur ». Elle complète sa décision du 06/11 (« le bip se suffit à lui-même », « quand le bip sonne
+ça ne doit pas arrêter Jeffrey s'il est actif »). La v3.157.1 ne rendait silencieux que les repos
+lancés par JEFFREY. Le 07/11 au matin, `dumpsys audio` montrait encore PROTOCOLE prendre la priorité
+audio à chaque fin de repos lancée à l'écran, une fois pour le bip et une fois pour la phrase.
+- **Natif** : `RestEndAudio.play` (`RestAudioService.kt`) joue le bip et rien d'autre. Il ne demande
+  plus la priorité audio et ne joue aucune phrase. Les règles du bip ne changent pas (casque seul
+  s'il est branché, sinon flux alarme), ni la vibration, ni la notification « Repos terminé ».
+  `RestAudioService` reste : il garde l'app en vie le temps du bip.
+- `RestTimerPlugin` ignore `voice` et `quiet`. Il efface à chaque repos ce qu'une version
+  précédente avait rangé dans les préférences `rest_voice`.
+- **JS** : `scheduleRestAlarm` ne prépare plus aucun audio et n'envoie plus de voix au natif
+  (`alarmRequest`, testé). Le carnet calcule encore la phrase (`restAnnouncement`), sans
+  l'utiliser.
+- Le reste de la voix de Jeffrey ne change pas : conversation, brief, notification.
+- Test ajouté dans `jeffreyQuietRest.test.mjs` (247 au total). Kotlin compilé.
+- **Pas vérifié sur le téléphone** : fin de repos lancée à l'écran, musique en cours, sans aucune
+  prise de priorité par PROTOCOLE dans `dumpsys audio`.

@@ -18,8 +18,8 @@ import androidx.core.content.ContextCompat
  * Ce n'est PAS une notification qui sonne : le bip est joué par l'app elle-même, sur le flux
  * ALARME, via MediaPlayer — indépendamment de tout pipeline de notification. C'est le seul
  * mécanisme constaté fiable téléphone en mode silencieux (voir RestTimerPlugin.kt). Depuis le
- * 01/11/2026, le bip et la phrase de Jeffrey sont joués par RestAudioService, au premier plan,
- * pour que la priorité audio soit vraiment accordée (voir RestAudioService.kt).
+ * 01/11/2026, le bip est joué par RestAudioService, au premier plan. Depuis le 07/11/2026, plus
+ * de phrase de Jeffrey ni de priorité audio : le bip seul (voir RestAudioService.kt).
  */
 /** Fin de repos dans la voix de Jeffrey (lot JT, 29/10/2026) : très court, lu entre deux séries. */
 private val END_TITLES = listOf(
@@ -41,10 +41,9 @@ class RestAlarmReceiver : BroadcastReceiver() {
         // persistant nous-mêmes plutôt que de compter sur un rappel JS à temps.
         try { NotificationManagerCompat.from(context).cancel(RestTimerPlugin.NOTIF_COUNTDOWN) } catch (_: Exception) { }
 
-        // Bip puis phrase de Jeffrey, dans un service au premier plan (01/11/2026) : sans lui,
-        // Android 16 ignore la demande de priorité audio dès qu'une autre app est à l'écran, et
-        // la musique ou Instagram continuent par-dessus. Si Android refuse le service, on joue
-        // quand même ici (goAsync garde le réveil en vie 10 s), sans garantie de priorité.
+        // Le bip, dans un service au premier plan (01/11/2026) qui garde l'app en vie le temps du
+        // son. Si Android refuse le service, on joue quand même ici (goAsync garde le réveil en
+        // vie 10 s). Bip seul depuis le 07/11/2026 : ni phrase ni priorité audio.
         try {
             ContextCompat.startForegroundService(context, Intent(context, RestAudioService::class.java))
         } catch (e: Exception) {
