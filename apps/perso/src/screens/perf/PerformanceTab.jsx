@@ -20,15 +20,16 @@ import { JeffreyChat } from "./JeffreyChat.jsx";
 import { sayStable } from "../../lib/jeffrey.js";
 import { SubTabs } from "../../components/SubTabs.jsx";
 
-// Sous-onglets (30/10/2026, retour de Yoann : la conversation prenait toute la place). Jeffrey
-// s'ouvre d'abord ; le dernier sous-onglet ouvert est retenu pendant la session, comme Corps et
-// les Réglages. Chaque sous-onglet ne calcule que ce qu'il affiche.
+// Sous-onglets (30/10/2026, retour de Yoann : la conversation prenait toute la place). Dépense
+// s'ouvre d'abord et Jeffrey passe en dernier (08/11/2026 : l'appli JEFFREY prend le relais) ; le
+// dernier sous-onglet ouvert est retenu pendant la session, comme Corps et les Réglages. Chaque
+// sous-onglet ne calcule que ce qu'il affiche.
 const ANALYSE_TABS = [
-  { key: "jeffrey", label: "Jeffrey" },
-  { key: "calories", label: "Calories" },
   { key: "depense", label: "Dépense" },
+  { key: "calories", label: "Calories" },
+  { key: "jeffrey", label: "Jeffrey" },
 ];
-let lastAnalyseTab = "jeffrey";
+let lastAnalyseTab = "depense";
 
 /* ============================================================
    TAB — PERFORMANCE

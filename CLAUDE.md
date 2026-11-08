@@ -49,7 +49,7 @@ dans sa voix : recueil `PHRASES` dans `apps/perso/src/lib/jeffrey.js` (`say`, `s
 `sayError`), sans aucun appel à l'IA. Tout nouveau message de l'app va dans ce recueil (test :
 chaque phrase dit « Monsieur », aucune ne tutoie).
 
-**Où il apparaît.** Onglet Analyse › sous-onglet « Jeffrey » (ouvert par défaut) ; bulle sur les
+**Où il apparaît.** Onglet Analyse › sous-onglet « Jeffrey » (en dernier depuis v3.157.3, Analyse s'ouvre sur « Dépense ») ; bulle sur les
 autres onglets (pas dans Analyse, les Réglages, ni avec un carnet de séance ouvert), qui ouvre la
 même conversation en surimpression ; carte du Bord (en haut le matin, une ligne sous les tuiles
 l'après-midi) ; notification de conversation (brief et réponses). La conversation s'ouvre tout en
@@ -5809,3 +5809,24 @@ audio à chaque fin de repos lancée à l'écran, une fois pour le bip et une fo
 - Test ajouté dans `jeffreyQuietRest.test.mjs` (247 au total). Kotlin compilé.
 - **Pas vérifié sur le téléphone** : fin de repos lancée à l'écran, musique en cours, sans aucune
   prise de priorité par PROTOCOLE dans `dumpsys audio`.
+
+## Analyse s'ouvre sur « Dépense », Jeffrey en dernier (08/11/2026, apps/perso v3.157.3)
+
+Demande de Yoann : l'onglet Analyse ouvre directement la dépense estimée, et le sous-onglet Jeffrey
+passe en dernier (l'appli JEFFREY prend le relais). Ordre : Dépense · Calories · Jeffrey
+(`ANALYSE_TABS`, `PerformanceTab.jsx`). La bulle, la carte du Bord et la notification ouvrent
+toujours la conversation en surimpression, sans changement. Vérifié dans l'aperçu (360 px).
+
+## Photo d'un plat : une carte bancaire comme échelle (08/11/2026, apps/perso v3.157.4)
+
+Question de Yoann : une référence de taille dans la photo améliore-t-elle l'estimation ? Oui pour
+la surface (la portion est la principale erreur, pas l'identification du plat). Carte bancaire
+retenue plutôt que la main : format normalisé (85,6 × 54 mm, ISO/IEC 7810 ID-1), plate et rigide,
+alors qu'une main change de forme selon la pose. Limite dite à Yoann : la carte ne donne pas la
+hauteur d'un tas ; le champ « Précision » reste le levier pour ça.
+- **Consigne au modèle** (`SYSTEM_PROMPT`, `PhotoDish.jsx`) : si une carte de ce format est
+  visible, s'en servir d'échelle en priorité (perspective comprise), et juger l'épaisseur à part.
+- **Écran** : le texte d'aide sous « Précision » dit de poser une carte à plat à côté de
+  l'assiette et de photographier de dessus.
+- Vérifié dans l'aperçu (texte affiché, aucune erreur). **Pas mesuré** : le gain réel de précision,
+  à comparer par Yoann sur quelques plats pesés.
