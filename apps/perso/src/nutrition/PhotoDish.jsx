@@ -12,7 +12,8 @@
 // l'identification du plat — sans repère d'échelle dans la photo (fourchette, diamètre de
 // l'assiette), l'écart peut facilement atteindre 30-50%. La note complémentaire est le
 // principal levier pour corriger ça ; le system prompt lui donne priorité sur le jugé visuel.
-// Carte bancaire (08/11/2026, choix de Yoann) : posée à plat à côté de l'assiette, elle sert
+// Carte au format carte bancaire (08/11/2026, choix de Yoann ; fidélité, vitale… pas forcément
+// une carte de paiement) : posée à plat à côté de l'assiette, elle sert
 // d'échelle (85,6 × 54 mm) ; elle ne dit rien de la hauteur d'un tas.
 
 import React, { useState, useRef } from "react";
@@ -44,7 +45,8 @@ préciser, ce qui n'a pas été mangé). Tâche :
    repères visuels disponibles (taille de l'assiette, des couverts, comparaison avec des portions
    courantes). Le poids estimé à partir d'une seule photo est la principale source d'erreur (peut
    facilement varier de 30 à 50 %) : reste réaliste, ne détaille pas ton raisonnement.
-   Si une carte bancaire (ou toute carte au même format : 85,6 × 54 mm) est visible, sers-t'en
+   Si une carte au format carte bancaire est visible (85,6 × 54 mm : carte bancaire, de fidélité,
+   vitale, d'identité, badge, quel que soit son motif), sers-t'en
    comme échelle en priorité : compare la surface et le diamètre de l'assiette et des aliments à
    ses dimensions, en tenant compte de la perspective (elle est posée à plat sur la table). Elle
    ne dit rien de la hauteur : juge l'épaisseur d'un tas (riz, pâtes) à part, avec prudence.
@@ -207,8 +209,9 @@ export default function PhotoDish({ ai, onAdd, onBack }) {
           style={{ ...inputStyle(false), fontFamily: "inherit", fontSize: 12, fontWeight: 400, resize: "vertical", width: "100%" }}
         />
         <Body style={{ fontSize: 12, color: C.dim, marginTop: 4 }}>
-          Estimation IA — le poids est le plus incertain. Posez une carte bancaire à plat à côté
-          de l'assiette et prenez la photo de dessus : elle sert d'échelle. La précision ci-dessus
+          Estimation IA — le poids est le plus incertain. Posez une carte au format carte bancaire
+          (fidélité, vitale…) à plat à côté de l'assiette et prenez la photo de dessus : elle sert
+          d'échelle. La précision ci-dessus
           prime sur ce que l'IA devine.
         </Body>
       </div>

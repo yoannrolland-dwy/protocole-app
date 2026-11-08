@@ -5830,3 +5830,6 @@ hauteur d'un tas ; le champ « Précision » reste le levier pour ça.
   l'assiette et de photographier de dessus.
 - Vérifié dans l'aperçu (texte affiché, aucune erreur). **Pas mesuré** : le gain réel de précision,
   à comparer par Yoann sur quelques plats pesés.
+- **Précision de Yoann (v3.157.5)** : pas forcément une carte de paiement, une carte au **format**
+  carte bancaire. La consigne cite des exemples (fidélité, vitale, d'identité, badge, quel que soit
+  le motif) et l'écran dit « une carte au format carte bancaire (fidélité, vitale…) ».
