@@ -1,6 +1,6 @@
 // Sous-onglet Calories d'Analyse (30/10/2026, retour de Yoann : « un peu vide »). Quatre lectures
-// du journal, choisies par Yoann : moyennes 7 j des macros, kcal jour par jour sur 14 j,
-// répartition par repas, régularité sur 28 j. Fonctions pures (testables en Node), aucune donnée
+// du journal, choisies par Yoann : moyennes 7 j des macros, kcal jour par jour sur 21 j,
+// répartition par repas sur 21 j (14 j avant le 08/11/2026), régularité sur 28 j. Fonctions pures (testables en Node), aucune donnée
 // nouvelle : `macroLog` (totaux du jour, mêmes kcal que Nutrition via `kcalOfEntry`) et `foodLog`
 // résolu (corrections V6 appliquées).
 //
@@ -52,7 +52,7 @@ export function macroAverages(macros, { asOf = today(), days = 7 } = {}) {
 }
 
 /** Kcal jour par jour, `days` jours finissant aujourd'hui. → [{ date, kcal|null, target, partial }]. */
-export function dailyKcal(macros, targets, { asOf = today(), days = 14 } = {}) {
+export function dailyKcal(macros, targets, { asOf = today(), days = 21 } = {}) {
   const map = byDateMap(macros);
   return windowEnding(asOf, days).map((date) => {
     const m = map.get(date);
@@ -65,7 +65,7 @@ export function dailyKcal(macros, targets, { asOf = today(), days = 14 } = {}) {
  * Les lignes de correction (« Retirer », négatives) se soustraient de leur repas. Les repas
  * vides sur toute la période sont omis. → { days, total, meals: [{ key, label, kcal, prot, share }] }.
  */
-export function mealBreakdown(foodLog, overrides, { asOf = today(), days = 14 } = {}) {
+export function mealBreakdown(foodLog, overrides, { asOf = today(), days = 21 } = {}) {
   const dates = new Set(windowEnding(shiftDateKey(asOf, -1), days));
   const entries = resolveLog(foodLog || [], overrides).filter((e) => dates.has(e.date));
   const logged = new Set(entries.map((e) => e.date)).size;

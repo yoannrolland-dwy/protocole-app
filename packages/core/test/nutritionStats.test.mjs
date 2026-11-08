@@ -27,17 +27,24 @@ test("moyennes 7 j : aujourd'hui exclu, ligne d'eau seule ignorée, 7 j précéd
   assert.equal(macroAverages([], { asOf: T0 }).cur, null);
 });
 
-test("kcal jour par jour : 14 dates finissant aujourd'hui, aujourd'hui marqué en cours, jour vide à null", () => {
+test("kcal jour par jour : 21 dates finissant aujourd'hui, aujourd'hui marqué en cours, jour vide à null", () => {
   assert.equal(TARGET, 2755);
   const rows = dailyKcal([day(0, 400), day(3, 2800)], targets, { asOf: T0 });
-  assert.equal(rows.length, 14);
-  assert.equal(rows[13].date, T0);
-  assert.equal(rows[13].partial, true);
-  assert.equal(rows[13].kcal, 400);
-  assert.equal(rows[10].kcal, 2800);
-  assert.equal(rows[12].kcal, null);
-  assert.equal(rows[0].date, d(13));
+  assert.equal(rows.length, 21);
+  assert.equal(rows[20].date, T0);
+  assert.equal(rows[20].partial, true);
+  assert.equal(rows[20].kcal, 400);
+  assert.equal(rows[17].kcal, 2800);
+  assert.equal(rows[19].kcal, null);
+  assert.equal(rows[0].date, d(20));
   assert.equal(rows[0].target, TARGET);
+});
+
+test("répartition par repas : 21 jours terminés (J−21 inclus, J−22 exclu)", () => {
+  const line = (n, kcal) => ({ date: d(n), meal: "dejeuner", q: 100, per100: { kcal, prot: 0, gluc: 0, lip: 0, fib: 0 } });
+  const r = mealBreakdown([line(21, 600), line(22, 9000)], {}, { asOf: T0 });
+  assert.equal(r.days, 1);
+  assert.equal(r.meals[0].kcal, 600);
 });
 
 test("répartition par repas : moyenne par jour saisi, correction soustraite, aujourd'hui et repas vides exclus", () => {

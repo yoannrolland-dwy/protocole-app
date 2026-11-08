@@ -121,20 +121,20 @@ function AveragesCard({ macros, targets }) {
   );
 }
 
-/* Kcal jour par jour sur 14 jours : les écarts ponctuels que la moyenne de la semaine lisse. */
+/* Kcal jour par jour sur 21 jours (14 avant le 08/11/2026) : les écarts ponctuels que la moyenne de la semaine lisse. */
 function DailyCard({ macros, targets }) {
   const { kcalTargetToday } = todayTargets(targets);
   const data = dailyKcal(macros, targets).map((d) => ({ ...d, label: d.date.slice(8) }));
   const any = data.some((d) => d.kcal != null);
   return (
     <Card>
-      {cardHead("Kcal · 14 jours", `cible ~${kcalTargetToday} · aujourd'hui en cours`)}
+      {cardHead("Kcal · 21 jours", `cible ~${kcalTargetToday} · aujourd'hui en cours`)}
       {any ? (
         <div style={{ height: 150 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 4, right: 0, left: -22, bottom: 0 }}>
               <CartesianGrid stroke={C.divider} vertical={false} />
-              <XAxis dataKey="label" tick={chartAxis} interval={1} />
+              <XAxis dataKey="label" tick={chartAxis} interval={2} />
               <YAxis tick={chartAxis} />
               <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle} cursor={{ fill: "rgba(255,255,255,.04)" }}
                 labelFormatter={(_, p) => (p?.[0] ? `${fmt(p[0].payload.date)}${p[0].payload.partial ? " · en cours" : ""}` : "")}
@@ -151,12 +151,12 @@ function DailyCard({ macros, targets }) {
   );
 }
 
-/* Moyenne par repas et par jour saisi, 14 derniers jours terminés. */
+/* Moyenne par repas et par jour saisi, 21 derniers jours terminés (14 avant le 08/11/2026). */
 function MealsCard({ foodLog, overrides }) {
   const { days, meals } = mealBreakdown(foodLog, overrides);
   return (
     <Card>
-      {cardHead("Par repas · 14 jours", days ? `moyenne par jour · ${days} j saisis` : null)}
+      {cardHead("Par repas · 21 jours", days ? `moyenne par jour · ${days} j saisis` : null)}
       {meals.length ? (
         <div>
           {meals.map((m) => (

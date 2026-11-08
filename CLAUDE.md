@@ -5833,3 +5833,12 @@ hauteur d'un tas ; le champ « Précision » reste le levier pour ça.
 - **Précision de Yoann (v3.157.5)** : pas forcément une carte de paiement, une carte au **format**
   carte bancaire. La consigne cite des exemples (fidélité, vitale, d'identité, badge, quel que soit
   le motif) et l'écran dit « une carte au format carte bancaire (fidélité, vitale…) ».
+
+## Calories : jour par jour et par repas sur 21 jours (08/11/2026, apps/perso v3.157.6)
+
+Demande de Yoann : les cartes « Kcal · 14 jours » et « Par repas · 14 jours » du sous-onglet
+Calories d'Analyse passent à **21 jours** (`dailyKcal` et `mealBreakdown`, `nutritionStats.js`,
+fenêtre par défaut 14 → 21). Mêmes règles qu'avant : le graphique finit aujourd'hui (marqué « en
+cours »), la répartition par repas ne compte que les jours terminés. Un repère de date tous les
+3 jours sur l'axe (7 repères, comme avant). Moyennes 7 j et régularité 28 j inchangées. Test mis à
+jour (J−21 inclus, J−22 exclu) — 248 tests.
