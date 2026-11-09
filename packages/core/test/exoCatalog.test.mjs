@@ -14,8 +14,11 @@ test("chaque exercice des séances (hors Basket) et de la bibliothèque, une seu
     for (const e of t.exos) assert.equal(names.includes(e.n), type !== "Basket", `${type} : ${e.n}`);
   }
   for (const e of EXERCISE_LIBRARY) assert.ok(names.includes(e.n), e.n);
-  // La première définition gagne : la presse HSR vient de Lower A, avec son gabarit.
-  assert.equal(catalogEntry("Presse à cuisses (HSR)").type, "Lower A");
+  // La première définition gagne : le squat vient de Lower A ; la presse HSR, sortie des
+  // gabarits le 09/11/2026, reste disponible depuis la bibliothèque.
+  assert.equal(catalogEntry("Squat sur sécurités").type, "Lower A");
+  assert.equal(catalogEntry("Presse à cuisses (HSR)").type, null);
+  assert.equal(catalogEntry("Mollets à la presse").type, null);
   assert.equal(catalogEntry("Presse à cuisses (poulie)").type, null);
 });
 

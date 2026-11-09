@@ -21,7 +21,7 @@ const history = [
     { nom: "Rowing poulie basse", mode: "reps", origine: "Rowing barre ou machine", rir: 1, series: [S(50, 10)] },
     { nom: "Core — Crunch machine", mode: "reps", series: [S(40, 12)] },
   ] },
-  { date: d(3), type: "Lower C", exercices: [{ nom: "Presse à cuisses (HSR)", mode: "reps", series: [S(140, 6), S(140, 6)] }] },
+  { date: d(3), type: "Lower C", exercices: [{ nom: "Leg extension unilatérale", mode: "reps", series: [S(40, 6), S(40, 6)] }, { nom: "Squat sur sécurités", mode: "reps", series: [S(80, 5)] }] },
 ];
 
 test("construction : prérempli série par série, poids par défaut, HSR et superset", () => {
@@ -33,16 +33,18 @@ test("construction : prérempli série par série, poids par défaut, HSR et sup
   assert.equal(tirage.series[0].poids, DEFAULT_WEIGHTS["Tirage vertical prise neutre"]);
   assert.equal(tirage.series[0].val, 9); // médiane de 8-10
   const lc = buildExercises({ type: "Lower C", training: history, hsrWeek: 9 });
-  const presse = lc.find((e) => e.nom === "Presse à cuisses (HSR)");
+  const legExt = lc.find((e) => e.nom === "Leg extension unilatérale");
   const hp = hsrParse(hsrForWeek(9).scheme);
-  assert.equal(presse.target, `${hp.reps}`);
-  assert.equal(presse.scheme, hsrForWeek(9).scheme);
+  assert.equal(legExt.target, `${hp.reps}`);
+  assert.equal(legExt.scheme, hsrForWeek(9).scheme);
   // Une série sans précédent reprend la dernière perf.
-  assert.deepEqual(presse.series.map((s) => s.poids), Array(presse.series.length).fill(140));
-  const mollets = lc.find((e) => e.nom === "Mollets à la presse");
+  assert.deepEqual(legExt.series.map((s) => s.poids), Array(legExt.series.length).fill(40));
+  const squat = lc.find((e) => e.nom === "Squat sur sécurités");
+  assert.deepEqual(squat.series.map((s) => s.poids), Array(squat.series.length).fill(80));
+  const mollets = lc.find((e) => e.nom === "Mollets debout à la barre");
   const tpl = TEMPLATES["Lower C"];
-  assert.equal(mollets.series.length, exoSeriesCount(tpl, tpl.exos.find((x) => x.n === "Mollets à la presse"), 9));
-  assert.equal(mollets.series.length, presse.series.length); // superset
+  assert.equal(mollets.series.length, exoSeriesCount(tpl, tpl.exos.find((x) => x.n === "Mollets debout à la barre"), 9));
+  assert.equal(mollets.series.length, squat.series.length); // superset
 });
 
 test("réouverture : séries réelles, substitution retrouvée par origine, ajout remis à la fin, jambe par jambe", () => {

@@ -66,6 +66,8 @@ export const DATA_KEYS = [
   // été retiré le 05/09/2026, plus aucun code ne le lit ni ne l'écrit — voir CLAUDE.md).
   "weightLog", "sleepLog", "trainingLog", "kneeLog", "elbowLog", "rhrLog", "napLog", "macroLog", "noteLog", "stepsLog",
   "targets", "phase", "hsrWeek", "model", "climbScheme", "basketSchedule",
+  // Note par exercice (09/11/2026) : réglages des machines, `{ [nom de l'exercice]: texte }`.
+  "exoNotes",
   // Fournisseur IA (26/10/2026). La clé LiteLLM, comme la clé Anthropic, reste hors export.
   "aiProvider", "litellmUrl", "litellmModel",
   // Adresse du serveur de sauvegarde (02/11/2026, vide = adresse par défaut). Sa clé, `backupKey`,

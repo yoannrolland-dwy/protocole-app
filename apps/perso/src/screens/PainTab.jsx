@@ -143,7 +143,7 @@ export function PainTab({ knee, save, hsrWeek }) {
       {/* Table HSR — genou uniquement */}
       {zone.hsr && (
       <Card style={{ padding: "10px 14px" }}>
-        <Label style={{ padding: "4px 0" }}>Table HSR · presse &amp; leg ext</Label>
+        <Label style={{ padding: "4px 0" }}>Table HSR · leg extension</Label>
         {HSR_TABLE.map((row) => {
           const cur = row.wk === curRow.wk;
           return (

@@ -37,6 +37,14 @@ export const EXERCISE_LIBRARY = [
     groupe: "quadriceps", mouvement: "genou", materiel: "poulie", tendon: "genou", famille: "presse-cuisses" },
   { n: "Presse à cuisses (disque)", s: 4, r: "8-10", rest: 180, mode: "reps", c: "contrôlé, reps + hautes",
     groupe: "quadriceps", mouvement: "genou", materiel: "disque", tendon: "genou", famille: "presse-cuisses" },
+  // Sorties des gabarits le 09/11/2026 (squat sur sécurités à leur place) : gardées ici sous
+  // leur nom d'origine, pour leur historique, « Ajouter un exercice » et « Remplacer » sur le squat.
+  { n: "Presse à cuisses", s: 4, r: "8-10", rest: 180, mode: "reps", c: "contrôlé, reps + hautes",
+    groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "presse-cuisses" },
+  // Sans `famille` : un remplacement garde le protocole du squat (4 × 4-6), ce qui fausserait
+  // l'historique HSR. Seulement par « Ajouter un exercice » (table HSR).
+  { n: "Presse à cuisses (HSR)", s: 3, r: "table HSR", rest: 180, mode: "reps", hsr: true, c: "tempo 6 s · amplitude 10-60°",
+    groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou" },
 
   // ---- Iso leg extension @60° (primer antalgique, genou raide) ----
   { n: "Iso leg extension @60° (poulie)", s: 5, r: "45 s", rest: 120, mode: "temps", opt: true, c: "primer antalgique · effort ~70 %",
@@ -57,6 +65,8 @@ export const EXERCISE_LIBRARY = [
     groupe: "ischios", mouvement: "isolation", materiel: "disque", tendon: null, famille: "leg-curl-unilateral" },
 
   // ---- Mollets à la presse (dépend de la presse à cuisses utilisée ce jour-là) ----
+  { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "enchaîné avec la presse",
+    groupe: "mollets", mouvement: "isolation", materiel: "machine", tendon: null, famille: "mollets-presse" },
   { n: "Mollets à la presse (poulie)", s: 4, r: "10-12", rest: 90, mode: "reps", c: "enchaîné",
     groupe: "mollets", mouvement: "isolation", materiel: "poulie", tendon: null, famille: "mollets-presse" },
   { n: "Mollets à la presse (disque)", s: 4, r: "10-12", rest: 90, mode: "reps", c: "enchaîné",

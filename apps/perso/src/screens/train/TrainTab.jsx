@@ -282,7 +282,7 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
           <span style={{ fontFamily: C.mono, fontSize: 12, color: C.accent, fontWeight: 800 }}>{hsrForWeek(hsrWeek).scheme}</span>
         </div>
         <Stepper value={hsrWeek} set={setHsrWeek} step={1} min={1} max={12} int unit="/12" />
-        <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>Pilote presse à cuisses + leg extension en Lower A et Lower C. Tempo 6 s · repos 2-3 min.</Body>
+        <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>Pilote la leg extension en Lower A, Lower C et Full Body. Tempo 6 s · repos 2-3 min.</Body>
       </Card>
 
     </div>

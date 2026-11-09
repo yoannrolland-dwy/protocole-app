@@ -71,23 +71,31 @@ const TEMPLATES = {
     { n: "Curl poignets supination", s: 2, r: "10-12", rest: 60, mode: "reps", c: "léger, avant-bras · stop si douleur poignet",
       groupe: "avant-bras", mouvement: "isolation", materiel: "halteres", tendon: null },
   ]},
+  // Squat sur sécurités à la place de la presse dans Lower A, B, C et Full Body (09/11/2026,
+  // choix de Yoann : genou bien mieux, reprise du squat). Descente lente jusqu'aux sécurités
+  // du rack (~60°, dans l'amplitude de rééduc), arrêt complet, remontée explosive : charge
+  // rapide sans rebond élastique, étape entre la HSR et les sauts. Mollets debout à la barre en
+  // superset (même barre, sous le rack), donc autant de séries que le squat (`exoSeriesCount`).
+  // La presse HSR n'est plus prescrite ; la table HSR ne pilote plus que la leg extension.
+  // La presse et les mollets à la presse restent dans la bibliothèque (même nom, même
+  // historique) : « Ajouter un exercice » ou « Remplacer » sur le squat (même `famille`).
   "Lower A": { kind: "muscu", knee: true, hsr: true, chargeTags: ["genou"], exos: [
     { n: "Iso leg extension @60° (si genou raide)", s: 5, r: "45 s", rest: 120, mode: "temps", opt: true, c: "primer antalgique · effort ~70 %",
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "iso-leg-extension" },
-    { n: "Presse à cuisses (HSR)", s: 3, r: "table HSR", rest: 180, mode: "reps", hsr: true, c: "tempo 6 s · amplitude 10-60°",
-      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "presse-cuisses" },
-    { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "en superset avec la presse", supersetAvec: "Presse à cuisses (HSR)",
-      groupe: "mollets", mouvement: "isolation", materiel: "machine", tendon: null, famille: "mollets-presse" },
+    { n: "Squat sur sécurités", s: 4, r: "4-6", rest: 180, mode: "reps", c: "descente lente 3 s jusqu'aux sécurités (~60°) · arrêt complet · remontée explosive",
+      groupe: "quadriceps", mouvement: "genou", materiel: "barre", tendon: "genou", famille: "presse-cuisses" },
+    { n: "Mollets debout à la barre", s: 4, r: "8-12", rest: 90, mode: "reps", c: "en superset avec le squat · cale sous l'avant du pied · montée rapide, descente 2 s", supersetAvec: "Squat sur sécurités",
+      groupe: "mollets", mouvement: "isolation", materiel: "barre", tendon: null, famille: "mollets-presse" },
     { n: "Soulevé de terre roumain", s: 3, r: "8-10", rest: 150, mode: "reps", c: "genou peu sollicité",
       groupe: "ischios-fessiers", mouvement: "hanche", materiel: "barre", tendon: null },
     { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 120, mode: "reps", hsr: true, c: "tempo 6 s",
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
   ]},
   "Lower B": { kind: "muscu", knee: true, chargeTags: ["genou"], exos: [
-    { n: "Presse à cuisses", s: 4, r: "8-10", rest: 180, mode: "reps", c: "contrôlé, reps + hautes",
-      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "presse-cuisses" },
-    { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "en superset avec la presse", supersetAvec: "Presse à cuisses",
-      groupe: "mollets", mouvement: "isolation", materiel: "machine", tendon: null, famille: "mollets-presse" },
+    { n: "Squat sur sécurités", s: 4, r: "4-6", rest: 180, mode: "reps", c: "descente lente 3 s jusqu'aux sécurités (~60°) · arrêt complet · remontée explosive",
+      groupe: "quadriceps", mouvement: "genou", materiel: "barre", tendon: "genou", famille: "presse-cuisses" },
+    { n: "Mollets debout à la barre", s: 4, r: "8-12", rest: 90, mode: "reps", c: "en superset avec le squat · cale sous l'avant du pied · montée rapide, descente 2 s", supersetAvec: "Squat sur sécurités",
+      groupe: "mollets", mouvement: "isolation", materiel: "barre", tendon: null, famille: "mollets-presse" },
     { n: "Hip thrust", s: 3, r: "8-10", rest: 120, mode: "reps", c: "genou-safe",
       groupe: "fessiers", mouvement: "hanche", materiel: "machine", tendon: null },
     { n: "Leg extension unilatérale", s: 3, r: "8-10", rest: 120, mode: "reps", c: "tempo 6 s",
@@ -102,10 +110,10 @@ const TEMPLATES = {
   "Lower C": { kind: "muscu", knee: true, hsr: true, chargeTags: ["genou"], exos: [
     { n: "Iso leg extension @60° (si genou raide)", s: 5, r: "45 s", rest: 120, mode: "temps", opt: true, c: "primer antalgique · effort ~70 %",
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "iso-leg-extension" },
-    { n: "Presse à cuisses (HSR)", s: 3, r: "table HSR", rest: 180, mode: "reps", hsr: true, c: "tempo 6 s · amplitude 10-60°",
-      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "presse-cuisses" },
-    { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "en superset avec la presse", supersetAvec: "Presse à cuisses (HSR)",
-      groupe: "mollets", mouvement: "isolation", materiel: "machine", tendon: null, famille: "mollets-presse" },
+    { n: "Squat sur sécurités", s: 4, r: "4-6", rest: 180, mode: "reps", c: "descente lente 3 s jusqu'aux sécurités (~60°) · arrêt complet · remontée explosive",
+      groupe: "quadriceps", mouvement: "genou", materiel: "barre", tendon: "genou", famille: "presse-cuisses" },
+    { n: "Mollets debout à la barre", s: 4, r: "8-12", rest: 90, mode: "reps", c: "en superset avec le squat · cale sous l'avant du pied · montée rapide, descente 2 s", supersetAvec: "Squat sur sécurités",
+      groupe: "mollets", mouvement: "isolation", materiel: "barre", tendon: null, famille: "mollets-presse" },
     { n: "Soulevé de terre roumain", s: 3, r: "8-10", rest: 150, mode: "reps", c: "genou peu sollicité",
       groupe: "ischios-fessiers", mouvement: "hanche", materiel: "barre", tendon: null },
     { n: "Hip thrust", s: 3, r: "8-10", rest: 120, mode: "reps", c: "genou-safe",
@@ -116,17 +124,17 @@ const TEMPLATES = {
   // Full Body (04/10/2026, demande de Yoann) : UNIQUEMENT le lundi qui suit un dimanche de
   // match (détection côté app, `isPostMatchDay` → recommandeur `postMatch`). Base Lower C
   // (choix de Yoann) + 1 pec + 1 dos + 1 épaule, ce qui ajoute une 3e exposition pecs/épaules
-  // ces semaines-là. Le bloc HSR genou (presse + leg extension, table HSR) est GARDÉ intact et
-  // en tête : si ce lundi remplace un Lower C (deux matchs consécutifs), c'est la seule séance
-  // lourde genou de la semaine. Mollets en superset avec la presse (habitude de Yoann, aucun
-  // temps perdu). RDL/hip thrust : chaîne postérieure déjà chargée par le match → 2-3 reps en
+  // ces semaines-là. Le bloc genou (squat sur sécurités depuis le 09/11/2026, leg extension
+  // HSR) reste en tête : si ce lundi remplace un Lower C (deux matchs consécutifs), c'est la
+  // seule séance lourde genou de la semaine. Mollets en superset avec le squat (aucun temps
+  // perdu). RDL/hip thrust : chaîne postérieure déjà chargée par le match → 2-3 reps en
   // réserve, jamais à l'échec. Mêmes noms d'exercices qu'Upper/Lower : historique, records et
   // progression partagés. Pas de planche (séance déjà longue, ~65 min).
   "Full Body": { kind: "muscu", knee: true, hsr: true, chargeTags: ["genou", "tirage"], exos: [
-    { n: "Presse à cuisses (HSR)", s: 3, r: "table HSR", rest: 180, mode: "reps", hsr: true, c: "tempo 6 s · amplitude 10-60° · superset mollets",
-      groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "presse-cuisses" },
-    { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "en superset avec la presse", supersetAvec: "Presse à cuisses (HSR)",
-      groupe: "mollets", mouvement: "isolation", materiel: "machine", tendon: null, famille: "mollets-presse" },
+    { n: "Squat sur sécurités", s: 4, r: "4-6", rest: 180, mode: "reps", c: "descente lente 3 s jusqu'aux sécurités (~60°) · arrêt complet · remontée explosive",
+      groupe: "quadriceps", mouvement: "genou", materiel: "barre", tendon: "genou", famille: "presse-cuisses" },
+    { n: "Mollets debout à la barre", s: 4, r: "8-12", rest: 90, mode: "reps", c: "en superset avec le squat · cale sous l'avant du pied · montée rapide, descente 2 s", supersetAvec: "Squat sur sécurités",
+      groupe: "mollets", mouvement: "isolation", materiel: "barre", tendon: null, famille: "mollets-presse" },
     { n: "Soulevé de terre roumain", s: 3, r: "8-10", rest: 150, mode: "reps", c: "lendemain de match : 2-3 reps en réserve, jamais à l'échec",
       groupe: "ischios-fessiers", mouvement: "hanche", materiel: "barre", tendon: null },
     { n: "Hip thrust", s: 3, r: "8-10", rest: 120, mode: "reps", c: "lendemain de match : 2-3 reps en réserve",

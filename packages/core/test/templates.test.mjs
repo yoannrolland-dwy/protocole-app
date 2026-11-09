@@ -42,7 +42,7 @@ test("Full Body : existe, HSR, tag genou, contenu et ordre figés", () => {
   assert.ok(TYPES.includes("Full Body"));
   assert.ok(FB.hsr && FB.chargeTags.includes("genou"));
   assert.equal(FB.exos.map((e) => e.n).join("|"),
-    "Presse à cuisses (HSR)|Mollets à la presse|Soulevé de terre roumain|Hip thrust|Leg extension unilatérale|Développé incliné haltères|Tirage vertical prise neutre|Élévations latérales haltères");
+    "Squat sur sécurités|Mollets debout à la barre|Soulevé de terre roumain|Hip thrust|Leg extension unilatérale|Développé incliné haltères|Tirage vertical prise neutre|Élévations latérales haltères");
   assert.equal(FB.exos.find((e) => e.n === "Élévations latérales haltères").s, 4);
 });
 
@@ -64,12 +64,13 @@ test("core retiré des gabarits de muscu : plus aucune planche ni crunch hors Mo
 
 test("ordre des exercices (10/10/2026) : composés lourds d'abord, isolations ensuite, mollets collés à la presse, leg extension après le soulevé de terre", () => {
   const order = (t) => TEMPLATES[t].exos.map((e) => e.n);
-  assert.deepEqual(order("Lower A"), ["Iso leg extension @60° (si genou raide)", "Presse à cuisses (HSR)", "Mollets à la presse", "Soulevé de terre roumain", "Leg extension unilatérale"]);
-  assert.deepEqual(order("Lower B"), ["Presse à cuisses", "Mollets à la presse", "Hip thrust", "Leg extension unilatérale", "Leg curl unilatéral"]);
-  assert.deepEqual(order("Lower C"), ["Iso leg extension @60° (si genou raide)", "Presse à cuisses (HSR)", "Mollets à la presse", "Soulevé de terre roumain", "Hip thrust", "Leg extension unilatérale"]);
+  assert.deepEqual(order("Lower A"), ["Iso leg extension @60° (si genou raide)", "Squat sur sécurités", "Mollets debout à la barre", "Soulevé de terre roumain", "Leg extension unilatérale"]);
+  assert.deepEqual(order("Lower B"), ["Squat sur sécurités", "Mollets debout à la barre", "Hip thrust", "Leg extension unilatérale", "Leg curl unilatéral"]);
+  assert.deepEqual(order("Lower C"), ["Iso leg extension @60° (si genou raide)", "Squat sur sécurités", "Mollets debout à la barre", "Soulevé de terre roumain", "Hip thrust", "Leg extension unilatérale"]);
   for (const t of ["Lower A", "Lower B", "Lower C", "Full Body"]) {
-    const o = order(t), i = o.findIndex((n) => n.startsWith("Presse"));
-    assert.equal(o[i + 1], "Mollets à la presse", `${t} : mollets juste après la presse (superset)`);
+    const o = order(t), i = o.indexOf("Squat sur sécurités");
+    assert.ok(i >= 0, `${t} : squat sur sécurités`);
+    assert.equal(o[i + 1], "Mollets debout à la barre", `${t} : mollets juste après le squat (superset)`);
     const le = o.indexOf("Leg extension unilatérale");
     for (const hinge of ["Soulevé de terre roumain", "Hip thrust"]) if (o.includes(hinge)) assert.ok(o.indexOf(hinge) < le, `${t} : ${hinge} avant leg extension`);
   }

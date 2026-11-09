@@ -59,9 +59,8 @@ export function exoProgress(sessions) {
     // reps l'emporte. Avant ce correctif, le volume brut (poids × reps) pouvait annoncer
     // "baisse" sur une séance qui venait pourtant de battre un record de charge (ex.
     // 40kg×10 → 45kg×6 : volume en baisse, mais c'est une progression, pas un recul).
-    const tendance = !prev ? "1re fois"
-      : beats(last, prev, last.mode) ? "hausse"
-      : beats(prev, last, last.mode) ? "baisse" : "stable";
+    // Baisse confirmée sur deux séances (09/11/2026, `trendOf`).
+    const tendance = { first: "1re fois", up: "hausse", down: "baisse", flat: "stable" }[trendOf(h, last.mode)];
     return {
       exo: nom,
       series_max: h.map((x) => `${x.d.slice(5)} ${isTimeMode(x.mode) ? `${x.val}s` : `${x.poids}x${x.val}`}`),
@@ -167,6 +166,35 @@ export function beats(a, b, mode) {
 }
 
 /**
+ * `a` est-elle NETTEMENT en dessous de `b` ? (09/11/2026, demande de Yoann : une rep de moins
+ * n'est pas une baisse.) Même charge avec au moins `DROP_REPS` reps de moins, ou charge plus
+ * légère sans plus de reps. Moins lourd mais plus de reps (45×6 → 40×10) n'est pas une baisse.
+ * Mode temps : au moins `DROP_TIME_RATIO` de secondes en moins (60 s → 54 s).
+ */
+export const DROP_REPS = 2;
+export const DROP_TIME_RATIO = 0.1;
+export function clearDrop(a, b, mode) {
+  if (!a || !b) return false;
+  if (isTimeMode(mode)) return +a.val <= +b.val * (1 - DROP_TIME_RATIO);
+  if (+a.poids === +b.poids) return +a.val <= +b.val - DROP_REPS;
+  return +a.poids < +b.poids && +a.val <= +b.val;
+}
+
+/**
+ * Tendance entre séances (09/11/2026) : `h` = meilleures séries dans l'ordre, la dernière en
+ * dernier. « hausse » = la dernière bat l'avant-dernière (charge d'abord, règle du 13/08/2026).
+ * « baisse » = les DEUX dernières séances sont nettement en dessous (`clearDrop`) de celle
+ * d'avant : un seul mauvais jour reste « stable ». Sinon « stable ».
+ */
+function trendOf(h, mode) {
+  const n = h.length;
+  if (n < 2) return "first";
+  if (beats(h[n - 1], h[n - 2], mode)) return "up";
+  if (n >= 3 && clearDrop(h[n - 1], h[n - 3], mode) && clearDrop(h[n - 2], h[n - 3], mode)) return "down";
+  return "flat";
+}
+
+/**
  * Meilleure série jamais réalisée sur cet exercice, toutes séances confondues SAUF celle
  * passée en `exclude` (la séance en cours d'écriture ou de modification : elle ne doit pas
  * être son propre record à battre). `null` si l'exercice n'a jamais été fait.
@@ -252,8 +280,9 @@ export function exerciseTrend(sessions) {
   if (h.length < 2) return { key: "first", label: "1re fois", delta: null };
   const last = h[h.length - 1], prev = h[h.length - 2];
   const delta = last.score - prev.score;
-  if (beats(last.best, prev.best, last.mode)) return { key: "up", label: "hausse", delta };
-  if (beats(prev.best, last.best, last.mode)) return { key: "down", label: "baisse", delta };
+  const key = trendOf(h.map((x) => x.best), last.mode);
+  if (key === "up") return { key: "up", label: "hausse", delta };
+  if (key === "down") return { key: "down", label: "baisse", delta };
   return { key: "flat", label: "stable", delta: 0 };
 }
 
@@ -326,15 +355,24 @@ export function progressiveOverloadSuggestion(sessions, nom) {
   // T4 (04/10/2026) : une paire « stable » dont le RIR a AUGMENTÉ n'est pas un plateau — même
   // série faite avec plus de reps en réserve = effort qui baisse = progression réelle. La paire
   // ne compte que si les deux RIR sont renseignés ; sinon (donnée absente) la règle d'avant.
+  // 09/11/2026 : même notion de « stable » que la tendance. Une fenêtre est plate si aucune
+  // séance ne bat la première de la fenêtre ni ne tombe nettement en dessous (`clearDrop`) :
+  // une rep de moins puis une de plus (8, 7, 8, 7) reste un plateau.
   const rirUp = (cur, prev) => cur.rir != null && prev.rir != null && cur.rir > prev.rir;
-  let start = sessions.length - 1;
-  while (start > 0
-    && !beats(sessions[start].best, sessions[start - 1].best, last.mode)
-    && !beats(sessions[start - 1].best, sessions[start].best, last.mode)
-    && !rirUp(sessions[start], sessions[start - 1])
-    && daysBetween(sessions[start - 1].date, sessions[start].date) <= PLATEAU_GAP_DAYS) {
-    start--;
-  }
+  const flatFrom = (k) => {
+    const ref = sessions[k].best;
+    for (let i = k + 1; i < sessions.length; i++) {
+      const cur = sessions[i];
+      if (beats(cur.best, ref, last.mode) || clearDrop(cur.best, ref, last.mode)) return false;
+      if (rirUp(cur, sessions[i - 1])) return false;
+      if (daysBetween(sessions[i - 1].date, cur.date) > PLATEAU_GAP_DAYS) return false;
+    }
+    return true;
+  };
+  // La plus longue fenêtre plate qui finit à la dernière séance (8, 7, 8, 7 : une fenêtre qui
+  // commence à 7 ne l'est pas, celle qui commence au premier 8 l'est).
+  let start = 0;
+  while (start < sessions.length - 1 && !flatFrom(start)) start++;
   const streak = sessions.slice(start);
   if (streak.length < PLATEAU_STABLE_STREAK) return null;
   if (sessionVolume(streak[streak.length - 1]) > sessionVolume(streak[0])) return null; // volume total en hausse → vraie progression, pas un plateau

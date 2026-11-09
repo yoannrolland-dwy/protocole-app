@@ -29,18 +29,15 @@ test("fiche match 10h30 : caféine déplacée à 9h20, nouveau petit-déj, écha
   assert.ok(flat("match10h").includes("Total : 41 g P / 65 g G / 13 g L / ~600 kcal."));
 });
 
-test("mollets en superset : autant de séries que la presse, à chaque semaine HSR", () => {
-  const mol = (t) => TEMPLATES[t].exos.find((e) => e.n === "Mollets à la presse");
-  for (const t of ["Lower A", "Lower C", "Full Body"]) {
-    assert.equal(exoSeriesCount(TEMPLATES[t], mol(t), 9), 4, `${t} semaine 9`);
-    assert.equal(exoSeriesCount(TEMPLATES[t], mol(t), 1), 3, `${t} semaine 1`);
-    assert.equal(exoSeriesCount(TEMPLATES[t], mol(t), 4), 4, `${t} semaine 4`);
+test("mollets en superset : autant de séries que le squat (09/11/2026), quelle que soit la semaine HSR", () => {
+  const mol = (t) => TEMPLATES[t].exos.find((e) => e.n === "Mollets debout à la barre");
+  for (const t of ["Lower A", "Lower B", "Lower C", "Full Body"]) {
+    assert.ok(!TEMPLATES[t].exos.some((e) => e.n === "Mollets à la presse"), `${t} : plus de mollets à la presse`);
+    for (const w of [1, 4, 9]) assert.equal(exoSeriesCount(TEMPLATES[t], mol(t), w), 4, `${t} semaine ${w}`);
   }
-  // Lower B : presse fixe à 4 séries, donc mollets 4 quelle que soit la semaine HSR.
-  assert.equal(exoSeriesCount(TEMPLATES["Lower B"], mol("Lower B"), 1), 4);
   // Un exo HSR suit la table, un exo ordinaire garde ses séries.
-  const presse = TEMPLATES["Lower A"].exos.find((e) => e.hsr && e.n.startsWith("Presse"));
-  assert.equal(exoSeriesCount(TEMPLATES["Lower A"], presse, 9), 4);
+  const legExt = TEMPLATES["Lower A"].exos.find((e) => e.hsr);
+  assert.equal(exoSeriesCount(TEMPLATES["Lower A"], legExt, 9), 4);
   assert.equal(exoSeriesCount(TEMPLATES["Upper A"], TEMPLATES["Upper A"].exos[0], 9), TEMPLATES["Upper A"].exos[0].s);
 });
 

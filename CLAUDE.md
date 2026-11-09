@@ -5842,3 +5842,47 @@ fenêtre par défaut 14 → 21). Mêmes règles qu'avant : le graphique finit au
 cours »), la répartition par repas ne compte que les jours terminés. Un repère de date tous les
 3 jours sur l'axe (7 repères, comme avant). Moyennes 7 j et régularité 28 j inchangées. Test mis à
 jour (J−21 inclus, J−22 exclu) — 248 tests.
+
+## Squat sur sécurités à la place de la presse, note par exercice (09/11/2026, apps/perso v3.158.0)
+
+Demande de Yoann : son genou va bien mieux, il reprend le squat « stoppé ».
+- **Squat sur sécurités** (*pin squat*) : 4 × 4-6, repos 3 min. Descente lente 3 s jusqu'aux
+  sécurités du rack (~60°, dans l'amplitude de rééduc), arrêt complet, remontée explosive.
+  C'est une charge rapide sans rebond élastique, l'étape entre la HSR et les sauts. Les règles
+  restent : douleur ≤ 3/10, retour à la base sous 24 h.
+- **Mollets debout à la barre** : en superset avec le squat (sous le rack), donc autant de séries
+  que lui (`exoSeriesCount`). Consigne : cale sous l'avant du pied, montée rapide, descente 2 s.
+- **Choix de Yoann : partout à la place de la presse** (Lower A, B, C, Full Body), en
+  connaissance de cause : la presse HSR n'est plus prescrite, et la table HSR ne pilote plus que
+  la leg extension (textes de Séance, Genou et du bloc recomposition du Coach IA mis à jour).
+- « Presse à cuisses », « Presse à cuisses (HSR) » et « Mollets à la presse » passent dans
+  `EXERCISE_LIBRARY` sous leur nom, donc avec leur historique, et restent dans « Ajouter un
+  exercice ».
+  - Le squat a `famille: "presse-cuisses"` : « Remplacer » propose la presse (et ses versions
+    poulie/disque) les jours où le genou ou le rack ne s'y prêtent pas.
+  - Mêmes règles pour les mollets.
+  - La presse HSR n'a volontairement pas de `famille` : un remplacement garde le protocole du
+    squat (4 × 4-6) et fausserait son historique HSR.
+- **Note dépliable par exercice** (réglages des machines) :
+  - nouvelle clé **`exoNotes`** = `{ [nom de l'exercice]: texte }`, dans `DATA_KEYS` ;
+  - `lib/exoNotes.js` et `screens/train/ExoNote.jsx`, sous la consigne de l'exercice ouvert ;
+  - repliée, elle montre sa première ligne ; elle est enregistrée à chaque frappe ;
+  - comme l'historique, elle est attachée au nom : la même note revient dans toutes les séances ;
+  - une note vide est retirée de la clé.
+- Tests : 249. Vérifié dans l'aperçu (360 px) : Lower B, note écrite puis repliée, remplacement
+  du squat par les trois presses, aucune erreur.
+- **Tendance hausse / stable / baisse revue** (même version, demande de Yoann : « une
+  répétition de moins ne veut pas forcément dire baisse ») :
+  - `clearDrop` (`training.js`) = nettement en dessous : même charge avec **2 reps de moins ou
+    plus**, ou charge plus légère **sans plus de reps** ; en mode temps, 10 % de secondes en
+    moins. 45×6 → 40×10 n'est plus une baisse.
+  - **hausse** inchangée : la dernière séance bat l'avant-dernière (charge d'abord, 13/08/2026).
+  - **baisse** = les **deux** dernières séances nettement en dessous de celle d'avant. Un seul
+    mauvais jour = stable (choix de Yoann). Il faut donc 3 séances pour voir une baisse.
+  - Même règle partout (`trendOf`) : écran Progrès, Coach IA (`exoProgress`), et le signal
+    « baisse de perf sur ≥ 2 exercices » du recommandeur, qui ne réagit donc plus à un mauvais jour.
+  - **Plateau** : même notion de stable. Une fenêtre est plate si aucune séance ne bat la
+    première ni ne tombe nettement en dessous (8, 7, 8, 7 reps = plateau). On garde la plus
+    longue qui finit à la dernière séance. RIR qui monte, trou > 56 j et volume en hausse le
+    coupent toujours. Records inchangés.
+  - Test `packages/core/test/trend.test.mjs` — 254 tests.

@@ -24,6 +24,8 @@ import { restTimer, useRestTimer, syncRestFromDraft, restState } from "../../lib
 import { readDraft, writeDraft, patchDraft, isForeign, acknowledge, DRAFT_EVENT } from "../../lib/sessionDraft.js";
 import { sayStable } from "../../lib/jeffrey.js";
 import { restAnnouncement, holdAnnouncement, genericAnnouncement } from "../../lib/restSpeech.js";
+import { readExoNotes, saveExoNote } from "../../lib/exoNotes.js";
+import { ExoNote } from "./ExoNote.jsx";
 
 const mono = { fontFamily: T.f.num, fontVariantNumeric: "tabular-nums" };
 const WARN = T.c.warn;
@@ -84,6 +86,9 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   // panneau "remplacer" est ouvert, ou null. Purement une affaire de CETTE séance — Upper/
   // Lower ne sont jamais modifiés, le remplacement se logue sous son propre nom.
   const [subOpen, setSubOpen] = useState(null);
+  // Notes par exercice (09/11/2026) : réglages des machines, attachés au nom de l'exercice.
+  const [notes, setNotes] = useState(readExoNotes);
+  const setNote = (nom, text) => setNotes(saveExoNote(nom, text));
   // « Ajouter un exercice » (31/10/2026) : panneau ouvert et recherche.
   const [addOpen, setAddOpen] = useState(false);
   const [addQuery, setAddQuery] = useState("");
@@ -386,6 +391,7 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
             {isOpen && (
               <>
                 {e.consigne && <div className="p-sec">{e.consigne}</div>}
+                <ExoNote nom={e.nom} text={notes[e.nom] || ""} onChange={(t) => setNote(e.nom, t)} />
                 {/* Le record à battre est affiché comme un fait, pas comme un objectif à
                     forcer — et il disparaît les jours où un tendon est hors base. */}
                 {!painRed && refRecords[e.nom] && (
