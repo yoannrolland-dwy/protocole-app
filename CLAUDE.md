@@ -6075,9 +6075,28 @@ changement de transport, de voix, de LiteLLM, ni dans le dépôt JEFFREY ou côt
   tests unitaires Android exigés avant l'APK.
 - Tests : `apps/perso/test/lot3-livraison.test.mjs` (7) ; Android `Lot3UnitTest.kt` (3, `./gradlew
   testDebugUnitTest`). 311 tests JS au total.
-- **Limites** : rien de ce lot n'a été essayé sur le téléphone avant installation ; les branchements
-  Android sont vérifiés dans le code source et par la compilation, pas en situation (délai de 55 s,
-  synchro bloquée, premier plan refusé, appelant étranger).
+- **Installé sur le S25 le 11/11/2026, par la nouvelle procédure** (`release.mjs build` puis
+  `install`, depuis la racine) : commit `3d95b02`, v3.161.0, empreinte de l'APK `70dbe61c…` vérifiée
+  sur le téléphone ; tests JS (311) et tests unitaires Android (3) passés pendant la construction.
+  Même certificat, `versionCode` 1, date de première installation inchangée. Avant : APK installé
+  copié (v3.160.0, empreinte vérifiée), copie serveur manuelle réussie à 18 h 04, sauvegarde locale
+  du jour présente, aucune séance en cours, données validées (35 clés, aucun problème). Tag
+  `apres-lot2-audit` poussé (cible a67fdaa). Après :
+  - démarrage normal, tous les onglets et les 3 onglets des Réglages sans écran de secours ;
+  - empreintes : 47 clés sur 48 identiques, dont les 12 sensibles ; seule `lastPosition` a changé ;
+    préférences Android identiques hors widget ;
+  - permissions du pont accordées ; réveil de sauvegarde de 23 h programmé ; `ALLOW_BACKUP` absent
+    des indicateurs du paquet (point 19 actif) ; aucun plantage ;
+  - **pont lu depuis JEFFREY** par son contrôle existant, sans IA ni écriture (récepteur de
+    débogage `WhatsAppCheckReceiver`, `--es mode protocole --es op version` puis `--es op lire --es
+    sujet forme`, adb seulement) : `version` → `appli 3.161.0`, `lire` → réponse complète ; le
+    nouveau contrôle de l'appelant laisse donc passer JEFFREY (même contrôle fait avant
+    installation, en référence) ;
+  - **synchro du widget** : bouton Sync touché, activité invisible ouverte puis refermée seule en
+    moins de 2 s, « MAJ » du widget passée de 18 h 05 à 18 h 07, aucun plantage.
+- **Limites** : pas essayés en situation (aucun test destructif) — délai de 55 s d'une réponse,
+  synchro bloquée (garde de 45 s), premier plan refusé, appelant étranger refusé par le pont, deux
+  usages du service en même temps. Vérifiés par le code, la compilation et les tests.
 
 ### Reportés à la fin de la campagne (non faits, volontairement)
 - Performance, non mesurée : Analyse › Dépense recalculée à chaque rendu, habituels de Nutrition
