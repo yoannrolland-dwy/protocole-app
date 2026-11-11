@@ -48,37 +48,29 @@ class JeffreyNotifReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun keepAlive(context: Context, text: String) {
-        try {
-            ContextCompat.startForegroundService(context, Intent(context, BriefService::class.java).putExtra("text", text))
-        } catch (e: Exception) {
-            Log.w(TAG, "service au premier plan refusé", e)
-        }
-    }
-
-    private fun stop(context: Context) = context.stopService(Intent(context, BriefService::class.java))
-
+    // Tickets du service (audit du 10/11/2026, point 16) : chaque usage rend le sien.
     private fun reply(context: Context, payload: JSONObject, userText: String?) {
         BriefRunner.postPending(context, userText)
-        keepAlive(context, if (userText != null) "Jeffrey vous répond, Monsieur…" else "Un instant, Monsieur…")
+        val lease = BriefServiceLease.acquire(context, if (userText != null) "Jeffrey vous répond, Monsieur…" else "Un instant, Monsieur…")
         val pending = goAsync()
-        BriefRunner.runReply(context, payload.toString()) { pending.finish() }
+        BriefRunner.runReply(context, payload.toString(), lease) { pending.finish() }
     }
 
     private fun listen(context: Context) {
-        if (JeffreySpeech.busy()) { JeffreySpeech.stop(); stop(context); return }
+        // Second tap : la lecture s'arrête ; son ticket est rendu par la fin de lecture (onDone).
+        if (JeffreySpeech.busy()) { JeffreySpeech.stop(); return }
         // Voix en vacances (01/11/2026) : « Écouter » d'une notification postée avant ne fait rien.
         if (!JeffreySpeech.enabled(context)) return
         val v = BriefRunner.storedSpec(context)?.optJSONObject("listen") ?: return
         val arr = v.optJSONArray("chunks") ?: return
         val chunks = (0 until arr.length()).map { arr.getString(it) }
         if (chunks.isEmpty() || v.optString("url").isBlank() || v.optString("key").isBlank()) return
-        keepAlive(context, "Jeffrey vous lit son message, Monsieur.")
+        val lease = BriefServiceLease.acquire(context, "Jeffrey vous lit son message, Monsieur.")
         val started = JeffreySpeech.begin(
             context, "notif-${System.currentTimeMillis()}",
             JeffreySpeech.Config(v.getString("url").trimEnd('/'), v.getString("key"), v.optDouble("speed", 1.2).toFloat()),
             true, v.optString("cacheKey").ifEmpty { null }, chunks, true,
-        ) { stop(context) }
-        if (!started) stop(context)
+        ) { BriefServiceLease.release(context, lease) }
+        if (!started) BriefServiceLease.release(context, lease)
     }
 }

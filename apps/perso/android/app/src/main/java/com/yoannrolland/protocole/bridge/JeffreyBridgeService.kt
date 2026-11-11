@@ -42,6 +42,13 @@ import java.util.concurrent.atomic.AtomicBoolean
  * (sinon `occupe`). Tout le calcul se fait en JavaScript, dans la page sans écran `bridge.html`
  * (même origine que l'app, donc même stockage, même code `packages/core`).
  */
+/** Qui a le droit d'appeler le pont : l'appli JEFFREY, signée comme PROTOCOLE. Pur (testé). */
+object BridgeCaller {
+    const val JEFFREY_PACKAGE = "fr.yrolland.jeffrey"
+    fun allowed(packages: Array<String>?, sameSignature: Boolean): Boolean =
+        sameSignature && packages != null && packages.contains(JEFFREY_PACKAGE)
+}
+
 class JeffreyBridgeService : Service() {
     companion object {
         const val MSG_QUESTION = 1
@@ -64,8 +71,11 @@ class JeffreyBridgeService : Service() {
 
     private fun onQuestion(msg: Message) {
         val to = msg.replyTo ?: return
-        // Deuxième verrou après la permission signature : l'appelant doit être signé comme nous.
-        if (packageManager.checkSignatures(msg.sendingUid, android.os.Process.myUid()) != PackageManager.SIGNATURE_MATCH) {
+        // Deuxième et troisième verrous après la permission signature : l'appelant doit être signé
+        // comme nous ET être l'appli JEFFREY (audit du 10/11/2026, point 18 : toute appli signée par
+        // la clé du Mac passait, une autre appli de développement est installée sur le téléphone).
+        val sameSignature = packageManager.checkSignatures(msg.sendingUid, android.os.Process.myUid()) == PackageManager.SIGNATURE_MATCH
+        if (!BridgeCaller.allowed(packageManager.getPackagesForUid(msg.sendingUid), sameSignature)) {
             Log.w(TAG, "appelant refusé")
             return
         }
@@ -121,12 +131,13 @@ object BridgePage {
     private fun start(context: Context, handler: Handler, op: String, json: String, timeoutMs: Long, done: (String) -> Unit) {
         val finished = AtomicBoolean(false)
         val web = WebView(context)
-        val keepAlive = AtomicBoolean(false)
+        // Ticket du service pour l'analyse (point 16) : rendu à la fin, jamais l'arrêt d'un autre usage.
+        val keepAlive = java.util.concurrent.atomic.AtomicReference<Long?>(null)
         val complete: (String) -> Unit = { result ->
             if (finished.compareAndSet(false, true)) {
                 handler.post {
                     web.destroy()
-                    if (keepAlive.get()) context.stopService(Intent(context, BriefService::class.java))
+                    com.yoannrolland.protocole.BriefServiceLease.release(context, keepAlive.getAndSet(null))
                     done(result)
                 }
             }
@@ -165,7 +176,7 @@ object BridgePage {
     private class PageInterface(
         private val context: Context, private val handler: Handler, private val web: WebView,
         private val op: String, private val json: String, private val finished: AtomicBoolean,
-        private val keepAlive: AtomicBoolean, private val complete: (String) -> Unit,
+        private val keepAlive: java.util.concurrent.atomic.AtomicReference<Long?>, private val complete: (String) -> Unit,
     ) {
         @JavascriptInterface fun request(): String = JSONObject().put("op", op).put("json", json).toString()
 
@@ -192,14 +203,8 @@ object BridgePage {
         /** Analyse : service au premier plan le temps de l'appel (réseau en économie
          *  d'énergie). Refusé par Android : on continue sans, l'appli JEFFREY est au premier plan. */
         @JavascriptInterface fun keepAlive() {
-            try {
-                androidx.core.content.ContextCompat.startForegroundService(
-                    context, Intent(context, BriefService::class.java).putExtra("text", "Jeffrey prépare votre analyse, Monsieur."),
-                )
-                keepAlive.set(true)
-            } catch (e: Exception) {
-                Log.w(TAG, "service au premier plan refusé")
-            }
+            if (keepAlive.get() != null) return
+            keepAlive.set(com.yoannrolland.protocole.BriefServiceLease.acquire(context, "Jeffrey prépare votre analyse, Monsieur."))
         }
 
         /** POST relayé (LiteLLM ne répond pas au CORS) ; la réponse revient entière à la page. */

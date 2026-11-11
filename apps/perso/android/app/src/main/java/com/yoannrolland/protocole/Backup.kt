@@ -113,6 +113,10 @@ class BackupAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (!BackupScheduler.enabled(context)) return
         val slot = intent.getStringExtra("slot") ?: "manuel"
+        // Réveil suivant programmé AVANT l'envoi (audit du 10/11/2026, point 21) : si la page ne
+        // rend jamais la main (processus tué, plantage), la sauvegarde suivante reste prévue. Reprogrammé
+        // aussi à la fin (même réveil, sans effet de bord).
+        BackupScheduler.scheduleNext(context)
         val pending = goAsync()
         BriefRunner.runBackup(context, slot) {
             BackupScheduler.scheduleNext(context)

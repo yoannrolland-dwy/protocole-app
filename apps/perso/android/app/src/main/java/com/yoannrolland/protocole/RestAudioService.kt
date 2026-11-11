@@ -42,13 +42,19 @@ class RestAudioService : Service() {
             .setOngoing(true)
             .setSilent(true)
             .build()
+        var foreground = true
         try {
             if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
             else startForeground(NOTIF_ID, n)
         } catch (e: Exception) {
             Log.w(RestEndAudio.TAG, "service au premier plan refusé : ${e.javaClass.simpleName}")
+            foreground = false
         }
         RestEndAudio.play(this) { stopSelf(startId) }
+        // Premier plan refusé (audit du 10/11/2026, point 20) : le service s'arrête tout de suite,
+        // sinon Android fait planter l'app quelques secondes plus tard (service demandé au premier
+        // plan qui ne l'a jamais été). Le bip, lancé juste avant, joue quand même.
+        if (!foreground) stopSelf(startId)
         return START_NOT_STICKY
     }
 
@@ -81,20 +87,20 @@ object RestEndAudio {
         val app = context.applicationContext
         val main = Handler(Looper.getMainLooper())
         val finished = AtomicBoolean(false)
+        var player: MediaPlayer? = null
+        // Le lecteur est toujours libéré, quelle que soit la fin (point 21) : fin du son, arrêt
+        // demandé, garde de 9,5 s, ou erreur à la préparation.
         val end = {
             if (finished.compareAndSet(false, true)) {
                 stopCurrent = null
+                player?.let { p -> runCatching { if (p.isPlaying) p.stop() }; runCatching { p.release() } }
+                player = null
                 main.post { onFinished() }
             }
         }
         main.postDelayed({ end() }, SAFETY_MS)
 
-        var player: MediaPlayer? = null
-        stopCurrent = {
-            runCatching { player?.let { it.stop(); it.release() } }
-            player = null
-            end()
-        }
+        stopCurrent = { end() }
 
         try {
             val mp = MediaPlayer()
@@ -134,7 +140,7 @@ object RestEndAudio {
             val afd = app.resources.openRawResourceFd(R.raw.alarm)
             mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
             afd.close()
-            mp.setOnCompletionListener { it.release(); player = null; end() }
+            mp.setOnCompletionListener { end() }
             mp.prepare()
             mp.start()
         } catch (_: Exception) {

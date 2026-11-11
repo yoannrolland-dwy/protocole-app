@@ -45,5 +45,22 @@ class SilentSyncActivity : BridgeActivity() {
         bridge.webView.setBackgroundColor(Color.TRANSPARENT)
         bridge.webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
         DashboardWidgetProvider.startSpin(applicationContext)
+        // Garde (audit du 10/11/2026, point 17) : si la synchro ne rend jamais la main (erreur,
+        // Health Connect qui ne répond pas, app qui ne se charge pas), l'activité invisible restait
+        // ouverte et la flèche du widget tournait sans fin. Au bout de 45 s, tout se referme.
+        guard.postDelayed({ if (!isFinishing) { DashboardWidgetProvider.stopSpin(applicationContext); finish() } }, GUARD_MS)
+    }
+
+    override fun onDestroy() {
+        guard.removeCallbacksAndMessages(null)
+        // Fermée par Android ou par la garde : la flèche s'arrête dans tous les cas.
+        DashboardWidgetProvider.stopSpin(applicationContext)
+        super.onDestroy()
+    }
+
+    private val guard = android.os.Handler(android.os.Looper.getMainLooper())
+
+    companion object {
+        const val GUARD_MS = 45_000L
     }
 }

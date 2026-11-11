@@ -22,6 +22,7 @@ import com.getcapacitor.annotation.CapacitorPlugin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Instant
 
 /**
@@ -59,7 +60,10 @@ class HealthNutritionPlugin : Plugin() {
         val end = call.getString("endDate") ?: run { call.reject("endDate requis"); return }
         scope.launch {
             try {
-                call.resolve(block(hc, TimeRangeFilter.between(Instant.parse(start), Instant.parse(end))))
+                // Calcul hors du fil de l'interface (point 21 : la FC repos moyenne des milliers de
+                // mesures) ; la lecture Health Connect, elle, était déjà asynchrone.
+                val range = TimeRangeFilter.between(Instant.parse(start), Instant.parse(end))
+                call.resolve(withContext(Dispatchers.Default) { block(hc, range) })
             } catch (e: Exception) {
                 call.reject("Lecture $label impossible : ${e.message}")
             }

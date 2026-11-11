@@ -8,6 +8,7 @@ import { store } from "../store.js";
 import { shareExport } from "../lib/offPhoneExport.js";
 import { say, sayStable } from "../lib/jeffrey.js";
 import { today } from "@rawcare/core/dateUtils";
+import { finishSilentSync } from "../silentSync.js";
 
 const btn = (primary) => ({
   minHeight: 52, width: "100%", borderRadius: 10, fontSize: 16, fontWeight: 700, fontFamily: "inherit",
@@ -51,7 +52,11 @@ export function RecoveryScreen({ error }) {
 export class AppErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null }; }
   static getDerivedStateFromError(error) { return { error }; }
-  componentDidCatch(error) { console.error("app", error?.name || "erreur"); }
+  componentDidCatch(error) {
+    console.error("app", error?.name || "erreur");
+    // Bouton Sync du widget (point 17) : l'app n'a pas pu se charger, l'activité invisible se referme.
+    if (this.props.silent) finishSilentSync();
+  }
   render() {
     if (!this.state.error) return this.props.children;
     return this.props.silent ? null : <RecoveryScreen error={this.state.error} />;

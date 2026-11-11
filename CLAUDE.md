@@ -3765,16 +3765,27 @@ Vérifié dans l'aperçu : 1:58 → 1:28 après un saut d'horloge de 30 s simul�
 `git push` ne met rien à jour sur le téléphone.
 L'app native installée sur le téléphone ne se met JAMAIS à jour seule — il
 faut rebuild + réinstaller à la main à chaque changement de code qui la
-concerne. **Depuis le chantier RawCare Phase 0 (05/08/2026), les commandes
-tournent depuis `apps/perso/`** (l'app a été relocalisée dans le monorepo,
-`android/` avec elle) :
+concerne. **Depuis le 11/11/2026 (fin de la campagne d'audit), une seule procédure**, après le
+commit, **depuis la racine du dépôt** (`/Users/yrolland/Documents/GitHub/protocole-app`) :
 ```
-npm run build --workspace=apps/perso
-cd apps/perso
-npx cap sync android
-cd android && ./gradlew assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+node apps/perso/scripts/release.mjs build
+node apps/perso/scripts/release.mjs install
 ```
+Depuis un autre dossier, donner le chemin absolu du script
+(`node /Users/yrolland/Documents/GitHub/protocole-app/apps/perso/scripts/release.mjs build`) ; le
+script retrouve alors lui-même la racine pour toutes ses étapes.
+- `build` refuse un arbre non commité, enchaîne `npm test`, le build Vite, `npx cap sync android`,
+  les tests unitaires Android (`./gradlew testDebugUnitTest`) et Gradle, et **s'arrête à la
+  première erreur**. Seulement si tout réussit, il écrit
+  `apps/perso/android/app/build/outputs/apk/debug/release.json` = `{ commit, version, apkSha256,
+  builtAt }`, la preuve que cet APK vient de la construction réussie de ce commit.
+- `install` refuse sans ce manifeste, si le commit en cours n'est pas le sien, si l'APK a changé ou
+  si l'arbre n'est pas propre ; puis `adb install -r` (jamais de désinstallation ni `-d`), et
+  vérifie l'empreinte de l'APK en place sur le téléphone. Règles : `scripts/releaseCheck.mjs`
+  (testées). Incident à l'origine : le 11/11/2026, un build lancé depuis `apps/perso` avec
+  `--workspace` a échoué sans arrêter la chaîne, et un APK plus ancien a été installé.
+- Les sauvegardes d'avant installation (copie de l'APK installé, copie serveur, empreintes) restent
+  à faire avant `install`.
 Téléphone branché en USB, débogage USB activé et autorisé sur l'appareil.
 Variables d'environnement requises (déjà ajoutées à `~/.zshrc`) :
 `ANDROID_HOME=/opt/homebrew/share/android-commandlinetools`,
@@ -6032,3 +6043,56 @@ LiteLLM ; personnalité de Jeffrey inchangée.
   Incident sans conséquence : un premier build lancé depuis le mauvais dossier a échoué et une
   première installation a mis l'APK construit juste avant l'extraction de `restAfterSet` (même
   comportement) ; il a été reconstruit depuis la racine et réinstallé, empreinte vérifiée.
+
+## Campagne de corrections de l'audit du 10/11/2026 — lot 3, fiabilité Android (11/11/2026, apps/perso v3.161.0)
+
+Points 16 à 21. Point de restauration avant ce lot : tag `apres-lot2-audit` (v3.160.0). Aucun
+changement de transport, de voix, de LiteLLM, ni dans le dépôt JEFFREY ou côté Oracle.
+- **16, service du brief partagé** : `LeaseCounter` / `BriefServiceLease` (`BriefService.kt`). Chaque
+  usage — page sans écran (brief, réponse, sauvegarde), bouton Écouter, analyse du pont — prend un
+  ticket et rend le sien ; le service ne s'arrête qu'au dernier. L'arrêt différé de 150 s d'une
+  réponse lue à voix haute ne coupe plus la suivante. Réponse depuis la notification sans résultat
+  (délai de 55 s, erreur) : le fil revient avec ses boutons et « Je n'ai pas pu vous répondre à
+  temps, Monsieur. Réessayez dans un instant. » (`postReplyFailed`), rien d'écrit.
+- **17, Sync du widget** : `finally` côté JS (la synchro qui lève une erreur referme quand même),
+  écran de secours en mode silencieux qui referme l'activité, garde native de 45 s et arrêt de la
+  flèche à la destruction (`SilentSyncActivity.kt`).
+- **18, appelant du pont** : `BridgeCaller.allowed` exige le paquet `fr.yrolland.jeffrey` en plus de
+  la permission `signature` et de la même signature. Permissions du pont inchangées.
+- **19, sauvegarde Android** : `android:allowBackup="false"` (vérifié dans le manifeste fusionné).
+  Les sauvegardes de PROTOCOLE (serveur Oracle, partage, Documents/Protocole) n'en dépendent pas.
+  Le transfert d'un téléphone à l'autre d'Android 12+ n'est pas concerné par ce réglage.
+- **20, suspecté** : vérifié dans le code — un premier plan refusé dans `RestAudioService` ou
+  `BriefService` laissait le service tourner, ce qui fait planter l'app quelques secondes plus tard
+  (règle d'Android). Les deux s'arrêtent désormais tout de suite ; le bip joue quand même. Rien de tel
+  dans l'historique du téléphone (Android 16). **Non vérifiable sans Android 17, laissé en l'état** :
+  la voix app fermée par un service `shortService`.
+- **21, divers** : réveil de sauvegarde suivant programmé avant l'envoi (`Backup.kt`) ; calcul des
+  lectures Health Connect (FC repos) hors du fil de l'interface ; `MediaPlayer` toujours libéré ;
+  journaux sans contenu (type d'erreur seulement : un message JSON ou d'en-tête pouvait citer la clé
+  de la voix ou de l'IA).
+- **Livraison** : `scripts/release.mjs` (voir « Mise à jour de l'app Android native ») : tests JS et
+  tests unitaires Android exigés avant l'APK.
+- Tests : `apps/perso/test/lot3-livraison.test.mjs` (7) ; Android `Lot3UnitTest.kt` (3, `./gradlew
+  testDebugUnitTest`). 311 tests JS au total.
+- **Limites** : rien de ce lot n'a été essayé sur le téléphone avant installation ; les branchements
+  Android sont vérifiés dans le code source et par la compilation, pas en situation (délai de 55 s,
+  synchro bloquée, premier plan refusé, appelant étranger).
+
+### Reportés à la fin de la campagne (non faits, volontairement)
+- Performance, non mesurée : Analyse › Dépense recalculée à chaque rendu, habituels de Nutrition
+  recalculés à chaque rendu, relecture complète à chaque retour dans l'app, carnet redessiné chaque
+  seconde pendant un repos, bloc unique de 820 Ko, WebView neuve à chaque opération du pont.
+- IA : secours Haiku 4.5 (Haiku 5.5 possible après le guide de migration), tarifs de lecture du
+  cache, tarifs Fable 5.2 / Haiku 5.5 absents, message pour `stop_reason: "refusal"`, sorties
+  structurées pour Photo d'un plat et Carte resto.
+- Ménage : `CLAUDE.md` à alléger, `README.md` périmé, code mort (cœur et écrans), service worker et
+  `vite-plugin-pwa`, Tailwind, permissions Health Connect inutiles, `versionName` figé à « 1.0 »,
+  18 mises à jour mineures, `main` en retard sur `dev`.
+- Tests sans couverture directe (TDEE et choix de fenêtre, score d'énergie, records, `zoneState`,
+  `medianTarget`, scan) et aucun test d'écran.
+- Fichiers à découper (`FoodSearch.jsx`, `App.jsx`, `NutritionTab.jsx`, `MuscuLogger.jsx`,
+  `SettingsPanel.jsx`, `recommendSessions`, `buildCoachPrompt`).
+- Question ouverte : le squat sur sécurités doit-il recevoir les suggestions de surcharge ?
+- Android 17 : voix app fermée en `shortService`.
+- JEFFREY : afficher en clair le code `restauration` (suivi dans `docs/suivi-jeffrey/`).

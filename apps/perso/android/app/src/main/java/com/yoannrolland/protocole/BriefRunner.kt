@@ -49,13 +49,15 @@ object BriefRunner {
     private const val THREAD_PREFS = "jeffrey_thread"
     // Un réveil en arrière-plan dispose d'environ une minute (goAsync) : on rend la main avant.
     private const val TIMEOUT_MS = 55_000L
+    const val REPLY_FAILED = "Je n'ai pas pu vous répondre à temps, Monsieur. Réessayez dans un instant."
     private val pool = Executors.newCachedThreadPool()
 
     /** Réponse de Monsieur depuis la notification (J4.3) : la page répond (`?mode=reply`) avec
      *  `payload` ({ kind: text | quick | confirm, … }), puis rend le fil à afficher. */
-    fun runReply(context: Context, payload: String, done: () -> Unit) {
+    /** `lease` : ticket du service pris par le bouton de la notification ; la page le rend à la fin. */
+    fun runReply(context: Context, payload: String, lease: Long? = null, done: () -> Unit) {
         val app = context.applicationContext
-        CoroutineScope(Dispatchers.Main).launch { startPage(app, payload, "mode=reply", done) }
+        CoroutineScope(Dispatchers.Main).launch { startPage(app, payload, "mode=reply", done, lease, reply = true) }
     }
 
     /** Sauvegarde sur le serveur (02/11/2026, réveils de 14 h et 23 h) : la page exporte les
@@ -73,15 +75,24 @@ object BriefRunner {
     }
 
     @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
-    private fun startPage(context: Context, payload: String, query: String, done: () -> Unit) {
+    private fun startPage(context: Context, payload: String, query: String, done: () -> Unit, lease: Long? = null, reply: Boolean = false) {
         val handler = Handler(Looper.getMainLooper())
         val finished = AtomicBoolean(false)
         val web = WebView(context)
+        // Ticket du service pour CETTE page (et sa voix) : jamais l'arrêt d'une autre (point 16).
+        val held = java.util.concurrent.atomic.AtomicReference<Long?>(lease)
         val finish: (String) -> Unit = { json ->
             if (finished.compareAndSet(false, true)) {
                 handler.post {
-                    val stop = { context.stopService(Intent(context, BriefService::class.java)) }
-                    runCatching { handleResult(context, json) }.onFailure { Log.e(TAG, "résultat", it) }
+                    val stop = { BriefServiceLease.release(context, held.getAndSet(null)) }
+                    // Jamais le contenu dans le journal : un message d'erreur JSON reprend le texte lu,
+                    // clé de la voix comprise (audit, point 21).
+                    runCatching { handleResult(context, json) }.onFailure { Log.e(TAG, "résultat : ${it.javaClass.simpleName}") }
+                    // Réponse depuis la notification sans résultat (délai de 55 s, page en erreur) : la
+                    // notification restait sur « … », sans bouton. Elle revient avec ses boutons (point 16).
+                    if (reply && runCatching { JSONObject(json).optJSONObject("notify") == null }.getOrDefault(true)) {
+                        runCatching { postReplyFailed(context) }
+                    }
                     web.destroy()
                     // G3 : réponse depuis la notification, brief de secours… l'app ouverte relit ses données.
                     ExternalWrites.notifyApp()
@@ -111,7 +122,7 @@ object BriefRunner {
 
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
-        web.addJavascriptInterface(Bridge(context, payload, web, handler, finish), "BriefBridge")
+        web.addJavascriptInterface(Bridge(context, payload, web, handler, finish, held), "BriefBridge")
         web.webViewClient = object : WebViewClient() {
             // Fichiers de l'app servis depuis assets/public (comme Capacitor), à la même origine.
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
@@ -271,6 +282,16 @@ object BriefRunner {
         try { NotificationManagerCompat.from(context).notify(NOTIF_ID, b.build()) } catch (e: SecurityException) { Log.w(TAG, "notification", e) }
     }
 
+    /** Réponse depuis la notification sans résultat : le dernier fil affiché revient, boutons
+     *  compris, avec une phrase claire. Rien n'est écrit dans la conversation. */
+    private fun postReplyFailed(context: Context) {
+        val spec = storedSpec(context) ?: JSONObject()
+        val msgs = spec.optJSONArray("messages") ?: org.json.JSONArray()
+        msgs.put(JSONObject().put("me", false).put("text", REPLY_FAILED))
+        spec.put("messages", msgs)
+        postThread(context, spec.toString(), alert = false)
+    }
+
     /** Pendant que Jeffrey répond : la réponse de Monsieur s'ajoute au fil, sans boutons (Android
      *  attend aussi cette mise à jour pour arrêter l'indicateur du champ de réponse). */
     fun postPending(context: Context, userText: String?) {
@@ -287,19 +308,18 @@ object BriefRunner {
     private class Bridge(
         private val context: Context, private val payload: String, private val web: WebView,
         private val handler: Handler, private val onFinish: (String) -> Unit,
+        private val held: java.util.concurrent.atomic.AtomicReference<Long?>,
     ) {
         /** Réponse de Monsieur depuis la notification (J4.3), "{}" pour une sauvegarde. */
         @JavascriptInterface fun payload(): String = payload
 
         // Service au premier plan le temps de l'appel (BriefService : rend le réseau quand
         // l'économie d'énergie le coupe aux apps en arrière-plan). Repli : simple notification.
+        // Un ticket par page (point 16) : un second appel ne fait que changer le texte.
         @JavascriptInterface fun preparing(text: String) {
-            try {
-                androidx.core.content.ContextCompat.startForegroundService(context, Intent(context, BriefService::class.java).putExtra("text", text))
-            } catch (e: Exception) {
-                Log.w(TAG, "service au premier plan refusé", e)
-                post(context, text, alert = false, ongoing = true)
-            }
+            val ok = if (held.get() != null) BriefServiceLease.update(context, text)
+                else BriefServiceLease.acquire(context, text)?.also { held.set(it) } != null
+            if (!ok) post(context, text, alert = false, ongoing = true)
         }
 
         @JavascriptInterface fun finish(json: String) = onFinish(json)
@@ -320,8 +340,9 @@ object BriefRunner {
                     text = (if (status in 200..299) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() } ?: ""
                     conn.disconnect()
                 } catch (e: Exception) {
-                    Log.w(TAG, "http", e)
-                    text = e.message ?: "erreur réseau"
+                    // Seulement le type : un en-tête refusé peut citer sa valeur (clé) dans le message.
+                    Log.w(TAG, "http : ${e.javaClass.simpleName}")
+                    text = if (e is java.io.IOException) (e.message ?: "erreur réseau") else "erreur de requête"
                 }
                 handler.post {
                     web.evaluateJavascript("window.__briefHttpDone(${JSONObject.quote(id)}, $status, ${JSONObject.quote(text)})", null)

@@ -282,12 +282,18 @@ export default function App({ silent = false } = {}) {
   useEffect(() => {
     if (loading) return;
     (async () => {
-      await runHealthSync();
-      // Lancé par le bouton Sync du widget (activité invisible, voir SilentSyncActivity.kt) :
-      // laisser React committer les setState de runHealthSync (donc l'effet qui pousse
-      // l'instantané au widget, plus bas) avant de refermer l'activité.
-      if (await isSilentSync()) {
-        setTimeout(finishSilentSync, 150);
+      // Une synchro qui lève une erreur ne laisse plus l'activité invisible ouverte ni la flèche du
+      // widget tourner (audit du 10/11/2026, point 17) : la fermeture est dans le `finally`.
+      try {
+        await runHealthSync();
+      } catch (e) {
+        console.error("synchro", e?.name || "erreur");
+        setHealthSync({ status: "error", message: "synchro interrompue", at: new Date().toISOString() });
+      } finally {
+        // Lancé par le bouton Sync du widget (activité invisible, voir SilentSyncActivity.kt) :
+        // laisser React committer les setState de runHealthSync (donc l'effet qui pousse
+        // l'instantané au widget, plus bas) avant de refermer l'activité.
+        if (await isSilentSync()) setTimeout(finishSilentSync, 150);
       }
     })();
   }, [loading]);
