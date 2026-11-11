@@ -473,6 +473,8 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
                 <div style={{ display: "flex", gap: 8 }}>
                   <Button variant="outline" style={{ flex: 1 }}
                     onClick={() => {
+                      // Maintien : la borne haute de la fourchette, la même durée que la série
+                      // préremplie (`seriesTarget`) — planche « 45-60 s » = 60 s partout (11/11/2026).
                       const s = e.mode === "temps" ? parseSecs(e.target) : e.rest;
                       restTimer.start(s, e.nom, e.mode === "temps" ? holdAnnouncement() : restAnnouncement(exos, ei, -1)); recordLast(ei, s);
                     }}>

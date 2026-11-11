@@ -17,7 +17,7 @@ globalThis.window = {
 };
 
 const { newSessionDraft, logSet, restAction } = await import("@rawcare/core/session/voiceSession");
-const { markJeffreyRest, nativeRest } = await import("../src/lib/bridgeRest.js");
+const { markJeffreyRest, nativeRest, restAfterSet } = await import("../src/lib/bridgeRest.js");
 const { writeDraft, readDraft } = await import("../src/lib/sessionDraft.js");
 const { restTimer, restState, syncRestFromDraft } = await import("../src/lib/restTimer.js");
 
@@ -86,4 +86,29 @@ test("repos lancé dans PROTOCOLE : le réveil ne reçoit aucune voix", async ()
   const req = alarmRequest(123456, "Rowing");
   assert.deepEqual(req, { endsAt: 123456, exercise: "Rowing" });
   assert.equal("voice" in req, false);
+});
+
+// Série notée à la voix sur un exercice SANS repos prévu (11/11/2026, accepté par Yoann) : le repos
+// précédent encore en cours s'arrête, aucun minuteur ne part, le réveil est retiré, pas de bip.
+test("série sans repos prévu : le repos en cours s'arrête, réveil retiré, aucun bip", () => {
+  const now = Date.now();
+  const d0 = newSessionDraft({ type: "Basket", training: [], hsrWeek: 9, date: today, start: "20:00" });
+  // Repos de 20 s en cours après le primer genou (3e exercice), puis série du suivant…
+  const running = { ...d0, rest: { secs: 20, remaining: 20, endAt: now + 15_000, label: "Primer iso genou", speech: "" } };
+  const last = d0.exos.findIndex((e) => e.rest === 0 && e.nom.startsWith("Spécifique basket : tirs"));
+  const r = logSet(running, { secondes: 30, exercice: d0.exos[last].nom }, ctx);
+  assert.equal(r.ok, true);
+  assert.equal(r.restSecs, 0);
+  assert.doesNotMatch(r.phrase, /repos/);
+  const after = restAfterSet(r.draft, { secs: r.restSecs, label: "x", speech: "", now });
+  assert.equal(after.rest.endAt, null);          // le décompte précédent est arrêté
+  assert.equal(after.rest.remaining, 20);        // comme « stop » : prêt pour le prochain
+  alarms.length = 0;
+  nativeRest(after.rest);
+  assert.deepEqual(alarms, [{ endAt: null }]);   // réveil retiré : aucun bip à venir
+  // Sans repos en cours : rien ne change, aucun minuteur créé.
+  assert.equal(restAfterSet({ ...d0, rest: undefined }, { secs: 0, now }).rest, undefined);
+  // Avec un repos prévu : un décompte part, comme avant.
+  const withRest = restAfterSet(d0, { secs: 90, label: "Rowing", speech: "", now });
+  assert.deepEqual([withRest.rest.secs, withRest.rest.endAt], [90, now + 90_000]);
 });

@@ -10,6 +10,19 @@ export function markJeffreyRest(draft, action) {
   return { ...draft, rest: { ...draft.rest, source: "jeffrey" } };
 }
 
+/**
+ * Repos après une série notée à la voix (`noter_serie`). `secs` : le repos prévu de l'exercice.
+ * - repos prévu : un décompte de `secs` part maintenant ;
+ * - aucun repos prévu (échauffement basket, 11/11/2026, accepté par Yoann) : aucun minuteur ne part,
+ *   et un repos précédent encore en cours s'arrête, comme « stop » — la série suivante a commencé.
+ *   Le réveil est alors retiré (`nativeRest`) : pas de bip.
+ */
+export function restAfterSet(draft, { secs, label, speech, now }) {
+  if (secs > 0) return { ...draft, rest: { secs, remaining: secs, endAt: now + secs * 1000, label, speech } };
+  if (draft?.rest?.endAt) return { ...draft, rest: { ...draft.rest, endAt: null, remaining: draft.rest.secs } };
+  return draft;
+}
+
 /** Réveil de fin de repos (natif, par la page du pont) : programmé à `rest.endAt`, sans voix et
  *  silencieux, ou retiré. Hors app native : rien. */
 export function nativeRest(rest) {

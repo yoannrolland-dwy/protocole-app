@@ -85,6 +85,28 @@ export const kcalFromMacros = (p, c, f, fib = 0) => (p ?? 0) * 4 + (c ?? 0) * 4 
 // foodLog) — sinon repli sur l'estimation ci-dessus. Ne jamais recalculer en 4/4/9 un jour qui
 // a déjà sa vraie valeur mesurée : Repas et Macros doivent toujours afficher le même chiffre.
 export const kcalOfEntry = (m) => m?.kcal ?? kcalFromMacros(m?.protein, m?.carbs, m?.fat, m?.fiber);
+// Un jour de macroLog porte-t-il un apport ? Une ligne d'eau seule (`{ date, water }`) n'en porte
+// pas : la compter pour 0 kcal tirait une moyenne vers le bas (audit du 10/11/2026, point 15).
+export const hasIntake = (m) => !!m && (m.kcal != null || m.protein != null || m.carbs != null || m.fat != null);
+
+/**
+ * Cible kcal EN VIGUEUR un jour donné (audit du 10/11/2026, point 9). Juger un jour passé contre
+ * la cible d'aujourd'hui faisait paraître hors cible tous les jours d'avant un palier.
+ * `targetHistory` note chaque changement de kcal : `{ date, kcal, prevKcal }`, `prevKcal` = cible
+ * au DÉBUT de ce jour-là. La cible d'un jour est donc le `prevKcal` du premier changement
+ * strictement postérieur (repli : le `kcal` du changement précédent) ; sans changement postérieur,
+ * c'est la cible actuelle. Un changement vaut pour son jour entier. La fenêtre de sèche garde sa
+ * règle (`targetsForDate`). Sans historique : la cible actuelle, comme avant.
+ */
+export function kcalTargetOn(date, targets, targetHistory) {
+  const current = () => { const t = targetsForDate(date, targets); return Math.round(kcalFromMacros(t.protein, t.carbs, t.fat, t.fiber)); };
+  if (isCutWindow(date, targets)) return current();
+  const hist = (targetHistory || []).filter((h) => h?.date && Number.isFinite(h.kcal)).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const i = hist.findIndex((h) => h.date > date);
+  if (i < 0) return current();
+  if (Number.isFinite(hist[i].prevKcal)) return hist[i].prevKcal;
+  return i > 0 ? hist[i - 1].kcal : current();
+}
 
 // Semaine ancrée sur le lundi, arithmétique locale pure (mêmes `new Date(y, m-1, d)` que
 // `shiftDateKey`/`localDateKey`), jamais un aller-retour par un instant UTC. Un jour sans
@@ -92,6 +114,7 @@ export const kcalOfEntry = (m) => m?.kcal ?? kcalFromMacros(m?.protein, m?.carbs
 // loggés (`days`), pour rester honnête sur une semaine partiellement saisie. Factorisé
 // (13/09/2026) : `weeklyWeekdayKcalTrend` (lun-ven, historique) et `weeklyKcalTrend` (7 jours,
 // voir plus bas) ne diffèrent que par le nombre de jours échantillonnés par semaine.
+const dateKeyOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 function weeklyKcalAverages(macros, { weeks = 8, endDate, sampleDays = 7 } = {}) {
   const end = endDate || today();
   const [ey, em, ed] = end.split("-").map(Number);
@@ -100,8 +123,11 @@ function weeklyKcalAverages(macros, { weeks = 8, endDate, sampleDays = 7 } = {})
   const thisMonday = new Date(endObj);
   thisMonday.setDate(endObj.getDate() - mondayOffset);
 
-  const kcalByDate = new Map(macros.map((m) => [m.date, kcalOfEntry(m)]));
-  const dateKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // Jusqu'à `end` compris : un repas planifié pour un jour à venir n'est pas encore mangé (audit du
+  // 10/11/2026, point 7). Aujourd'hui reste compté (règle du 13/09/2026). Eau seule : pas un apport.
+  const endKey = dateKeyOf(endObj);
+  const kcalByDate = new Map(macros.filter((m) => hasIntake(m) && m.date <= endKey).map((m) => [m.date, kcalOfEntry(m)]));
+  const dateKey = dateKeyOf;
 
   const out = [];
   for (let w = weeks - 1; w >= 0; w--) {
@@ -157,7 +183,8 @@ export function weeklyProteinTrend(macros, { weeks = 8, endDate } = {}) {
   const thisMonday = new Date(endObj);
   thisMonday.setDate(endObj.getDate() - ((endObj.getDay() + 6) % 7));
   const key = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const byDate = new Map((macros || []).filter((m) => m.protein != null && m.date !== end).map((m) => [m.date, m.protein]));
+  // Jours TERMINÉS seulement : ni aujourd'hui, ni un jour à venir déjà planifié (point 7).
+  const byDate = new Map((macros || []).filter((m) => m.protein != null && m.date < end).map((m) => [m.date, m.protein]));
   const out = [];
   for (let w = weeks - 1; w >= 0; w--) {
     const monday = new Date(thisMonday);
@@ -203,7 +230,11 @@ export function buildKcalByDate({ foodLog, overrides, macros, today: todayKey })
     const t = totals(entriesFor(resolved, d));
     if (t.missing.kcal === 0) foodKcalByDate[d] = t.kcal;
   }
-  const merged = mergeKcalSeries(foodKcalByDate, macros);
+  // Totaux dérivés du journal restés sans aucune ligne de journal (jour vidé, audit du 10/11/2026,
+  // point 6) : jamais relus en 4/4/9, ce jour n'a plus d'apport connu.
+  const foodDates = new Set(resolved.map((e) => e.date));
+  const usable = (macros || []).filter((m) => m.source !== "foodlog" || foodDates.has(m.date));
+  const merged = mergeKcalSeries(foodKcalByDate, usable);
   if (todayKey != null) delete merged[todayKey];
   return merged;
 }

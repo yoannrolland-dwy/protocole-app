@@ -1,6 +1,7 @@
 // Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; rendu v2 à l'étape 5 d'U3 via
 // design/compat.jsx (mêmes primitives, valeurs v2), polices écrites en dur remontées à 12-13 px.
 import { useState, useMemo } from "react";
+import { useDayRollover } from "../lib/dayRollover.js";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Cell } from "recharts";
 import { Plus, Trash2 } from "lucide-react";
 import { computeEnergyScore, computeSleepScore, scoreLabel } from "@rawcare/core/energy";
@@ -52,6 +53,7 @@ export function SleepTab({ sleep, rhr, steps, naps, save }) {
   const [forceManual, setForceManual] = useState(false);
   const loadHM = (dec) => { setH(Math.floor(dec)); setMin(Math.round((dec - Math.floor(dec)) * 60)); };
   const pickDate = (d) => { setDate(d); const e = sleep.find((s) => s.date === d); if (e) { loadHM(e.hours); setQuality(e.quality ?? 3); } setForceManual(false); };
+  useDayRollover(date, pickDate); // jour suivant si l'écran reste ouvert la nuit (audit, point 14)
   const add = () => save.sleep(upsert(sleep, { date, hours: round(h + min / 60, 2), quality, source: "manual" }));
   const isSynced = cur?.source === "healthconnect" && !forceManual;
 

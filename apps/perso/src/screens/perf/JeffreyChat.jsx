@@ -2,7 +2,7 @@
 // de l'onglet Analyse. Contrat et règles : packages/core/src/coach/jeffrey.js ; spec : ROADMAP.md,
 // « Chantier J ». La conversation du jour vit dans `jeffreyLog` (App.jsx) : une réponse en cours
 // s'y enregistre même si Monsieur change d'onglet (l'écriture passe par App, toujours montée).
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Send, ChevronRight, ChevronDown, Mic, Square, Volume2 } from "lucide-react";
 import { TEMPLATES } from "@rawcare/core/session/templates";
 import {
@@ -14,7 +14,9 @@ import { today } from "../../ui.jsx";
 import { aiMissing, fmtCost } from "../../lib/ai.js";
 import { say, sayStable, sayError } from "../../lib/jeffrey.js";
 import { streamTransportFor } from "../../lib/jeffreyHttp.js";
-import { jeffreyTurn, newId, hhmm } from "../../lib/jeffreyTurn.js";
+import { jeffreyTurn, mergeTurn, unionDay, newId, hhmm } from "../../lib/jeffreyTurn.js";
+import { getSync } from "../../store.js";
+import { turnFlight } from "../../lib/turnFlight.js";
 import { voiceAvailable, voiceReady, listen, stopListening, speak, stopSpeaking, createSpeechStream, headsetConnected } from "../../lib/voice.js";
 
 function SessionCard({ choice, onStart }) {
@@ -106,7 +108,11 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
   const [voiceNote, setVoiceNote] = useState("");
   const composerRef = useRef(null);
   const bottomRef = useRef(null);
-  const busy = live != null;
+  // Un seul tour à la fois dans toute l'app (audit du 10/11/2026, point 13) : la conversation existe
+  // en deux exemplaires (onglet Analyse, surimpression de la bulle) ; un second message parti de
+  // l'autre pendant qu'une réponse s'écrit lançait deux tours sur le même jour.
+  const inFlight = useSyncExternalStore(turnFlight.subscribe, turnFlight.count);
+  const busy = live != null || inFlight > 0;
 
   // À l'ouverture (onglet Analyse, bulle, carte du Bord) : tout en bas de la conversation, champ et
   // boutons à portée de pouce (30/10/2026). Une image plus tard, car l'app remet l'écran en haut à
@@ -136,9 +142,10 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
     const date = today();
     setErr("");
     setLive({ text: "", progress: "" });
+    // Fusion dans la conversation du moment (mergeTurn), jamais une réécriture du jour entier.
     const apply = ({ history: h, journal, memDate }) => {
       if (journal) { saveJournal(journal); if (memDate) onMemoryDone?.(memDate); }
-      setDay(date, h);
+      setDay(date, (cur) => mergeTurn(cur, history, h));
     };
     try {
       const r = await jeffreyTurn({
@@ -159,26 +166,38 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
     }
   };
 
+  // `turnFlight.begin()` est pris tout de suite, avant toute attente (le casque est interrogé plus
+  // bas) : deux taps rapprochés, ou un envoi depuis l'autre exemplaire, ne lancent pas deux tours.
   const ask = async (userEntry) => {
-    if (busy) return;
+    if (busy || !turnFlight.begin()) return;
+    try { await askLocked(userEntry); } finally { turnFlight.end(); }
+  };
+  const askLocked = async (userEntry) => {
     let history = entries;
     // Réponse rapide touchée : on le dit à Jeffrey dans le résultat de son outil.
     const lastA = [...history].reverse().find((e) => e.role === "assistant");
+    let patch = null;
     if (userEntry.quickFor && lastA?.quick?.id === userEntry.quickFor) {
-      history = history.map((e) => (e === lastA ? { ...e, toolResults: { ...e.toolResults, [lastA.quick.id]: `Monsieur a touché « ${userEntry.text} ».` } } : e));
+      patch = (e) => (e.id === lastA.id ? { ...e, toolResults: { ...e.toolResults, [lastA.quick.id]: `Monsieur a touché « ${userEntry.text} ».` } } : e);
+      history = history.map(patch);
     }
     let { quickFor: _q, ...entry } = userEntry;
     // Mémoire (J1.3) : la conversation d'un jour passé part avec le premier message, une fois.
     if (memory && !history.some((e) => e.memoryFor === memory.date)) entry = withMemory(entry, memory.date, memory.entries);
-    const next = [...history, { ...entry, id: newId(), at: hhmm() }];
-    setDay(today(), next);
+    const mine = { ...entry, id: newId(), at: hhmm() };
+    const next = [...history, mine];
+    // Ajout du seul message de Monsieur à la conversation du moment (point 13), jamais une
+    // réécriture du jour avec la copie de ce rendu.
+    setDay(today(), (cur) => [...(patch ? cur.map(patch) : cur), mine]);
     setVoiceNote("");
     // Il répond comme on lui a parlé (décision 11) : question dictée → réponse à voix haute, dès
     // la première phrase complète, pendant que le reste s'écrit. Casque branché (31/10/2026, choix
     // de Yoann) : il parle aussi quand Monsieur écrit.
-    if (!entry.spoken && !(voiceReady() && await headsetConnected())) { run(next, entry.mode || "chat"); return; }
+    if (!entry.spoken && !(voiceReady() && await headsetConnected())) { await run(next, entry.mode || "chat"); return; }
     const voice = createSpeechStream();
-    run(next, entry.mode || "chat", voice.feed).then((h) => {
+    const h = await run(next, entry.mode || "chat", voice.feed);
+    // La voix finit après le tour : elle ne retient pas le verrou.
+    Promise.resolve(h).then((h) => {
       const reply = h && [...h].reverse().find((e) => e.role === "assistant" && e.text);
       if (reply) setSpeakingId(reply.id);
       return voice.finish().then((r) => {
@@ -223,7 +242,10 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
   // Confirmation ou annulation d'une action (J2). La note du jour s'écrit ici (elle est aussi
   // dans ce composant) ; l'eau et le genou par App (`onAction`), avec l'écriture de l'écran.
   const decide = (entryId, action, ok, baseline) => {
-    const next = decideAction(entries, entryId, action.id, {
+    // Décision prise sur la version la plus fraîche (point 13) : une carte déjà confirmée depuis la
+    // notification n'est jamais réappliquée, même si l'écran ne l'a pas encore relue.
+    const fresh = unionDay(entries, getSync("jeffreyLog", {})[today()] || []);
+    const next = decideAction(fresh, entryId, action.id, {
       ok, baseline, doneText: say("actionDone"), cancelledText: say("actionCancelled"),
       apply: (act) => {
         if (act.kind !== "note") return onAction?.(act) ?? null;
@@ -231,7 +253,9 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
         return null;
       },
     });
-    if (next) setDay(today(), next);
+    // Seule l'entrée de la carte est remplacée dans la conversation du moment (point 13).
+    const updated = next?.find((e) => e.id === entryId);
+    if (updated) setDay(today(), (cur) => cur.map((e) => (e.id === entryId ? updated : e)));
   };
 
 
@@ -242,7 +266,10 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
     ask(jeffreyAsk("chat", { text: t }));
   };
   const lastEntry = entries[entries.length - 1];
-  const retry = () => { if (!busy && lastEntry?.role === "user") run(entries, lastEntry.mode || "chat"); };
+  const retry = () => {
+    if (busy || lastEntry?.role !== "user" || !turnFlight.begin()) return;
+    run(entries, lastEntry.mode || "chat").finally(() => turnFlight.end());
+  };
   const lastAssistant = [...entries].reverse().find((e) => e.role === "assistant" && !e.hidden);
   const quick = !busy && lastEntry?.role === "assistant" ? lastAssistant?.quick : null;
   const spent = entries.reduce((s, e) => s + (e.meta?.cents || 0), 0);
@@ -259,9 +286,9 @@ export function JeffreyChat({ coach, ai, entries, setDay, todayNote, saveNote, s
       <div style={{ display: "grid", gap: 14 }}>
         {entries.map((e) => <Message key={e.id} entry={e} onStart={onStart} onDecide={decide} speaking={speakingId === e.id} onSpeak={toggleSpeak} />)}
         {busy && (
-          <div style={{ fontSize: 15, color: live.text ? T.c.text : T.c.muted, whiteSpace: "pre-wrap", lineHeight: 1.5 }} aria-live="polite">
-            {live.text || sayStable("chatThinking")}
-            {live.progress && <div className="p-num" style={{ fontSize: 12, color: T.c.muted, marginTop: 4 }}>{live.progress}</div>}
+          <div style={{ fontSize: 15, color: live?.text ? T.c.text : T.c.muted, whiteSpace: "pre-wrap", lineHeight: 1.5 }} aria-live="polite">
+            {live?.text || sayStable("chatThinking")}
+            {live?.progress && <div className="p-num" style={{ fontSize: 12, color: T.c.muted, marginTop: 4 }}>{live.progress}</div>}
           </div>
         )}
         {err && (

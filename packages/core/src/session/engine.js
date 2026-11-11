@@ -10,7 +10,7 @@
 // rien n'est tapé (« "" » = vide, pas 0).
 
 import { TEMPLATES, DEFAULT_WEIGHTS, hsrForWeek, hsrParse, exoSeriesCount } from "./templates.js";
-import { lastPerf, lastExerciseSets, medianTarget } from "./perf.js";
+import { lastPerf, lastExerciseSets, seriesTarget } from "./perf.js";
 import { EXERCISE_LIBRARY } from "./exercises.js";
 import { catalogEntry } from "./exoCatalog.js";
 import { round } from "../dateUtils.js";
@@ -19,12 +19,12 @@ import { beats } from "../training.js";
 const hsrReps = (hsrWeek) => hsrParse(hsrForWeek(hsrWeek).scheme).reps;
 
 /** Séries préremplies : la même série de la dernière séance, sinon la dernière perf, sinon le
- *  poids par défaut ; reps = médiane de la fourchette cible. */
-function prefill({ training, nom, target, perLeg, nSeries }) {
+ *  poids par défaut ; reps = médiane de la fourchette cible, durée = sa borne haute. */
+function prefill({ training, nom, target, perLeg, nSeries, mode }) {
   const last = lastPerf(training, nom);
   const lastSets = lastExerciseSets(training, nom);
   const def = DEFAULT_WEIGHTS[nom];
-  const medVal = medianTarget(target);
+  const medVal = seriesTarget(target, mode); // durée : borne haute (planche 60 s, 11/11/2026)
   const mk = (leg, k) => {
     const pool = lastSets ? (leg == null ? lastSets : lastSets.filter((s) => s.leg === leg)) : null;
     const prev = pool?.[k] || null;
@@ -41,7 +41,7 @@ function prefill({ training, nom, target, perLeg, nSeries }) {
 export function makeExercise(ex, tpl, { training = [], hsrWeek } = {}) {
   const nSeries = exoSeriesCount(tpl, ex, hsrWeek);
   const target = ex.hsr ? `${hsrReps(hsrWeek)}` : ex.r;
-  const { last, def, series } = prefill({ training, nom: ex.n, target, perLeg: ex.perLeg, nSeries });
+  const { last, def, series } = prefill({ training, nom: ex.n, target, perLeg: ex.perLeg, nSeries, mode: ex.mode });
   return { nom: ex.n, mode: ex.mode, perLeg: !!ex.perLeg, opt: !!ex.opt, rest: ex.rest,
     target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${nSeries} × ${ex.r}`, consigne: ex.c, def, last,
     groupe: ex.groupe, mouvement: ex.mouvement, materiel: ex.materiel, tendon: ex.tendon, famille: ex.famille, rir: null, series };
@@ -109,7 +109,7 @@ export const toggleSet = (exos, ei, si) =>
 export const addSet = (exos, ei, leg) => mapExo(exos, ei, (e) => {
   const sameLeg = e.series.filter((s) => s.leg === leg);
   const proto = sameLeg[sameLeg.length - 1] || {};
-  return { ...e, series: [...e.series, { poids: proto.poids ?? "", val: proto.val ?? medianTarget(e.target), fait: false, leg }] };
+  return { ...e, series: [...e.series, { poids: proto.poids ?? "", val: proto.val ?? seriesTarget(e.target, e.mode), fait: false, leg }] };
 });
 
 /** Indice de la DERNIÈRE série non cochée de la jambe (ou de la liste), -1 si aucune : « − série »
@@ -154,7 +154,7 @@ export function substitutionCandidates(e, template) {
  */
 export const substituteExercise = (exos, ei, lib, { training = [] } = {}) => mapExo(exos, ei, (e) => {
   const nSeries = e.perLeg ? e.series.filter((s) => s.leg === "G").length : e.series.length;
-  const { last, def, series } = prefill({ training, nom: lib.n, target: e.target, perLeg: e.perLeg, nSeries });
+  const { last, def, series } = prefill({ training, nom: lib.n, target: e.target, perLeg: e.perLeg, nSeries, mode: e.mode });
   const origin = e.origine ?? e.nom;
   return { ...e, rir: null, nom: lib.n, consigne: lib.c, groupe: lib.groupe, mouvement: lib.mouvement,
     materiel: lib.materiel, tendon: lib.tendon, famille: lib.famille, def, last, series,

@@ -1,6 +1,7 @@
 // Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; rendu v2 à l'étape 5 d'U3 via
 // design/compat.jsx (mêmes primitives, valeurs v2), polices écrites en dur remontées à 12-13 px.
 import { useState } from "react";
+import { useDayRollover } from "../lib/dayRollover.js";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Cell } from "recharts";
 import { Plus, Trash2 } from "lucide-react";
 import { C, today, fmt, upsert, lastN, Card, Label, Empty, Btn, Stepper, Field, DateField, chartAxis, tooltipStyle, tooltipItemStyle } from "../design/compat.jsx";
@@ -15,6 +16,7 @@ export function StepsTab({ steps, save }) {
   const [n, setN] = useState(cur?.count ?? 0);
   const [forceManual, setForceManual] = useState(false);
   const pickDate = (d) => { setDate(d); const e = steps.find((s) => s.date === d); setN(e?.count ?? 0); setForceManual(false); };
+  useDayRollover(date, pickDate); // jour suivant si l'écran reste ouvert la nuit (audit, point 14)
   const add = () => save.steps(upsert(steps, { date, count: Math.round(n), source: "manual" }));
   const isSynced = cur?.source === "healthconnect" && !forceManual;
 

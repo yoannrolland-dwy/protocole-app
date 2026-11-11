@@ -20,7 +20,9 @@ Il reçoit `ok: false` : il ne peut donc pas annoncer un succès. Il ne connaît
 traite comme une erreur générique.
 
 ## À faire côté JEFFREY (proposition, non faite)
-- Dire en clair : « PROTOCOLE restaure une sauvegarde, je réessaie dans un instant. »
-- Réessayer une fois après quelques secondes, ou proposer de réessayer, sans rejouer une action déjà
-  confirmée si la seconde tentative renvoie autre chose qu'un succès.
+- Dire en clair : « PROTOCOLE restaure une sauvegarde, rien n'a été fait. Redemandez-le-moi dans
+  un instant. »
+- **Ne pas réessayer automatiquement une action d'écriture.** Sans preuve qu'elle n'a pas déjà été
+  exécutée en partie, une seconde tentative pourrait écrire deux fois. Le refus explicite, avec la
+  demande de réessayer adressée à Monsieur, suffit : c'est lui qui redemande.
 - Ajouter `restauration` au catalogue des erreurs (notes G3 / G4).

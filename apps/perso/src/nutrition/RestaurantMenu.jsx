@@ -238,6 +238,9 @@ export default function RestaurantMenu({ ai, remaining, meal, onLogDishes, onBac
         effort: "medium", maxTokens: 16000, onRetry: setProgress, // 16000 : Opus 5.5 (26/10/2026)
       });
       setProgress("");
+      // Compté dès que la réponse est là : une réponse illisible ou coupée a été payée aussi, et
+      // manquait à « Dépensé ce mois-ci » (audit du 10/11/2026, point 15).
+      recordSpend(cents);
       // Échec net de lecture du lien (page bloquée/inaccessible/type non supporté) : jusqu'ici
       // totalement invisible, on ne lisait que les blocs "text" — voir `webFetchError`.
       const fetchErr = hasUrl ? webFetchError(data.content) : null;
@@ -255,7 +258,6 @@ export default function RestaurantMenu({ ai, remaining, meal, onLogDishes, onBac
         setState("error");
         return;
       }
-      recordSpend(cents);
       setMeta({ model: usedModel, fellBack: usedModel !== askedModel, usage: data.usage, cents, fetchErr });
       setResult({ plats: parsed.plats || [], suggestions: parsed.suggestions || [] });
       setState("done");

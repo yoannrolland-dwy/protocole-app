@@ -10,6 +10,7 @@ import { buildCoachBriefing, SEED_COACH_PROFILE } from "@rawcare/core/coach/prom
 import { JEFFREY_PERSONA, pendingMemoryDate, applyWater, applyKnee, foodEntriesFor } from "@rawcare/core/coach/jeffrey";
 import { deriveMacroLog, resolveLog, FOOD_LOG_EVENT } from "./nutrition/foodStore.js";
 import { JeffreyBubble } from "./components/JeffreyBubble.jsx";
+import { unionDay } from "./lib/jeffreyTurn.js";
 import { JeffreyOverlay } from "./components/JeffreyOverlay.jsx";
 import { syncHealthConnect } from "./healthSync.js";
 import { mergeSteps, mergeSleep, mergeWeight, mergeRhr, mergeNaps } from "@rawcare/core/healthMerge";
@@ -448,7 +449,9 @@ export default function App({ silent = false } = {}) {
       // une tuile aussi étroite — condensé pour rester sur une ligne comme les autres notes.
       sync: { value: "", note: `MAJ ${new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` },
     });
-  }, [loading, weight, sleep, macros, steps, training, targets, naps]);
+    // `rhr` : le score d'énergie en dépend ; sans lui, le widget gardait l'ancien score quand seule la
+    // FC repos changeait à la synchro (audit du 10/11/2026, point 15).
+  }, [loading, weight, sleep, macros, steps, training, targets, naps, rhr]);
 
   const save = {
     weight: (v) => { setWeight(v); store.set("weightLog", v); },
@@ -542,9 +545,17 @@ export default function App({ silent = false } = {}) {
   const setJeffreyMemoryDate = (v) => { setJeffreyMemoryDateState(v); store.set("jeffreyMemoryDate", v); };
   // Écriture fonctionnelle : une réponse qui arrive après un changement d'onglet s'enregistre
   // quand même. On ne garde que 30 jours de conversations (décision du chantier J).
+  // Audit du 10/11/2026, point 13 : le jour est d'abord réuni avec celui du stockage (une page sans
+  // écran — notification, brief, pont — a pu y écrire avant la relecture), pour qu'aucun message ne
+  // soit effacé et qu'aucune action décidée ne redevienne « à confirmer » (`unionDay`). `entries`
+  // peut être une fonction (conversation du moment → nouvelle) ; sinon, la version donnée fait foi
+  // pour ses entrées, et la réunion garde le reste.
   const setJeffreyDay = (date, entries) => setJeffreyLog((prev) => {
     const oldest = shiftDateKey(today(), -30);
-    const next = Object.fromEntries(Object.entries({ ...prev, [date]: entries }).filter(([d]) => d >= oldest));
+    const stored = getSync("jeffreyLog", {})[date] || [];
+    const base = unionDay(prev[date] || [], stored);
+    const day = typeof entries === "function" ? entries(base) : unionDay(entries, base);
+    const next = Object.fromEntries(Object.entries({ ...prev, [date]: day }).filter(([d]) => d >= oldest));
     store.set("jeffreyLog", next);
     return next;
   });

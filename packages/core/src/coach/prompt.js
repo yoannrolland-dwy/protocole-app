@@ -17,7 +17,7 @@ import { volumeForCoach, PRIORITY_GROUPS, VOLUME_TARGET } from "../volume.js";
 // de « fiable/moyenne/faible » — même mot que l'écran, clés internes inchangées.
 const CONFIANCE = { fiable: "élevée", moyenne: "moyenne", faible: "faible" };
 import { sessionLoad, sessionGenes, geneZoneLabel } from "../sessionLoad.js";
-import { PHASES, phaseTarget, targetsForDate, kcalFromMacros, kcalOfEntry, isCutWindow, tdeeNow, weightTrend7, recompWindows } from "../targets.js";
+import { PHASES, phaseTarget, targetsForDate, kcalFromMacros, kcalOfEntry, isCutWindow, tdeeNow, weightTrend7, recompWindows, hasIntake, kcalTargetOn } from "../targets.js";
 import { realDeficit } from "../tdee.js";
 import { isPalierEntry } from "../palier.js";
 import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor, alcoholGramsFor } from "../nutrition/foodStore.js";
@@ -70,7 +70,9 @@ export function splitCarnet(raw) {
 // Hissé hors de buildCoachPrompt : buildCoachBriefing en a besoin aussi, et le laisser dans
 // la portée de buildCoachPrompt provoquait un ReferenceError au clic sur « Copier le
 // contexte » (invisible à la compilation, puisque l'erreur n'existe qu'à l'exécution).
-export const last14 = (arr) => arr.filter((e) => daysBetween(e.date, today()) <= 14).sort(byDate);
+// Les 14 derniers jours, aujourd'hui compris, JAMAIS un jour à venir : un repas planifié pour demain
+// apparaissait comme passé (audit du 10/11/2026, point 15).
+export const last14 = (arr) => arr.filter((e) => { const d = daysBetween(e.date, today()); return d >= 0 && d <= 14; }).sort(byDate);
 
 // Détail des repas (nom + quantité de chaque aliment, par repas) : ce que `macros`
 // (agrégats macroLog) ne peut pas montrer. Regroupé ici plutôt que dans `foodStore.js`,
@@ -144,7 +146,11 @@ export function buildCoachPrompt(data, note) {
   const paliers = histSorted
     .filter((p, i) => isPalierEntry(p, histSorted[i - 1]) && daysBetween(p.date, today()) <= 90)
     .map((p) => ({ date: p.date, kcal: p.kcal, P: p.protein, G: p.carbs, L: p.fat, F: p.fiber, source: p.source }));
-  const m7 = win(macros, 0, 6);
+  // Moyennes 7 j sur les jours TERMINÉS (hier → J−7) : la journée en cours, incomplète, tirait la
+  // moyenne vers le bas le matin (audit du 10/11/2026, point 8). Macros : seulement les jours qui
+  // portent un apport (une ligne d'eau seule n'en est pas un) ; eau : les jours où elle est notée.
+  const m7all = win(macros, 1, 7);
+  const m7 = m7all.filter(hasIntake);
   const sessCount = (a, b) => { const o = {}; win(training, a, b).forEach((t) => { o[t.type] = (o[t.type] || 0) + 1; }); return o; };
   // Verdict du recommandeur ("Prochaine séance") : recalculé ici avec les mêmes données,
   // et injecté dans le prompt pour que le coach commente/valide UN seul avis au lieu de
@@ -202,7 +208,7 @@ export function buildCoachPrompt(data, note) {
   const waterTgtToday = targets.water + (basketTodayFlag ? 1000 : 0);
   const atToday = targetsForDate(today(), targets);
   const sToday_steps = findDay(steps, today()), sYest_steps = findDay(steps, y);
-  const steps7 = avgKey(win(steps, 0, 6), "count");
+  const steps7 = avgKey(win(steps, 1, 7), "count"); // jours terminés (point 8)
 
   // Douleur : format nommé genou/coude si `zones` absent (apps/perso, identique bit pour
   // bit à avant), format générique par zone sinon (apps/public, N zones arbitraires — voir
@@ -291,14 +297,14 @@ export function buildCoachPrompt(data, note) {
       // 3e semaine seulement en Recomposition (règle "perte > 0,3 kg/sem sur 2 semaines") —
       // ajoutée aux autres phases, elle changerait leur prompt, vérifié identique par hash.
       ...(PHASES[phase].noTarget ? { moy_7j_il_y_a_2_sem: wt.avg7prev2, tendance_kg_sem_precedente: wt.deltaWeekPrev } : {}) },
-    macros_moy_7j: { proteines: avgKey(m7, "protein"), glucides: avgKey(m7, "carbs"), lipides: avgKey(m7, "fat"), fibres: avgKey(m7, "fiber"), eau_ml: avgKey(m7, "water") },
+    macros_moy_7j: { proteines: avgKey(m7, "protein"), glucides: avgKey(m7, "carbs"), lipides: avgKey(m7, "fat"), fibres: avgKey(m7, "fiber"), eau_ml: avgKey(m7all, "water") },
     cibles: { proteines: atToday.protein, glucides: atToday.carbs, lipides: atToday.fat, fibres: atToday.fiber, eau_ml: targets.water },
     // Sommeil et genou : ces agrégats remplacent les tableaux bruts 14 j qui étaient
     // envoyés en plus et n'apportaient rien de plus que ce que le JS calcule ici.
     sommeil: {
       heures_moy_7j: avgKey(win(sleep, 0, 6), "hours"), qualite_moy_7j: avgKey(win(sleep, 0, 6), "quality"),
-      pire_nuit_7j: (() => { const v = win(sleep, 0, 6).map((s) => s.hours).filter((x) => x != null); return v.length ? round(Math.min(...v), 2) : null; })(),
-      nuits_sous_6h_7j: win(sleep, 0, 6).filter((s) => s.hours != null && s.hours < 6).length,
+      // `pire_nuit_7j` et `nuits_sous_6h_7j` retirés (audit du 10/11/2026, point 10) : Monsieur est
+      // un petit dormeur, la durée seule n'est jamais un signal ; seule la qualité compte.
     },
     pas_moy_7j: steps7 != null ? Math.round(steps7) : null,
     seances_7j: sessCount(0, 6), seances_14j: sessCount(0, 13),
@@ -359,12 +365,13 @@ export function buildCoachPrompt(data, note) {
     const m = macros.find((e) => e.date === d);
     const st = steps.find((e) => e.date === d);
     const kcal = m ? Math.round(kcalOfEntry(m)) : null;
-    const at = targetsForDate(d, targets);
+    // Cible en vigueur CE jour-là (historique des paliers), pas celle d'aujourd'hui (point 9).
+    const cibleKc = kcalTargetOn(d, targets, targetHistory);
     // Clés courtes et champs nuls omis : sur 14 lignes, les `"proteines":null` répétés
     // pesaient pour rien. Une légende explicite les abréviations dans le prompt.
     const row = { d: d.slice(5), p: w?.kg, kc: kcal, P: m?.protein, G: m?.carbs, L: m?.fat,
       F: m?.fiber, eau: m?.water, pas: st?.count,
-      cible_kc: Math.round(kcalFromMacros(at.protein, at.carbs, at.fat, at.fiber)) };
+      cible_kc: cibleKc };
     Object.keys(row).forEach((k) => { if (row[k] == null) delete row[k]; });
     return row;
   });
@@ -396,7 +403,7 @@ ${profile.trim()}` : "";
   // `identity` (RawCare, chantier Coach IA public) : remplace la clause nommée "de Yoann,
   // 43 ans, athlète (...)" — absente pour apps/perso, comportement identique à avant.
   const who = identity ?? "de Yoann, 43 ans, athlète (muscu/basket/escalade)";
-  const system = `Tu es le coach personnel tout-en-un ${who} : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. ${phaseClause} ${tendinopathiesClause}Protéines hautes prioritaires. Escalade = volume tirage, jamais empilée le jour d'un Upper ; ne pas cumuler les expositions genou.${tempBlock}${profileBlock}`;
+  const system = `Tu es le coach personnel tout-en-un ${who} : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. ${phaseClause} ${tendinopathiesClause}Protéines hautes prioritaires. Escalade = volume de tirage : pas le jour où des séries de tirage ou de flexion du coude ont déjà été cochées.${tempBlock}${profileBlock}`;
 
 
   const user = `TEMPS RÉEL — hier vs aujourd'hui (regarde d'abord ça, c'est le plus actionnable). "heure_analyse" est l'heure EXACTE de cette analyse : les champs "_aujourdhui"/"_en_cours" (pas, macros, eau) ne couvrent que depuis ce matin jusqu'à cette heure-là, jamais la journée entière — ne les juge JAMAIS insuffisants par rapport à une cible de journée complète (3000 pas ou 600 kcal à 8h du matin, c'est juste tôt, pas un problème). Pour macros/eau spécifiquement, base-toi sur "repas_aujourdhui" (par nom de repas) plutôt que sur le total brut : avant midi seul le petit-déjeuner est normalement pris, entre midi et 15h le déjeuner s'ajoute, entre 15h et 18h le goûter, entre 19h et 22h le dîner — "Pré-training", "Post-training" et "Extra" sont des repas flexibles, jamais un repère horaire (les deux premiers sont liés à une séance, pas à l'heure de la journée). Un repas plus tardif déjà rempli n'est pas suspect : ${authorLabel} planifie parfois ses repas à l'avance dans la journée.
@@ -498,7 +505,7 @@ export function buildBilanPrompt({ facts, phase, targets, profile, identity, not
       fibres_moy_semaines_perte: facts.fibresVsStagnationPoids.droppingWeeksAvgFiber,
       n_semaines_stagnation: facts.fibresVsStagnationPoids.stagnantWeeksN, n_semaines_perte: facts.fibresVsStagnationPoids.droppingWeeksN,
     } : null,
-    kcal_semaine_lun_ven: (facts.kcalSemaineLunVen || []).filter((w) => w.avgKcal != null)
+    kcal_semaine: (facts.kcalSemaine || []).filter((w) => w.avgKcal != null)
       .map((w) => ({ semaine: w.weekStart, kcal_moy: w.avgKcal, jours: w.days })),
   };
 

@@ -553,7 +553,7 @@ export function recommendSessions({ training, knee, elbow, zones, sleep, targets
   }
   if (!kneeRed && sleepDrift) {
     restScore += 14;
-    restReason += ` ${poorNights} nuits courtes ou de mauvaise qualité sur les 3 derniers jours.`;
+    restReason += ` ${poorNights} nuits de mauvaise qualité sur les 3 derniers jours.`;
   }
   // Repère soft : ne pèse vraiment que si les 3 signaux ci-dessus restent propres — un
   // streak à signaux propres n'empêche jamais une suggestion d'entraînement, il fait

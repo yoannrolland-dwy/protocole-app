@@ -20,6 +20,79 @@ export const withoutOldThinking = (entries) => {
 };
 
 /**
+ * Range le résultat d'un tour dans la conversation TELLE QU'ELLE EST MAINTENANT (audit du
+ * 10/11/2026, point 13). Avant, le tour réécrivait le jour entier avec sa propre copie, prise au
+ * départ : tout ce qui avait changé pendant la réponse était écrasé — une carte confirmée
+ * redevenait « Confirmer » (un second tap écrivait l'eau ou le repas deux fois), une réponse
+ * arrivée entre-temps (autre message, notification) disparaissait.
+ * - `current` : la conversation du jour à l'instant de l'écriture ;
+ * - `base` : l'historique donné au tour (son dernier message est celui de Monsieur) ;
+ * - `result` : ce que le tour rend (`base` + ses nouvelles entrées).
+ * Les entrées déjà présentes gardent leur version ACTUELLE ; seules les nouvelles entrées du tour
+ * sont ajoutées, juste après le message auquel elles répondent (à la fin s'il a disparu).
+ */
+// Une action est « décidée » quand Monsieur l'a confirmée ou annulée. Une décision ne se perd
+// jamais au profit d'une copie où elle est encore « à confirmer ».
+const decided = (a) => !!a && a.status && a.status !== "pending";
+
+/** Une même entrée vue de deux côtés : `a` fait foi, sauf pour une action décidée seulement dans `b`. */
+function mergeEntry(a, b) {
+  if (!b?.actions?.length || !a?.actions?.length) return a;
+  let changed = false;
+  const toolResults = { ...(a.toolResults || {}) };
+  const actions = a.actions.map((x) => {
+    const y = b.actions.find((z) => z.id === x.id);
+    if (!decided(x) && decided(y)) {
+      changed = true;
+      if (b.toolResults?.[x.id] != null) toolResults[x.id] = b.toolResults[x.id];
+      return y;
+    }
+    return x;
+  });
+  return changed ? { ...a, actions, toolResults } : a;
+}
+
+/**
+ * Réunit deux versions de la conversation d'un jour (audit du 10/11/2026, point 13) — celle d'un
+ * écran et celle du stockage, qu'une page sans écran (notification, brief, pont) a pu écrire :
+ * - aucune entrée n'est perdue : celles que seule `other` connaît sont remises à leur place, juste
+ *   après l'entrée qui les précède dans `other` ;
+ * - pour une entrée connue des deux, `primary` fait foi, sauf qu'une action décidée d'un côté reste
+ *   décidée (jamais un second « Confirmer » sur une action déjà écrite).
+ */
+export function unionDay(primary, other) {
+  const p = primary || [];
+  const o = other || [];
+  if (!o.length) return p;
+  const byId = new Map(o.map((e) => [e.id, e]));
+  let out = p.map((e) => (byId.has(e.id) ? mergeEntry(e, byId.get(e.id)) : e));
+  const have = new Set(out.map((e) => e.id));
+  o.forEach((e, i) => {
+    if (have.has(e.id)) return;
+    const prevId = i > 0 ? o[i - 1].id : null;
+    const at = prevId == null ? -1 : out.findIndex((x) => x.id === prevId);
+    out = prevId == null ? [e, ...out] : at >= 0 ? [...out.slice(0, at + 1), e, ...out.slice(at + 1)] : [...out, e];
+    have.add(e.id);
+  });
+  return out;
+}
+
+export function mergeTurn(current, base, result) {
+  const cur = current || [];
+  const baseIds = new Set((base || []).map((e) => e.id));
+  const curIds = new Set(cur.map((e) => e.id));
+  const added = (result || []).filter((e) => !baseIds.has(e.id) && !curIds.has(e.id));
+  if (!added.length) return cur;
+  const anchor = (base || [])[base.length - 1];
+  const at = anchor ? cur.findIndex((e) => e.id === anchor.id) : -1;
+  // Le message de Monsieur n'est plus là : la réponse ne s'affiche jamais sans sa question.
+  const merged = at >= 0
+    ? [...cur.slice(0, at + 1), ...added, ...cur.slice(at + 1)]
+    : [...cur, ...(anchor ? [anchor] : []), ...added];
+  return withoutOldThinking(merged);
+}
+
+/**
  * Joue un tour : `history` se termine par le message de Monsieur. Relance une fois, outils
  * interdits, si la réponse n'a aucun texte. → { history, journal, memDate }.
  * En cas d'erreur, `e.partial` porte ce qui a déjà été reçu (même forme).

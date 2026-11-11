@@ -13,7 +13,7 @@
 // Connect est coupée (healthSync.js) : `foodLog` est désormais l'unique écrivain des
 // macros au quotidien. L'eau reste une exception partagée (voir plus bas), inchangée.
 
-import { today as todayKey } from "../dateUtils.js";
+import { today as todayKey, upsert } from "../dateUtils.js";
 
 // Pré-training/post-training ajoutés le 04/09/2026 (whey/bonbons avant le petit-déj,
 // collation après le basket) — clés nouvelles, aucune migration nécessaire. "autre" → "Extra"
@@ -205,6 +205,44 @@ export function deriveMacroLog(log) {
     for (const [k, name] of Object.entries(MACRO_FIELD)) fields[name] = t[k];
     return fields;
   });
+}
+
+const DERIVED_FIELDS = ["kcal", ...Object.values(MACRO_FIELD)];
+
+/**
+ * `macroLog` remis en accord avec `foodLog` (audit du 10/11/2026, point 6).
+ * - Chaque date du journal reçoit ses totaux (comme avant, `upsert` garde l'eau).
+ * - Une date de `clearDates` qui n'a PLUS aucune ligne dans le journal (dernier aliment supprimé,
+ *   ajout annulé sur un jour vide) perd ses totaux dérivés : avant, ils restaient, et le Bord, le
+ *   widget, la dépense et le palier comptaient encore ce jour. L'eau reste (ligne
+ *   `{ date, water, source: "manual" }`, comme l'écrivent les boutons d'eau) ; sans eau, la
+ *   ligne disparaît.
+ * Garde-fous : seules les lignes `source: "foodlog"` sont touchées (jamais l'historique d'avant
+ * le module ni une saisie manuelle), et seulement pour les dates que l'appelant a VUES dans le
+ * journal (`clearDates`) — un journal illisible ou vide au chargement ne vide donc rien.
+ * → `{ macros, changed }` ; `macros` est la liste d'origine si rien ne change.
+ */
+export function syncMacroLog(macros, log, clearDates = []) {
+  let next = macros || [];
+  let changed = false;
+  for (const d of deriveMacroLog(log || [])) {
+    const cur = next.find((m) => m.date === d.date);
+    if (!cur || cur.source !== "foodlog" || DERIVED_FIELDS.some((f) => cur[f] !== d[f])) {
+      next = upsert(next, d);
+      changed = true;
+    }
+  }
+  const present = new Set((log || []).map((e) => e.date));
+  for (const date of clearDates) {
+    if (present.has(date)) continue;
+    const cur = next.find((m) => m.date === date);
+    if (!cur || cur.source !== "foodlog") continue;
+    const rest = { ...cur, source: "manual" };
+    DERIVED_FIELDS.forEach((f) => { delete rest[f]; });
+    next = rest.water != null ? next.map((m) => (m === cur ? rest : m)) : next.filter((m) => m !== cur);
+    changed = true;
+  }
+  return { macros: changed ? next : macros, changed };
 }
 
 // --- Copier un repas (M4) ------------------------------------------------------

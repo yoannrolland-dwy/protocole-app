@@ -14,7 +14,7 @@ import {
   cutAdherence, sleepEnergyCorrelation,
 } from "./insights.js";
 import { sessionLoad } from "./sessionLoad.js";
-import { weeklyWeekdayKcalTrend } from "./targets.js";
+import { weeklyKcalTrend } from "./targets.js";
 
 export const BILAN_WINDOW_DAYS = 90;
 
@@ -80,7 +80,12 @@ export function fiberWeightStagnationCorrelation(weightLog, macros, todayDate, w
     }
     if (n < FIBER_STAGNATION_MIN_LOGGED_DAYS) continue;
     const avgFiber = sum / n;
-    (Math.abs(wEnd - wStart) < STAGNATION_THRESHOLD_KG ? stagnant : dropping).push(avgFiber);
+    // Stagnation : variation sous le seuil. Perte : baisse d'au moins le seuil. Une semaine de
+    // PRISE de poids n'est ni l'une ni l'autre : elle était rangée à tort dans les semaines de
+    // perte (audit du 10/11/2026, point 15) ; elle est laissée de côté.
+    const delta = wEnd - wStart;
+    if (Math.abs(delta) < STAGNATION_THRESHOLD_KG) stagnant.push(avgFiber);
+    else if (delta < 0) dropping.push(avgFiber);
   }
   if (stagnant.length < FIBER_STAGNATION_MIN_WEEKS || dropping.length < FIBER_STAGNATION_MIN_WEEKS) return null;
   const avg = (arr) => Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10;
@@ -107,6 +112,8 @@ export function computeBilanFacts({ training, weight, macros, sleep, rhr, steps,
     sommeilVsEnergie: sleepEnergyCorrelation({ sleepLog: sleep, rhrLog: rhr, stepsLog: steps }, todayDate, windowDays),
     escaladeVsDouleurGenou: climbLoadPainCorrelation(training, knee, todayDate, windowDays),
     fibresVsStagnationPoids: fiberWeightStagnationCorrelation(weight, macros, todayDate, windowDays),
-    kcalSemaineLunVen: weeklyWeekdayKcalTrend(macros, { weeks: Math.ceil(windowDays / 7), endDate: todayDate }),
+    // Moyenne sur les 7 jours de la semaine, comme la carte d'Analyse depuis le 13/09/2026 (les
+    // écarts de Yoann ne tombent pas un jour fixe) : le bilan envoyait encore lundi-vendredi.
+    kcalSemaine: weeklyKcalTrend(macros, { weeks: Math.ceil(windowDays / 7), endDate: todayDate }),
   };
 }

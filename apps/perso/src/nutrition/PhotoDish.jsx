@@ -113,6 +113,9 @@ export default function PhotoDish({ ai, onAdd, onBack }) {
         effort: "medium", maxTokens: 16000, onRetry: setProgress,
       });
       setProgress("");
+      // Compté dès que la réponse est là : une réponse illisible ou « plat non reconnu » a été payée
+      // aussi, et manquait à « Dépensé ce mois-ci » (audit du 10/11/2026, point 15).
+      recordSpend(cents);
       const raw = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
       let parsed;
       try { parsed = extractJson(raw); }
@@ -125,7 +128,6 @@ export default function PhotoDish({ ai, onAdd, onBack }) {
         setState("error");
         return;
       }
-      recordSpend(cents);
       setMeta({ model: usedModel, fellBack: usedModel !== askedModel, usage: data.usage, cents });
       setResult(parsed);
       setState("done");

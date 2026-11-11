@@ -1,6 +1,7 @@
 // Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; rendu v2 à l'étape 5 d'U3 via
 // design/compat.jsx (mêmes primitives, valeurs v2), polices écrites en dur remontées à 12-13 px.
 import { useState } from "react";
+import { useDayRollover } from "../lib/dayRollover.js";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from "recharts";
 import { Plus, Trash2 } from "lucide-react";
 import { HSR_TABLE, hsrForWeek } from "@rawcare/core/session/templates";
@@ -59,6 +60,7 @@ export function PainTab({ knee, save, hsrWeek }) {
     setPain(e ? e.pain : null);
     setBaseline(e ? e.baseline !== false : true);
   };
+  useDayRollover(date, pickDate); // jour suivant si l'écran reste ouvert la nuit (audit, point 14)
   const add = () => { if (pain == null) return; save.knee(upsert(log, { date, pain, baseline })); };
 
   const kLast = lastN(log, 1)[0];

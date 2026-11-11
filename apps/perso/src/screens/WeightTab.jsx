@@ -1,6 +1,7 @@
 // Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; rendu v2 à l'étape 5 d'U3 via
 // design/compat.jsx (mêmes primitives, valeurs v2), polices écrites en dur remontées à 12-13 px.
 import { useState } from "react";
+import { useDayRollover } from "../lib/dayRollover.js";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from "recharts";
 import { Plus, Trash2 } from "lucide-react";
 import { PHASES, weightTrend7 } from "@rawcare/core/targets";
@@ -24,6 +25,7 @@ export function WeightTab({ weight, targets, save, phase }) {
   const [kg, setKg] = useState(lastN(weight, 1)[0]?.kg ?? 95);
   const [forceManual, setForceManual] = useState(false);
   const pickDate = (d) => { setDate(d); const e = weight.find((w) => w.date === d); if (e) setKg(e.kg); setForceManual(false); };
+  useDayRollover(date, pickDate); // jour suivant si l'écran reste ouvert la nuit (audit, point 14)
   const wLast = lastN(weight, 1)[0];
   const data = lastN(weight, 60).map((w) => ({ date: fmt(w.date), kg: w.kg }));
   const add = () => save.weight(upsert(weight, { date, kg: round(kg), source: "manual" }));

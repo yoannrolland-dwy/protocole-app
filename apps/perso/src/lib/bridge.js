@@ -10,14 +10,15 @@ import { briefMissing } from "@rawcare/core/coach/brief";
 import { buildReading, BRIDGE_VERSION, BRIDGE_SUBJECTS, BRIDGE_ERRORS } from "@rawcare/core/coach/bridge";
 import { jeffreyAsk, withMemory, pendingMemoryDate } from "@rawcare/core/coach/jeffrey";
 import { APP_VERSION } from "../version.js";
-import { loadData, briefReminders, aiFromSettings, foodContext, saveDay, briefDoneFromJeffrey } from "./brief.js";
+import { loadData, briefReminders, aiFromSettings, foodContext, briefDoneFromJeffrey } from "./brief.js";
+import { saveTurn } from "./conversationStore.js";
 import { makeCoach } from "./coachInputs.js";
 import { checkAgir, doneSummary, paramsKey } from "@rawcare/core/coach/bridgeActions";
 import { searchCiqual, getCiqual } from "@rawcare/core/nutrition/ciqual";
 import { applyActionStored } from "./jeffreyNotify.js";
 import { readDraft, writeDraft } from "./sessionDraft.js";
 import { restAnnouncement } from "./restSpeech.js";
-import { nativeRest, markJeffreyRest } from "./bridgeRest.js";
+import { nativeRest, markJeffreyRest, restAfterSet } from "./bridgeRest.js";
 import { readSession, logSet, undoLastSet, goToExercise, nextExercise, restAction, finishCheck, abandonCheck } from "@rawcare/core/session/voiceSession";
 import { currentSet } from "@rawcare/core/session/engine";
 import { byDate } from "@rawcare/core/dateUtils";
@@ -75,7 +76,7 @@ export async function runAnalyse({ type, transport }) {
   const note = (data.notes || []).find((n) => n.date === date)?.text || "";
   const save = ({ history: h, journal, memDate: md }) => {
     if (journal) { store.set("coachJournal", journal); if (md) store.set("jeffreyMemoryDate", md); }
-    saveDay(date, h);
+    saveTurn(date, entries, h); // fusion dans la conversation du moment (audit, point 13)
   };
   let r;
   try {
@@ -199,8 +200,8 @@ export function runSessionNow(action, p, { now = Date.now(), write = true } = {}
   let draft = r.draft;
   // Série notée : repos de l'exercice lancé, avec la phrase de fin de repos du carnet.
   if (action === "noter_serie") {
-    const secs = r.restSecs;
-    draft = { ...draft, rest: { secs, remaining: secs, endAt: now + secs * 1000, label: draft.exos[r.ei].nom, speech: restAnnouncement(draft.exos, r.ei, r.si) } };
+    // Sans repos prévu : aucun minuteur, le repos en cours s'arrête, pas de bip (`restAfterSet`).
+    draft = restAfterSet(draft, { secs: r.restSecs, label: draft.exos[r.ei].nom, speech: restAnnouncement(draft.exos, r.ei, r.si), now });
   }
   if (action === "annuler_serie" && draft.rest?.endAt) draft = { ...draft, rest: { ...draft.rest, endAt: null, remaining: draft.rest.secs } };
   if (action === "repos" && p?.action === "lancer") {

@@ -20,7 +20,7 @@ import { progressColor, MACRO_KIND } from "../lib/progress.js";
 import { Panel, Eyebrow, Button, IconButton, Chip, NumberField } from "../design/primitives.jsx";
 import {
   MEALS, useFoodLog, makeEntry, amounts, entriesFor, totals, isQuickRef, newQuickRef,
-  copySourceCandidates, copyEntries, deriveMacroLog, suggestions, pinsForMeal, mutedForMeal, allMealPins,
+  copySourceCandidates, copyEntries, syncMacroLog, suggestions, pinsForMeal, mutedForMeal, allMealPins,
 } from "./foodStore.js";
 import FoodSearch from "./FoodSearch.jsx";
 import RecipesPanel from "./RecipesPanel.jsx";
@@ -267,20 +267,14 @@ export default function NutritionTab({ targetsFor, macros, save, training, ai })
   // l'historique Cronometer (avant le module) n'est donc jamais recalculé ni écrasé.
   // Comparaison avant écriture pour ne déclencher un save.macros que si quelque chose a
   // réellement changé (évite une boucle de re-render/écriture à chaque frappe).
+  // Jour vidé de ses aliments (audit du 10/11/2026, point 6) : une date VUE dans le journal pendant
+  // que l'onglet est ouvert, puis absente, perd ses totaux (l'eau reste). `syncMacroLog` (cœur).
+  const seenDates = useRef(new Set());
   useEffect(() => {
     if (!food.ready) return;
-    const derived = deriveMacroLog(food.log);
-    if (!derived.length) return;
-    let next = macros;
-    let changed = false;
-    for (const d of derived) {
-      const cur = macros.find((m) => m.date === d.date);
-      if (!cur || cur.protein !== d.protein || cur.carbs !== d.carbs || cur.fat !== d.fat || cur.fiber !== d.fiber || cur.kcal !== d.kcal || cur.source !== "foodlog") {
-        next = upsert(next, d);
-        changed = true;
-      }
-    }
-    if (changed) save.macros(next);
+    const r = syncMacroLog(macros, food.log, [...seenDates.current]);
+    seenDates.current = new Set(food.log.map((e) => e.date));
+    if (r.changed) save.macros(r.macros);
     // food.log et macros suffisent à déterminer si une dérivation est nécessaire ; save
     // est stable (vient de App.jsx), l'omettre évite une boucle de dépendances inutile.
     // eslint-disable-next-line react-hooks/exhaustive-deps

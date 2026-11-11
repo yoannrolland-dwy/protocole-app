@@ -5950,3 +5950,69 @@ Rapport : `docs/audit-2026-11-10.md`. Point de restauration : tag Git `avant-cam
 - **Ce que les sauvegardes ne restaurent pas** : les clés secrètes (IA, LiteLLM, voix, sauvegarde),
   le brouillon de séance en cours, les marqueurs du jour (brief, mémoire, jetons du pont, position),
   les réglages Android privés (brief activé, voix activée), les permissions Health Connect.
+
+## Campagne de corrections de l'audit du 10/11/2026 — lot 2, chiffres faux ou trompeurs (11/11/2026, apps/perso v3.160.0)
+
+Points 6 à 15 du rapport `docs/audit-2026-11-10.md`. Point de restauration avant ce lot : tag Git
+`apres-lot1-audit` (v3.159.0). Aucun changement de fournisseur, modèle, secours, transport, voix ni
+LiteLLM ; personnalité de Jeffrey inchangée.
+- **6, jour vidé** : `syncMacroLog` (`foodStore.js`, cœur) remplace la dérivation de `NutritionTab`.
+  Une date vue dans le journal puis vidée perd ses totaux dérivés (l'eau reste ; sans eau, la ligne
+  part). Seules les lignes `source: "foodlog"` sont touchées, et seulement pour les dates vues pendant
+  que l'onglet est ouvert. `buildKcalByDate` ne relit plus en 4/4/9 un total resté sans journal.
+- **7 et 15, semaine en cours** : `weeklyKcalTrend` / `weeklyProteinTrend` ignorent les jours à venir
+  (repas planifiés) ; kcal : aujourd'hui compté (règle du 13/09) ; protéines : jours terminés. Une
+  ligne d'eau seule n'est plus un jour à 0 kcal (`hasIntake`, `targets.js`).
+- **8, faits pour Jeffrey** : `macros_moy_7j` et `pas_moy_7j` sur les 7 jours terminés (hier → J−7) ;
+  macros sur les seuls jours avec un apport. Même source pour le pont (`moyenne_7j`).
+- **9, cible du jour** : `kcalTargetOn(date, targets, targetHistory)` (`targets.js`) : la cible en
+  vigueur ce jour-là, d'après le `prevKcal` du premier changement postérieur. Utilisée par la
+  régularité 28 j, la ligne de chaque barre de « Kcal · 21 jours » (info-bulle « cible du jour ») et
+  `cible_kc` du jour par jour envoyé à Jeffrey. La ligne pointillée reste la cible actuelle (libellé
+  « cible actuelle »). Sans historique : comme avant.
+- **10, petit dormeur et phrases périmées** : `pire_nuit_7j` et `nuits_sous_6h_7j` ne partent plus.
+  Phrase du recommandeur : « nuits de mauvaise qualité ». Contexte du coach : la règle validée du
+  04/10/2026 remplace l'ancienne (« Escalade = volume de tirage : pas le jour où des séries de tirage
+  ou de flexion du coude ont déjà été cochées. »), la règle de cumul genou retirée le 13/09 n'y
+  figure plus. Aucune restriction nouvelle.
+- **11, plateau** : plus de suggestion de surcharge pour les exercices des groupes `mobilite` et
+  `coiffe` (rotation externe d'épaule, cheville au mur ; les exercices en durée l'étaient déjà). **Squat sur sécurités inchangé** : il garde
+  la règle commune ; la question ouverte du rapport (doit-il recevoir ces suggestions ?) n'est pas
+  tranchée.
+- **12, scan** : un échec réseau de `getOFFByBarcode` n'est plus gardé en mémoire ; produit trouvé ou
+  inconnu, si.
+- **13, conversation de Jeffrey** :
+  - `mergeTurn` (`jeffreyTurn.js`) range le résultat d'un tour dans la conversation du moment, au
+    lieu de réécrire le jour avec la copie prise au départ ;
+  - `unionDay` réunit deux versions d'un jour : aucune entrée perdue, une action décidée d'un côté
+    ne redevient jamais « à confirmer » ;
+  - `turnFlight` : un seul tour à la fois dans toute l'app (onglet Analyse et bulle) ;
+  - `setJeffreyDay` (App) réunit l'état et le stockage ; l'écran ajoute ou remplace ses entrées une
+    à une, et décide une carte sur la version la plus fraîche ;
+  - pages sans écran (`lib/conversationStore.js`) : réponse depuis la notification, brief, point et
+    bilan du pont rangés par `saveTurn` ; « Confirmer » de la notification par `saveDayMerged`.
+- **14, date figée** : `useDayRollover` (`lib/dayRollover.js`) sur Poids, Énergie, Pas et Genou : un
+  écran qui montrait aujourd'hui passe au nouveau jour au retour dans l'app, au focus ou chaque
+  minute ; une autre date choisie n'est pas touchée.
+- **15, petits écarts** :
+  - bilan 3 mois : une semaine de prise de poids n'est plus comptée « en perte », et la moyenne kcal
+    porte sur 7 jours (`kcalSemaine` / `kcal_semaine`) ;
+  - jours à venir exclus des 14 jours envoyés à Jeffrey (`last14`) ;
+  - journée terminée mais mobilité encore possible : elle n'est plus dite « moins prioritaire »
+    (phrase seule, `kind` inchangé pour Jeffrey et le pont) ;
+  - **planche « 45-60 s » : 60 s partout** (série préremplie et bouton « Maintien », choix de Yoann ;
+    consigne gardée) — `seriesTarget` (`session/perf.js`), borne haute pour une durée ;
+  - séance à la voix : pas de « repos 0 secondes » ni de minuteur pour un exercice sans repos
+    (un repos en cours s'arrête) ; un exercice en répétitions au poids du corps (cheville au mur) se
+    note sans charge ;
+  - coût d'une réponse illisible compté dans « Dépensé ce mois-ci » (Photo d'un plat, Carte resto) ;
+  - widget : énergie rafraîchie aussi quand seule la FC repos change.
+- Tests : `packages/core/test/lot2-chiffres.test.mjs` (19), `apps/perso/test/lot2-conversation.test.mjs`
+  (10) ; 303 au total. Capture du prompt régénérée (phrase d'escalade, deux champs de sommeil retirés,
+  moyennes sur les jours terminés, clé `kcal_semaine`).
+- **Limites** :
+  - l'ordre d'un message venu d'une page sans écran suit sa place dans le stockage (juste après
+    l'entrée qui le précède) : aucune perte, mais pas un ordre à la seconde (heure à la minute) ;
+  - `turnFlight` est en mémoire : il protège l'app ouverte, pas une réponse depuis la notification
+    lancée en même temps (celle-ci est rangée par fusion, rien n'est perdu) ;
+  - les points 13 et 14 n'ont été vérifiés que par les tests et l'aperçu, pas sur le téléphone.

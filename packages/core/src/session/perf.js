@@ -41,6 +41,21 @@ export function lastExerciseSets(training, nom) {
 // préremplissage de la série (ici) et le bouton "maintien" (parseSecs) affichent le même
 // nombre de secondes. Sans "min" dans la chaîne (reps, HSR, secondes déjà en l'état),
 // comportement strictement inchangé.
+/**
+ * Valeur proposée pour une série : la médiane de la fourchette en répétitions (`medianTarget`), la
+ * BORNE HAUTE en durée (mode « temps »). Choix de Yoann du 11/11/2026 : la planche « 45-60 s »
+ * vaut 60 s partout (série préremplie et bouton « Maintien »), la consigne reste « 45-60 s ».
+ * Seule la planche a une fourchette en durée ; une durée unique (« 45 s », « 3 min ») ne change pas.
+ */
+export const seriesTarget = (r, mode) => {
+  if (mode !== "temps") return medianTarget(r);
+  const s = String(r);
+  const nums = s.match(/\d+/g);
+  if (!nums) return "";
+  const val = +nums[nums.length - 1];
+  return /min/i.test(s) ? val * 60 : val;
+};
+
 export const medianTarget = (r) => {
   const s = String(r);
   const nums = s.match(/\d+/g);

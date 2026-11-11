@@ -124,11 +124,12 @@ function AveragesCard({ macros, targets }) {
 /* Kcal jour par jour sur 21 jours (14 avant le 08/11/2026) : les écarts ponctuels que la moyenne de la semaine lisse. */
 function DailyCard({ macros, targets }) {
   const { kcalTargetToday } = todayTargets(targets);
-  const data = dailyKcal(macros, targets).map((d) => ({ ...d, label: d.date.slice(8) }));
+  // Ligne de cible : la cible en vigueur chaque jour (historique des paliers, audit point 9).
+  const data = dailyKcal(macros, targets, { targetHistory: getSync("targetHistory", []) }).map((d) => ({ ...d, label: d.date.slice(8) }));
   const any = data.some((d) => d.kcal != null);
   return (
     <Card>
-      {cardHead("Kcal · 21 jours", `cible ~${kcalTargetToday} · aujourd'hui en cours`)}
+      {cardHead("Kcal · 21 jours", `cible actuelle ~${kcalTargetToday} · aujourd'hui en cours`)}
       {any ? (
         <div style={{ height: 150 }}>
           <ResponsiveContainer width="100%" height="100%">
@@ -138,7 +139,7 @@ function DailyCard({ macros, targets }) {
               <YAxis tick={chartAxis} />
               <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: C.muted }} itemStyle={tooltipItemStyle} cursor={{ fill: "rgba(255,255,255,.04)" }}
                 labelFormatter={(_, p) => (p?.[0] ? `${fmt(p[0].payload.date)}${p[0].payload.partial ? " · en cours" : ""}` : "")}
-                formatter={(v) => [v == null ? "—" : v, "kcal"]} />
+                formatter={(v, _n, p) => [v == null ? "—" : `${v} · cible du jour ${p?.payload?.target ?? "—"}`, "kcal"]} />
               <ReferenceLine y={kcalTargetToday} stroke={C.accent} strokeDasharray="2 3" strokeWidth={1.5} />
               <Bar dataKey="kcal" radius={[3, 3, 0, 0]}>
                 {data.map((d, i) => <Cell key={i} fill={d.partial && d.kcal != null ? C.muted : kcalBarColor(d.kcal, d.target)} />)}
@@ -177,7 +178,7 @@ function MealsCard({ foodLog, overrides }) {
 
 /* Régularité sur 28 jours terminés : saisie, respect de la cible, alcool. */
 function RegularityCard({ macros, foodLog, targets }) {
-  const r = regularity({ macros, foodLog, targets });
+  const r = regularity({ macros, foodLog, targets, targetHistory: getSync("targetHistory", []) });
   const row = (label, value) => (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, padding: "7px 0", borderTop: `1px solid ${C.divider}` }}>
       <span style={{ fontSize: 13, color: C.text2 }}>{label}</span>

@@ -340,6 +340,7 @@ function sessionVolume(session) {
  * n'est pas résolue dans les gabarits (ex. un exercice substitué via la bibliothèque — voir
  * `EXERCISE_LIBRARY` —, jamais catalogué avec sa propre fourchette).
  */
+const NO_OVERLOAD_GROUPS = ["mobilite", "coiffe"];
 export function progressiveOverloadSuggestion(sessions, nom) {
   if (!sessions || sessions.length < PLATEAU_STABLE_STREAK) return null;
   const last = sessions[sessions.length - 1];
@@ -347,6 +348,11 @@ export function progressiveOverloadSuggestion(sessions, nom) {
 
   const defs = templateDefsFor(nom);
   if (!defs.length || defs.some((d) => d.hsr)) return null;
+  // Mobilité et coiffe des rotateurs (audit du 10/11/2026, point 11) : la consigne y est « léger »
+  // ou une amplitude, jamais une charge à pousser. Un plateau n'y veut rien dire, et « passez à la
+  // charge supérieure » y serait un mauvais conseil. Le squat sur sécurités n'est PAS concerné :
+  // sa règle reste celle de tout exercice en reps (question ouverte, non tranchée).
+  if (defs.every((d) => NO_OVERLOAD_GROUPS.includes(d.groupe))) return null;
   const range = parseRepRange(defs[0].r);
   if (!range) return null;
 

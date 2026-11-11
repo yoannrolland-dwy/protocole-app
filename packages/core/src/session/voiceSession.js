@@ -16,6 +16,7 @@
 // `voix.last` (dernière série notée à la voix, pour « annule »).
 
 import { TEMPLATES } from "./templates.js";
+import { metaFor } from "./exoMeta.js";
 import { buildExercises, currentSet, recordSetIndexes, doneExercises, sessionRecord, spokenName } from "./engine.js";
 import { exerciseSessions, recordToBeat, progressiveOverloadSuggestion, painOutOfBase } from "../training.js";
 
@@ -24,6 +25,7 @@ const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toL
 const num = (v) => (typeof v === "number" ? v : typeof v === "string" ? Number(v.replace(",", ".")) : NaN);
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 const isTime = (e) => e?.mode === "temps";
+const isBodyweight = (e) => (e?.materiel ?? metaFor(e?.nom)?.materiel) === "aucun";
 const SIDE = { G: "côté gauche", D: "côté droit" };
 export const kilos = (kg) => `${String(kg).replace(".", ",")} kilo${Math.abs(kg) >= 2 ? "s" : ""}`;
 
@@ -156,7 +158,9 @@ export function logSet(d, p, ctx) {
     const kg = Math.round(num(p.kg) * 10) / 10;
     if (!Number.isFinite(kg) || kg < 0 || kg > 500) return fail("charge hors de 0 à 500 kg");
     poids = kg;
-  } else if (!isTime(e) && before.poids === "") {
+  } else if (!isTime(e) && before.poids === "" && !isBodyweight(e)) {
+    // Exercice au poids du corps (squats de l'échauffement basket, cheville au mur) : aucune charge
+    // à demander, la série se note sans kilos, comme à l'écran (audit du 10/11/2026, point 15).
     return fail(`charge inconnue pour ${e.nom} : demandez-la à Monsieur`, { besoin: "kg" });
   }
   const firstOfExercise = !e.series.some((s) => s.fait);
@@ -167,9 +171,11 @@ export function logSet(d, p, ctx) {
   const record = !!ref && recordSetIndexes(exos[cur.ei], ref).has(cur.si);
   const plateau = firstOfExercise ? plateauOf(e.nom, d, ctx) : null;
   const draft = { ...d, exos, courant, voix: { last: { ei: cur.ei, si: cur.si, before } } };
-  const phrase = `${where(exos, cur)} notée, ${setWords(exos[cur.ei], after)}, repos ${restText(e.rest)}.`
+  // Exercice sans repos prévu (échauffement basket) : on ne dit pas « repos 0 secondes ».
+  const restSecs = Number(e.rest) > 0 ? Number(e.rest) : 0;
+  const phrase = `${where(exos, cur)} notée, ${setWords(exos[cur.ei], after)}${restSecs ? `, repos ${restText(restSecs)}` : ""}.`
     + (record ? " Record battu, Monsieur." : "") + (plateau ? ` ${plateau}` : "");
-  return { ok: true, draft, ei: cur.ei, si: cur.si, restSecs: e.rest, phrase, record, plateau };
+  return { ok: true, draft, ei: cur.ei, si: cur.si, restSecs, phrase, record, plateau };
 }
 
 /** « Annule » : la dernière série notée à la voix revient comme avant. */

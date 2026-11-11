@@ -130,7 +130,7 @@ export async function searchOFF(query, { limit = 20 } = {}) {
  *   `notFound` : code-barres inconnu d'OFF (réponse propre, pas une erreur) — à
  *   distinguer d'`error` (réseau/serveur), pour des messages différents dans l'UI.
  */
-export async function getOFFByBarcode(barcode) {
+export async function getOFFByBarcode(barcode, { retryDelays = RETRY_DELAYS_MS } = {}) {
   const code = String(barcode).trim();
   if (!code) return { item: null, notFound: false, error: false };
   if (barcodeCache.has(code)) return barcodeCache.get(code);
@@ -145,10 +145,13 @@ export async function getOFFByBarcode(barcode) {
         : { item: null, notFound: true, error: false };
       break;
     } catch {
-      if (attempt >= RETRY_DELAYS_MS.length) { result = { item: null, notFound: false, error: true }; break; }
-      await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+      if (attempt >= retryDelays.length) { result = { item: null, notFound: false, error: true }; break; }
+      await new Promise((r) => setTimeout(r, retryDelays[attempt]));
     }
   }
-  barcodeCache.set(code, result);
+  // Un échec réseau n'est JAMAIS gardé (audit du 10/11/2026, point 12) : il restait en mémoire
+  // jusqu'au redémarrage de l'app, et le même code-barres rescanné, réseau revenu, échouait encore.
+  // Produit trouvé ou réellement inconnu d'Open Food Facts : gardés, comme avant.
+  if (!result.error) barcodeCache.set(code, result);
   return result;
 }

@@ -10,6 +10,7 @@ import { today, shiftDateKey, daysBetween } from "@rawcare/core/dateUtils";
 import { claimPatch, briefDoneByJeffrey } from "@rawcare/core/coach/brief";
 import { makeCoach } from "./coachInputs.js";
 import { jeffreyTurn, newId, hhmm } from "./jeffreyTurn.js";
+import { saveTurn, saveDayMerged } from "./conversationStore.js";
 import { say } from "./jeffrey.js";
 import { fetchWeather } from "./weather.js";
 import { applyActionStored } from "./jeffreyNotify.js";
@@ -97,12 +98,9 @@ export function briefReminders() {
 
 const dateLabel = () => new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 
-/** Enregistre la conversation du jour (élagage à 30 jours, comme App.jsx). */
-export function saveDay(date, entries) {
-  const oldest = shiftDateKey(today(), -30);
-  const log = { ...getSync("jeffreyLog", {}), [date]: entries };
-  store.set("jeffreyLog", Object.fromEntries(Object.entries(log).filter(([d]) => d >= oldest)));
-}
+// Écriture de la conversation : lib/conversationStore.js (11/11/2026, testée). `saveDay` reste
+// exporté ici pour le pont.
+export { saveDay } from "./conversationStore.js";
 
 /**
  * Écrit le brief dans la conversation du jour et le marque fait. → texte de la réponse.
@@ -122,7 +120,7 @@ export async function runBrief({ data, ai, transport, missing, onText }) {
   const note = (data.notes || []).find((n) => n.date === date)?.text || "";
   const save = ({ history: h, journal, memDate: md }) => {
     if (journal) { store.set("coachJournal", journal); if (md) store.set("jeffreyMemoryDate", md); }
-    saveDay(date, h);
+    saveTurn(date, entries, h);
   };
   try {
     const r = await jeffreyTurn({ history, mode: "brief", coach: makeCoach(data), ai, note, transport, foodContext, onText });
@@ -151,15 +149,18 @@ export async function runReply({ payload, data, ai, transport }) {
       ok: payload.ok !== false, baseline: payload.baseline, apply: applyActionStored,
       doneText: say("actionDone"), cancelledText: say("actionCancelled"),
     });
-    if (next) saveDay(date, next);
+    if (next) saveDayMerged(date, next); // rien d'écrit ailleurs entre-temps n'est effacé
     return { entries: next || entries, reply: "" };
   }
   const text = (payload.text || "").trim();
   if (!text) return { entries, reply: "" };
   let history = entries;
   const lastA = [...history].reverse().find((e) => e.role === "assistant");
+  // Réponse rapide touchée : dite à Jeffrey dans le résultat de son outil, et gardée à l'écriture.
+  let patch = null;
   if (payload.quickFor && lastA?.quick?.id === payload.quickFor) {
-    history = history.map((e) => (e === lastA ? { ...e, toolResults: { ...e.toolResults, [lastA.quick.id]: `Monsieur a touché « ${text} ».` } } : e));
+    patch = (e) => (e.id === lastA.id ? { ...e, toolResults: { ...e.toolResults, [lastA.quick.id]: `Monsieur a touché « ${text} ».` } } : e);
+    history = history.map(patch);
   }
   let ask = jeffreyAsk("chat", { text });
   const memDate = pendingMemoryDate(log, date, getSync("jeffreyMemoryDate", null));
@@ -168,7 +169,7 @@ export async function runReply({ payload, data, ai, transport }) {
   const note = (data.notes || []).find((n) => n.date === date)?.text || "";
   const save = ({ history: h, journal, memDate: md }) => {
     if (journal) { store.set("coachJournal", journal); if (md) store.set("jeffreyMemoryDate", md); }
-    saveDay(date, h);
+    saveTurn(date, entries, h, patch);
   };
   try {
     const r = await jeffreyTurn({ history, mode: "chat", coach: makeCoach(data), ai, note, transport, foodContext });

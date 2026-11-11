@@ -164,7 +164,14 @@ export function nextSessions({ now = new Date(), base, planFor }) {
   } else {
     const open = mobiliteFirst(recoToday.suggestions.filter((s) => slotOpen(s.type, ctx)), mobilitePlanned(planToday.weeklyPlan)).slice(0, 3);
     const trainable = open.filter((s) => !isRestType(s.type));
-    const notProposed = explain({ all: recoToday.suggestions, shown: trainable.length ? open : [], avoid: recoToday.avoid, slotReason, plan: planToday });
+    const explained = explain({ all: recoToday.suggestions, shown: trainable.length ? open : [], avoid: recoToday.avoid, slotReason, plan: planToday });
+    // Journée terminée mais mobilité encore possible (la note le dit) : elle n'est pas « moins
+    // prioritaire », surtout un jour où elle est au planning (audit du 10/11/2026, point 15). Seule
+    // la phrase change ; le `kind` reste « priority » (Jeffrey et le pont s'en servent).
+    const restOpen = !trainable.length && slotOpen("Mobilité", ctx);
+    const notProposed = !restOpen ? explained : explained.map((x) => (isRestType(x.type) && x.kind === "priority"
+      ? { ...x, reason: mobilitePlanned(planToday.weeklyPlan) ? "Prévue au planning aujourd'hui — encore possible ce matin." : "Encore possible ce matin." }
+      : x));
     today = trainable.length
       ? { date: todayKey, status: "open", suggestions: open, avoid: avoidOpen, note: null, notProposed }
       // `avoid` conservé même journée fermée (05/10/2026, bug vu sur les vraies données de

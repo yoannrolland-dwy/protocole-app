@@ -8,20 +8,20 @@
 // incomplète — même raison que le TDEE du 13/09/2026), et un jour sans repas saisi est ignoré,
 // jamais compté à 0. Seul le graphique jour par jour montre aujourd'hui, marqué « en cours ».
 import { today, shiftDateKey } from "./dateUtils.js";
-import { kcalOfEntry, kcalFromMacros, targetsForDate } from "./targets.js";
+import { kcalOfEntry, kcalTargetOn, hasIntake } from "./targets.js";
 import { MEALS, amounts, resolveLog, alcoholGramsFor } from "./nutrition/foodStore.js";
 
 /** Les `days` dates qui finissent à `end` (incluse), de la plus ancienne à la plus récente. */
 const windowEnding = (end, days) => Array.from({ length: days }, (_, i) => shiftDateKey(end, i - days + 1));
 
 /** Un jour de macroLog qui porte des repas (une ligne d'eau seule ne compte pas comme jour saisi). */
-const hasFood = (m) => m && (m.kcal != null || m.protein != null || m.carbs != null || m.fat != null);
+const hasFood = hasIntake;
 
-/** Cible kcal d'une date (fenêtre de sèche comprise), même formule que l'onglet Nutrition. */
-export const kcalTargetFor = (date, targets) => {
-  const t = targetsForDate(date, targets);
-  return Math.round(kcalFromMacros(t.protein, t.carbs, t.fat, t.fiber));
-};
+/**
+ * Cible kcal d'une date (fenêtre de sèche comprise). Avec `targetHistory`, c'est la cible en
+ * vigueur CE jour-là (`kcalTargetOn`, audit du 10/11/2026, point 9) ; sans, la cible actuelle.
+ */
+export const kcalTargetFor = (date, targets, targetHistory) => kcalTargetOn(date, targets, targetHistory);
 
 const byDateMap = (macros) => new Map((macros || []).filter(hasFood).map((m) => [m.date, m]));
 
@@ -51,12 +51,15 @@ export function macroAverages(macros, { asOf = today(), days = 7 } = {}) {
   return { cur: avg(yesterday), prev: avg(shiftDateKey(yesterday, -days)) };
 }
 
-/** Kcal jour par jour, `days` jours finissant aujourd'hui. → [{ date, kcal|null, target, partial }]. */
-export function dailyKcal(macros, targets, { asOf = today(), days = 21 } = {}) {
+/**
+ * Kcal jour par jour, `days` jours finissant aujourd'hui. → [{ date, kcal|null, target, partial }].
+ * `target` : la cible du jour concerné (`targetHistory`), pas celle d'aujourd'hui.
+ */
+export function dailyKcal(macros, targets, { asOf = today(), days = 21, targetHistory } = {}) {
   const map = byDateMap(macros);
   return windowEnding(asOf, days).map((date) => {
     const m = map.get(date);
-    return { date, kcal: m ? kcalOfEntry(m) : null, target: kcalTargetFor(date, targets), partial: date === asOf };
+    return { date, kcal: m ? kcalOfEntry(m) : null, target: kcalTargetFor(date, targets, targetHistory), partial: date === asOf };
   });
 }
 
@@ -89,7 +92,7 @@ export function mealBreakdown(foodLog, overrides, { asOf = today(), days = 21 } 
  * Régularité sur les `days` derniers jours terminés : jours saisis, jours dans ±10 % de la cible
  * kcal du jour, et alcool sur 7 et 28 jours (grammes, saisie libre).
  */
-export function regularity({ macros, foodLog, targets, asOf = today(), days = 28 }) {
+export function regularity({ macros, foodLog, targets, targetHistory, asOf = today(), days = 28 }) {
   const map = byDateMap(macros);
   const keys = windowEnding(shiftDateKey(asOf, -1), days);
   let logged = 0, inRange = 0;
@@ -97,7 +100,7 @@ export function regularity({ macros, foodLog, targets, asOf = today(), days = 28
     const m = map.get(d);
     if (!m) continue;
     logged++;
-    const target = kcalTargetFor(d, targets);
+    const target = kcalTargetFor(d, targets, targetHistory);
     if (target > 0 && Math.abs(kcalOfEntry(m) - target) / target <= 0.10) inRange++;
   }
   const alcohol = (n) => Math.round(keys.slice(-n).reduce((a, d) => a + alcoholGramsFor(foodLog || [], d), 0));
