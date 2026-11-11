@@ -5932,4 +5932,21 @@ Rapport : `docs/audit-2026-11-10.md`. Point de restauration : tag Git `avant-cam
   le même envoi que les Réglages) et « Recharger ». Rien en mode silencieux (widget).
   **Limite** : il ne propose pas de restaurer ; une donnée abîmée déjà stockée y ramène à chaque
   lancement.
-- Tests `apps/perso/test/lot1-donnees.test.mjs` (10, faux stockage, quota simulé).
+- Tests : `apps/perso/test/lot1-donnees.test.mjs` (13, faux stockage, quota simulé) et
+  `restoreGuard.test.mjs` (7). 274 tests au total.
+- Suivi pour la session JEFFREY (code `restauration`, rien changé côté JEFFREY) :
+  `docs/suivi-jeffrey/2026-11-11-code-restauration.md`.
+- **Installé sur le S25 le 11/11/2026** (`adb install -r`, même signature, sans désinstallation).
+  Avant : APK installé copié (v3.158.0), copie serveur manuelle réussie, sauvegarde locale du jour
+  présente, export du téléphone validé par `validateImport` (35 clés, aucun problème). Après :
+  démarrage normal, 5 onglets et 3 onglets des Réglages ouverts sans écran de secours, v3.159.0
+  affichée, place occupée 0,93 million de caractères (19 % du repère). Empreintes comparées sans
+  afficher les valeurs : 47 clés sur 48 identiques, dont toutes les clés secrètes et toute la
+  configuration IA et voix ; seule `lastPosition` a changé (notée à l'ouverture). Préférences
+  Android identiques hors widget et cache de la WebView ; permissions du pont accordées ; réveil de
+  sauvegarde de 23 h programmé ; aucun plantage. **Pas essayé sur le téléphone** (choix, aucun
+  risque pris sur les données réelles) : stockage plein, restauration réelle, écran de secours,
+  modification d'une séance après un retour dans l'app. Tous vérifiés dans l'aperçu et les tests.
+- **Ce que les sauvegardes ne restaurent pas** : les clés secrètes (IA, LiteLLM, voix, sauvegarde),
+  le brouillon de séance en cours, les marqueurs du jour (brief, mémoire, jetons du pont, position),
+  les réglages Android privés (brief activé, voix activée), les permissions Health Connect.
