@@ -6002,13 +6002,14 @@ LiteLLM ; personnalité de Jeffrey inchangée.
     (phrase seule, `kind` inchangé pour Jeffrey et le pont) ;
   - **planche « 45-60 s » : 60 s partout** (série préremplie et bouton « Maintien », choix de Yoann ;
     consigne gardée) — `seriesTarget` (`session/perf.js`), borne haute pour une durée ;
-  - séance à la voix : pas de « repos 0 secondes » ni de minuteur pour un exercice sans repos
-    (un repos en cours s'arrête) ; un exercice en répétitions au poids du corps (cheville au mur) se
-    note sans charge ;
+  - séance à la voix : pas de « repos 0 secondes » ni de minuteur pour un exercice sans repos ; un
+    repos encore en cours s'arrête, comme « stop », réveil retiré, sans bip (`restAfterSet`,
+    `bridgeRest.js`, accepté par Yoann le 11/11/2026) ; un exercice en répétitions au poids du corps
+    (cheville au mur) se note sans charge ;
   - coût d'une réponse illisible compté dans « Dépensé ce mois-ci » (Photo d'un plat, Carte resto) ;
   - widget : énergie rafraîchie aussi quand seule la FC repos change.
 - Tests : `packages/core/test/lot2-chiffres.test.mjs` (19), `apps/perso/test/lot2-conversation.test.mjs`
-  (10) ; 303 au total. Capture du prompt régénérée (phrase d'escalade, deux champs de sommeil retirés,
+  (10), repos sans bip dans `jeffreyQuietRest.test.mjs` (1) ; 304 au total. Capture du prompt régénérée (phrase d'escalade, deux champs de sommeil retirés,
   moyennes sur les jours terminés, clé `kcal_semaine`).
 - **Limites** :
   - l'ordre d'un message venu d'une page sans écran suit sa place dans le stockage (juste après
@@ -6016,3 +6017,18 @@ LiteLLM ; personnalité de Jeffrey inchangée.
   - `turnFlight` est en mémoire : il protège l'app ouverte, pas une réponse depuis la notification
     lancée en même temps (celle-ci est rangée par fusion, rien n'est perdu) ;
   - les points 13 et 14 n'ont été vérifiés que par les tests et l'aperçu, pas sur le téléphone.
+- **Installé sur le S25 le 11/11/2026** (`adb install -r`, même certificat, `versionCode` 1 inchangé,
+  date de première installation inchangée). Avant : APK installé copié (v3.159.0, empreinte
+  vérifiée), copie serveur manuelle réussie à 17 h 41, sauvegarde locale du jour présente, aucune
+  séance en cours, données validées par `validateImport` (35 clés, aucun problème). Tag
+  `apres-lot1-audit` poussé (cible ff10948). Après : démarrage normal, Nutrition, les 4 sous-onglets
+  de Corps, Séance, les 3 sous-onglets d'Analyse et le Bord ouverts sans écran de secours ni
+  alerte, v3.160.0 affichée, « cible actuelle » sur la carte Kcal 21 jours. Empreintes comparées
+  sans afficher les valeurs : 47 clés sur 48 identiques, dont les 12 sensibles (clés, configuration
+  IA et voix) et `macroLog` (rien vidé à l'ouverture de Nutrition) ; seule `lastPosition` a changé.
+  Préférences Android identiques hors widget ; permissions du pont accordées ; réveil de 23 h
+  programmé ; aucun plantage. **Pas essayé sur le téléphone** (aucune saisie, aucun appel à
+  l'IA) : suppression d'un aliment, conversation concurrente, passage de minuit, séance à la voix.
+  Incident sans conséquence : un premier build lancé depuis le mauvais dossier a échoué et une
+  première installation a mis l'APK construit juste avant l'extraction de `restAfterSet` (même
+  comportement) ; il a été reconstruit depuis la racine et réinstallé, empreinte vérifiée.
