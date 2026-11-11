@@ -9,6 +9,7 @@ import { TEMPLATES, TYPES, hsrForWeek } from "@rawcare/core/session/templates";
 import { C, today, fmt, round, byDate, lastN, daysBetween, Card, Label, Body, Empty, Btn, inputStyle, Stepper, Field, DateField } from "../../design/compat.jsx";
 import { MuscuLogger } from "./MuscuLogger.jsx";
 import { restTimer } from "../../lib/restTimer.js";
+import { sameSession, upsertSession } from "../../lib/trainingEdit.js";
 import { ProgressScreen } from "./ProgressScreen.jsx";
 import { GeneField } from "./GeneField.jsx";
 import { VolumeCard } from "./VolumeCard.jsx";
@@ -45,8 +46,9 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
   const [duration, setDuration] = useState(() => draft0?.duration ?? 60);
   const [rpe, setRpe] = useState(() => draft0?.rpe ?? 7);
   const [gene, setGene] = useState(() => draft0?.gene ?? null);
-  // Séance déjà enregistrée en cours de modification (référence exacte de l'objet
-  // dans `training`) — null quand on démarre une nouvelle séance à blanc.
+  // Séance déjà enregistrée en cours de modification — null quand on démarre une nouvelle
+  // séance à blanc. Retrouvée par `id` à l'enregistrement (lib/trainingEdit.js), jamais par
+  // référence : la relecture au retour dans l'app remplace les objets.
   const [editing, setEditing] = useState(() => {
     const id = draft0?.editingId;
     return id ? (training.find((t) => t.id === id) ?? null) : null;
@@ -102,11 +104,11 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
       // la même entrée qu'avant. Les anciens `blocs` d'une séance rééditée ne sont pas repris.
       ...(type === "Escalade" && gene && Object.keys(gene).length ? { gene } : {}) };
     store.set("trainingDraft", null);
-    save.training((editing ? training.map((x) => (x === editing ? rec : x)) : [...training, rec]).sort(byDate));
+    save.training(upsertSession(training, editing, rec).list.sort(byDate));
     setOpen(null); setEditing(null);
   };
   const saveMuscu = (rec) => {
-    save.training((editing ? training.map((x) => (x === editing ? rec : x)) : [...training, rec]).sort(byDate));
+    save.training(upsertSession(training, editing, rec).list.sort(byDate));
     setOpen(null); setEditing(null);
   };
 
@@ -165,7 +167,7 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
                 facile à toucher par erreur — le 1er tap arme « Supprimer ? » 3 s, le 2e supprime. */}
             <button type="button" className="p-tap" aria-label={armed === t ? `Confirmer la suppression de ${t.type} du ${fmt(t.date)}` : `Supprimer la séance ${t.type} du ${fmt(t.date)}`}
               onClick={() => {
-                if (armed === t) { setArmed(null); save.training(training.filter((x) => x !== t)); return; }
+                if (sameSession(armed, t)) { setArmed(null); save.training(training.filter((x) => x !== t)); return; }
                 setArmed(t); clearTimeout(armTimer.current); armTimer.current = setTimeout(() => setArmed(null), 3000);
               }}
               style={{

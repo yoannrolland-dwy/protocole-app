@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
 import { Capacitor } from "@capacitor/core";
 import App from "./App.jsx";
+import { AppErrorBoundary } from "./components/RecoveryScreen.jsx";
+import { releaseRestoreLock } from "./store.js";
 import { isSilentSync } from "./silentSync.js";
 import "./index.css";
 import "./design/theme.css";
@@ -10,6 +12,10 @@ import { applyTheme } from "./design/tokens.js";
 
 // Design system v2 (U2) : variables CSS posées avant le premier rendu.
 applyTheme();
+
+// Restauration (audit du 10/11/2026, point 4) : la page principale qui (re)démarre lève le gel posé
+// pour les pages sans écran, avant tout rendu et toute écriture.
+releaseRestoreLock();
 
 if (Capacitor.isNativePlatform()) {
   // App native : les assets sont embarqués dans l'APK, le service worker n'apporte rien
@@ -41,7 +47,10 @@ isSilentSync().then((silent) => {
   }
   createRoot(document.getElementById("root")).render(
     <React.StrictMode>
-      <App silent={silent} />
+      {/* Limite d'erreur (audit du 10/11/2026, point 5) : écran de secours au lieu d'un écran noir. */}
+      <AppErrorBoundary silent={silent}>
+        <App silent={silent} />
+      </AppErrorBoundary>
     </React.StrictMode>
   );
 });

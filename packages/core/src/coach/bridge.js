@@ -160,4 +160,6 @@ export function buildReading(sujet, ctx) {
 /** Codes d'erreur courts du pont (jamais de texte technique ni de donnée privée). */
 // Contrat v1 confirmé par la session JEFFREY (05/11/2026). `trop_long` : réponse au-delà de
 // 200 000 caractères (limite Binder), posé par le service Android.
-export const BRIDGE_ERRORS = ["occupe", "inconnu", "delai", "ia_absente", "ia_echec", "interne", "trop_long"];
+// `restauration` (11/11/2026) : une restauration est en cours dans PROTOCOLE, rien n'a été fait,
+// réessayer dans quelques secondes.
+export const BRIDGE_ERRORS = ["occupe", "inconnu", "delai", "ia_absente", "ia_echec", "interne", "trop_long", "restauration"];

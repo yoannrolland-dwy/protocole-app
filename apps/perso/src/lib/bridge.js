@@ -23,6 +23,7 @@ import { currentSet } from "@rawcare/core/session/engine";
 import { byDate } from "@rawcare/core/dateUtils";
 import { briefAfterKnee } from "@rawcare/core/coach/brief";
 import { jeffreyTurn, newId, hhmm } from "./jeffreyTurn.js";
+import { dispatchBridge } from "./restoreGuard.js";
 import { aiMissing } from "./ai.js";
 
 /** Erreur du pont : un code court, jamais un texte technique ni une donnée. */
@@ -250,14 +251,18 @@ export async function handleBridgeRequest(op, json, { transport } = {}) {
   try {
     let args = {};
     try { args = json ? JSON.parse(json) : {}; } catch { return { ok: false, erreur: "inconnu" }; }
-    if (op === "version") return { ok: true, json: bridgeVersion() };
-    if (op === "lire") return { ok: true, json: readSubject(args?.sujet) };
-    if (op === "analyse") return { ok: true, json: await runAnalyse({ type: args?.type, transport }) };
-    // G2 : JEFFREY confirme qu'il fait le brief du jour, avant de parler ou de notifier.
-    if (op === "brief_fait") return { ok: true, json: briefDoneFromJeffrey(args) };
-    // G3 : action relue puis écrite (voir runAgir).
-    if (op === "agir") return { ok: true, json: await runAgir(args) };
-    return { ok: false, erreur: "inconnu" };
+    // Pendant une restauration (gel de store.js), une opération qui écrit rend « restauration »,
+    // jamais un succès : refusée avant, résultat écarté si le gel apparaît pendant (restoreGuard.js).
+    return await dispatchBridge(op, async () => {
+      if (op === "version") return { ok: true, json: bridgeVersion() };
+      if (op === "lire") return { ok: true, json: readSubject(args?.sujet) };
+      if (op === "analyse") return { ok: true, json: await runAnalyse({ type: args?.type, transport }) };
+      // G2 : JEFFREY confirme qu'il fait le brief du jour, avant de parler ou de notifier.
+      if (op === "brief_fait") return { ok: true, json: briefDoneFromJeffrey(args) };
+      // G3 : action relue puis écrite (voir runAgir).
+      if (op === "agir") return { ok: true, json: await runAgir(args) };
+      return { ok: false, erreur: "inconnu" };
+    });
   } catch (e) {
     // Seulement un code connu : jamais un message d'erreur qui pourrait porter une donnée.
     const code = e?.bridgeCode || e?.code;

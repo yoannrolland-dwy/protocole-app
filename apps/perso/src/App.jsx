@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
-import { store, getSync } from "./store.js";
+import { store, getSync, STORAGE_ERROR_EVENT } from "./store.js";
 import { scheduleBackupReminder } from "./cloudBackup.js";
 import { computeEnergyScore, scoreLabel } from "@rawcare/core/energy";
 import { PHASES, DEFAULT_TARGETS, targetsForDate, kcalFromMacros, kcalOfEntry, buildKcalByDate, weightTrend7, recompWindows } from "@rawcare/core/targets";
@@ -75,6 +75,16 @@ export default function App({ silent = false } = {}) {
   };
   const [showSettings, setShowSettings] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Chargement qui échoue (sauvegarde abîmée, audit du 10/11/2026, point 4) : relancé au rendu pour
+  // que la limite d'erreur (main.jsx) affiche l'écran de secours au lieu de « Chargement… » sans fin.
+  const [loadError, setLoadError] = useState(null);
+  // Écriture refusée par le téléphone (point 3) : bandeau tant que Monsieur ne l'a pas lu.
+  const [storageFail, setStorageFail] = useState(null);
+  useEffect(() => {
+    const on = (e) => setStorageFail(e.detail || {});
+    window.addEventListener(STORAGE_ERROR_EVENT, on);
+    return () => window.removeEventListener(STORAGE_ERROR_EVENT, on);
+  }, []);
 
   const [weight, setWeight] = useState([]);
   const [sleep, setSleep] = useState([]);
@@ -157,6 +167,7 @@ export default function App({ silent = false } = {}) {
 
   useEffect(() => {
     (async () => {
+     try {
       setWeight(await store.get("weightLog", []));
       setSleep(await store.get("sleepLog", []));
       // Migration (01/09/2026) : "Leg curl bilatéral" était une erreur de nom, l'exercice
@@ -185,7 +196,9 @@ export default function App({ silent = false } = {}) {
       // valeurs que l'utilisateur a réglées, et couvrira aussi les champs futurs.
       const storedTargets = await store.get("targets", {});
       setTargets({ ...DEFAULT_TARGETS, ...storedTargets, cut: { ...DEFAULT_TARGETS.cut, ...(storedTargets.cut || {}) } });
-      setPhaseState(await store.get("phase", "seche"));
+      // Phase inconnue (sauvegarde abîmée) : « Sèche » à l'écran, rien de réécrit (audit, point 4).
+      const storedPhase = await store.get("phase", "seche");
+      setPhaseState(PHASES[storedPhase] ? storedPhase : "seche");
       setHsrWeekState(await store.get("hsrWeek", 1));
       setTargetHistory(await store.get("targetHistory", []));
       setPalierWeekly(await store.get("palierWeekly", null));
@@ -234,6 +247,9 @@ export default function App({ silent = false } = {}) {
       // sauvegarde ne doit pas faire croire à l'app qu'elle vient d'être sauvegardée.
       setLastCloudBackup(await store.get("lastCloudBackup", null));
       setLoading(false);
+     } catch (e) {
+      setLoadError(e);
+     }
     })();
   }, []);
 
@@ -695,6 +711,7 @@ export default function App({ silent = false } = {}) {
   // Lancé par le bouton Sync du widget (SilentSyncActivity, voir main.jsx) : tous les
   // effets ci-dessus (chargement, runHealthSync, mise à jour du widget) tournent
   // normalement, mais rien ne doit jamais s'afficher à l'écran.
+  if (loadError) throw loadError;
   if (silent) return null;
 
   return (
@@ -711,6 +728,15 @@ export default function App({ silent = false } = {}) {
       {/* Contenu */}
       <div style={{ flex: 1, minHeight: 0, position: "relative", display: "flex", flexDirection: "column" }}>
       <main ref={mainRef} style={{ flex: 1, overflowY: "auto", padding: bubbleOn ? "14px 16px 88px" : "14px 16px 24px" }}>
+        {storageFail && (
+          <div role="alert" style={{ background: COLORS.dangerBg, border: `1.5px solid ${COLORS.danger}`, borderRadius: 8, padding: "10px 12px", marginBottom: 12 }}>
+            <div style={{ fontSize: 14, color: COLORS.danger, fontWeight: 700 }}>{say(storageFail.quota ? "storageFull" : "storageFailed")}</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button type="button" className="p-btn p-btn--primary" style={{ flex: 1 }} onClick={() => { setStorageFail(null); setShowSettings(true); }}>Réglages</button>
+              <button type="button" className="p-btn p-btn--outline" style={{ flex: 1 }} onClick={() => setStorageFail(null)}>Compris</button>
+            </div>
+          </div>
+        )}
         {loading ? <Empty>Chargement…</Empty> : showSettings ? (
           <SettingsPanel {...{ apiKey, setApiKey, model, setModel, aiProvider, setAiProvider, litellmUrl, setLitellmUrl, litellmKey, setLitellmKey, litellmModel, setLitellmModel, healthSync, coachProfile, setCoachProfile, coachJournal, setCoachJournal, jeffreyPersona, setJeffreyPersona, targets, lastAutoBackup, lastCloudBackup, phase, setPhase, basketSchedule, setBasketSchedule }} onCloudBackupDone={markCloudBackup} lastOffPhone={lastOffPhone} onServerBackupChange={() => setServerBackupTick((t) => t + 1)} saveTargets={save.targets} buildBriefing={coach.buildBriefing} onHealthSync={runHealthSync} onClose={() => setShowSettings(false)} />
         ) : (

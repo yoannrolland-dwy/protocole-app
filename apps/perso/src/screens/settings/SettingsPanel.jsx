@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import { Download, Upload, X, Copy } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
-import { exportData, importData } from "../../store.js";
+import { importData, storageUsage, STORAGE_USUAL_LIMIT_CHARS } from "../../store.js";
+import { shareExport } from "../../lib/offPhoneExport.js";
+import { restoreErrorText } from "../../lib/restoreMessage.js";
 import { isBackupStale, daysSinceBackup } from "../../cloudBackup.js";
 import { PHASES, kcalFromMacros } from "@rawcare/core/targets";
 import { C, today, fmt, Card, Label, Body, Btn, inputStyle, TextInput, Stepper, Field, Pills, ScreenHeader } from "../../design/compat.jsx";
@@ -156,44 +158,26 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
     }
   };
   const doExport = async () => {
-    const json = JSON.stringify(exportData(), null, 2);
-    const name = `protocole-${today()}.json`;
-    // Le téléchargement via <a download> ne fonctionne pas dans la WebView native :
-    // on écrit le fichier puis on ouvre le partage Android (Drive, mail, Fichiers…).
-    if (Capacitor.isNativePlatform()) {
-      try {
-        const { Filesystem, Directory, Encoding } = await import("@capacitor/filesystem");
-        const { Share } = await import("@capacitor/share");
-        await Filesystem.writeFile({ path: name, data: json, directory: Directory.Cache, encoding: Encoding.UTF8 });
-        const { uri } = await Filesystem.getUri({ path: name, directory: Directory.Cache });
-        // `Share.share` ne résout QUE si une destination a été choisie (annuler la feuille
-        // rejette la promesse) : c'est le seul signal disponible côté app pour dire que la
-        // sauvegarde est partie. On ne peut évidemment pas vérifier qu'elle est bien
-        // arrivée sur Drive — on date une intention aboutie, pas une réception.
-        await Share.share({ title: name, files: [uri] });
-        onCloudBackupDone?.();
-        setMsg(say("backupSent"));
-      } catch (e) {
-        const txt = String(e?.message || e);
-        setMsg(/cancel/i.test(txt) ? say("backupCancelled") : say("backupFailed", { x: txt }));
-      }
-      return;
+    // Écriture et partage : lib/offPhoneExport.js (partagé avec l'écran de secours, 11/11/2026).
+    try {
+      const { native } = await shareExport();
+      onCloudBackupDone?.();
+      if (native) setMsg(say("backupSent"));
+    } catch (e) {
+      const txt = String(e?.message || e);
+      setMsg(/cancel/i.test(txt) ? say("backupCancelled") : say("backupFailed", { x: txt }));
     }
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = name; a.click();
-    URL.revokeObjectURL(url);
-    // Sur la PWA le fichier atterrit dans les téléchargements de la machine qui affiche
-    // l'app — donc hors du téléphone aussi, du point de vue du risque couvert.
-    onCloudBackupDone?.();
   };
   const doImport = (e) => {
     const file = e.target.files?.[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      try { importData(JSON.parse(reader.result)); setMsg(say("imported")); setTimeout(() => window.location.reload(), 800); }
-      catch { setMsg(say("invalidFile")); }
+      // Fichier vérifié avant toute écriture, restauration tout ou rien, puis stockage figé jusqu'au
+      // rechargement (store.js, audit du 10/11/2026, point 4).
+      let obj;
+      try { obj = JSON.parse(reader.result); } catch { setMsg(say("invalidFile")); return; }
+      try { importData(obj); setMsg(say("imported")); setTimeout(() => window.location.reload(), 800); }
+      catch (err) { setMsg(restoreErrorText(err)); }
     };
     reader.readAsText(file);
   };
@@ -470,6 +454,7 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
             <input type="file" accept="application/json" onChange={doImport} style={{ display: "none" }} />
           </label>
         </div>
+        <StorageUsageLine />
         {Capacitor.isNativePlatform() && (
           <Body style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>
             Sauvegarde auto locale (dossier Documents/Protocole) : {lastAutoBackup ? `dernière le ${fmt(lastAutoBackup)}` : "pas encore faite"}.
@@ -483,5 +468,23 @@ export function SettingsPanel({ apiKey, setApiKey, model, setModel,
       {msg && <Body style={{ color: C.accent, fontSize: 12 }}>{msg}</Body>}
       <Body style={{ fontSize: 12, color: C.dim, textAlign: "center", fontFamily: C.mono }}>Protocole v{APP_VERSION}</Body>
     </div>
+  );
+}
+
+// Place occupée par les données de l'app (audit du 10/11/2026, point 3). Le plafond n'a pas été
+// mesuré sur ce téléphone : 5 millions de caractères est la valeur habituelle d'une WebView.
+const USAGE_LABELS = { foodLog: "journal alimentaire", jeffreyLog: "conversations de Jeffrey", trainingLog: "séances" };
+const millions = (n) => (n / 1e6).toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+// 0,92 million ; 2,4 millions ; sous 100 000 : en milliers (« 0 million » ne dit rien).
+const fmtChars = (n) => (n >= 1e5 ? `${millions(n)} ${n >= 2e6 ? "millions" : "million"}` : (Math.round(n / 1000) <= 1 ? "1 millier" : `${Math.round(n / 1000)} milliers`));
+function StorageUsageLine() {
+  const [u] = useState(() => storageUsage(3));
+  const pct = Math.round((u.chars / STORAGE_USUAL_LIMIT_CHARS) * 100);
+  return (
+    <Body style={{ fontSize: 12, color: pct >= 80 ? C.danger : C.dim, marginTop: 8 }}>
+      Place occupée : {fmtChars(u.chars)} de caractères, environ {pct} % du plafond habituel d'une WebView
+      ({millions(STORAGE_USUAL_LIMIT_CHARS)} millions, non mesuré sur ce téléphone).
+      {u.top.length ? ` Plus gros : ${u.top.map((x) => `${USAGE_LABELS[x.key] || x.key} ${fmtChars(x.chars)}`).join(", ")}.` : ""}
+    </Body>
   );
 }

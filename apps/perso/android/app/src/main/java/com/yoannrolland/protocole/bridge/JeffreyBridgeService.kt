@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * appli signée par la même clé peut se lier). Échange par `Messenger` :
  * - question (`what` = 1) : Bundle { op, id, json } ; `replyTo` obligatoire ;
  * - réponse (`what` = 2) : Bundle { id, ok, json } ou { id, ok = false, erreur } — un code court
- *   (occupe, inconnu, delai, ia_absente, ia_echec, interne, trop_long), jamais un texte technique
+ *   (occupe, inconnu, delai, ia_absente, ia_echec, interne, trop_long, restauration), jamais un texte technique
  *   ni une donnée. Réponse de 200 000 caractères au plus (sinon `trop_long`).
  * Opérations : `version`, `lire` (20 s), `analyse` (90 s) — G1 ; `brief_fait` (20 s) — G2 ; `agir` (20 s) — G3.
  * Une seule requête à la fois

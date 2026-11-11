@@ -10,8 +10,9 @@
 import { pageTransport, pageRequest } from "./lib/pageHttp.js";
 import { today } from "@rawcare/core/dateUtils";
 import { aiMissing } from "./lib/ai.js";
-import { sayError } from "./lib/jeffrey.js";
-import { getSync } from "./store.js";
+import { sayError, say } from "./lib/jeffrey.js";
+import { guardWrite } from "./lib/restoreGuard.js";
+import { getSync, storageFrozen } from "./store.js";
 import { voiceServer, speechPlan } from "./lib/voiceConfig.js";
 import { loadData, aiFromSettings, runReply, runBrief, readBriefState, writeBriefState, claimBrief, releaseClaim } from "./lib/brief.js";
 import { briefHandoff, briefMissing, jeffreyBackupDue } from "@rawcare/core/coach/brief";
@@ -50,11 +51,14 @@ const todaySpec = (extra) => {
 async function reply() {
   const payload = JSON.parse(bridge?.payload() || "{}");
   const ai = aiFromSettings();
-  if (payload.kind !== "confirm" && aiMissing(ai)) {
+  if (payload.kind !== "confirm" && aiMissing(ai) && !storageFrozen()) {
     return finish({ notify: { kind: "thread", alert: false, spec: todaySpec({ me: false, text: aiMissing(ai) }) } });
   }
   try {
-    const r = await runReply({ payload, data: loadData(), ai, transport: bridgeTransport });
+    // Restauration en cours (gel de store.js) : rien n'est fait ni annoncé fait (restoreGuard.js).
+    const g = await guardWrite(() => runReply({ payload, data: loadData(), ai, transport: bridgeTransport }));
+    if (g.blocked) return finish({ notify: { kind: "thread", alert: false, spec: todaySpec({ me: false, text: say("restoring") }) } });
+    const r = g.value;
     const voice = r.reply ? voiceFor(r.reply) : undefined;
     return finish({ notify: { kind: "thread", alert: false, spec: todaySpec(), voice } });
   } catch (e) {
@@ -77,6 +81,8 @@ async function backup(slot) {
 // s'en charge). JEFFREY a confirmé → seule la copie du matin part. Sinon → le brief de PROTOCOLE,
 // exactement comme celui de l'app (même runBrief, notification sans bruit, voix si casque).
 async function signalCheck() {
+  // Restauration en cours : aucun brief ni copie, rien d'annoncé ; l'app qui redémarre reprend la main.
+  if (storageFrozen()) return finish({});
   const date = today();
   const state = readBriefState();
   const step = briefHandoff({ nowMs: Date.now(), today: date, state }).step;
@@ -95,7 +101,9 @@ async function signalCheck() {
   const data = loadData();
   try {
     const missing = briefMissing({ today: date, sleep: data.sleep, weight: data.weight, knee: data.knee });
-    const text = await runBrief({ data, ai, transport: bridgeTransport, missing });
+    const g = await guardWrite(() => runBrief({ data, ai, transport: bridgeTransport, missing }));
+    if (g.blocked) return finish({}); // gel apparu pendant le brief : rien n'est sûr, rien d'annoncé
+    const text = g.value;
     if (!text) return finish({});
     await sendBackup("matin", bridgeRequest);
     return finish({ notify: { kind: "thread", alert: false, spec: todaySpec(), voice: voiceFor(text) } });

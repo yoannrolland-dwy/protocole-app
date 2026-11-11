@@ -4,6 +4,7 @@
 // Logique : src/lib/serverBackup.js ; requêtes : client HTTP natif (lib/backupNative.js).
 import { useState, useEffect, useRef } from "react";
 import { importData, getSync, store } from "../../store.js";
+import { restoreErrorText } from "../../lib/restoreMessage.js";
 import { C, Card, Label, Body, Btn, TextInput } from "../../design/compat.jsx";
 import { say } from "../../lib/jeffrey.js";
 import { BACKUP_DEFAULT_URL, backupConfig, serverBackupState, sendBackup, listBackups, fetchBackup } from "../../lib/serverBackup.js";
@@ -69,13 +70,16 @@ export function ServerBackupCard({ onChange }) {
       return;
     }
     setArmed(null); setBusy(true); setMsg("");
+    let obj;
+    try { obj = await fetchBackup(id, backupRequest); }
+    catch (e) { setBusy(false); setMsg(say("serverRestoreFailed", { x: e.message })); return; }
     try {
-      importData(await fetchBackup(id, backupRequest));
+      importData(obj);
       setMsg(say("imported"));
       setTimeout(() => window.location.reload(), 800);
     } catch (e) {
       setBusy(false);
-      setMsg(say("serverRestoreFailed", { x: e.message }));
+      setMsg(restoreErrorText(e));
     }
   };
 

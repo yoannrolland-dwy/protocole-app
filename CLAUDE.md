@@ -85,7 +85,8 @@ PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
   05/11/2026) ; l'appelant est revérifié (`checkSignatures`). `Messenger` : question `what = 1`,
   Bundle `{ op, id, json }` ; réponse `what = 2`, `{ id, ok, json }` ou `{ id, ok = false, erreur }`
   (code court : `occupe`, `inconnu` — op, sujet, type ou JSON —, `delai`, `ia_absente`, `ia_echec`,
-  `interne`, `trop_long` au-delà de 200 000 caractères). Une requête à la fois ; 20 s
+  `interne`, `trop_long` au-delà de 200 000 caractères, `restauration` pendant les 15 s qui
+  suivent une restauration — rien n'a été fait, réessayer). Une requête à la fois ; 20 s
   pour `version`/`lire`, 90 s pour `analyse`. Le journal Android ne note que l'opération, l'issue
   et la durée.
 - Calcul : page sans écran `bridge.html` (`src/bridgePage.js`, `lib/bridge.js`), même origine que
@@ -3720,7 +3721,7 @@ Vérifié dans l'aperçu : 1:58 → 1:28 après un saut d'horloge de 30 s simul�
    `apiKey`, `litellmKey`, `voiceKey`, `backupKey` (jamais dans un export) ; `serverBackup` (marqueur
    de la dernière copie serveur, même raison que `lastCloudBackup`) ; les marqueurs du jour de Jeffrey
    `jeffreyMemoryDate` et `jeffreyBrief` (les restaurer ferait sauter un brief ou une mise en
-   mémoire) ; `jeffreyAgir` (jetons de relecture du pont, valables 3 minutes) ; `jeffreyStart` (séance à
+   mémoire) ; `restoreLock` (gel de 15 s après une restauration, 11/11/2026) ; `jeffreyAgir` (jetons de relecture du pont, valables 3 minutes) ; `jeffreyStart` (séance à
    ouvrir demandée par JEFFREY, valable 10 minutes) ; `lastPosition` (position du téléphone, propre à l'appareil). `climbScheme` reste
    dans `DATA_KEYS` mais n'est plus lu depuis le 08/10/2026 (même cas qu'`elbowLog`).
 2. **Toujours vérifier que le build passe** (`npm run build --workspace=apps/perso`,
@@ -5886,3 +5887,49 @@ Demande de Yoann : son genou va bien mieux, il reprend le squat « stoppé ».
     longue qui finit à la dernière séance. RIR qui monte, trou > 56 j et volume en hausse le
     coupent toujours. Records inchangés.
   - Test `packages/core/test/trend.test.mjs` — 254 tests.
+
+## Campagne de corrections de l'audit du 10/11/2026 — lot 1, sécurité des données (11/11/2026, apps/perso v3.159.0)
+
+Rapport : `docs/audit-2026-11-10.md`. Point de restauration : tag Git `avant-campagne-audit`
+(v3.158.0). Lot 1, points 1 à 5 :
+- **Séance passée modifiée** : retrouvée par `id` (repli sur le contenu pour une vieille séance
+  sans `id`), plus par référence d'objet, que la relecture au retour dans l'app cassait
+  (`lib/trainingEdit.js`, `TrainTab.jsx`). Séance disparue entre-temps : ajoutée plutôt que perdue.
+- **Capacitor** `@capacitor/android`, `core` et `cli` : 8.5.0 → **8.5.1** (GHSA-rvm3-566m-v7fv,
+  chemin du proxy HTTP interne). Seul changement du lockfile avec la ligne de version de l'app.
+  Les appels directs `CapacitorHttp.request/get` (LiteLLM, Open Food Facts) et `JeffreyHttpPlugin`
+  ne passent pas par ce chemin. L'alerte modérée restante sur `@capacitor/cli` (outil iOS) ne
+  touche pas l'APK.
+- **Écriture refusée** : `store.set` rend `true`/`false`, retient l'erreur (`storageError`) et
+  émet `STORAGE_ERROR_EVENT` ; l'app affiche un bandeau rouge (stockage plein ou autre échec).
+  Réglages › Appareil › Sauvegarde : place occupée (`storageUsage`), contre un plafond habituel de
+  5 millions de caractères **non mesuré sur le téléphone**. `store.set(k, undefined)` retire la clé
+  (avant : chaîne « undefined » écrite, relue comme la valeur par défaut).
+- **Restauration** (fichier et serveur) : `validateImport` vérifie la forme de chaque clé avant
+  toute écriture (listes, objets, textes ; clés plus lues acceptées telles quelles). Phase inconnue
+  au chargement : affichée « Sèche », rien de réécrit.
+  - **Écriture qui échoue en route** : retour arrière en trois temps (retirer toutes les clés déjà
+    écrites, remettre les anciennes valeurs, relire chaque clé). Remettre dans l'ordre d'écriture
+    échouait quand la place libérée avait été reprise (cas reproduit le 11/11/2026, test à l'appui).
+    Tout retrouvé → `code: "write"` (« rien n'a été modifié », vérifié). Sinon → `code: "rollback"`,
+    clés nommées dans `unrestored`, alerte à l'écran et `STORAGE_ERROR_EVENT`. **Ce n'est pas une
+    garantie** : une autre page qui écrit au même moment peut empêcher de tout remettre ; c'est
+    alors dit, jamais présenté comme réussi.
+  - **Gel après une restauration réussie**, jusqu'au rechargement : `store.set` et `store.del`
+    refusés (`storageFrozen`) dans la page, et dans les pages sans écran par le marqueur daté
+    `restoreLock` (15 s au plus, **hors DATA_KEYS**), levé par `main.jsx` au démarrage. Toutes les
+    écritures et suppressions de l'app passent par `store` (vérifié : aucun accès direct au
+    `localStorage` ailleurs).
+  - **Pont et notification pendant le gel** (`lib/restoreGuard.js`) : `agir`, `analyse` et
+    `brief_fait` rendent `{ ok: false, erreur: "restauration" }`, sans rien lancer ; si le gel
+    apparaît pendant l'opération, son résultat est écarté (jamais `fait: true`). Réponse depuis la
+    notification : « Restauration en cours, Monsieur : rien n'a été fait. Réessayez dans un
+    instant. », sans appel à l'IA. Brief de secours : rien de lancé ni d'annoncé, l'app qui
+    redémarre reprend la main. `lire` et `version` restent possibles. JEFFREY (autre dépôt) ne
+    connaît pas encore ce code : il voit `ok: false`, donc jamais un succès.
+- **Écran de secours** (`components/RecoveryScreen.jsx`, limite d'erreur dans `main.jsx`) : erreur
+  d'affichage ou chargement qui échoue → « Sauvegarder hors du téléphone » (`lib/offPhoneExport.js`,
+  le même envoi que les Réglages) et « Recharger ». Rien en mode silencieux (widget).
+  **Limite** : il ne propose pas de restaurer ; une donnée abîmée déjà stockée y ramène à chaque
+  lancement.
+- Tests `apps/perso/test/lot1-donnees.test.mjs` (10, faux stockage, quota simulé).

@@ -26,6 +26,19 @@ export const PHRASES = {
   backupFailed: ["La sauvegarde a échoué, Monsieur : {x}"],
   imported: ["Données restaurées, Monsieur. Je recharge…"],
   invalidFile: ["Ce fichier n'est pas une sauvegarde, Monsieur."],
+  importRefused: ["Je refuse cette sauvegarde, Monsieur : {x}. Rien n'a été modifié."],
+  // Écriture refusée en cours de restauration : le message dit lui-même si tout a été remis en place.
+  restoreFailed: ["Restauration impossible, Monsieur : {x}."],
+  // Retour arrière incomplet : alerte d'abord, sans détour (une donnée d'avant n'est plus sur le téléphone).
+  // Pont et notification pendant le gel qui suit une restauration : jamais « c'est fait ».
+  restoring: ["Restauration en cours, Monsieur : rien n'a été fait. Réessayez dans un instant."],
+  restorePartial: ["Alerte, Monsieur : la restauration a échoué et je n'ai pas tout remis en place. {x}. Reprenez ces données depuis une sauvegarde."],
+  // Écriture refusée par le téléphone (audit du 10/11/2026, point 3) : dit clairement, d'abord.
+  storageFailed: ["Je n'ai pas pu enregistrer votre dernière saisie, Monsieur. Sauvegardez hors du téléphone avant toute chose."],
+  storageFull: ["Le stockage du téléphone est plein, Monsieur : votre dernière saisie n'est pas enregistrée. Sauvegardez hors du téléphone avant toute chose."],
+  // Écran de secours (point 5) : une erreur a arrêté l'affichage.
+  recoveryTitle: ["Un incident a interrompu l'affichage, Monsieur."],
+  recoveryBody: ["Vos données sont toujours sur le téléphone. Mettez-les à l'abri, puis rechargez, Monsieur."],
   // Sauvegarde sur le serveur Oracle (02/11/2026).
   serverBackupKeySaved: ["C'est noté, Monsieur. Vos données partiront trois fois par jour."],
   serverBackupKeyRemoved: ["Clé retirée, Monsieur. Plus aucune copie ne part vers le serveur."],
