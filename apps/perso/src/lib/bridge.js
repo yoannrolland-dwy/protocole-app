@@ -16,11 +16,11 @@ import { makeCoach } from "./coachInputs.js";
 import { checkAgir, doneSummary, paramsKey } from "@rawcare/core/coach/bridgeActions";
 import { searchCiqual, getCiqual } from "@rawcare/core/nutrition/ciqual";
 import { applyActionStored } from "./jeffreyNotify.js";
-import { readDraft, writeDraft } from "./sessionDraft.js";
-import { restAnnouncement } from "./restSpeech.js";
-import { nativeRest, markJeffreyRest, restAfterSet } from "./bridgeRest.js";
-import { readSession, logSet, undoLastSet, goToExercise, nextExercise, restAction, finishCheck, abandonCheck } from "@rawcare/core/session/voiceSession";
-import { currentSet } from "@rawcare/core/session/engine";
+import { readDraft } from "./sessionDraft.js";
+import { nativeRest } from "./bridgeRest.js";
+import { readSession, finishCheck, abandonCheck } from "@rawcare/core/session/voiceSession";
+import { SESSION_NOW, sessionCtx, runSessionNow } from "./sessionGestures.js";
+import { AGIR_KEY, AGIR_TTL_MS, pendingAgir, newJeton, keptAgir } from "./agirTokens.js";
 import { byDate } from "@rawcare/core/dateUtils";
 import { briefAfterKnee } from "@rawcare/core/coach/brief";
 import { jeffreyTurn, newId, hhmm } from "./jeffreyTurn.js";
@@ -96,10 +96,8 @@ export async function runAnalyse({ type, transport }) {
 // jeton. L'écriture (`verifier: false`) exige ce jeton, pour exactement les mêmes paramètres, dans
 // les 3 minutes, une seule fois ; l'action est revérifiée sur les données du moment et n'est écrite
 // que si sa phrase n'a pas changé. Ainsi ce qui est écrit est toujours ce que Monsieur a entendu.
-// Jetons en attente : clé `jeffreyAgir`, hors DATA_KEYS (marqueur du moment, jamais exporté).
-const AGIR_KEY = "jeffreyAgir";
-const AGIR_TTL_MS = 3 * 60_000;
-const AGIR_MAX = 5;
+// Jetons en attente : clé `jeffreyAgir`, hors DATA_KEYS (marqueur du moment, jamais exporté) ;
+// lib/agirTokens.js.
 
 /** Données lues au moment de la demande (mêmes clés que les écrans). */
 export function agirContext() {
@@ -117,9 +115,6 @@ export function agirContext() {
   };
 }
 
-const pendingAgir = (now) => Object.fromEntries(Object.entries(getSync(AGIR_KEY, {}) || {}).filter(([, v]) => v?.exp > now));
-const newJeton = () => Math.random().toString(36).slice(2, 8);
-
 /**
  * `agir { action, parametres, verifier, jeton? }`.
  * verifier: true → { ok: true, resume, jeton } ou { ok: false, raison, choix?, besoin? }.
@@ -130,14 +125,20 @@ export async function runAgir(args, { now = Date.now(), ctx = agirContext() } = 
   const action = args?.action;
   const parametres = args?.parametres && typeof args.parametres === "object" ? args.parametres : {};
   const key = paramsKey(action, parametres);
-  // G4-C3 : gestes de séance notés tout de suite (choix de Yoann), sans relecture ni jeton.
-  if (SESSION_NOW.has(action)) return runSessionNow(action, parametres, { now, write: args?.verifier === false });
+  // G4-C3 : gestes de séance notés tout de suite (choix de Yoann). Depuis le 12/11/2026, la
+  // relecture d'un geste rend un jeton, et une écriture qui porte un `jeton` (même vide) n'est faite
+  // que si ce jeton est valable et la cible du geste inchangée (lib/sessionGestures.js).
+  if (SESSION_NOW.has(action)) {
+    const opts = { now, write: args?.verifier === false };
+    if (args && Object.prototype.hasOwnProperty.call(args, "jeton")) opts.jeton = args.jeton;
+    return runSessionNow(action, parametres, opts);
+  }
   const check = SESSION_CONFIRM.has(action) ? () => sessionConfirmCheck(action, parametres, now) : () => checkAgir(action, parametres, ctx);
   if (args?.verifier !== false) {
     const res = await check();
     if (!res.ok) return res;
     const jeton = newJeton();
-    const kept = Object.entries(pendingAgir(now)).sort((a, b) => b[1].exp - a[1].exp).slice(0, AGIR_MAX - 1);
+    const kept = keptAgir(now);
     store.set(AGIR_KEY, Object.fromEntries([...kept, [jeton, { key, resume: res.resume, exp: now + AGIR_TTL_MS }]]));
     return { ok: true, resume: res.resume, ...(res.question ? { question: res.question } : {}), jeton };
   }
@@ -172,51 +173,9 @@ export async function runAgir(args, { now = Date.now(), ctx = agirContext() } = 
 }
 
 // --- G4-C3 : la séance à la voix (05/11/2026) ----------------------------------------------------
-// Règles pures : packages/core/src/session/voiceSession.js ; ici, l'écriture du brouillon, le
-// réveil de fin de repos (natif, par la page) et l'enregistrement de la séance.
-const SESSION_NOW = new Set(["noter_serie", "annuler_serie", "aller_a", "exercice_suivant", "repos"]);
+// Règles pures : packages/core/src/session/voiceSession.js ; gestes immédiats et leur jeton :
+// lib/sessionGestures.js ; ici, la fin et l'abandon de la séance (relecture et jeton ordinaires).
 const SESSION_CONFIRM = new Set(["terminer_seance", "annuler_seance"]);
-
-function sessionCtx(now) {
-  return { training: getSync("trainingLog", []), knee: getSync("kneeLog", []), now };
-}
-
-/** Geste de séance immédiat. `write: false` : décrit sans rien écrire. */
-export function runSessionNow(action, p, { now = Date.now(), write = true } = {}) {
-  const d = readDraft();
-  const ctx = sessionCtx(now);
-  let r;
-  if (action === "noter_serie") r = logSet(d, p, ctx);
-  else if (action === "annuler_serie") r = undoLastSet(d);
-  else if (action === "aller_a") r = goToExercise(d, p, ctx);
-  else if (action === "exercice_suivant") r = nextExercise(d, ctx);
-  else r = restAction(d, p?.action, now);
-  if (!r.ok) {
-    const out = { fait: false, raison: r.raison };
-    if (r.choix) out.choix = r.choix;
-    if (r.besoin) out.besoin = r.besoin;
-    return out;
-  }
-  let draft = r.draft;
-  // Série notée : repos de l'exercice lancé, avec la phrase de fin de repos du carnet.
-  if (action === "noter_serie") {
-    // Sans repos prévu : aucun minuteur, le repos en cours s'arrête, pas de bip (`restAfterSet`).
-    draft = restAfterSet(draft, { secs: r.restSecs, label: draft.exos[r.ei].nom, speech: restAnnouncement(draft.exos, r.ei, r.si), now });
-  }
-  if (action === "annuler_serie" && draft.rest?.endAt) draft = { ...draft, rest: { ...draft.rest, endAt: null, remaining: draft.rest.secs } };
-  if (action === "repos" && p?.action === "lancer") {
-    const cur = currentSet(draft.exos, { ei: draft.courant });
-    if (cur) draft = { ...draft, rest: { ...draft.rest, speech: restAnnouncement(draft.exos, cur.ei, -1) } };
-  }
-  const out = { fait: true, resume: r.phrase };
-  if (r.record) out.record = true;
-  if (r.plateau) out.plateau = r.plateau;
-  if (!write) return { ok: true, resume: r.phrase, immediat: true };
-  draft = markJeffreyRest(draft, action);
-  writeDraft(draft);
-  if (action === "noter_serie" || action === "annuler_serie" || action === "repos") nativeRest(draft.rest);
-  return out;
-}
 
 /** Fin ou abandon de la séance : relecture (résumé, question), puis écriture après « oui ». */
 function sessionConfirmCheck(action, p, now) {

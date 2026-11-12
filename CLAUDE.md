@@ -172,6 +172,12 @@ PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
   - **Depuis v3.157.2 (07/11/2026), c'est vrai de TOUT repos**, lancé dans PROTOCOLE ou par
     JEFFREY : voir la section du 07/11/2026 en fin de fichier. `quiet` et `rest.source` sont encore
     écrits mais n'ont plus d'effet.
+- **Jeton des gestes de séance (v3.162.0, 12/11/2026, préparé en local, pas installé)** : la relecture
+  d'un geste (`verifier: true`) rend un `jeton` lié à l'action, aux paramètres et à la cible (séance,
+  exercice, série, minuteur) ; une écriture qui porte la clé `jeton` (même vide) n'est faite que si le
+  jeton est valable et la cible inchangée, jamais de repli vers le geste immédiat. Sans `jeton` :
+  inchangé. Code : `lib/sessionGestures.js`, `lib/agirTokens.js`. Contrat :
+  `docs/suivi-jeffrey/2026-11-12-jeton-gestes-seance.md`.
 - **Relecture dans l'app ouverte (G3)** : après toute écriture d'une page sans écran (pont,
   notification, brief de secours), l'app relit poids, genou, macros, note, journal alimentaire,
   conversation, carnet, marqueur de mémoire et séances (G4-A) avant son prochain enregistrement. Trois
@@ -6115,3 +6121,31 @@ changement de transport, de voix, de LiteLLM, ni dans le dépôt JEFFREY ou côt
 - Question ouverte : le squat sur sécurités doit-il recevoir les suggestions de surcharge ?
 - Android 17 : voix app fermée en `shortService`.
 - JEFFREY : afficher en clair le code `restauration` (suivi dans `docs/suivi-jeffrey/`).
+
+## Jeton des gestes de séance pour le pont JEFFREY (12/11/2026, apps/perso v3.162.0)
+
+Extension ciblée du pont, distincte de la campagne d'audit, d'après le plan
+`jeffrey-app/docs/cadrage/PLAN_JETON_GESTES_SEANCE.md`. **Préparée en local** : point de restauration
+= tag local `avant-jetons-gestes` (997a9a6, v3.161.0), rien de poussé ni d'installé.
+- Les gestes de séance (`runSessionNow`) sortent de `lib/bridge.js` vers `lib/sessionGestures.js`,
+  sans changement de comportement, pour être testés sous Node ; les jetons de `agir` vont dans
+  `lib/agirTokens.js` (même clé `jeffreyAgir`, 3 minutes, 5 au plus, chemin des autres actions
+  inchangé).
+- Relecture d'un geste : `{ ok, resume, immediat: true, jeton }`, rien d'écrit dans la séance. Écriture
+  avec la clé `jeton` : jeton retiré d'abord (usage unique, même refusé), refus si vide, inconnu,
+  périmé, déjà utilisé ou autres paramètres ; puis le geste est recalculé et écrit seulement si sa
+  cible est identique (`gestureTarget`, comparée en JSON à clés triées). La cible d'une série porte
+  aussi les valeurs écrites (kilos préremplis compris), jamais `rev` ni le décompte. Repos : minuteur
+  identifié par son heure de fin (un minuteur remplacé est refusé), sauf `lancer` (exercice et durée).
+- Stockage gelé (restauration) : la relecture ne rend pas de jeton, l'écriture avec jeton n'écrit rien
+  (le retrait du jeton doit être enregistré avant toute écriture). Le code `restauration` du pont
+  reste en amont.
+- Écarts au plan : `repos` `lancer` ne compare pas « en cours ou non » ; heure de fin ajoutée pour les
+  autres actions de repos ; `BRIDGE_VERSION` gardé à 1 (JEFFREY reconnaît la prise en charge au
+  `jeton` de la relecture).
+- Tests : `apps/perso/test/jeffreyGestureToken.test.mjs` (17) — 328 au total.
+- Retour arrière : remettre `apps/perso`, `packages/core`, `CLAUDE.md` et `docs` à l'état du tag
+  `avant-jetons-gestes`, puis supprimer `lib/sessionGestures.js`, `lib/agirTokens.js`, le test et la
+  note ; ou appliquer à l'envers le correctif gardé dans
+  `~/Documents/protocole-sauvegardes/jetons-gestes-2026-11/`.
+

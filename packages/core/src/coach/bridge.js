@@ -1,5 +1,9 @@
 // Pont privé PROTOCOLE → JEFFREY (étape G1, lecture seule, 05/11/2026). Cadrage :
 // jeffrey-app/docs/cadrage/ETAPE_G_PONT_PROTOCOLE.md (§3, §5, §6 : contrat v1).
+// Extension compatible du 12/11/2026 (op `agir`, gestes de séance) : la relecture d'un geste rend un
+// `jeton` lié à l'action, aux paramètres et à la cible ; une écriture qui porte un `jeton` n'est faite
+// que s'il est valable et la cible inchangée (apps/perso/src/lib/sessionGestures.js). Sans jeton :
+// geste immédiat, inchangé.
 // Principe inchangé : PROTOCOLE calcule les faits, Jeffrey (ici l'appli JEFFREY) les juge et parle.
 // Ce module ne fait que METTRE EN FORME des faits déjà calculés ailleurs (buildCoachPrompt,
 // nextSessions, computeEnergyScore, buildBilanPrompt) : aucune règle métier nouvelle. La
