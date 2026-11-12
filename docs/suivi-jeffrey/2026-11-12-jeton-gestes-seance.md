@@ -1,8 +1,9 @@
 # Jeton des gestes de séance : contrat implémenté dans PROTOCOLE (12/11/2026, v3.162.0)
 
 Pour la session JEFFREY. Plan d'origine : `jeffrey-app/docs/cadrage/PLAN_JETON_GESTES_SEANCE.md`.
-**Préparé en local seulement** : rien de poussé, rien d'installé sur le S25. Rien à changer côté
-JEFFREY pour garder le comportement actuel.
+**Livré** : commit `9773199` (branche `dev`), installé sur le S25 le 12/11/2026 à 9 h 49, APK
+`2a2f12350c49b572926f9c0b987c9007a41529c2bd53967dd9b2396617a3e5a0`. Rien à changer côté JEFFREY pour
+garder le comportement actuel.
 
 ## Op `agir`, gestes `noter_serie`, `annuler_serie`, `aller_a`, `exercice_suivant`, `repos`
 
@@ -39,5 +40,8 @@ pour reconnaître un minuteur remplacé. `BRIDGE_VERSION` reste à 1 : la prise 
 
 ## Vérifié (local, données fictives)
 
-`apps/perso/test/jeffreyGestureToken.test.mjs`, 17 tests ; 328 tests au total, tous verts. Pas
-d'essai sur le téléphone.
+`apps/perso/test/jeffreyGestureToken.test.mjs`, 17 tests ; 328 tests au total, tous verts.
+Sur le téléphone après installation : lecture du pont depuis le JEFFREY installé (`version` →
+`{ pont: 1, appli: "3.162.0" }`, `lire forme` complète), sans IA ni écriture. **Aucun geste essayé
+sur le téléphone** (ni avec ni sans jeton) : à faire côté JEFFREY, hors séance réelle, quand sa
+version avec jeton sera prête.

@@ -172,7 +172,7 @@ PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
   - **Depuis v3.157.2 (07/11/2026), c'est vrai de TOUT repos**, lancé dans PROTOCOLE ou par
     JEFFREY : voir la section du 07/11/2026 en fin de fichier. `quiet` et `rest.source` sont encore
     écrits mais n'ont plus d'effet.
-- **Jeton des gestes de séance (v3.162.0, 12/11/2026, préparé en local, pas installé)** : la relecture
+- **Jeton des gestes de séance (v3.162.0, installé sur le S25 le 12/11/2026)** : la relecture
   d'un geste (`verifier: true`) rend un `jeton` lié à l'action, aux paramètres et à la cible (séance,
   exercice, série, minuteur) ; une écriture qui porte la clé `jeton` (même vide) n'est faite que si le
   jeton est valable et la cible inchangée, jamais de repli vers le geste immédiat. Sans `jeton` :
@@ -6125,8 +6125,8 @@ changement de transport, de voix, de LiteLLM, ni dans le dépôt JEFFREY ou côt
 ## Jeton des gestes de séance pour le pont JEFFREY (12/11/2026, apps/perso v3.162.0)
 
 Extension ciblée du pont, distincte de la campagne d'audit, d'après le plan
-`jeffrey-app/docs/cadrage/PLAN_JETON_GESTES_SEANCE.md`. **Préparée en local** : point de restauration
-= tag local `avant-jetons-gestes` (997a9a6, v3.161.0), rien de poussé ni d'installé.
+`jeffrey-app/docs/cadrage/PLAN_JETON_GESTES_SEANCE.md`. Point de restauration : tag
+`avant-jetons-gestes` (997a9a6, v3.161.0), poussé. Livrée par le commit `9773199`.
 - Les gestes de séance (`runSessionNow`) sortent de `lib/bridge.js` vers `lib/sessionGestures.js`,
   sans changement de comportement, pour être testés sous Node ; les jetons de `agir` vont dans
   `lib/agirTokens.js` (même clé `jeffreyAgir`, 3 minutes, 5 au plus, chemin des autres actions
@@ -6144,7 +6144,24 @@ Extension ciblée du pont, distincte de la campagne d'audit, d'après le plan
   autres actions de repos ; `BRIDGE_VERSION` gardé à 1 (JEFFREY reconnaît la prise en charge au
   `jeton` de la relecture).
 - Tests : `apps/perso/test/jeffreyGestureToken.test.mjs` (17) — 328 au total.
-- Retour arrière : remettre `apps/perso`, `packages/core`, `CLAUDE.md` et `docs` à l'état du tag
+- **Installé sur le S25 le 12/11/2026 à 9 h 49** (`release.mjs build` puis `install`, depuis la
+  racine) : commit `9773199`, v3.162.0, empreinte de l'APK `2a2f12350c49b572…` vérifiée sur le
+  téléphone ; tests JS (328) et tests unitaires Android passés pendant la construction ; même
+  certificat, `versionCode` 1, date de première installation inchangée. Avant : aucune séance en
+  cours, aucun jeton valable (seule carte « à confirmer » : une note du 31/10 abandonnée, qui ne peut
+  plus être confirmée, laissée telle quelle), copie serveur manuelle réussie à 9 h 47, sauvegarde
+  locale du jour présente, APK installé copié (v3.161.0, `70dbe61c…`, certificat vérifié). Après :
+  - démarrage normal, les 13 écrans (onglets, sous-onglets, Réglages) sans écran de secours ni
+    alerte, « Protocole v3.162.0 » affiché ;
+  - empreintes : 47 clés sur 48 identiques, dont les 12 sensibles (clés, configuration IA et voix) ;
+    seule `lastPosition` a changé ; préférences Android identiques hors widget ;
+  - permissions du pont accordées ; réveil de sauvegarde de 14 h programmé ; aucun plantage ;
+  - **pont lu depuis le JEFFREY installé** (`WhatsAppCheckReceiver`, sans IA ni écriture) :
+    `version` → `{ pont: 1, appli: "3.162.0" }`, `lire forme` → réponse complète.
+  - **Pas essayé sur le téléphone** (choix de Yoann : pas sur sa vraie séance) : aucun geste, avec ou
+    sans jeton. Le JEFFREY installé n'envoie pas encore de jeton aux gestes : rien ne change pour lui.
+- Retour arrière : APK précédent `~/Documents/protocole-sauvegardes/jetons-gestes-2026-11/
+  protocole-installe-avant-jetons.apk` (`adb install -r`, données conservées). Code : remettre `apps/perso`, `packages/core`, `CLAUDE.md` et `docs` à l'état du tag
   `avant-jetons-gestes`, puis supprimer `lib/sessionGestures.js`, `lib/agirTokens.js`, le test et la
   note ; ou appliquer à l'envers le correctif gardé dans
   `~/Documents/protocole-sauvegardes/jetons-gestes-2026-11/`.
