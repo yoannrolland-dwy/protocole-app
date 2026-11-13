@@ -20,8 +20,8 @@ documenter le livré ici, dans CLAUDE.md.
 ## État courant (13/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.165.0, commit `5a630d3`, le 13/11/2026 à 19 h 10 (démonstrations 3D,
-  étapes 1 et 2).
+- **Installé sur le S25** : v3.166.0, commit `c7b1258`, le 13/11/2026 à 19 h 29 (démonstrations 3D,
+  étapes 1 et 2, gestes corrigés d'après la littérature).
 - **Git** : `dev` = `origin/dev` (poussé le 13/11/2026 au soir), dossier propre, aucune autre branche
   de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à
   la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
@@ -34,7 +34,7 @@ documenter le livré ici, dans CLAUDE.md.
   campagne », plus bas.
 - **Chantier en cours : démonstrations 3D** (sections du 13/11/2026 en fin de fichier). Étape 1
   (Mobilité) et étape 2 (haltères, barre, bancs) installées. Gestes corrigés d'après la
-  littérature en v3.166.0 (pas encore installée) ; sources dans `docs/demos-3d/`. Reste l'étape 3
+  littérature en v3.166.0, installée ; Yoann doit juger le résultat ; sources dans `docs/demos-3d/`. Reste l'étape 3
   (machines et poulies, avec le hip thrust et le rowing).
 - **En attente hors de ce dépôt** (appli JEFFREY, dépôt `jeffrey-app`) : installer son récepteur du
   signal de record, puis l'essayer casque branché ; envoyer un jeton aux gestes de séance ;
@@ -6447,5 +6447,14 @@ de mobilité non cités étaient déjà dans les fourchettes des sources (chat-v
 thoracique, bascule, 90/90, squat profond, levée de jambe, charnière, genou au mur).
 
 **Vérifications** : 348 tests verts (appuis, portée, barre et sécurités inchangés) ; images relues
-dans l'aperçu. **Pas vérifié** : le téléphone et l'avis de Yoann.
+dans l'aperçu.
+
+**Installé sur le S25 le 13/11/2026 à 19 h 29** (`release.mjs build` puis `install`) : commit
+`c7b1258`, empreinte de l'APK `8f17a9e6b714bfdc…` vérifiée sur le téléphone. Avant : aucune séance
+en cours ; APK 3.165.0 copié dans `~/Documents/protocole-sauvegardes/gestes-corriges-2026-11/` ;
+copie serveur manuelle réussie à 19 h 28 ; empreintes relevées. Après : « v3.166.0 » dans les
+Réglages ; 47 clés sur 48 identiques (seule `lastPosition` a changé) ; préférences Android
+identiques ; permission du signal JEFFREY accordée ; aucun plantage. Démonstration du développé
+couché ouverte depuis Upper B sur le téléphone, sans erreur ; séance de test annulée, rien
+enregistré. **Pas vérifié** : l'avis de Yoann sur les gestes corrigés.
 
