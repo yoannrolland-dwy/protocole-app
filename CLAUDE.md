@@ -20,8 +20,8 @@ documenter le livré ici, dans CLAUDE.md.
 ## État courant (13/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.164.0, commit `f19e586`, le 13/11/2026 à 18 h 46 (Mobilité élargie
-  et démonstrations 3D, étape 1).
+- **Installé sur le S25** : v3.165.0, commit `5a630d3`, le 13/11/2026 à 19 h 10 (démonstrations 3D,
+  étapes 1 et 2).
 - **Git** : `dev` = `origin/dev` (poussé le 13/11/2026 au soir), dossier propre, aucune autre branche
   de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à
   la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
@@ -33,8 +33,8 @@ documenter le livré ici, dans CLAUDE.md.
   10/11/2026 est faite (lots 1 à 3). Ce qui reste ouvert est dans « Reportés à la fin de la
   campagne », plus bas.
 - **Chantier en cours : démonstrations 3D** (sections du 13/11/2026 en fin de fichier). Étape 1
-  (Mobilité) installée ; étape 2 (haltères, barre, bancs) écrite en v3.165.0, pas encore installée.
-  Reste l'étape 3 (machines et poulies, avec le hip thrust et le rowing).
+  (Mobilité) et étape 2 (haltères, barre, bancs) installées ; Yoann doit juger les gestes. Reste
+  l'étape 3 (machines et poulies, avec le hip thrust et le rowing).
 - **En attente hors de ce dépôt** (appli JEFFREY, dépôt `jeffrey-app`) : installer son récepteur du
   signal de record, puis l'essayer casque branché ; envoyer un jeton aux gestes de séance ;
   afficher en clair le code `restauration`. Notes : `docs/suivi-jeffrey/`.
@@ -6399,7 +6399,15 @@ Lower B, Lower C et Full Body pour ces exercices.
 - Aperçu : planches d'images des positions clés relues ; à 375 px, carnet de Lower A avec le
   bouton sur le squat, les mollets et le soulevé de terre (pas sur la leg extension), écran du
   squat sur sécurités, aucune erreur console, aucun débordement.
-- **Pas vérifié** : le téléphone ; le jugement de Yoann sur la justesse des gestes.
+- **Installé sur le S25 le 13/11/2026 à 19 h 10** (`release.mjs build` puis `install`) : commit
+  `5a630d3`, empreinte de l'APK `67b40445e6a1c845…` vérifiée sur le téléphone, date de première
+  installation inchangée. Avant : aucune séance en cours ; APK 3.164.0 copié dans
+  `~/Documents/protocole-sauvegardes/barre-halteres-3d-2026-11/` ; copie serveur manuelle réussie à
+  19 h 10 ; empreintes des 48 clés et des 5 préférences Android relevées. Après : « v3.165.0 » dans
+  les Réglages ; les 48 clés identiques ; préférences identiques ; permission du signal JEFFREY
+  accordée ; aucun plantage. Démonstration du squat sur sécurités ouverte depuis Lower A sur le
+  téléphone, sans erreur ; séance de test annulée, rien enregistré.
+- **Pas vérifié** : le jugement de Yoann sur la justesse des gestes.
 - **Limites** : la prise exacte (largeur, rotation des poignets) et le placement des omoplates ne
   se voient pas ; le banc Hammer Strength est un banc générique.
 
