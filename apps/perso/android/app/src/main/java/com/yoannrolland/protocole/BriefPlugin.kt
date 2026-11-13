@@ -51,6 +51,14 @@ class BriefPlugin : Plugin() {
         call.resolve(JSObject().put("sent", JeffreySignal.send(context, json, check = true)))
     }
 
+    /** Record coché à l'écran (13/11/2026) : `json` = recordPayload → { sent, raison }. */
+    @PluginMethod
+    fun signalRecord(call: PluginCall) {
+        val json = call.getString("json") ?: return call.reject("json manquant")
+        val r = JeffreySignal.sendRecord(context, json)
+        call.resolve(JSObject().put("sent", r == "envoye").put("raison", r))
+    }
+
     @PluginMethod
     fun isEnabled(call: PluginCall) {
         call.resolve(JSObject().put("enabled", BriefScheduler.enabled(context)))

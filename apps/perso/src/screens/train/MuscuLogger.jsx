@@ -26,6 +26,8 @@ import { sayStable } from "../../lib/jeffrey.js";
 import { restAnnouncement, holdAnnouncement, genericAnnouncement } from "../../lib/restSpeech.js";
 import { readExoNotes, saveExoNote } from "../../lib/exoNotes.js";
 import { ExoNote } from "./ExoNote.jsx";
+import { recordPayload, firstTime } from "../../lib/recordSignal.js";
+import { signalRecord } from "../../lib/briefNative.js";
 
 const mono = { fontFamily: T.f.num, fontVariantNumeric: "tabular-nums" };
 const WARN = T.c.warn;
@@ -162,7 +164,13 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   const upd = (ei, si, field, value) => mutate((p) => updateSet(p, ei, si, field, value));
   const toggle = (ei, si) => {
     const base = currentExos();
-    mutate(() => toggleSet(base, ei, si));
+    const after = toggleSet(base, ei, si);
+    mutate(() => after);
+    // Record battu à l'écran → JEFFREY félicite, casque branché seulement (13/11/2026).
+    if (!base[ei].series[si].fait) {
+      const p = recordPayload({ after, ei, si, ref: refRecords[base[ei].nom], painRed, date });
+      if (p && firstTime(p)) signalRecord(p);
+    }
     // coche = fin de série → relance le minuteur sur le dernier temps utilisé pour cet exercice (fin de série uniquement, pas décoche)
     if (!base[ei].series[si].fait) {
       // Fin de repos dite par Jeffrey (31/10/2026) : la série ou l'exercice qui vient.

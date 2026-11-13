@@ -26,6 +26,16 @@ export async function briefEnabled() {
  * toujours hors app native). Quand il part, Kotlin programme aussi le contrôle de la minute
  * (BriefSignalCheckReceiver) : le brief de secours part même si l'app a été quittée.
  */
+/**
+ * Record coché à l'écran (13/11/2026) : prévient JEFFREY, qui félicite. Le natif n'envoie que si un
+ * casque est branché et JEFFREY joignable. `payload` vient de recordPayload (lib/recordSignal.js).
+ * → true si le signal est parti. Jamais d'erreur remontée : un record ne doit rien bloquer.
+ */
+export async function signalRecord(payload) {
+  if (!native()) return false;
+  try { return (await Brief.signalRecord({ json: JSON.stringify(payload) })).sent === true; } catch (e) { console.warn("brief", e); return false; }
+}
+
 export async function signalJeffrey({ date, manque }) {
   if (!native()) return false;
   try { return (await Brief.signalJeffrey({ json: JSON.stringify({ date, manque }) })).sent === true; } catch (e) { console.warn("brief", e); return false; }

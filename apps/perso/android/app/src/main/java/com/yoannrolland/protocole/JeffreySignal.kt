@@ -68,6 +68,36 @@ object JeffreySignal {
         }
     }
 
+    // Record coché à l'écran (13/11/2026, choix de Yoann : « le mélange des deux, seulement casque
+    // branché ») : JEFFREY félicite, phrase générale puis détail. Même permission que le brief.
+    const val ACTION_RECORD = "fr.yrolland.jeffrey.action.PROTOCOLE_RECORD"
+    private const val RECORD_RECEIVER = "fr.yrolland.jeffrey.protocole.RecordSignalReceiver"
+
+    private fun recordIntent(json: String) = Intent(ACTION_RECORD)
+        .setPackage(JEFFREY)
+        .setComponent(ComponentName(JEFFREY, RECORD_RECEIVER))
+        .putExtra("json", json)
+
+    /**
+     * → "envoye", ou la raison de ne pas envoyer : "sans_casque", "jeffrey_absent". Le casque est
+     * vérifié ici, au moment même : sans lui, JEFFREY n'est pas réveillé du tout.
+     */
+    fun sendRecord(context: Context, json: String): String {
+        if (Headset.connected(context) == null) return "sans_casque"
+        val pm = context.packageManager
+        val installed = try { pm.getPackageInfo(JEFFREY, 0); true } catch (e: PackageManager.NameNotFoundException) { false }
+        if (!installed || context.checkSelfPermission(PERMISSION) != PackageManager.PERMISSION_GRANTED ||
+            pm.queryBroadcastReceivers(recordIntent("{}"), 0).isEmpty()) return "jeffrey_absent"
+        return try {
+            context.sendBroadcast(recordIntent(json))
+            Log.i(TAG, "record signalé à JEFFREY")
+            "envoye"
+        } catch (e: Exception) {
+            Log.w(TAG, "signal de record refusé : ${e.javaClass.simpleName}")
+            "jeffrey_absent"
+        }
+    }
+
     private fun checkIntent(context: Context, flags: Int) = PendingIntent.getBroadcast(
         context, REQ, Intent(context, BriefSignalCheckReceiver::class.java), flags or PendingIntent.FLAG_IMMUTABLE,
     )

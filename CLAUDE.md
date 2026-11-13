@@ -17,7 +17,7 @@ les pièges identifiés et les tests attendus — ne pas les rouvrir sans raison
 À la fin d'une étape : cocher son état dans le tableau de `ROADMAP.md`, et
 documenter le livré ici, dans CLAUDE.md.
 
-## Jeffrey, état actuel (mis à jour le 07/11/2026, apps/perso v3.157.2)
+## Jeffrey, état actuel (mis à jour le 13/11/2026, apps/perso v3.163.0)
 
 Résumé de référence. Les sections datées plus bas (chantier J, 29-31/10/2026) racontent comment on
 en est arrivé là ; **en cas de désaccord, c'est cette section qui fait foi**. À tenir à jour à
@@ -178,6 +178,14 @@ PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
   jeton est valable et la cible inchangée, jamais de repli vers le geste immédiat. Sans `jeton` :
   inchangé. Code : `lib/sessionGestures.js`, `lib/agirTokens.js`. Contrat :
   `docs/suivi-jeffrey/2026-11-12-jeton-gestes-seance.md`.
+- **Record coché à l'écran → JEFFREY félicite (v3.163.0, 13/11/2026, choix de Yoann : « le mélange
+  des deux, seulement casque branché »)** : diffusion explicite à
+  `fr.yrolland.jeffrey/.protocole.RecordSignalReceiver`, action
+  `fr.yrolland.jeffrey.action.PROTOCOLE_RECORD`, même permission que le brief, extra `json` =
+  `{ date, exercice, kg, reps | secondes, jambe?, ancien, detail }`. Envoyée seulement casque branché
+  (vérifié par le natif), jamais genou hors base, jamais pour une série notée à la voix, une fois par
+  série et valeurs. `lib/recordSignal.js`, `JeffreySignal.sendRecord`. Contrat :
+  `G5-protocole-signal-record.md` (notes de la session JEFFREY).
 - **Relecture dans l'app ouverte (G3)** : après toute écriture d'une page sans écran (pont,
   notification, brief de secours), l'app relit poids, genou, macros, note, journal alimentaire,
   conversation, carnet, marqueur de mémoire et séances (G4-A) avant son prochain enregistrement. Trois
@@ -6166,6 +6174,22 @@ Extension ciblée du pont, distincte de la campagne d'audit, d'après le plan
   note ; ou appliquer à l'envers le correctif gardé dans
   `~/Documents/protocole-sauvegardes/jetons-gestes-2026-11/`.
 
+## Record coché à l'écran : JEFFREY félicite, casque branché (13/11/2026, apps/perso v3.163.0)
+
+Question de Yoann : un record fait dans PROTOCOLE ne faisait pas parler JEFFREY. C'était normal :
+JEFFREY ne voyait un record que dans la réponse à une série notée à la voix. Son choix : une phrase
+générale tout de suite, puis le détail, **seulement casque branché**.
+- `lib/recordSignal.js` (testé) : `recordPayload` (même définition que l'étoile du carnet,
+  `recordSetIndexes` ; rien genou hors base ; l'ancien record = la série record précédente de la
+  séance, sinon l'historique), `recordDetail` (« Nouveau record de développé incliné haltères :
+  32 kilos, 8 répétitions. »), `firstTime` (une fois par série et valeurs, en mémoire).
+- `MuscuLogger.toggle` : au cochage seulement. Une série notée à la voix ne passe pas par là.
+- Natif : `JeffreySignal.sendRecord` refuse sans casque (`Headset.connected`) ou si le récepteur de
+  JEFFREY n'existe pas, puis envoie ; `BriefPlugin.signalRecord`, `briefNative.signalRecord`.
+- PROTOCOLE ne parle pas : les phrases et la voix sont à JEFFREY (autre dépôt), qui doit créer le
+  récepteur. Tant qu'il n'existe pas, rien n'est envoyé.
+- Tests : `apps/perso/test/recordSignal.test.mjs` (5), 339 au total. Aperçu : série record cochée,
+  étoile affichée, aucune erreur. **Pas vérifié sur le téléphone.**
 
 ## Oiseau haltères, curls poignets retirés, détail de Photo d'un plat (13/11/2026, apps/perso v3.163.0)
 
