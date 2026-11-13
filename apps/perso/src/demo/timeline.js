@@ -6,12 +6,13 @@ const isNum = (v) => typeof v === "number";
 
 /** Mélange deux poses. Une clé absente d'un côté vaut 0 (angles), sauf les cibles et les
  *  directions, reprises telles quelles de l'autre pose. */
-const TARGET_KEY = /^(pos|hand[LR]|foot[LR]|elbow[LR]|kneePole[LR])$/;
+const TARGET_KEY = /^(pos|hand[LR]|foot[LR]|elbow[LR]|kneePole[LR]|grip[LR]|handFrame)$/;
 export function lerpPose(a, b, k) {
   const out = {};
   for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
     const va = a[key], vb = b[key];
     if (va == null && vb == null) continue;
+    if (typeof (va ?? vb) === "string") { out[key] = k < 0.5 ? (va ?? vb) : (vb ?? va); continue; }
     if (va == null || vb == null) {
       const v = va ?? vb;
       if (TARGET_KEY.test(key) || /^flat/.test(key)) out[key] = v;
@@ -51,7 +52,7 @@ export function poseAt(tl, t) {
 }
 
 const swapSide = (key) => key.replace(/([LR])$/, (m) => (m === "L" ? "R" : "L"));
-const FLIP_X = /^(pos|hand[LR]|foot[LR]|elbow[LR]|kneePole[LR])$/;
+const FLIP_X = /^(pos|hand[LR]|foot[LR]|elbow[LR]|kneePole[LR]|grip[LR])$/;
 
 /** Même pose de l'autre côté du corps. */
 export function mirrorPose(p) {
@@ -79,6 +80,7 @@ export function mirrorDemo(d) {
     ...d, props,
     frames: d.frames.map((f) => ({ ...f, pose: mirrorPose(f.pose) })),
     pin: d.pin && { ...d.pin, p: swapSide(d.pin.p), x: d.pin.x != null ? -d.pin.x : undefined },
+    rest: d.rest && { ...d.rest, points: d.rest.points.map(swapSide) },
     active: d.active.map(swapSide),
     touch: d.touch?.map(swapSide),
   };

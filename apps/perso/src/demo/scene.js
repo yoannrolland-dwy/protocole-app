@@ -6,7 +6,7 @@ import {
   MeshStandardMaterial, MeshBasicMaterial, CylinderGeometry, SphereGeometry, BoxGeometry, GridHelper,
   Vector3, Quaternion, BufferGeometry, Line, LineBasicMaterial, MathUtils,
 } from "three";
-import { createRig, applyPose, snapshot, RADIUS } from "./rig.js";
+import { createRig, applyPose, snapshot, RADIUS, BAR, DB, SAFETY_R, barLine } from "./rig.js";
 import { buildTimeline, poseAt } from "./timeline.js";
 import { COLORS } from "../design/tokens.js";
 
@@ -77,11 +77,19 @@ function buildBody(rig, mats) {
 function bounds(rig, demo) {
   const lo = new Vector3(Infinity, Infinity, Infinity), hi = new Vector3(-Infinity, -Infinity, -Infinity);
   for (const f of demo.frames) {
-    applyPose(rig, f.pose, { pin: demo.pin });
-    for (const [n, p] of Object.entries(snapshot(rig))) {
+    applyPose(rig, f.pose, { pin: demo.pin, rest: demo.rest });
+    const snap = snapshot(rig);
+    for (const [n, p] of Object.entries(snap)) {
       const r = RADIUS[n];
       lo.min(new Vector3(p[0] - r, p[1] - r, p[2] - r));
       hi.max(new Vector3(p[0] + r, p[1] + r, p[2] + r));
+    }
+    if (demo.props?.barbell) {
+      const { center, axis } = barLine(snap);
+      for (const k of [-1, 1]) {
+        const end = center.clone().addScaledVector(axis, k * BAR.half);
+        lo.min(end.clone().subScalar(BAR.plate)); hi.max(end.clone().addScalar(BAR.plate));
+      }
     }
   }
   // Les accessoires posés à côté du corps (colonne de poulie, montant) restent dans le cadre.
@@ -111,6 +119,8 @@ export function createDemoScene(canvas, { onTick } = {}) {
     prop: new MeshStandardMaterial({ color: COLORS.raised, roughness: 0.95, metalness: 0 }),
     mat: new MeshStandardMaterial({ color: COLORS.card, roughness: 1, metalness: 0 }),
     metal: new MeshStandardMaterial({ color: COLORS.muted, roughness: 0.5, metalness: 0.3 }),
+    weight: new MeshStandardMaterial({ color: "#3d3d38", roughness: 0.7, metalness: 0.2 }),
+    safety: new MeshStandardMaterial({ color: COLORS.text2, roughness: 0.4, metalness: 0.3 }),
     cable: new LineBasicMaterial({ color: COLORS.text2 }),
     edge: new MeshBasicMaterial({ color: COLORS.line }),
   };
@@ -121,7 +131,7 @@ export function createDemoScene(canvas, { onTick } = {}) {
   scene.add(propGroup);
 
   let demo = null, tl = null, t = 0, playing = true, speed = 1, raf = 0, last = 0, dirty = true, disposed = false;
-  let cable = null, lastTick = 0;
+  let cable = null, lastTick = 0, barbell = null, dumbbells = null;
   const cam = { az: 90, el: 10, dist: 4, base: 4, target: new Vector3(0, 0.8, 0) };
 
   function placeCamera() {
@@ -135,8 +145,11 @@ export function createDemoScene(canvas, { onTick } = {}) {
   }
 
   function clearProps() {
-    for (const o of [...propGroup.children]) { propGroup.remove(o); o.geometry?.dispose?.(); }
-    cable = null;
+    for (const o of [...propGroup.children]) {
+      propGroup.remove(o);
+      o.traverse((x) => x.geometry?.dispose?.());
+    }
+    cable = null; barbell = null; dumbbells = null;
   }
 
   function buildProps(d, b) {
@@ -162,10 +175,55 @@ export function createDemoScene(canvas, { onTick } = {}) {
       m.position.set(p.pole[0], 1.05, p.pole[1]);
       propGroup.add(m);
     }
+    // Boîte : [x, y, z, largeur, hauteur, profondeur, inclinaison autour de X en degrés].
     for (const bx of p.boxes || []) {
       const m = new Mesh(new BoxGeometry(bx[3], bx[4], bx[5]), mats.prop);
       m.position.set(bx[0], bx[1], bx[2]);
+      if (bx[6]) m.rotation.x = MathUtils.degToRad(bx[6]);
       propGroup.add(m);
+    }
+    // Rack : deux montants, et les sécurités (barres horizontales d'avant en arrière) à leur hauteur.
+    if (p.rack) {
+      const { z = 0, x = 0.62, safety } = p.rack;
+      for (const sx of [-x, x]) {
+        // Quatre montants : la barre passe entre ceux de devant et ceux de derrière.
+        for (const sz of [z - 0.36, z + 0.36]) {
+          const up = new Mesh(new BoxGeometry(0.06, 2.0, 0.06), mats.metal);
+          up.position.set(sx, 1.0, sz);
+          propGroup.add(up);
+        }
+        if (safety != null) {
+          const bar = new Mesh(new CylinderGeometry(SAFETY_R, SAFETY_R, 0.78, 14), mats.safety);
+          bar.rotation.x = Math.PI / 2;
+          bar.position.set(sx, safety, z);
+          propGroup.add(bar);
+        }
+      }
+    }
+    if (p.barbell) {
+      const g = new Group();
+      const shaft = new Mesh(new CylinderGeometry(BAR.r, BAR.r, BAR.half * 2, 14), mats.metal);
+      g.add(shaft);
+      for (const k of [-1, 1]) {
+        const plate = new Mesh(new CylinderGeometry(BAR.plate, BAR.plate, BAR.plateW, 32), mats.weight);
+        plate.position.y = k * BAR.plateAt;
+        g.add(plate);
+      }
+      barbell = g;
+      propGroup.add(g);
+    }
+    if (p.dumbbells) {
+      dumbbells = ["L", "R"].map(() => {
+        const g = new Group();
+        g.add(new Mesh(new CylinderGeometry(DB.r, DB.r, DB.handle * 2 + DB.plateW * 2, 12), mats.metal));
+        for (const k of [-1, 1]) {
+          const plate = new Mesh(new CylinderGeometry(DB.plate, DB.plate, DB.plateW, 20), mats.weight);
+          plate.position.y = k * (DB.handle + DB.plateW / 2);
+          g.add(plate);
+        }
+        propGroup.add(g);
+        return g;
+      });
     }
     if (p.cable) {
       const g = new BufferGeometry().setFromPoints([new Vector3(...p.cable.from), new Vector3()]);
@@ -177,7 +235,27 @@ export function createDemoScene(canvas, { onTick } = {}) {
   function applyAt(time) {
     if (!demo) return null;
     const cur = poseAt(tl, time);
-    applyPose(rig, cur.pose, { pin: demo.pin });
+    applyPose(rig, cur.pose, { pin: demo.pin, rest: demo.rest });
+    if (barbell) {
+      const { center, axis } = barLine(snapshot(rig));
+      barbell.position.copy(center);
+      barbell.quaternion.setFromUnitVectors(UP, axis);
+    }
+    if (dumbbells) {
+      for (const [i, side] of ["L", "R"].entries()) {
+        const hand = rig.j["ha" + side].getWorldPosition(new Vector3());
+        const elbow = rig.j["el" + side].getWorldPosition(new Vector3());
+        const fore = hand.clone().sub(elbow).normalize();
+        // Sens de la poignée : celui demandé par la pose, sinon l'avant de l'avant-bras (prise
+        // neutre bras le long du corps). Toujours ramené perpendiculaire à l'avant-bras.
+        const hint = cur.pose["grip" + side]
+          ? new Vector3(...cur.pose["grip" + side])
+          : new Vector3(0, 0, 1).applyQuaternion(rig.j["el" + side].getWorldQuaternion(new Quaternion()));
+        const dir = hint.addScaledVector(fore, -hint.dot(fore)).normalize();
+        dumbbells[i].position.copy(hand);
+        dumbbells[i].quaternion.setFromUnitVectors(UP, dir);
+      }
+    }
     if (cable) {
       const pos = cable.line.geometry.attributes.position;
       const w = rig.j[cable.to].getWorldPosition(new Vector3());

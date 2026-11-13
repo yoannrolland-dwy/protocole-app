@@ -110,8 +110,13 @@ const v3 = (p) => new Vector3(p[0], p[1], p[2]);
  * - `shL/shR : [flexion, abduction, rotation externe]`, `elL/elR` : flexion ;
  * - cibles : `handL/handR: [x, y, z]` (centre de la main), `footL/footR: [x, y, z]` (cheville, pied
  *   mis à plat), avec `elbowL/R` et `kneePoleL/R` : direction où plie le coude ou le genou ;
- * - `flatL/flatR: 1` : pied à plat sans cible ; `yawL/yawR` : ouverture du pied.
+ * - `flatL/flatR: 1` : pied à plat sans cible ; `yawL/yawR` : ouverture du pied ;
+ * - `handFrame: "chest" | "pelvis"` : les cibles des mains sont données dans le repère de ce point
+ *   du corps (barre posée sur le dos ou sur les hanches : elle suit le corps qui bouge) ;
+ * - `gripL/gripR: [x, y, z]` : sens de la poignée d'un haltère (dessin seul, voir scene.js).
  * `opts.pin = { p, z, x? }` : ce point est ramené à cette profondeur (les appuis ne glissent pas).
+ * `opts.rest = { points, y }` : ces points-là sont posés à cette hauteur (banc, cale) au lieu du
+ * point le plus bas du corps posé au sol.
  * Rend `{ reach }` : distance manquante de chaque cible hors de portée.
  */
 export function applyPose(rig, pose, opts = {}) {
@@ -139,8 +144,12 @@ export function applyPose(rig, pose, opts = {}) {
   if (pose.pos) root.position.set(pose.pos[0], pose.pos[1], pose.pos[2]);
   else {
     let low = Infinity;
-    for (const [name, , , rr] of JOINTS) if (!guided.has(name)) low = Math.min(low, worldPos(rig, name, _v).y - rr);
-    root.position.y = -low;
+    const rest = opts.rest;
+    for (const [name, , , rr] of JOINTS) {
+      if (rest ? !rest.points.includes(name) : guided.has(name)) continue;
+      low = Math.min(low, worldPos(rig, name, _v).y - rr);
+    }
+    root.position.y = (rest ? rest.y : 0) - low;
     if (opts.pin) {
       root.updateMatrixWorld(true);
       const p = worldPos(rig, opts.pin.p, _v);
@@ -154,7 +163,9 @@ export function applyPose(rig, pose, opts = {}) {
   for (const [side, s] of [["L", 1], ["R", -1]]) {
     if (pose["hand" + side]) {
       const pole = pose["elbow" + side] ? v3(pose["elbow" + side]) : new Vector3(s * 0.4, -0.6, -1);
-      reach["hand" + side] = solveTwoBone(rig, "sh" + side, "el" + side, "ha" + side, v3(pose["hand" + side]), pole);
+      const target = v3(pose["hand" + side]);
+      if (pose.handFrame) j[pose.handFrame].localToWorld(target);
+      reach["hand" + side] = solveTwoBone(rig, "sh" + side, "el" + side, "ha" + side, target, pole);
     }
     if (pose["foot" + side]) {
       const pole = pose["kneePole" + side] ? v3(pose["kneePole" + side]) : new Vector3(s * 0.08, 0, 1);
@@ -165,6 +176,17 @@ export function applyPose(rig, pose, opts = {}) {
     root.updateMatrixWorld(true);
   }
   return { reach };
+}
+
+// Matériel, en mètres : barre olympique (2,2 m, disques de 45 cm), haltère, sécurités du rack.
+export const BAR = { half: 1.1, r: 0.014, plate: 0.225, plateAt: 0.85, plateW: 0.05 };
+export const DB = { handle: 0.075, r: 0.016, plate: 0.075, plateW: 0.05 };
+export const SAFETY_R = 0.025;
+
+/** Barre tenue à deux mains : elle passe par le centre des deux mains (positions de `snapshot`). */
+export function barLine(snap) {
+  const a = new Vector3(...snap.haL), b = new Vector3(...snap.haR);
+  return { center: a.clone().add(b).multiplyScalar(0.5), axis: a.sub(b).normalize() };
 }
 
 /** Positions de tous les points du corps, pour les tests et pour cadrer la caméra. */

@@ -71,7 +71,7 @@ export function DemoViewer({ nom, consigne, alerte, onClose }) {
         )}
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "12px 16px 24px", display: "grid", gap: 14, alignContent: "start", gridTemplateColumns: "minmax(0, 1fr)" }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "12px 16px 24px", display: "grid", gap: 14, alignContent: "start", gridTemplateColumns: "minmax(0, 1fr)", gridAutoRows: "max-content" }}>
         <div aria-live="polite" style={{ fontSize: 16, fontWeight: 600, color: T.c.text, lineHeight: 1.35, minHeight: 44 }}>{tick.cue}</div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

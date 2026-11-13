@@ -1,4 +1,5 @@
-// Démonstrations 3D des exercices (13/11/2026, étape 1 : la séance Mobilité).
+// Démonstrations 3D des exercices (13/11/2026). Étape 1 : la séance Mobilité ; étape 2 : haltères,
+// barre et bancs.
 // Une entrée par NOM d'exercice (le même nom que dans les gabarits). Poses en angles anatomiques,
 // décrites dans rig.js. Textes écrits pour PROTOCOLE.
 //
@@ -7,8 +8,9 @@
 // - `active` : parties du mannequin dessinées en jaune (la zone qui travaille) ;
 // - `view` : caméra de départ (face, profilG, profilD, dos, dessus, ou { az, el } en degrés) ;
 // - `pin` : appui qui ne glisse pas ; `touch` : points qui doivent toucher le sol (tests) ;
+// - `rest` : points posés sur un banc ou une cale, à cette hauteur (au lieu du sol) ;
 // - `sides` : exercice d'un seul côté, on peut voir l'autre ; `side` : le côté qui travaille ici ;
-// - `props` : accessoires (tapis, mur, montant, caisson, câble) ;
+// - `props` : accessoires (tapis, mur, montant, caisson, câble, rack, barre, haltères) ;
 // - `sentir`, `eviter` : un repère chacun.
 
 const LR = (key, v) => ({ [key + "L"]: v, [key + "R"]: v });
@@ -30,6 +32,20 @@ const FEET_FLOOR = { footL: [0.2, 0.085, 0.47], footR: [-0.2, 0.085, 0.47] };
 const stand = (y, z, pitch, extra = {}) => ({
   pos: [0, y, z], root: [pitch, 0, 0], footL: [0.11, 0.085, 0], footR: [-0.11, 0.085, 0], ...extra,
 });
+
+// Étape 2. Bancs : assise à 45 cm. Dossier : [x, y, z, largeur, longueur, épaisseur, inclinaison].
+const SEAT = [0, 0.225, -0.02, 0.3, 0.45, 0.4];
+const SEATED = { points: ["pelvis"], y: 0.45 };
+const SEATED_FEET = { footL: [0.22, 0.085, 0.5], footR: [-0.22, 0.085, 0.5], kneePoleL: [0.3, 1, 0.5], kneePoleR: [-0.3, 1, 0.5] };
+// Barre posée sur le haut du dos : mains tenues dans le repère du buste, elle suit le corps.
+const BAR_ON_BACK = { handFrame: "chest", handL: [0.45, 0.2, -0.115], handR: [-0.45, 0.2, -0.115], elbowL: [0.3, -1, -0.8], elbowR: [-0.3, -1, -0.8] };
+const SQUAT_FEET = { footL: [0.17, 0.085, 0], footR: [-0.17, 0.085, 0], yawL: 15, yawR: 15, kneePoleL: [0.3, 0, 1], kneePoleR: [-0.3, 0, 1] };
+// Squat sur sécurités : en bas, 60° de flexion du genou, barre au-dessus du milieu du pied
+// (calculé) ; la barre y repose sur les sécurités.
+const SQUAT_SAFETY = 1.334 - 0.014 - 0.025;
+// Prises : sens de la poignée de l'haltère (dans le prolongement l'une de l'autre, ou neutre).
+const PRONE = { gripL: [1, 0, 0], gripR: [-1, 0, 0] };
+const NEUTRAL = { gripL: [0, 0, 1], gripR: [0, 0, 1] };
 
 export const DEMOS = {
   "Chat-vache": {
@@ -269,6 +285,164 @@ export const DEMOS = {
     sentir: "Toute la sangle abdominale, sans pincement dans le bas du dos.",
     eviter: "Laisser le bassin descendre ou monter les fesses : la ligne reste droite.",
   },
+
+  // ---------------------------------------------------------------- Étape 2 : haltères, barre, bancs
+
+  "Développé couché haltères": (() => {
+    const base = { root: [-90, 0, 0], neck: [6, 0, 0], footL: [0.3, 0.085, 0.42], footR: [-0.3, 0.085, 0.42],
+      kneePoleL: [0.4, 1, 0.3], kneePoleR: [-0.4, 1, 0.3], elbowL: [1, -0.6, 0.3], elbowR: [-1, -0.6, 0.3], ...PRONE };
+    const top = { ...base, handL: [0.17, 1.12, -0.46], handR: [-0.17, 1.12, -0.46] };
+    const low = { ...base, handL: [0.3, 0.66, -0.43], handR: [-0.3, 0.66, -0.43] };
+    return {
+      view: { az: 55, el: 22 }, active: ["torse", "epauleL", "epauleR", "brasL", "brasR"],
+      rest: { points: ["pelvis", "spine", "chest", "ribs", "head"], y: 0.45 }, pin: { p: "pelvis", z: 0 }, touch: ["toeL", "heelL", "toeR", "heelR"],
+      props: { dumbbells: true, boxes: [[0, 0.225, -0.31, 0.3, 0.45, 1.02]] },
+      frames: [
+        { d: 1.2, hold: 0.6, cue: "Allongé, pieds au sol, omoplates serrées, haltères au-dessus des épaules", pose: top },
+        { d: 2.2, hold: 0.3, cue: "Descendre lentement, coudes à 45-60° du buste, jusqu'au niveau de la poitrine", pose: low },
+        { d: 1.2, hold: 0.6, cue: "Pousser vers le haut sans cogner les haltères, épaules plaquées au banc", pose: top },
+      ],
+      sentir: "Les pectoraux qui s'étirent en bas et poussent en remontant.",
+      eviter: "Décoller les fesses du banc ou ouvrir les coudes à 90° : l'avant de l'épaule souffre.",
+    };
+  })(),
+
+  "Développé incliné haltères": (() => {
+    // Dossier à 30° : buste incliné de 60° en arrière, épaules vers (±0.185, 0.80, −0.42).
+    const base = { root: [-60, 0, 0], neck: [18, 0, 0], ...SEATED_FEET, elbowL: [1, -1, -0.5], elbowR: [-1, -1, -0.5], ...PRONE };
+    const top = { ...base, handL: [0.18, 1.36, -0.39], handR: [-0.18, 1.36, -0.39] };
+    const low = { ...base, handL: [0.31, 0.89, -0.37], handR: [-0.31, 0.89, -0.37] };
+    return {
+      view: { az: 65, el: 14 }, active: ["torse", "epauleL", "epauleR"],
+      rest: SEATED, pin: { p: "pelvis", z: 0 }, touch: ["toeL", "heelL", "toeR", "heelR"],
+      props: { dumbbells: true, boxes: [SEAT, [0, 0.613, -0.371, 0.3, 0.8, 0.08, -60]] },
+      frames: [
+        { d: 1.2, hold: 0.6, cue: "Dossier incliné à 30°, dos calé, haltères au-dessus du haut de la poitrine", pose: top },
+        { d: 2.2, hold: 0.3, cue: "Descendre lentement sur les côtés du haut de la poitrine, coudes sous les poignets", pose: low },
+        { d: 1.2, hold: 0.6, cue: "Pousser vers le haut, les haltères se rapprochent sans se toucher", pose: top },
+      ],
+      sentir: "Le haut des pectoraux et l'avant des épaules.",
+      eviter: "Cambrer pour pousser plus lourd : le bas du dos reste au contact du dossier.",
+    };
+  })(),
+
+  "Développé militaire haltères": (() => {
+    // Dossier légèrement incliné (buste à 12° en arrière), épaules vers (±0.185, 1.03, −0.10).
+    const base = { root: [-12, 0, 0], neck: [6, 0, 0], ...SEATED_FEET, elbowL: [1, -1, 0], elbowR: [-1, -1, 0], ...PRONE };
+    const low = { ...base, handL: [0.33, 1.1, -0.05], handR: [-0.33, 1.1, -0.05] };
+    const top = { ...base, handL: [0.16, 1.6, -0.08], handR: [-0.16, 1.6, -0.08] };
+    return {
+      view: { az: 25, el: 8 }, active: ["epauleL", "epauleR", "brasL", "brasR"],
+      rest: SEATED, pin: { p: "pelvis", z: 0 }, touch: ["toeL", "heelL", "toeR", "heelR"],
+      props: { dumbbells: true, boxes: [SEAT, [0, 0.869, -0.205, 0.3, 0.8, 0.08, -12]] },
+      frames: [
+        { d: 1.2, hold: 0.5, cue: "Assis, dos calé contre le dossier, haltères à hauteur des oreilles", pose: low },
+        { d: 1.3, hold: 0.4, cue: "Pousser au-dessus de la tête, sans cambrer ni verrouiller les coudes", pose: top },
+        { d: 2, hold: 0.3, cue: "Redescendre en freinant jusqu'aux oreilles", pose: low },
+      ],
+      sentir: "Le devant et le côté des épaules.",
+      eviter: "Décoller le dos du dossier ou cambrer pour finir la répétition.",
+    };
+  })(),
+
+  "Élévations latérales haltères": {
+    view: "face", active: ["epauleL", "epauleR"], touch: ["toeL", "heelL", "toeR", "heelR"], props: { dumbbells: true },
+    frames: [
+      { d: 1.2, hold: 0.4, cue: "Debout, buste légèrement penché, coudes à peine fléchis, haltères le long des cuisses",
+        pose: stand(0.975, 0, 5, { neck: [-5, 0, 0], ...LR("sh", [0, 12, 0]), ...LR("el", 15) }) },
+      { d: 1.2, hold: 0.4, cue: "Monter les bras sur les côtés jusqu'à l'horizontale, sans élan",
+        pose: stand(0.975, 0, 5, { neck: [-5, 0, 0], ...LR("sh", [8, 86, 0]), ...LR("el", 15) }) },
+      { d: 2, hold: 0.2, cue: "Redescendre en freinant, sans laisser tomber",
+        pose: stand(0.975, 0, 5, { neck: [-5, 0, 0], ...LR("sh", [0, 12, 0]), ...LR("el", 15) }) },
+    ],
+    sentir: "Le côté des épaules, du début à la fin du mouvement.",
+    eviter: "Hausser les épaules vers les oreilles ou donner de l'élan avec le buste.",
+  },
+
+  "Curl marteau (prise neutre)": {
+    view: { az: 60, el: 10 }, active: ["brasL", "brasR", "avantBrasL", "avantBrasR"], touch: ["toeL", "heelL", "toeR", "heelR"], props: { dumbbells: true },
+    frames: [
+      { d: 1.2, hold: 0.3, cue: "Debout, coudes collés au corps, pouces vers l'avant", pose: stand(0.975, 0, 0, { ...LR("sh", [0, 5, 0]), ...LR("el", 8) }) },
+      { d: 1.2, hold: 0.5, cue: "Plier les coudes, pouces vers le haut, sans avancer les coudes", pose: stand(0.975, 0, 0, { ...LR("sh", [8, 5, 0]), ...LR("el", 125) }) },
+      { d: 2, hold: 0.2, cue: "Redescendre en freinant jusqu'aux bras presque tendus", pose: stand(0.975, 0, 0, { ...LR("sh", [0, 5, 0]), ...LR("el", 8) }) },
+    ],
+    sentir: "L'avant du bras et le dessus de l'avant-bras.",
+    eviter: "Balancer le buste ou avancer les coudes pour lever plus lourd.",
+  },
+
+  "Oiseau haltères": (() => {
+    // Assis au bout du banc, poitrine posée sur les cuisses ; épaules vers (±0.185, 0.67, 0.47).
+    const base = { root: [57, 0, 0], spine: [15, 0, 0], chest: [12, 0, 0], neck: [-24, 0, 0],
+      footL: [0.16, 0.085, 0.42], footR: [-0.16, 0.085, 0.42], kneePoleL: [0.1, 1, 0.5], kneePoleR: [-0.1, 1, 0.5],
+      elbowL: [0.2, 1, -0.3], elbowR: [-0.2, 1, -0.3], ...NEUTRAL };
+    const low = { ...base, handL: [0.3, 0.15, 0.47], handR: [-0.3, 0.15, 0.47] };
+    const high = { ...base, handL: [0.72, 0.62, 0.47], handR: [-0.72, 0.62, 0.47] };
+    return {
+      view: { az: 25, el: 22 }, active: ["epauleL", "epauleR"],
+      rest: SEATED, pin: { p: "pelvis", z: 0 }, touch: ["toeL", "heelL", "toeR", "heelR"],
+      props: { dumbbells: true, boxes: [[0, 0.225, -0.4, 0.3, 0.45, 1.0]] },
+      frames: [
+        { d: 1.2, hold: 0.4, cue: "Assis au bout du banc, poitrine sur les cuisses, haltères sous les genoux, prise neutre", pose: low },
+        { d: 1.3, hold: 0.6, cue: "Ouvrir les bras sur les côtés jusqu'à hauteur d'épaule, coudes à peine fléchis, omoplates serrées", pose: high },
+        { d: 2, hold: 0.2, cue: "Redescendre en freinant", pose: low },
+      ],
+      sentir: "L'arrière des épaules et le haut du dos, entre les omoplates.",
+      eviter: "Plier les coudes pour tirer, ou relever le buste pour aider.",
+    };
+  })(),
+
+  "Squat sur sécurités": {
+    view: { az: 35, el: 28 }, active: ["cuisseL", "cuisseR", "genouL", "genouR", "bassin"], touch: ["toeL", "heelL", "toeR", "heelR"],
+    props: { barbell: true, rack: { z: 0.03, safety: SQUAT_SAFETY } },
+    frames: [
+      { d: 1, hold: 1, cue: "Barre sur le haut du dos, pieds largeur d'épaules, pointes légèrement ouvertes",
+        pose: { pos: [0, 0.97, 0.05], root: [10, 0, 0], neck: [-6, 0, 0], ...SQUAT_FEET, ...BAR_ON_BACK } },
+      { d: 3, hold: 0.8, onSafety: true, cue: "Descendre en 3 secondes jusqu'à poser la barre sur les sécurités (~60° de genou), puis arrêt complet",
+        pose: { pos: [0, 0.85, -0.06], root: [25, 0, 0], neck: [-15, 0, 0], ...SQUAT_FEET, ...BAR_ON_BACK } },
+      { d: 0.8, hold: 1, cue: "Remonter de façon explosive, genoux dans l'axe des pieds",
+        pose: { pos: [0, 0.97, 0.05], root: [10, 0, 0], neck: [-6, 0, 0], ...SQUAT_FEET, ...BAR_ON_BACK } },
+    ],
+    sentir: "Les quadriceps et les fessiers ; au genou, une gêne de 3/10 au plus.",
+    eviter: "Rebondir sur les sécurités ou laisser les genoux rentrer vers l'intérieur.",
+  },
+
+  "Mollets debout à la barre": (() => {
+    const base = { root: [2, 0, 0], ...LR("knee", 3), ...BAR_ON_BACK };
+    return {
+      view: { az: 100, el: 6 }, active: ["jambeL", "jambeR", "chevilleL", "chevilleR"],
+      rest: { points: ["toeL", "toeR"], y: 0.06 }, pin: { p: "toeL", z: 0.2 },
+      props: { barbell: true, rack: { z: 0.06 }, boxes: [[0, 0.03, 0.2, 0.6, 0.06, 0.14]] },
+      frames: [
+        { d: 1.2, hold: 0.4, cue: "Barre sur le dos, l'avant des pieds sur la cale, talons dans le vide",
+          pose: { ...base, ...LR("ankle", 12) } },
+        { d: 0.7, hold: 0.5, cue: "Monter vite sur la pointe des pieds, le plus haut possible", pose: { ...base, ...LR("ankle", -34) } },
+        { d: 2, hold: 0.4, cue: "Redescendre en 2 secondes, talons sous la cale", pose: { ...base, ...LR("ankle", 12) } },
+      ],
+      sentir: "Les mollets, étirés en bas et contractés en haut.",
+      eviter: "Plier les genoux pour aider ou rebondir en bas.",
+    };
+  })(),
+
+  "Soulevé de terre roumain": (() => {
+    const FT = { footL: [0.11, 0.085, 0], footR: [-0.11, 0.085, 0], kneePoleL: [0.05, 0, 1], kneePoleR: [-0.05, 0, 1], elbowL: [0.3, 0, -1], elbowR: [-0.3, 0, -1] };
+    const top = { pos: [0, 0.965, 0.0], root: [3, 0, 0], ...FT, handL: [0.24, 0.9, 0.1], handR: [-0.24, 0.9, 0.1] };
+    const low = { pos: [0, 0.86, -0.31], root: [70, 0, 0], neck: [-25, 0, 0], ...FT, handL: [0.24, 0.45, 0.06], handR: [-0.24, 0.45, 0.06] };
+    // À mi-chemin (calculé) : les hanches ont déjà reculé, la barre est à mi-cuisse.
+    const mid = { pos: [0, 0.89, -0.305], root: [45, 0, 0], neck: [-16, 0, 0], ...FT, handL: [0.24, 0.67, 0.08], handR: [-0.24, 0.67, 0.08] };
+    return {
+      view: { az: 58, el: 12 }, active: ["cuisseL", "cuisseR", "bassin"], touch: ["toeL", "heelL", "toeR", "heelR"], cut: true,
+      props: { barbell: true },
+      frames: [
+        { d: 1.2, hold: 0.6, cue: "Debout, barre contre les cuisses, prise largeur d'épaules, genoux déverrouillés", pose: top },
+        { d: 1.2, hold: 0, cue: "Reculer les fesses, dos plat : la barre glisse le long des cuisses", pose: mid },
+        { d: 1.3, hold: 0.4, cue: "Jusque sous les genoux, sans arrondir le dos", pose: low },
+        { d: 0.8, hold: 0, cue: "Remonter en poussant les hanches vers l'avant", pose: mid },
+        { d: 0.7, hold: 0.6, cue: "Debout, fessiers serrés, sans se pencher en arrière", pose: top },
+      ],
+      sentir: "L'arrière des cuisses qui s'étire, puis les fessiers en remontant.",
+      eviter: "Arrondir le dos ou plier les genoux comme un squat : ce sont les hanches qui reculent.",
+    };
+  })(),
 };
 
 export const hasDemo = (nom) => !!DEMOS[nom];

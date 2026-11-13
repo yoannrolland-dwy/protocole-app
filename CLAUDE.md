@@ -28,13 +28,13 @@ documenter le livré ici, dans CLAUDE.md.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
   `avant-campagne-audit`, `apres-lot1-audit`, `apres-lot2-audit`, `avant-jetons-gestes`. APK
   précédents : `~/Documents/protocole-sauvegardes/` (hors Git).
-- **Tests** : 346 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
+- **Tests** : 348 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
 - **Chantiers** : tous ceux de `ROADMAP.md` sont livrés (V, R, S, T, U, J). La campagne d'audit du
   10/11/2026 est faite (lots 1 à 3). Ce qui reste ouvert est dans « Reportés à la fin de la
   campagne », plus bas.
-- **Chantier en cours : démonstrations 3D** (section du 13/11/2026 en fin de fichier). Étape 1
-  (Mobilité) installée ; Yoann doit juger le rendu et la justesse des gestes avant les étapes 2
-  (haltères, barre, banc) et 3 (machines et poulies).
+- **Chantier en cours : démonstrations 3D** (sections du 13/11/2026 en fin de fichier). Étape 1
+  (Mobilité) installée ; étape 2 (haltères, barre, bancs) écrite en v3.165.0, pas encore installée.
+  Reste l'étape 3 (machines et poulies, avec le hip thrust et le rowing).
 - **En attente hors de ce dépôt** (appli JEFFREY, dépôt `jeffrey-app`) : installer son récepteur du
   signal de record, puis l'essayer casque branché ; envoyer un jeton aux gestes de séance ;
   afficher en clair le code `restauration`. Notes : `docs/suivi-jeffrey/`.
@@ -6355,3 +6355,51 @@ ajouter ses mouvements à la séance Mobilité, et voir chaque exercice exécut�
   Yoann sur la justesse de chaque geste.
 - **Pas fait** : les exercices hors Mobilité (étapes 2 et 3) ; JEFFREY ne reçoit ni les zones ni
   la mise en garde.
+
+## Démonstrations 3D, étape 2 : haltères, barre et bancs (13/11/2026, apps/perso v3.165.0)
+
+Demandée par Yoann après l'installation de l'étape 1 (« passe à l'étape 2 »).
+
+**Choix de Yoann (13/11/2026) :**
+- développé militaire **assis, dossier légèrement incliné** (« à 6 sur un banc Hammer Strength »,
+  montré à 12° en arrière) ;
+- oiseau **assis, poitrine sur les genoux** ;
+- rowing montré **en machine**, donc à l'étape 3 ; le hip thrust (enregistré `machine`) aussi ;
+- **curls poignets sans démonstration** : le mannequin n'a pas de poignet articulé, et ces
+  exercices ne sont plus dans ses séances.
+
+**Neuf démonstrations ajoutées** (`demos.js`) : développé couché haltères (banc plat), développé
+incliné haltères (dossier à 30°), développé militaire haltères, élévations latérales haltères,
+curl marteau, oiseau haltères, squat sur sécurités, mollets debout à la barre, soulevé de terre
+roumain. Le bouton « Voir le geste en 3D » apparaît donc aussi dans Upper A, Upper B, Lower A,
+Lower B, Lower C et Full Body pour ces exercices.
+- **Squat sur sécurités** : en bas, 60° de flexion du genou et barre au-dessus du milieu du pied
+  (position calculée) ; la barre s'y pose sur les sécurités (`onSafety`). Descente 3 s, arrêt,
+  remontée explosive, comme la consigne de la séance.
+- **Mollets** : barre sur le dos, avant des pieds sur une cale de 6 cm, talons dans le vide.
+- **Soulevé de terre roumain** : quatre positions (haut, mi-cuisse, sous le genou, retour), pour
+  que les mains restent sur la barre tout le long.
+
+**Mannequin et dessin** :
+- `rig.js` : `handFrame` (cibles des mains dans le repère du buste ou du bassin : une barre
+  posée sur le dos suit le corps) ; `opts.rest` (points posés sur un banc ou une cale, au lieu du
+  sol) ; mesures du matériel `BAR`, `DB`, `SAFETY_R` et `barLine` (la barre passe par les deux
+  mains).
+- `scene.js` : barre olympique (2,2 m, disques de 45 cm) entre les mains ; haltères dans chaque
+  main, poignée réglée par `gripL/gripR` (prise dans le prolongement ou neutre) ; rack à quatre
+  montants et sécurités plus claires ; bancs avec dossier incliné (7ᵉ valeur des boîtes).
+- `DemoViewer.jsx` : une consigne sur trois lignes ne passe plus sous le bouton de lecture
+  (lignes de la grille à `max-content`).
+
+**Vérifications** :
+- `demo.test.mjs` (9 tests, 348 au total) : en plus des contrôles de l'étape 1 sur les neuf
+  nouvelles démonstrations, les disques ne touchent jamais le sol, la barre du squat se pose sur
+  les sécurités en bas sans jamais passer dessous, et les points d'appui sont bien sur le banc ou la
+  cale.
+- Aperçu : planches d'images des positions clés relues ; à 375 px, carnet de Lower A avec le
+  bouton sur le squat, les mollets et le soulevé de terre (pas sur la leg extension), écran du
+  squat sur sécurités, aucune erreur console, aucun débordement.
+- **Pas vérifié** : le téléphone ; le jugement de Yoann sur la justesse des gestes.
+- **Limites** : la prise exacte (largeur, rotation des poignets) et le placement des omoplates ne
+  se voient pas ; le banc Hammer Strength est un banc générique.
+

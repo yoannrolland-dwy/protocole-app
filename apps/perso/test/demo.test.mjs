@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { TEMPLATES } from "@rawcare/core/session/templates";
 import { EXERCISE_CATALOG } from "@rawcare/core/session/exoCatalog";
 import { DEMOS, hasDemo } from "../src/demo/demos.js";
-import { createRig, applyPose, snapshot, RADIUS, PARTS } from "../src/demo/rig.js";
+import { createRig, applyPose, snapshot, RADIUS, PARTS, BAR, SAFETY_R, barLine } from "../src/demo/rig.js";
 import { buildTimeline, poseAt, mirrorPose, mirrorDemo } from "../src/demo/timeline.js";
 
 const rig = createRig();
@@ -24,7 +24,45 @@ test("chaque exercice de la séance Mobilité a sa démonstration, et chaque dé
   for (const e of TEMPLATES["Mobilité"].exos) assert.ok(hasDemo(e.n), `pas de démonstration : ${e.n}`);
   const noms = new Set(EXERCISE_CATALOG.map((c) => c.ex.n));
   for (const nom of Object.keys(DEMOS)) assert.ok(noms.has(nom), `démonstration sans exercice : ${nom}`);
-  assert.equal(hasDemo("Développé couché haltères"), false, "étape 1 : la mobilité seulement");
+  // Étape 2 : haltères, barre et bancs. Le hip thrust et le rowing (machines) viendront à l'étape 3 ;
+  // les curls poignets restent sans démonstration (le mannequin n'a pas de poignet articulé).
+  for (const nom of ["Développé couché haltères", "Développé incliné haltères", "Développé militaire haltères",
+    "Élévations latérales haltères", "Curl marteau (prise neutre)", "Oiseau haltères",
+    "Squat sur sécurités", "Mollets debout à la barre", "Soulevé de terre roumain"]) assert.ok(hasDemo(nom), `pas de démonstration : ${nom}`);
+  for (const nom of ["Hip thrust", "Rowing barre ou machine", "Leg extension unilatérale", "Curl poignets pronation"]) assert.equal(hasDemo(nom), false, nom);
+});
+
+test("barre : les disques ne touchent jamais le sol ; au squat, la barre se pose sur les sécurités sans passer dessous", () => {
+  eachVersion((nom, d) => {
+    if (!d.props?.barbell) return;
+    const tl = buildTimeline(d.frames, { cut: d.cut });
+    const safety = d.props.rack?.safety;
+    for (let t = 0; t < tl.total; t += 0.1) {
+      applyPose(rig, poseAt(tl, t).pose, { pin: d.pin, rest: d.rest });
+      const { center } = barLine(snapshot(rig));
+      assert.ok(center.y - BAR.plate > 0.005, `${nom}, à ${t.toFixed(1)} s : un disque touche le sol`);
+      if (safety != null) assert.ok(center.y - BAR.r - (safety + SAFETY_R) > -0.008, `${nom}, à ${t.toFixed(1)} s : la barre passe sous les sécurités`);
+    }
+    d.frames.forEach((f, i) => {
+      if (!f.onSafety) return;
+      applyPose(rig, f.pose, { pin: d.pin, rest: d.rest });
+      const { center } = barLine(snapshot(rig));
+      assert.ok(Math.abs(center.y - BAR.r - (safety + SAFETY_R)) < 0.01, `${nom}, position ${i} : la barre devrait reposer sur les sécurités`);
+    });
+  });
+  assert.ok(DEMOS["Squat sur sécurités"].frames.some((f) => f.onSafety), "le squat montre l'arrêt sur les sécurités");
+});
+
+test("bancs et cale : les points d'appui sont posés dessus", () => {
+  eachVersion((nom, d) => {
+    if (!d.rest) return;
+    d.frames.forEach((f, i) => {
+      applyPose(rig, f.pose, { pin: d.pin, rest: d.rest });
+      const s = snapshot(rig);
+      const low = Math.min(...d.rest.points.map((p) => s[p][1] - RADIUS[p]));
+      assert.ok(Math.abs(low - d.rest.y) < 1e-6, `${nom}, position ${i} : pas posé sur l'appui`);
+    });
+  });
 });
 
 test("forme d'une démonstration : positions, consignes, repères, zones en jaune connues", () => {
@@ -48,7 +86,7 @@ test("forme d'une démonstration : positions, consignes, repères, zones en jaun
 test("positions clés : appuis au sol, rien sous le sol, cibles à portée, mur respecté", () => {
   eachVersion((nom, d) => {
     d.frames.forEach((f, i) => {
-      const { reach } = applyPose(rig, f.pose, { pin: d.pin });
+      const { reach } = applyPose(rig, f.pose, { pin: d.pin, rest: d.rest });
       const s = snapshot(rig);
       const where = `${nom}, position ${i}`;
       assert.ok(lowest(s) > -0.012, `${where} : un point passe sous le sol (${lowest(s).toFixed(3)} m)`);
@@ -67,7 +105,7 @@ test("pendant le trajet : rien ne s'enfonce, rien ne se décroche, le corps ne s
     const tl = buildTimeline(d.frames, { cut: d.cut });
     let prev = null;
     for (let t = 0; t < tl.total; t += 0.1) {
-      const { reach } = applyPose(rig, poseAt(tl, t).pose, { pin: d.pin });
+      const { reach } = applyPose(rig, poseAt(tl, t).pose, { pin: d.pin, rest: d.rest });
       const s = snapshot(rig);
       const where = `${nom}, à ${t.toFixed(1)} s`;
       assert.ok(lowest(s) > -0.03, `${where} : un point s'enfonce (${lowest(s).toFixed(3)} m)`);
