@@ -89,11 +89,13 @@ function solveTwoBone(rig, a, b, end, target, pole) {
   return full - (la + lb); // > 0 : cible hors de portée, de cette distance
 }
 
-/** Pied à plat : la semelle parallèle au sol, la pointe dans la direction `yaw` (degrés, 0 = +Z). */
-function flatFoot(rig, ankle, yaw = 0) {
+/** Pied à plat : la semelle parallèle au sol, la pointe dans la direction `yaw` (degrés, 0 = +Z).
+ *  `pitch` (degrés, autour de l'axe gauche-droite) incline la semelle, par exemple sur le plateau
+ *  d'une presse. */
+function flatFoot(rig, ankle, yaw = 0, pitch = 0) {
   const A = rig.j[ankle];
   A.parent.getWorldQuaternion(_q).invert();
-  _q2.setFromEuler(new Euler(0, rad(yaw), 0));
+  _q2.setFromEuler(new Euler(rad(pitch), rad(yaw), 0, "YXZ"));
   A.quaternion.copy(_q).multiply(_q2);
 }
 
@@ -110,7 +112,8 @@ const v3 = (p) => new Vector3(p[0], p[1], p[2]);
  * - `shL/shR : [flexion, abduction, rotation externe]`, `elL/elR` : flexion ;
  * - cibles : `handL/handR: [x, y, z]` (centre de la main), `footL/footR: [x, y, z]` (cheville, pied
  *   mis à plat), avec `elbowL/R` et `kneePoleL/R` : direction où plie le coude ou le genou ;
- * - `flatL/flatR: 1` : pied à plat sans cible ; `yawL/yawR` : ouverture du pied ;
+ * - `flatL/flatR: 1` : pied à plat sans cible ; `yawL/yawR` : ouverture du pied ; `sole` : inclinaison
+ *   des semelles d'un pied guidé (plateau de presse) ;
  * - `handFrame: "chest" | "pelvis"` : les cibles des mains sont données dans le repère de ce point
  *   du corps (barre posée sur le dos ou sur les hanches : elle suit le corps qui bouge) ;
  * - `gripL/gripR: [x, y, z]` : sens de la poignée d'un haltère (dessin seul, voir scene.js).
@@ -171,7 +174,7 @@ export function applyPose(rig, pose, opts = {}) {
       const pole = pose["kneePole" + side] ? v3(pose["kneePole" + side]) : new Vector3(s * 0.08, 0, 1);
       reach["foot" + side] = solveTwoBone(rig, "hip" + side, "kn" + side, "an" + side, v3(pose["foot" + side]), pole);
       root.updateMatrixWorld(true);
-      flatFoot(rig, "an" + side, s * n("yaw" + side));
+      flatFoot(rig, "an" + side, s * n("yaw" + side), n("sole"));
     }
     root.updateMatrixWorld(true);
   }

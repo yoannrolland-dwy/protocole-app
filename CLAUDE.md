@@ -28,14 +28,15 @@ documenter le livré ici, dans CLAUDE.md.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
   `avant-campagne-audit`, `apres-lot1-audit`, `apres-lot2-audit`, `avant-jetons-gestes`. APK
   précédents : `~/Documents/protocole-sauvegardes/` (hors Git).
-- **Tests** : 348 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
+- **Tests** : 349 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
 - **Chantiers** : tous ceux de `ROADMAP.md` sont livrés (V, R, S, T, U, J). La campagne d'audit du
   10/11/2026 est faite (lots 1 à 3). Ce qui reste ouvert est dans « Reportés à la fin de la
   campagne », plus bas.
 - **Chantier en cours : démonstrations 3D** (sections du 13/11/2026 en fin de fichier). Étape 1
   (Mobilité) et étape 2 (haltères, barre, bancs) installées. Gestes corrigés d'après la
-  littérature en v3.166.0, installée ; Yoann doit juger le résultat ; sources dans `docs/demos-3d/`. Reste l'étape 3
-  (machines et poulies, avec le hip thrust et le rowing).
+  littérature en v3.166.0, installée (« c'est mieux », Yoann) ; sources dans `docs/demos-3d/`.
+  Étape 3 (poulies et machines) écrite en v3.167.0, pas encore installée. Sans démonstration :
+  curls poignets, rowing machine à disques, échauffement basket.
 - **En attente hors de ce dépôt** (appli JEFFREY, dépôt `jeffrey-app`) : installer son récepteur du
   signal de record, puis l'essayer casque branché ; envoyer un jeton aux gestes de séance ;
   afficher en clair le code `restauration`. Notes : `docs/suivi-jeffrey/`.
@@ -6457,4 +6458,41 @@ Réglages ; 47 clés sur 48 identiques (seule `lastPosition` a changé) ; préf�
 identiques ; permission du signal JEFFREY accordée ; aucun plantage. Démonstration du développé
 couché ouverte depuis Upper B sur le téléphone, sans erreur ; séance de test annulée, rien
 enregistré. **Pas vérifié** : l'avis de Yoann sur les gestes corrigés.
+
+## Démonstrations 3D, étape 3 : poulies et machines (13/11/2026, apps/perso v3.167.0)
+
+Demandée par Yoann après les corrections (« c'est mieux, go la suite »). Repères :
+`docs/demos-3d/technique-machines-poulies.md`.
+
+**Choix de Yoann (13/11/2026)** : leg curl **assis** ; hip thrust **en machine** ; « Rowing barre ou
+machine » montré **à la poulie basse assise** ; extension triceps **à la corde**.
+
+**Démonstrations ajoutées** :
+- **Poulies** : tirage vertical prise neutre (buste 15° en arrière, poignée au haut de la poitrine),
+  rowing poulie basse (buste vertical, poignée au haut du ventre), écarté poulie basse en ligne
+  ascendante (coudes fixes, mains à hauteur du menton), élévations latérales poulie (câble derrière
+  le corps, arrêt à l'horizontale), extension triceps à la corde (bras immobiles, corde écartée en
+  bas), face pull (coudes hauts, mains de part et d'autre du front).
+- **Machines** : rear delt (bras horizontaux, prise neutre), iso leg extension à 60° (deux jambes),
+  leg extension unilatérale **dans l'amplitude de rééducation 10-60°, tempo 3 s / 3 s**, leg curl
+  assis (genou de 8 à 100°), hip thrust en machine (en haut : buste parallèle au sol, tibia vertical,
+  genou à 90°), presse à 45° (genou à 90° en bas, 10° en haut), presse HSR (10-60°, tempo 3 s / 3 s),
+  mollets à la presse.
+- **Variantes d'équipement** : même démonstration pour les versions poulie et disque (tirage, leg
+  extension, iso, leg curl, presse, mollets) ; les développés en machine reprennent ceux aux
+  haltères avec des poignées ; « Rowing barre ou machine » = rowing poulie basse.
+- **Sans démonstration** : curls poignets (pas de poignet articulé), rowing machine à disques
+  (machine non précisée), échauffement basket.
+
+**Dessin** (`scene.js`) : plusieurs câbles (vers une main, les deux mains ou un point du corps),
+corde à deux brins, poignée tenue à deux mains, poignées seules (`handles`), coussins qui suivent
+une articulation (`pads` : rouleau de leg extension et de leg curl, ceinture de hip thrust),
+plateaux qui suivent les pieds ou les orteils (`follow` : presse). `rig.js` : `sole` incline les
+semelles sur le plateau de la presse. Positions des pieds de la presse calculées sur une glissière à
+45° pour une cheville naturelle.
+
+**Vérifications** : 349 tests (nouveau : la leg extension et la presse HSR restent dans 10-60° de
+flexion pendant tout le trajet, l'iso tient à 60°) ; images de toutes les positions clés relues ; à
+375 px, carnet Upper A avec le bouton sur tous ses exercices, écran du face pull, aucune erreur liée
+aux démonstrations. **Pas vérifié** : le téléphone et l'avis de Yoann.
 

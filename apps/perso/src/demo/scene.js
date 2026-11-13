@@ -121,6 +121,8 @@ export function createDemoScene(canvas, { onTick } = {}) {
     metal: new MeshStandardMaterial({ color: COLORS.muted, roughness: 0.5, metalness: 0.3 }),
     weight: new MeshStandardMaterial({ color: "#3d3d38", roughness: 0.7, metalness: 0.2 }),
     safety: new MeshStandardMaterial({ color: COLORS.text2, roughness: 0.4, metalness: 0.3 }),
+    pad: new MeshStandardMaterial({ color: "#2e2e2a", roughness: 0.9, metalness: 0 }),
+    rope: new LineBasicMaterial({ color: COLORS.text }),
     cable: new LineBasicMaterial({ color: COLORS.text2 }),
     edge: new MeshBasicMaterial({ color: COLORS.line }),
   };
@@ -131,7 +133,7 @@ export function createDemoScene(canvas, { onTick } = {}) {
   scene.add(propGroup);
 
   let demo = null, tl = null, t = 0, playing = true, speed = 1, raf = 0, last = 0, dirty = true, disposed = false;
-  let cable = null, lastTick = 0, barbell = null, dumbbells = null;
+  let cables = [], lastTick = 0, barbell = null, dumbbells = null, rope = null, handle = null, pads = [], follows = [];
   const cam = { az: 90, el: 10, dist: 4, base: 4, target: new Vector3(0, 0.8, 0) };
 
   function placeCamera() {
@@ -149,7 +151,7 @@ export function createDemoScene(canvas, { onTick } = {}) {
       propGroup.remove(o);
       o.traverse((x) => x.geometry?.dispose?.());
     }
-    cable = null; barbell = null; dumbbells = null;
+    cables = []; barbell = null; dumbbells = null; rope = null; handle = null; pads = []; follows = [];
   }
 
   function buildProps(d, b) {
@@ -212,11 +214,13 @@ export function createDemoScene(canvas, { onTick } = {}) {
       barbell = g;
       propGroup.add(g);
     }
-    if (p.dumbbells) {
+    // Haltères, ou simples poignées de machine (`handles`) : même orientation de prise.
+    if (p.dumbbells || p.handles) {
+      const plates = !!p.dumbbells;
       dumbbells = ["L", "R"].map(() => {
         const g = new Group();
-        g.add(new Mesh(new CylinderGeometry(DB.r, DB.r, DB.handle * 2 + DB.plateW * 2, 12), mats.metal));
-        for (const k of [-1, 1]) {
+        g.add(new Mesh(new CylinderGeometry(DB.r, DB.r, plates ? DB.handle * 2 + DB.plateW * 2 : 0.13, 12), mats.metal));
+        if (plates) for (const k of [-1, 1]) {
           const plate = new Mesh(new CylinderGeometry(DB.plate, DB.plate, DB.plateW, 20), mats.weight);
           plate.position.y = k * (DB.handle + DB.plateW / 2);
           g.add(plate);
@@ -225,11 +229,43 @@ export function createDemoScene(canvas, { onTick } = {}) {
         return g;
       });
     }
-    if (p.cable) {
-      const g = new BufferGeometry().setFromPoints([new Vector3(...p.cable.from), new Vector3()]);
-      cable = { line: new Line(g, mats.cable), to: p.cable.to };
-      propGroup.add(cable.line);
+    // Câbles : d'une poulie fixe à une main, aux deux mains (`mains`) ou à un point du corps.
+    for (const c of [...(p.cable ? [p.cable] : []), ...(p.cables || [])]) {
+      const line = new Line(new BufferGeometry().setFromPoints([new Vector3(...c.from), new Vector3()]), mats.cable);
+      cables.push({ line, to: c.to });
+      propGroup.add(line);
     }
+    // Corde : la poulie, le nœud un peu au-dessus des mains, puis un brin vers chaque main.
+    if (p.rope) {
+      const mk = () => { const l = new Line(new BufferGeometry().setFromPoints([new Vector3(), new Vector3()]), mats.rope); propGroup.add(l); return l; };
+      rope = { pulley: new Vector3(...p.rope.pulley), main: mk(), left: mk(), right: mk() };
+    }
+    // Poignée droite tenue à deux mains (tirage, rowing).
+    if (p.handle) {
+      handle = new Mesh(new CylinderGeometry(0.016, 0.016, 1, 12), mats.metal);
+      propGroup.add(handle);
+    }
+    // Coussins qui suivent un point du corps (rouleau de leg extension, ceinture de hip thrust) :
+    // cylindre le long de l'axe gauche-droite du repère de ce point.
+    for (const pd of p.pads || []) {
+      const m = new Mesh(new CylinderGeometry(pd.r, pd.r, pd.len, 18), mats.pad);
+      propGroup.add(m);
+      pads.push({ m, ...pd });
+    }
+    // Plateaux qui suivent les pieds ou les orteils (presse), inclinaison fixe.
+    for (const fo of p.follow || []) {
+      const m = new Mesh(new BoxGeometry(...fo.size), mats.prop);
+      if (fo.rotX) m.rotation.x = MathUtils.degToRad(fo.rotX);
+      propGroup.add(m);
+      follows.push({ m, ...fo });
+    }
+  }
+
+  // Point nommé : une articulation, ou le milieu des mains, des chevilles ou des orteils.
+  const MID = { mains: ["haL", "haR"], pieds: ["anL", "anR"], orteils: ["toeL", "toeR"] };
+  function pointOf(name) {
+    if (MID[name]) return rig.j[MID[name][0]].getWorldPosition(new Vector3()).add(rig.j[MID[name][1]].getWorldPosition(new Vector3())).multiplyScalar(0.5);
+    return rig.j[name].getWorldPosition(new Vector3());
   }
 
   function applyAt(time) {
@@ -256,12 +292,34 @@ export function createDemoScene(canvas, { onTick } = {}) {
         dumbbells[i].quaternion.setFromUnitVectors(UP, dir);
       }
     }
-    if (cable) {
-      const pos = cable.line.geometry.attributes.position;
-      const w = rig.j[cable.to].getWorldPosition(new Vector3());
+    for (const c of cables) {
+      const pos = c.line.geometry.attributes.position;
+      const w = pointOf(c.to);
       pos.setXYZ(1, w.x, w.y, w.z);
       pos.needsUpdate = true;
     }
+    if (rope) {
+      const mid = pointOf("mains");
+      const knot = mid.clone().addScaledVector(rope.pulley.clone().sub(mid).normalize(), 0.13);
+      const set = (line, a, b) => { const pos = line.geometry.attributes.position; pos.setXYZ(0, a.x, a.y, a.z); pos.setXYZ(1, b.x, b.y, b.z); pos.needsUpdate = true; };
+      set(rope.main, rope.pulley, knot);
+      set(rope.left, knot, pointOf("haL"));
+      set(rope.right, knot, pointOf("haR"));
+    }
+    if (handle) {
+      const a = pointOf("haL"), b = pointOf("haR");
+      const axis = a.clone().sub(b);
+      handle.position.copy(a).add(b).multiplyScalar(0.5);
+      handle.scale.set(1, axis.length() + 0.16, 1);
+      handle.quaternion.setFromUnitVectors(UP, axis.normalize());
+    }
+    for (const pd of pads) {
+      const j = rig.j[pd.joint];
+      pd.m.position.copy(j.localToWorld(new Vector3(...pd.at)));
+      const q = j.getWorldQuaternion(new Quaternion());
+      pd.m.quaternion.copy(q).multiply(new Quaternion().setFromUnitVectors(UP, new Vector3(1, 0, 0)));
+    }
+    for (const fo of follows) fo.m.position.copy(pointOf(fo.at)).add(new Vector3(...(fo.offset || [0, 0, 0])));
     return cur;
   }
 

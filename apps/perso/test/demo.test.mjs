@@ -29,7 +29,14 @@ test("chaque exercice de la séance Mobilité a sa démonstration, et chaque dé
   for (const nom of ["Développé couché haltères", "Développé incliné haltères", "Développé militaire haltères",
     "Élévations latérales haltères", "Curl marteau (prise neutre)", "Oiseau haltères",
     "Squat sur sécurités", "Mollets debout à la barre", "Soulevé de terre roumain"]) assert.ok(hasDemo(nom), `pas de démonstration : ${nom}`);
-  for (const nom of ["Hip thrust", "Rowing barre ou machine", "Leg extension unilatérale", "Curl poignets pronation"]) assert.equal(hasDemo(nom), false, nom);
+  // Étape 3 : poulies et machines, et leurs variantes d'équipement (même geste, même démonstration).
+  for (const nom of ["Tirage vertical prise neutre", "Rowing barre ou machine", "Rowing poulie basse", "Écarté poulie basse",
+    "Élévations latérales poulie", "Extension triceps poulie haute", "Face pull", "Rear delt machine (reverse pec deck)",
+    "Iso leg extension @60° (si genou raide)", "Leg extension unilatérale", "Leg curl unilatéral", "Hip thrust",
+    "Presse à cuisses", "Presse à cuisses (HSR)", "Mollets à la presse", "Développé couché (disque)", "Leg extension unilatérale (poulie)"]) assert.ok(hasDemo(nom), `pas de démonstration : ${nom}`);
+  // Restent sans démonstration : les curls poignets (pas de poignet articulé) et le rowing machine à
+  // disques (machine non précisée), et l'échauffement basket.
+  for (const nom of ["Curl poignets pronation", "Curl poignets supination", "Rowing machine à disques"]) assert.equal(hasDemo(nom), false, nom);
 });
 
 test("barre : les disques ne touchent jamais le sol ; au squat, la barre se pose sur les sécurités sans passer dessous", () => {
@@ -51,6 +58,22 @@ test("barre : les disques ne touchent jamais le sol ; au squat, la barre se pose
     });
   });
   assert.ok(DEMOS["Squat sur sécurités"].frames.some((f) => f.onSafety), "le squat montre l'arrêt sur les sécurités");
+});
+
+test("rééducation du genou : la leg extension et la presse HSR restent dans 10-60° de flexion", () => {
+  const flex = (s, S) => { const t = [0, 1, 2].map((i) => s["kn" + S][i] - s["hip" + S][i]), b = [0, 1, 2].map((i) => s["an" + S][i] - s["kn" + S][i]);
+    return Math.acos(t.reduce((x, v, i) => x + v * b[i], 0) / Math.hypot(...t) / Math.hypot(...b)) * 180 / Math.PI; };
+  for (const [nom, sides] of [["Leg extension unilatérale", ["L"]], ["Presse à cuisses (HSR)", ["L", "R"]], ["Iso leg extension @60° (si genou raide)", ["L", "R"]]]) {
+    const d = DEMOS[nom], tl = buildTimeline(d.frames, { cut: d.cut });
+    let lo = 180, hi = 0;
+    for (let t = 0; t < tl.total; t += 0.05) {
+      applyPose(rig, poseAt(tl, t).pose, { pin: d.pin, rest: d.rest });
+      const s = snapshot(rig);
+      for (const S of sides) { const k = flex(s, S); lo = Math.min(lo, k); hi = Math.max(hi, k); }
+    }
+    if (nom.startsWith("Iso")) { assert.ok(Math.abs(DEMOS[nom].frames[1].pose.kneeL - 60) < 1e-9, "tenue à 60°"); continue; }
+    assert.ok(lo > 8 && hi < 62, `${nom} : de ${lo.toFixed(1)}° à ${hi.toFixed(1)}°`);
+  }
 });
 
 test("bancs et cale : les points d'appui sont posés dessus", () => {

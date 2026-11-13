@@ -49,6 +49,23 @@ const SQUAT_SAFETY = 1.316 - 0.014 - 0.025;
 const PRONE = { gripL: [1, 0, 0], gripR: [-1, 0, 0] };
 const NEUTRAL = { gripL: [0, 0, 1], gripR: [0, 0, 1] };
 
+// Étape 3. Machines de jambes : assise à 50 cm.
+const LEG_SEAT = { points: ["pelvis"], y: 0.5 };
+const LEG_EXT_BASE = { root: [-10, 0, 0], ...LR("hip", [80, 0, 0]), handL: [0.27, 0.56, 0.02], handR: [-0.27, 0.56, 0.02], elbowL: [1, -0.3, -0.3], elbowR: [-1, -0.3, -0.3] };
+const LEG_EXT_BOXES = [[0, 0.25, 0.02, 0.45, 0.5, 0.5], [0, 0.85, -0.22, 0.45, 0.7, 0.08, -10]];
+const LEG_CURL_BASE = { root: [-15, 0, 0], ...LR("hip", [75, 0, 0]), handL: [0.27, 0.56, 0.02], handR: [-0.27, 0.56, 0.02], elbowL: [1, -0.3, -0.3], elbowR: [-1, -0.3, -0.3] };
+// Presse à 45° : buste incliné de 55° en arrière, pieds sur une glissière à 45° (positions des
+// pieds calculées pour 90°, 60° et 10° de flexion du genou), semelles à plat sur le plateau.
+const PRESS_SEAT = { points: ["pelvis"], y: 0.4 };
+const PRESS_FEET = { 90: [0.15, 1.012, 0.312], 60: [0.15, 1.111, 0.411], 10: [0.15, 1.191, 0.492] };
+const pressPose = (foot) => ({ root: [-55, 0, 0], neck: [20, 0, 0], footL: foot, footR: [-foot[0], foot[1], foot[2]], kneePoleL: [0.15, 1, 0.3], kneePoleR: [-0.15, 1, 0.3], sole: -135,
+  handL: [0.3, 0.45, -0.1], handR: [-0.3, 0.45, -0.1], elbowL: [1, -0.3, 0], elbowR: [-1, -0.3, 0] });
+const PRESS_PROPS = {
+  boxes: [[0, 0.2, 0.05, 0.45, 0.4, 0.45], [0, 0.595, -0.364, 0.45, 0.8, 0.08, -55], [0.42, 1.05, 0.45, 0.05, 1.1, 0.05, 45], [-0.42, 1.05, 0.45, 0.05, 1.1, 0.05, 45]],
+  follow: [{ at: "pieds", offset: [0, 0.116, 0.032], size: [0.7, 0.55, 0.04], rotX: -45 }],
+};
+const CALF_PRESS = { root: [-55, 0, 0], neck: [20, 0, 0], ...LR("hip", [84, 0, 0]), ...LR("knee", 8), handL: [0.3, 0.45, -0.1], handR: [-0.3, 0.45, -0.1], elbowL: [1, -0.3, 0], elbowR: [-1, -0.3, 0] };
+
 export const DEMOS = {
   "Chat-vache": {
     view: "profilG", active: ["torse", "bassin"], pin: KNEES, touch: ["knL", "knR", "haL", "haR"], props: { mat: true },
@@ -461,6 +478,269 @@ export const DEMOS = {
       eviter: "Arrondir le dos ou plier les genoux comme un squat : ce sont les hanches qui reculent.",
     };
   })(),
+
+  // ---------------------------------------------------------------- Étape 3 : poulies et machines
+  // Repères : docs/demos-3d/technique-machines-poulies.md (ACE, NSCA, études citées).
+
+  // Buste incliné de 30° au plus (ACE ; ici 15°), poignée jusqu'au haut de la poitrine, coudes qui
+  // descendent le long des côtes. Choix de Yoann : prise neutre.
+  "Tirage vertical prise neutre": (() => {
+    const base = { root: [-15, 0, 0], neck: [6, 0, 0], footL: [0.2, 0.085, 0.45], footR: [-0.2, 0.085, 0.45],
+      kneePoleL: [0.2, 1, 0.6], kneePoleR: [-0.2, 1, 0.6], elbowL: [0.6, -1, -0.6], elbowR: [-0.6, -1, -0.6], gripL: [0, 0, 1], gripR: [0, 0, 1] };
+    const top = { ...base, handL: [0.25, 1.62, -0.06], handR: [-0.25, 1.62, -0.06] };
+    const low = { ...base, handL: [0.25, 1.03, 0.03], handR: [-0.25, 1.03, 0.03] };
+    return {
+      view: { az: 60, el: 8 }, active: ["torse", "brasL", "brasR"],
+      rest: { points: ["pelvis"], y: 0.47 }, pin: { p: "pelvis", z: 0 }, touch: ["toeL", "heelL", "toeR", "heelR"],
+      props: { handles: true, handle: true, cables: [{ from: [0, 2.35, -0.06], to: "mains" }],
+        boxes: [[0, 0.235, -0.02, 0.4, 0.47, 0.4], [0, 0.63, 0.33, 0.6, 0.08, 0.12], [0, 1.2, -0.55, 0.1, 2.4, 0.1], [0, 2.38, -0.3, 0.1, 0.06, 0.55]] },
+      frames: [
+        { d: 1.2, hold: 0.5, cue: "Assis, cuisses calées, buste un peu en arrière, bras tendus, prise neutre", pose: top },
+        { d: 1.3, hold: 0.6, cue: "Tirer la poignée jusqu'au haut de la poitrine, coudes vers les hanches", pose: low },
+        { d: 2, hold: 0.2, cue: "Remonter en contrôlant jusqu'aux bras tendus, épaules qui s'étirent", pose: top },
+      ],
+      sentir: "Les dorsaux, sous les bras, qui tirent les coudes vers le bas.",
+      eviter: "Se pencher en arrière de plus de 30° ou tirer avec les bras seuls, coudes en avant.",
+    };
+  })(),
+
+  // Buste vertical (léger allongement vers l'avant au départ), poignée jusqu'au haut du ventre,
+  // coudes juste derrière le tronc. Choix de Yoann : poulie basse assise ; prise neutre (coude).
+  "Rowing poulie basse": (() => {
+    const base = { neck: [0, 0, 0], footL: [0.12, 0.25, 0.62], footR: [-0.12, 0.25, 0.62], kneePoleL: [0.1, 1, 0.3], kneePoleR: [-0.1, 1, 0.3], sole: -60,
+      elbowL: [0.3, -0.3, -1], elbowR: [-0.3, -0.3, -1], gripL: [0, 1, 0], gripR: [0, 1, 0] };
+    const reach = { ...base, root: [12, 0, 0], handL: [0.06, 0.88, 0.66], handR: [-0.06, 0.88, 0.66] };
+    const pull = { ...base, root: [0, 0, 0], handL: [0.06, 0.86, 0.17], handR: [-0.06, 0.86, 0.17] };
+    return {
+      view: { az: 70, el: 10 }, active: ["torse", "brasL", "brasR", "epauleL", "epauleR"],
+      rest: { points: ["pelvis"], y: 0.4 }, pin: { p: "pelvis", z: 0 },
+      props: { handles: true, handle: true, cables: [{ from: [0, 0.3, 1.25], to: "mains" }],
+        boxes: [[0, 0.2, 0.05, 0.35, 0.4, 0.8], [0, 0.25, 0.72, 0.5, 0.35, 0.04, -30], [0, 0.35, 1.3, 0.2, 0.7, 0.1]] },
+      frames: [
+        { d: 1.2, hold: 0.4, cue: "Assis, pieds calés, genoux légèrement fléchis, bras tendus, dos droit", pose: reach },
+        { d: 1.3, hold: 0.6, cue: "Tirer la poignée jusqu'au haut du ventre, buste vertical, coudes juste derrière le corps", pose: pull },
+        { d: 2, hold: 0.2, cue: "Rendre en contrôlant, bras tendus, les épaules s'avancent un peu", pose: reach },
+      ],
+      sentir: "Le milieu du dos, entre les omoplates, qui se serrent en fin de tirage.",
+      eviter: "Basculer le buste d'avant en arrière pour tirer, ou hausser les épaules.",
+    };
+  })(),
+
+  // Coudes fixes à ~15-30°, les bras partent ~30-45° sous l'horizontale et finissent mains à hauteur
+  // des épaules ou du menton.
+  "Écarté poulie basse": {
+    view: { az: 30, el: 10 }, active: ["torse", "epauleL", "epauleR"], touch: ["toeL", "heelL", "toeR", "heelR"],
+    props: { handles: true, cables: [{ from: [0.85, 0.2, -0.05], to: "haL" }, { from: [-0.85, 0.2, -0.05], to: "haR" }],
+      boxes: [[0.92, 1.0, -0.05, 0.12, 2.0, 0.12], [-0.92, 1.0, -0.05, 0.12, 2.0, 0.12]] },
+    frames: [
+      { d: 1.2, hold: 0.5, cue: "Debout entre les poulies basses, bras ouverts vers le bas, coudes légèrement fléchis",
+        pose: stand(0.975, 0, 4, { handL: [0.649, 1.14, 0.116], handR: [-0.649, 1.14, 0.116], elbowL: [0.5, -1, -0.3], elbowR: [-0.5, -1, -0.3] }) },
+      { d: 1.4, hold: 0.6, cue: "Ramener les mains devant soi, de bas en haut, jusqu'à hauteur du menton",
+        pose: stand(0.975, 0, 4, { handL: [0.1, 1.58, 0.56], handR: [-0.1, 1.58, 0.56], elbowL: [0.5, -1, -0.3], elbowR: [-0.5, -1, -0.3] }) },
+      { d: 2, hold: 0.2, cue: "Rouvrir lentement, sans changer l'angle des coudes, jusqu'à l'étirement", pose: null },
+    ],
+    sentir: "Le haut des pectoraux, étirés en bas et serrés en haut.",
+    eviter: "Plier les coudes pour pousser (cela devient un développé) ou cambrer.",
+  },
+
+  // Montée jusqu'à 90°, coude presque tendu, rotation neutre (Coratella 2020). Consigne de la séance :
+  // poulie à hauteur de main, câble derrière le corps.
+  "Élévations latérales poulie": {
+    view: { az: 20, el: 10 }, active: ["epauleL"], touch: ["toeL", "heelL", "toeR", "heelR"], sides: true, side: "L",
+    props: { cables: [{ from: [-0.4, 0.85, -0.18], to: "haL" }], boxes: [[-0.47, 1.0, -0.22, 0.12, 2.0, 0.12]] },
+    frames: [
+      { d: 1.2, hold: 0.4, cue: "De profil à la poulie, le câble passe derrière le corps, main à côté de la cuisse",
+        pose: stand(0.975, 0, 5, { handL: [0.2, 0.89, -0.06], elbowL: [0.1, 0, -1], shR: [0, 6, 0], elR: 10 }) },
+      { d: 1.2, hold: 0.4, cue: "Monter le bras sur le côté, un peu en avant, jusqu'à l'horizontale",
+        pose: stand(0.975, 0, 5, { handL: [0.715, 1.463, 0.29], elbowL: [0.1, 0, -1], shR: [0, 6, 0], elR: 10 }) },
+      { d: 2, hold: 0.2, cue: "Redescendre en freinant, la poulie garde le muscle sous tension en bas", pose: null },
+    ],
+    sentir: "Le côté de l'épaule, y compris en bas du mouvement.",
+    eviter: "Hausser l'épaule, pencher le buste vers la poulie ou dépasser l'horizontale.",
+  },
+
+  // Bras verticaux immobiles le long du corps, coudes de ~90-110° à ~0-5°, buste vertical ou un peu
+  // penché. Choix de Yoann : corde.
+  "Extension triceps poulie haute": {
+    view: { az: 60, el: 8 }, active: ["brasL", "brasR"], touch: ["toeL", "heelL", "toeR", "heelR"],
+    props: { rope: { pulley: [0, 2.15, 0.42] }, boxes: [[0, 1.1, 0.5, 0.12, 2.2, 0.12]] },
+    frames: [
+      { d: 1.2, hold: 0.4, cue: "Face à la poulie haute, buste un peu penché, coudes collés au corps, corde à hauteur de poitrine",
+        pose: stand(0.975, 0, 10, { neck: [-8, 0, 0], ...LR("sh", [-6, 8, 0]), ...LR("el", 100) }) },
+      { d: 1.2, hold: 0.5, cue: "Tendre les bras vers le bas, écarter un peu la corde en fin de mouvement",
+        pose: stand(0.975, 0, 10, { neck: [-8, 0, 0], ...LR("sh", [-10, 14, 0]), ...LR("el", 4) }) },
+      { d: 2, hold: 0.2, cue: "Remonter en freinant, sans que les coudes avancent", pose: null },
+    ],
+    sentir: "L'arrière du bras, jusqu'au coude tendu.",
+    eviter: "Avancer les coudes ou appuyer avec le poids du corps.",
+  },
+
+  // Arrivée : coudes à la hauteur des épaules, coudes pliés, mains de part et d'autre du front
+  // (rotation externe). Prise neutre sur la corde.
+  "Face pull": {
+    view: { az: 40, el: 12 }, active: ["epauleL", "epauleR", "torse"], touch: ["toeL", "heelL", "toeR", "heelR"],
+    props: { rope: { pulley: [0, 1.55, 0.95] }, boxes: [[0, 1.1, 1.02, 0.12, 2.2, 0.12]] },
+    frames: [
+      { d: 1.2, hold: 0.4, cue: "Face à la poulie à hauteur du visage, bras tendus, corde en prise neutre",
+        pose: stand(0.975, 0, 0, { handL: [0.07, 1.47, 0.57], handR: [-0.07, 1.47, 0.57], elbowL: [1, -0.1, -0.3], elbowR: [-1, -0.1, -0.3] }) },
+      { d: 1.3, hold: 0.6, cue: "Tirer vers le visage, coudes hauts et écartés, mains de part et d'autre du front",
+        pose: stand(0.975, 0, 0, { handL: [0.33, 1.72, 0.0], handR: [-0.33, 1.72, 0.0], elbowL: [1, -0.1, -0.3], elbowR: [-1, -0.1, -0.3] }) },
+      { d: 2, hold: 0.2, cue: "Rendre en contrôlant jusqu'aux bras tendus", pose: null },
+    ],
+    sentir: "L'arrière des épaules et le haut du dos, entre les omoplates.",
+    eviter: "Tirer vers le menton avec les coudes bas, ou se pencher en arrière.",
+  },
+
+  // Bras horizontaux, coudes à ~10-20°, de devant jusqu'au plan du corps ; prise neutre (Schoenfeld 2013).
+  "Rear delt machine (reverse pec deck)": {
+    view: { az: 30, el: 25 }, active: ["epauleL", "epauleR"],
+    rest: { points: ["pelvis"], y: 0.47 }, pin: { p: "pelvis", z: 0 }, touch: ["toeL", "heelL", "toeR", "heelR"],
+    props: { handles: true, boxes: [[0, 0.235, -0.02, 0.4, 0.47, 0.4], [0, 0.95, 0.15, 0.35, 0.5, 0.06], [0, 0.6, 0.3, 0.12, 0.7, 0.1]] },
+    frames: [
+      { d: 1.2, hold: 0.4, cue: "Assis, poitrine contre le coussin, bras tendus devant, poignées verticales",
+        pose: { root: [0, 0, 0], footL: [0.2, 0.085, 0.45], footR: [-0.2, 0.085, 0.45], kneePoleL: [0.2, 1, 0.6], kneePoleR: [-0.2, 1, 0.6],
+          handL: [0.11, 1.065, 0.575], handR: [-0.11, 1.065, 0.575], elbowL: [0.4, 0.2, -1], elbowR: [-0.4, 0.2, -1], gripL: [0, 1, 0], gripR: [0, 1, 0] } },
+      { d: 1.3, hold: 0.6, cue: "Ouvrir les bras à l'horizontale jusqu'au niveau du corps, coudes légèrement fléchis",
+        pose: { root: [0, 0, 0], footL: [0.2, 0.085, 0.45], footR: [-0.2, 0.085, 0.45], kneePoleL: [0.2, 1, 0.6], kneePoleR: [-0.2, 1, 0.6],
+          handL: [0.765, 1.065, 0.02], handR: [-0.765, 1.065, 0.02], elbowL: [0.4, 0.2, -1], elbowR: [-0.4, 0.2, -1], gripL: [0, 1, 0], gripR: [0, 1, 0] } },
+      { d: 2, hold: 0.2, cue: "Revenir en contrôlant", pose: null },
+    ],
+    sentir: "L'arrière des épaules.",
+    eviter: "Plier les coudes pour tirer ou décoller la poitrine du coussin.",
+  },
+
+  // Machine de leg extension : assise à 50 cm, dossier à 10°, cuisses à l'horizontale, rouleau devant
+  // le bas du tibia. Isométrie à 60° de flexion (Rio 2015 : 5 × 45 s à ~70 %).
+  "Iso leg extension @60° (si genou raide)": {
+    view: "profilG", active: ["cuisseL", "cuisseR", "genouL", "genouR"],
+    rest: LEG_SEAT, pin: { p: "pelvis", z: 0 },
+    props: { boxes: LEG_EXT_BOXES, pads: [{ joint: "anL", at: [-0.095, 0.04, 0.075], r: 0.05, len: 0.45 }] },
+    frames: [
+      { d: 1.5, hold: 0.6, cue: "Assis, dos calé, genoux à 90°, rouleau sur le bas des tibias", pose: { ...LEG_EXT_BASE, ...LR("knee", 90) } },
+      { d: 1.5, hold: 4, cue: "Monter jusqu'à 60° de flexion et tenir 45 secondes, effort à 70 %, sans douleur", pose: { ...LEG_EXT_BASE, ...LR("knee", 60) } },
+    ],
+    sentir: "Les quadriceps qui tiennent, une tension stable au-dessus du genou.",
+    eviter: "Tendre la jambe ou forcer au-delà du seuil de douleur.",
+  },
+
+  // Amplitude de la rééducation de Yoann (HSR) : de 60° à 10° de flexion, tempo 3 s montée, 3 s
+  // descente. La machine standard va de 90° à 0-10° ; la zone 0-30° charge le plus la rotule.
+  "Leg extension unilatérale": {
+    view: "profilG", active: ["cuisseL", "genouL"], sides: true, side: "L",
+    rest: LEG_SEAT, pin: { p: "pelvis", z: 0 },
+    props: { boxes: LEG_EXT_BOXES, pads: [{ joint: "anL", at: [0, 0.04, 0.075], r: 0.05, len: 0.22 }] },
+    frames: [
+      { d: 1.5, hold: 0.4, cue: "Assis, dos calé, une jambe sous le rouleau, genou à 60° (amplitude de rééducation)", pose: { ...LEG_EXT_BASE, kneeL: 60, kneeR: 90 } },
+      { d: 3, hold: 0.3, cue: "Tendre en 3 secondes jusqu'à 10° de flexion, sans verrouiller le genou", pose: { ...LEG_EXT_BASE, kneeL: 10, kneeR: 90 } },
+      { d: 3, hold: 0.3, cue: "Redescendre en 3 secondes jusqu'à 60°", pose: { ...LEG_EXT_BASE, kneeL: 60, kneeR: 90 } },
+    ],
+    sentir: "Le quadriceps, avec une gêne au tendon de 3/10 au plus.",
+    eviter: "Lancer la charge, ou sortir de l'amplitude 10-60°.",
+  },
+
+  // Assis (choix de Yoann) : hanche à ~90°, coussin sur les cuisses, genou de ~5-10° à ~90-110°
+  // (Maeo 2021 : la position assise allonge davantage les ischio-jambiers).
+  "Leg curl unilatéral": {
+    view: "profilG", active: ["cuisseL"], sides: true, side: "L",
+    rest: LEG_SEAT, pin: { p: "pelvis", z: 0 },
+    props: { boxes: [[0, 0.25, 0.02, 0.45, 0.5, 0.5], [0, 0.87, -0.24, 0.45, 0.7, 0.08, -15], [0, 0.68, 0.33, 0.5, 0.07, 0.15]],
+      pads: [{ joint: "anL", at: [0, 0.04, -0.075], r: 0.05, len: 0.22 }] },
+    frames: [
+      { d: 1.5, hold: 0.4, cue: "Assis, dos calé, coussin sur le bas des cuisses, jambe tendue sur le rouleau", pose: { ...LEG_CURL_BASE, kneeL: 8, kneeR: 8 } },
+      { d: 1.4, hold: 0.5, cue: "Plier le genou jusqu'à ~100°, le talon passe sous l'assise", pose: { ...LEG_CURL_BASE, kneeL: 100, kneeR: 8 } },
+      { d: 2.2, hold: 0.2, cue: "Revenir en freinant jusqu'à la jambe presque tendue", pose: { ...LEG_CURL_BASE, kneeL: 8, kneeR: 8 } },
+    ],
+    sentir: "L'arrière de la cuisse.",
+    eviter: "Décoller les fesses de l'assise ou laisser la charge retomber.",
+  },
+
+  // Machine de hip thrust (choix de Yoann) : haut du dos sur le coussin (pointe des omoplates), pieds
+  // à plat ; en haut, genou à ~90°, tibia vertical, buste parallèle au sol, hanche neutre (NSCA).
+  "Hip thrust": (() => {
+    const base = { neck: [20, 0, 0], footL: [0.17, 0.085, 0.88], footR: [-0.17, 0.085, 0.88], kneePoleL: [0.1, 1, 0.4], kneePoleR: [-0.1, 1, 0.4],
+      handL: [0.3, 0.45, -0.05], handR: [-0.3, 0.45, -0.05], elbowL: [1, -0.5, 0], elbowR: [-1, -0.5, 0] };
+    return {
+      view: { az: 75, el: 12 }, active: ["bassin", "hancheL", "hancheR"],
+      rest: { points: ["ribs"], y: 0.42 }, pin: { p: "ribs", z: 0 }, touch: ["toeL", "heelL", "toeR", "heelR"],
+      props: { boxes: [[0, 0.21, -0.05, 0.5, 0.42, 0.3], [0, 0.01, 0.88, 0.6, 0.02, 0.4]], pads: [{ joint: "pelvis", at: [0, -0.02, 0.13], r: 0.05, len: 0.5 }] },
+      frames: [
+        { d: 1.2, hold: 0.4, cue: "Haut du dos sur le coussin, ceinture sur les hanches, pieds à plat, hanches basses", pose: { ...base, root: [-55, 0, 0], neck: [36, 0, 0] } },
+        { d: 1.2, hold: 1, cue: "Pousser dans les talons jusqu'au buste parallèle au sol, tibias verticaux, fessiers serrés", pose: { ...base, root: [-90, 0, 0] } },
+        { d: 2, hold: 0.2, cue: "Redescendre en contrôlant", pose: { ...base, root: [-55, 0, 0], neck: [36, 0, 0] } },
+      ],
+      sentir: "Les fessiers, surtout en haut.",
+      eviter: "Cambrer pour monter plus haut : en haut, côtes basses et menton rentré.",
+    };
+  })(),
+
+  // Presse à 45° : dossier incliné, pieds à largeur de hanches sur le plateau ; en bas, genou à ~90°
+  // (ACE), en haut ~5-10° sans verrouiller. Glissière calculée pour une cheville naturelle.
+  "Presse à cuisses": {
+    view: { az: 80, el: 10 }, active: ["cuisseL", "cuisseR", "bassin"],
+    rest: PRESS_SEAT, pin: { p: "pelvis", z: 0 }, props: PRESS_PROPS,
+    frames: [
+      { d: 1.2, hold: 0.4, cue: "Dos et bassin calés, pieds à largeur de hanches au milieu du plateau, jambes presque tendues", pose: pressPose(PRESS_FEET[10]) },
+      { d: 2.2, hold: 0.3, cue: "Descendre jusqu'à environ 90° de genou, le bassin reste collé au siège", pose: pressPose(PRESS_FEET[90]) },
+      { d: 1.4, hold: 0.4, cue: "Pousser sans verrouiller les genoux, genoux dans l'axe des pieds", pose: pressPose(PRESS_FEET[10]) },
+    ],
+    sentir: "Les quadriceps et les fessiers ; au genou, une gêne de 3/10 au plus.",
+    eviter: "Décoller le bassin du siège en bas, ou verrouiller les genoux en haut.",
+  },
+
+  // Protocole HSR de Yoann : amplitude 10-60° de flexion, tempo 3 s / 3 s.
+  "Presse à cuisses (HSR)": {
+    view: { az: 80, el: 10 }, active: ["cuisseL", "cuisseR", "genouL", "genouR"],
+    rest: PRESS_SEAT, pin: { p: "pelvis", z: 0 }, props: PRESS_PROPS,
+    frames: [
+      { d: 1.2, hold: 0.4, cue: "Dos calé, pieds au milieu du plateau, genoux à 10° de flexion", pose: pressPose(PRESS_FEET[10]) },
+      { d: 3, hold: 0.3, cue: "Descendre en 3 secondes jusqu'à 60° de genou (amplitude de rééducation)", pose: pressPose(PRESS_FEET[60]) },
+      { d: 3, hold: 0.3, cue: "Remonter en 3 secondes jusqu'à 10°, sans verrouiller", pose: pressPose(PRESS_FEET[10]) },
+    ],
+    sentir: "Les quadriceps, avec une gêne au tendon de 3/10 au plus.",
+    eviter: "Accélérer ou sortir de l'amplitude 10-60°.",
+  },
+
+  // Jambes presque tendues ; cheville de ~15-20° de flexion dorsale à ~30-45° de flexion plantaire.
+  "Mollets à la presse": {
+    view: { az: 80, el: 10 }, active: ["jambeL", "jambeR", "chevilleL", "chevilleR"],
+    rest: PRESS_SEAT, pin: { p: "pelvis", z: 0 },
+    props: { boxes: PRESS_PROPS.boxes, follow: [{ at: "orteils", offset: [0, 0.18, -0.1], size: [0.7, 0.55, 0.04], rotX: -45 }] },
+    frames: [
+      { d: 1.2, hold: 0.5, cue: "Jambes presque tendues, l'avant des pieds au bas du plateau, talons dans le vide", pose: { ...CALF_PRESS, ...LR("ankle", 15) } },
+      { d: 0.8, hold: 0.6, cue: "Pousser sur la pointe des pieds le plus loin possible", pose: { ...CALF_PRESS, ...LR("ankle", -35) } },
+      { d: 2, hold: 0.4, cue: "Revenir en 2 secondes jusqu'à l'étirement, sans rebond", pose: { ...CALF_PRESS, ...LR("ankle", 15) } },
+    ],
+    sentir: "Les mollets, étirés puis contractés.",
+    eviter: "Plier les genoux ou rebondir en bas.",
+  },
 };
+
+// Une position de retour écrite `pose: null` reprend la première position.
+for (const d of Object.values(DEMOS)) for (const fr of d.frames) if (!fr.pose) fr.pose = d.frames[0].pose;
+
+// Variantes du même geste sur un autre équipement : même démonstration. Les développés en machine
+// reprennent ceux aux haltères, avec des poignées à la place des haltères.
+const withHandles = (d) => ({ ...d, props: { ...d.props, dumbbells: false, handles: true } });
+const SAME = {
+  "Tirage vertical prise neutre (poulie)": DEMOS["Tirage vertical prise neutre"],
+  "Rowing barre ou machine": DEMOS["Rowing poulie basse"],
+  "Iso leg extension @60° (poulie)": DEMOS["Iso leg extension @60° (si genou raide)"],
+  "Iso leg extension @60° (disque)": DEMOS["Iso leg extension @60° (si genou raide)"],
+  "Leg extension unilatérale (poulie)": DEMOS["Leg extension unilatérale"],
+  "Leg extension unilatérale (disque)": DEMOS["Leg extension unilatérale"],
+  "Leg curl unilatéral (poulie)": DEMOS["Leg curl unilatéral"],
+  "Leg curl unilatéral (disque)": DEMOS["Leg curl unilatéral"],
+  "Presse à cuisses (poulie)": DEMOS["Presse à cuisses"],
+  "Presse à cuisses (disque)": DEMOS["Presse à cuisses"],
+  "Mollets à la presse (poulie)": DEMOS["Mollets à la presse"],
+  "Mollets à la presse (disque)": DEMOS["Mollets à la presse"],
+  "Développé couché (poulie)": withHandles(DEMOS["Développé couché haltères"]),
+  "Développé couché (disque)": withHandles(DEMOS["Développé couché haltères"]),
+  "Développé incliné (poulie)": withHandles(DEMOS["Développé incliné haltères"]),
+  "Développé incliné (disque)": withHandles(DEMOS["Développé incliné haltères"]),
+  "Développé militaire (poulie)": withHandles(DEMOS["Développé militaire haltères"]),
+  "Développé militaire (disque)": withHandles(DEMOS["Développé militaire haltères"]),
+};
+Object.assign(DEMOS, SAME);
 
 export const hasDemo = (nom) => !!DEMOS[nom];
