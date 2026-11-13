@@ -17,6 +17,30 @@ les pièges identifiés et les tests attendus — ne pas les rouvrir sans raison
 À la fin d'une étape : cocher son état dans le tableau de `ROADMAP.md`, et
 documenter le livré ici, dans CLAUDE.md.
 
+## État courant (13/11/2026) : à lire en premier dans une session neuve
+
+À tenir à jour à chaque installation.
+- **Installé sur le S25** : v3.163.0, commit `6b85f79`, le 13/11/2026 à 16 h 42.
+- **Git** : `dev` = `origin/dev`, dossier propre, aucune autre branche de travail, aucun worktree,
+  rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à la demande de Yoann (il
+  datait du 25/10) : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
+- **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
+  `avant-campagne-audit`, `apres-lot1-audit`, `apres-lot2-audit`, `avant-jetons-gestes`. APK
+  précédents : `~/Documents/protocole-sauvegardes/` (hors Git).
+- **Tests** : 339 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
+- **Chantiers** : tous ceux de `ROADMAP.md` sont livrés (V, R, S, T, U, J). La campagne d'audit du
+  10/11/2026 est faite (lots 1 à 3). Ce qui reste ouvert est dans « Reportés à la fin de la
+  campagne », plus bas.
+- **En attente hors de ce dépôt** (appli JEFFREY, dépôt `jeffrey-app`) : installer son récepteur du
+  signal de record, puis l'essayer casque branché ; envoyer un jeton aux gestes de séance ;
+  afficher en clair le code `restauration`. Notes : `docs/suivi-jeffrey/`.
+- **Jamais essayé sur le téléphone** : voir les lignes « Pas vérifié » et « Pas essayé » des
+  sections datées de novembre (restauration réelle, gestes avec jeton, vraie photo de plat avec
+  son détail, record coché casque branché).
+- **Plusieurs sessions peuvent travailler dans ce dossier en même temps** (celle du pont JEFFREY
+  surtout) : relancer `git status` avant de toucher à la version, à ce fichier, et avant chaque
+  commit ; commiter par chemins explicites, jamais tout le dossier.
+
 ## Jeffrey, état actuel (mis à jour le 13/11/2026, apps/perso v3.163.0)
 
 Résumé de référence. Les sections datées plus bas (chantier J, 29-31/10/2026) racontent comment on
@@ -356,7 +380,8 @@ versions plus anciennes que Claude connaîtrait mieux par défaut) :
 - recharts 3.10.0 (graphiques)
 - lucide-react 1.25.0 (icônes)
 - vite-plugin-pwa 1.3.0 (manifeste + service worker)
-- @capacitor/core, @capacitor/android, @capacitor/app 8.4.x/8.1.x (app native)
+- @capacitor/core, @capacitor/android 8.5.1 (depuis le 11/11/2026, avis de sécurité),
+  @capacitor/app 8.1.x, @capacitor/haptics 8.0.x (app native)
 - @capgo/capacitor-health 8.10.0 (lecture Health Connect : pas, sommeil,
   énergie, hydratation — PAS le détail des macros, voir plus bas)
 - @capacitor-mlkit/barcode-scanning 8.1.0 (scan code-barres, module Nutrition M3,
@@ -6121,7 +6146,7 @@ changement de transport, de voix, de LiteLLM, ni dans le dépôt JEFFREY ou côt
   structurées pour Photo d'un plat et Carte resto.
 - Ménage : `CLAUDE.md` à alléger, `README.md` périmé, code mort (cœur et écrans), service worker et
   `vite-plugin-pwa`, Tailwind, permissions Health Connect inutiles, `versionName` figé à « 1.0 »,
-  18 mises à jour mineures, `main` en retard sur `dev`.
+  18 mises à jour mineures. (`main` en retard sur `dev` : réglé le 13/11/2026, aligné.)
 - Tests sans couverture directe (TDEE et choix de fenêtre, score d'énergie, records, `zoneState`,
   `medianTarget`, scan) et aucun test d'écran.
 - Fichiers à découper (`FoodSearch.jsx`, `App.jsx`, `NutritionTab.jsx`, `MuscuLogger.jsx`,
@@ -6225,3 +6250,25 @@ le même jour par l'autre session, les deux changements partent dans la même in
 - Vérifié dans l'aperçu (360 px), avec une réponse d'IA simulée : détail et explication affichés,
   614 kcal (somme des lignes) ajoutées au déjeuner, pas de débordement ; rear delt remplacé par
   l'oiseau dans Upper B. **Pas vérifié** : un vrai appel à l'IA (payant) et le téléphone.
+
+## Installation de la v3.163.0, tour des sessions du projet (13/11/2026)
+
+- **Installée sur le S25 le 13/11/2026 à 16 h 42** par la session du pont (`release.mjs build`
+  puis `install`) : commit `6b85f79`, empreinte de l'APK `0be08bc0815a2ac9…`, vérifiée sur le
+  téléphone. Elle contient le signal de record et les trois changements de la section précédente.
+  - Avant : APK 3.162.0 copié dans `~/Documents/protocole-sauvegardes/record-2026-11/`, copie
+    serveur manuelle réussie à 16 h 41, empreintes des 48 clés relevées.
+  - Après : 48 clés présentes (seules la position et la date de la dernière copie serveur ont
+    changé), démarrage sur le Bord sans écran de secours, « v3.163.0 » dans les Réglages, lien
+    avec JEFFREY autorisé, aucun plantage.
+  - Contrôle refait le même soir par une seconde session : même empreinte, 339 tests, « Oiseau
+    haltères », « Détail de l'estimation » et `signalRecord` présents dans l'APK.
+- **Pas essayé sur le téléphone** : une vraie photo de plat (appel payant), « Remplacer » par
+  l'oiseau, Upper A et B sans les curls, un record coché casque branché (rien ne part tant que
+  JEFFREY n'a pas son récepteur).
+- **Signal de record, côté JEFFREY** : le 13/11 au soir, son récepteur était écrit, mais ni commité
+  ni installé. À suivre dans une session JEFFREY.
+- **Tour des sessions du projet (13/11/2026)** : les six sessions ouvertes sur ce dossier ont
+  été relues. Toutes sont terminées, tout leur travail est commité, poussé sur `dev` et décrit
+  dans ce fichier. Rien n'était en attente. La suite part d'une session neuve, avec la section
+  « État courant » en tête de ce fichier.
