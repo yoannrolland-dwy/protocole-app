@@ -99,4 +99,19 @@ export const EXERCISE_LIBRARY = [
     groupe: "epaules", mouvement: "poussee", materiel: "poulie", tendon: null, famille: "developpe-militaire" },
   { n: "Développé militaire (disque)", s: 3, r: "8-10", rest: 120, mode: "reps", c: "",
     groupe: "epaules", mouvement: "poussee", materiel: "disque", tendon: null, famille: "developpe-militaire" },
+
+  // ---- Arrière d'épaule (alternative au rear delt machine, 13/11/2026, demande de Yoann) ----
+  // « Oiseau » = élévations buste penché (reverse fly). Prise neutre, haltères légers : rien ne
+  // force le poignet. Même groupe que la machine, donc même décompte de volume épaules.
+  { n: "Oiseau haltères", s: 2, r: "10-12", rest: 60, mode: "reps",
+    c: "buste penché ou poitrine sur banc incliné · prise neutre, coudes à peine fléchis · sans élan",
+    groupe: "epaules", mouvement: "isolation", materiel: "halteres", tendon: null, famille: "rear-delt" },
+
+  // ---- Curls poignets : sortis d'Upper A et B le 13/11/2026 (douleur aux poignets, choix de
+  // Yoann). Gardés ici sous leur nom d'origine, pour leur historique et « Ajouter un exercice ».
+  // Sans `famille` : ils ne remplacent rien et rien ne les remplace.
+  { n: "Curl poignets pronation", s: 2, r: "10-12", rest: 60, mode: "reps", c: "léger, avant-bras · stop si douleur poignet",
+    groupe: "avant-bras", mouvement: "isolation", materiel: "halteres", tendon: null },
+  { n: "Curl poignets supination", s: 2, r: "10-12", rest: 60, mode: "reps", c: "léger, avant-bras · stop si douleur poignet",
+    groupe: "avant-bras", mouvement: "isolation", materiel: "halteres", tendon: null },
 ];

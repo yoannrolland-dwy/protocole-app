@@ -100,6 +100,25 @@ test("remplacement : candidats de la même famille, retour à l'original", () =>
   assert.equal(exos[ri].origine, undefined);
 });
 
+test("rear delt machine : l'oiseau haltères en remplacement, protocole du gabarit gardé (13/11/2026)", () => {
+  let exos = buildExercises({ type: "Upper B", training: history, hsrWeek: 9 });
+  const ri = exos.findIndex((e) => e.nom === "Rear delt machine (reverse pec deck)");
+  const cands = substitutionCandidates(exos[ri], TEMPLATES["Upper B"]);
+  assert.deepEqual(cands.map((c) => c.n), ["Oiseau haltères"]);
+  const prev = exos[ri];
+  exos = substituteExercise(exos, ri, cands[0], { training: history });
+  assert.equal(exos[ri].nom, "Oiseau haltères");
+  assert.equal(exos[ri].origine, "Rear delt machine (reverse pec deck)");
+  assert.equal(exos[ri].groupe, "epaules");
+  assert.equal(exos[ri].series.length, prev.series.length);
+  assert.equal(exos[ri].rest, prev.rest);
+  // Jamais fait : aucun poids inventé.
+  assert.ok(exos[ri].series.every((s) => s.poids === "" || s.poids == null));
+  assert.ok(substitutionCandidates(exos[ri], TEMPLATES["Upper B"]).some((c) => c.isOriginal));
+  // Aussi dans « Ajouter un exercice ».
+  assert.equal(catalogEntry("Oiseau haltères").groupe, "epaules");
+});
+
 test("ajout et retrait d'un exercice", () => {
   let exos = buildExercises({ type: "Mobilité", training: [], hsrWeek: 9 });
   const n = exos.length;

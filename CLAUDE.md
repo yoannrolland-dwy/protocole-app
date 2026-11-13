@@ -6166,3 +6166,38 @@ Extension ciblée du pont, distincte de la campagne d'audit, d'après le plan
   note ; ou appliquer à l'envers le correctif gardé dans
   `~/Documents/protocole-sauvegardes/jetons-gestes-2026-11/`.
 
+
+## Oiseau haltères, curls poignets retirés, détail de Photo d'un plat (13/11/2026, apps/perso v3.163.0)
+
+Trois demandes de Yoann. Même numéro de version que le signal de record ci-dessus : il a été posé
+le même jour par l'autre session, les deux changements partent dans la même installation.
+- **Oiseau haltères** (élévations buste penché, *reverse fly*) : nouvelle entrée de
+  `EXERCISE_LIBRARY`, `famille: "rear-delt"`, posée aussi sur « Rear delt machine (reverse pec
+  deck) » d'Upper B. « Remplacer cet exercice » le propose donc sur le rear delt (protocole du
+  gabarit gardé : 2 × 10-12, repos 60 s), et il est dans « Ajouter un exercice ». Prise neutre :
+  rien ne force le poignet. Groupe `epaules`, comme la machine. Jamais fait : aucun poids inventé.
+- **Curls poignets retirés d'Upper A et d'Upper B** (choix de Yoann : douleur aux poignets, surtout
+  à gauche, revenue malgré la réduction du 04/10). Upper A et B passent à **8 exercices**.
+  - Les avant-bras travaillent déjà sur les tirages, le curl marteau et l'escalade.
+  - « Curl poignets pronation » et « Curl poignets supination » passent dans `EXERCISE_LIBRARY`
+    sous leur nom, donc avec leur historique, et restent dans « Ajouter un exercice ».
+  - Le grip isométrique (suspension, farmer walk) n'a pas été ajouté : à reproposer seulement une
+    fois les poignets sans douleur. Une douleur qui dure ou revient hors de ces exercices : avis
+    d'un kiné ou d'un médecin.
+- **Photo d'un plat : détail de l'estimation**.
+  - `nutrition/dishEstimate.js` (nouveau, testé) : la consigne (`DISH_PROMPT`), `extractJson` et
+    `readDishEstimate`, sortis de `PhotoDish.jsx`.
+  - L'IA rend en plus `detail` (une ligne par composant : aliment, grammes, kcal, P/G/L/Fib ;
+    matière grasse de cuisson et sauce sur leur propre ligne) et `explication` (2 à 4 phrases :
+    repère d'échelle, hypothèses de cuisson, effet de la note, point le plus incertain). La
+    consigne « ne détaille pas ton raisonnement » est retirée.
+  - Écran : « Détail de l'estimation » sous le total, avant « Ajouter ».
+  - **Le total affiché et ajouté au journal est la somme des lignes** quand le détail est complet
+    (aucune ligne écartée ni coupée, toutes les valeurs là). Sinon, le total annoncé par l'IA,
+    comme avant. Le journal reçoit toujours une seule ligne « <plat> (estimé IA) ».
+  - Coût : quelques centaines de tokens de sortie en plus par photo, non mesuré.
+- Tests : `apps/perso/test/dishEstimate.test.mjs` (5), un test dans `sessionEngine.test.mjs`,
+  `templates.test.mjs` mis à jour ; 339 au total avec ceux du signal de record.
+- Vérifié dans l'aperçu (360 px), avec une réponse d'IA simulée : détail et explication affichés,
+  614 kcal (somme des lignes) ajoutées au déjeuner, pas de débordement ; rear delt remplacé par
+  l'oiseau dans Upper B. **Pas vérifié** : un vrai appel à l'IA (payant) et le téléphone.

@@ -15,6 +15,9 @@
 // Carte au format carte bancaire (08/11/2026, choix de Yoann ; fidélité, vitale… pas forcément
 // une carte de paiement) : posée à plat à côté de l'assiette, elle sert
 // d'échelle (85,6 × 54 mm) ; elle ne dit rien de la hauteur d'un tas.
+// Détail de l'estimation (13/11/2026, demande de Yoann) : sous le total, une ligne par composant
+// (grammes, kcal, macros) et les hypothèses de l'IA. Consigne et lecture : dishEstimate.js. Le
+// journal reçoit toujours une seule ligne « <plat> (estimé IA) ».
 
 import React, { useState, useRef } from "react";
 import { ChevronLeft, Sparkles, Plus, Camera, Image, X } from "lucide-react";
@@ -24,50 +27,11 @@ import { aiMissing, fmtCost, recordSpend } from "../lib/ai.js";
 import { fileToImagePayload } from "@rawcare/core/nutrition/imageUtils";
 import { newQuickRef } from "./foodStore.js";
 import { say, sayError, sayStable } from "../lib/jeffrey.js";
+// Consigne et lecture de la réponse : dishEstimate.js (détail de l'estimation, 13/11/2026).
+import { DISH_PROMPT, buildDishUserText, extractJson, readDishEstimate } from "./dishEstimate.js";
 
 const MAX_PHOTOS = 3;
-
-function extractJson(raw) {
-  let s = raw.trim();
-  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fence) s = fence[1].trim();
-  const start = s.indexOf("{");
-  const end = s.lastIndexOf("}");
-  if (start >= 0 && end > start) s = s.slice(start, end + 1);
-  return JSON.parse(s);
-}
-
-const SYSTEM_PROMPT = `Tu es un nutritionniste qui estime les macros d'une assiette à partir d'une photo.
-On te donne une ou plusieurs photos du même plat (éventuellement plusieurs angles) et une note
-complémentaire facultative écrite par l'utilisateur (une quantité, un ingrédient à corriger ou
-préciser, ce qui n'a pas été mangé). Tâche :
-1. Identifie les aliments visibles sur la ou les photos et estime les quantités au jugé, à l'aide des
-   repères visuels disponibles (taille de l'assiette, des couverts, comparaison avec des portions
-   courantes). Le poids estimé à partir d'une seule photo est la principale source d'erreur (peut
-   facilement varier de 30 à 50 %) : reste réaliste, ne détaille pas ton raisonnement.
-   Si une carte au format carte bancaire est visible (85,6 × 54 mm : carte bancaire, de fidélité,
-   vitale, d'identité, badge, quel que soit son motif), sers-t'en
-   comme échelle en priorité : compare la surface et le diamètre de l'assiette et des aliments à
-   ses dimensions, en tenant compte de la perspective (elle est posée à plat sur la table). Elle
-   ne dit rien de la hauteur : juge l'épaisseur d'un tas (riz, pâtes) à part, avec prudence.
-2. Si la note complémentaire précise ou corrige une quantité ou un ingrédient, PRIORISE cette
-   information sur ton estimation visuelle — l'utilisateur en sait plus que la photo.
-3. Calcule kcal/prot/gluc/lip/fib (en grammes, kcal en kcal) pour l'ensemble de l'assiette.
-4. Donne un nom court et concret au plat (ex. "Poulet rôti, riz, brocolis"), pas une catégorie
-   générique.
-
-Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, sans balises markdown, exactement
-selon ce schéma :
-{"lisible":boolean,"nom":string,"kcal":number,"prot":number,"gluc":number,"lip":number,"fib":number}
-
-Si la ou les photos ne permettent pas d'identifier un plat exploitable (flou, hors-sujet, vide), mets
-"lisible" à false plutôt que d'inventer — les autres champs peuvent alors être à 0/vide.`;
-
-function buildUserText(note) {
-  return note.trim()
-    ? `Estime les macros de ce plat à partir de la ou des photos ci-jointes.\n\nNote complémentaire de l'utilisateur : ${note.trim()}`
-    : "Estime les macros de ce plat à partir de la ou des photos ci-jointes.";
-}
+const r0 = (n) => Math.round(n ?? 0);
 
 export default function PhotoDish({ ai, onAdd, onBack }) {
   const [photos, setPhotos] = useState([]); // [{id, dataUrl, base64, mediaType}]
@@ -78,7 +42,7 @@ export default function PhotoDish({ ai, onAdd, onBack }) {
   const [state, setState] = useState("idle"); // idle | loading | done | error
   const [progress, setProgress] = useState("");
   const [err, setErr] = useState("");
-  const [result, setResult] = useState(null); // { nom, kcal, prot, gluc, lip, fib }
+  const [result, setResult] = useState(null); // readDishEstimate : { nom, kcal, prot, gluc, lip, fib, detail, explication }
   const [meta, setMeta] = useState(null);
   const [added, setAdded] = useState(false);
 
@@ -104,11 +68,11 @@ export default function PhotoDish({ ai, onAdd, onBack }) {
     try {
       const user = [
         ...photos.map((p) => ({ type: "image", source: { type: "base64", media_type: p.mediaType, data: p.base64 } })),
-        { type: "text", text: buildUserText(note) },
+        { type: "text", text: buildDishUserText(note) },
       ];
       const askedModel = ai.model || "claude-sonnet-5";
       const { data, usedModel, cents } = await callClaude({
-        provider: ai.provider, baseUrl: ai.baseUrl, apiKey: ai.apiKey, model: askedModel, system: SYSTEM_PROMPT, user,
+        provider: ai.provider, baseUrl: ai.baseUrl, apiKey: ai.apiKey, model: askedModel, system: DISH_PROMPT, user,
         // 1024 → 16000 (26/10/2026) : avec Opus 5.5 la réflexion toujours active aurait coupé le JSON.
         effort: "medium", maxTokens: 16000, onRetry: setProgress,
       });
@@ -123,13 +87,14 @@ export default function PhotoDish({ ai, onAdd, onBack }) {
         console.warn("Photo d'un plat — JSON illisible :", raw);
         setErr(say("aiUnreadable")); setState("error"); return;
       }
-      if (!parsed.lisible) {
+      const estimate = readDishEstimate(parsed);
+      if (!estimate) {
         setErr(say("photoUnknown"));
         setState("error");
         return;
       }
       setMeta({ model: usedModel, fellBack: usedModel !== askedModel, usage: data.usage, cents });
-      setResult(parsed);
+      setResult(estimate);
       setState("done");
     } catch (e) {
       console.error("PhotoDish", e);
@@ -235,6 +200,32 @@ export default function PhotoDish({ ai, onAdd, onBack }) {
             <span>L{Math.round(result.lip)}</span>
             <span>Fib{Math.round(result.fib)}</span>
           </div>
+          {/* Détail de l'estimation (13/11/2026) : une ligne par composant, puis les hypothèses de l'IA.
+              Affiché avant « Ajouter », pour le lire avant de valider. */}
+          {(result.detail.length > 0 || result.explication) && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+              <Label style={{ marginBottom: 6 }}>Détail de l'estimation</Label>
+              {result.detail.length > 0 && (
+                <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 8 }}>
+                  {result.detail.map((l, i) => (
+                    <li key={i} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", columnGap: 10, alignItems: "baseline" }}>
+                      <span style={{ fontSize: 13, color: C.text, overflowWrap: "anywhere" }}>
+                        {l.aliment}
+                        {l.grammes !== null && <span style={{ fontFamily: C.mono, color: C.muted }}> · {r0(l.grammes)} g</span>}
+                      </span>
+                      <span style={{ fontFamily: C.mono, fontSize: 13, color: C.text, fontWeight: 700, whiteSpace: "nowrap" }}>{r0(l.kcal)} kcal</span>
+                      <span style={{ gridColumn: "1 / -1", fontFamily: C.mono, fontSize: 12, color: C.muted }}>
+                        P{l.prot === null ? "—" : r0(l.prot)} G{l.gluc === null ? "—" : r0(l.gluc)} L{l.lip === null ? "—" : r0(l.lip)} Fib{l.fib === null ? "—" : r0(l.fib)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {result.explication && (
+                <Body style={{ fontSize: 13, color: C.muted, marginTop: result.detail.length ? 10 : 0, lineHeight: 1.45 }}>{result.explication}</Body>
+              )}
+            </div>
+          )}
           <Btn variant={added ? "plain" : "primary"} disabled={added} onClick={add}
             style={{ width: "100%", marginTop: 9, padding: "7px 0", fontSize: 13 }}>
             {added ? "Ajouté au journal ✓" : (<><Plus size={12} style={{ display: "inline", verticalAlign: -2, marginRight: 4 }} />Ajouter</>)}

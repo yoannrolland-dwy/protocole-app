@@ -2,6 +2,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { TEMPLATES, TYPES, DEFAULT_WEIGHTS } from "../src/session/templates.js";
+import { catalogEntry } from "../src/session/exoCatalog.js";
+import { metaFor } from "../src/session/exoMeta.js";
 
 const maxRep = (r) => Math.max(...String(r).match(/\d+/g).map(Number));
 
@@ -11,19 +13,27 @@ test("Upper A/B et Lower B : plus aucune série au-delà de 12 reps (hors temps/
       if (e.mode === "reps" && e.r !== "table HSR") assert.ok(maxRep(e.r) <= 12, `${t} · ${e.n} ${e.r}`);
 });
 
-test("Upper A/B après la spécialisation du 05/10 et le déménagement du core (07/10), épaules 3+2 (08/10) : 9 exercices chacun", () => {
+test("Upper A/B après la spécialisation du 05/10 et le déménagement du core (07/10), épaules 3+2 (08/10), sans curls poignets (13/11) : 8 exercices chacun", () => {
   const A = Object.fromEntries(TEMPLATES["Upper A"].exos.map((e) => [e.n, e]));
   const B = Object.fromEntries(TEMPLATES["Upper B"].exos.map((e) => [e.n, e]));
-  assert.equal(TEMPLATES["Upper A"].exos.length, 9);
-  assert.equal(TEMPLATES["Upper B"].exos.length, 9);
+  // 13/11/2026 : curls poignets retirés (douleur aux poignets), 8 exercices chacun.
+  assert.equal(TEMPLATES["Upper A"].exos.length, 8);
+  assert.equal(TEMPLATES["Upper B"].exos.length, 8);
   assert.equal(TEMPLATES["Upper A"].exos.map((e) => e.n).join("|"),
-    "Développé incliné haltères|Tirage vertical prise neutre|Rowing barre ou machine|Écarté poulie basse|Élévations latérales poulie|Extension triceps poulie haute|Face pull|Élévations latérales haltères|Curl poignets pronation");
+    "Développé incliné haltères|Tirage vertical prise neutre|Rowing barre ou machine|Écarté poulie basse|Élévations latérales poulie|Extension triceps poulie haute|Face pull|Élévations latérales haltères");
   assert.equal(TEMPLATES["Upper B"].exos.map((e) => e.n).join("|"),
-    "Développé couché haltères|Développé militaire haltères|Tirage vertical prise neutre|Écarté poulie basse|Élévations latérales poulie|Rear delt machine (reverse pec deck)|Élévations latérales haltères|Curl marteau (prise neutre)|Curl poignets supination");
+    "Développé couché haltères|Développé militaire haltères|Tirage vertical prise neutre|Écarté poulie basse|Élévations latérales poulie|Rear delt machine (reverse pec deck)|Élévations latérales haltères|Curl marteau (prise neutre)");
   assert.deepEqual([A["Tirage vertical prise neutre"].s, A["Rowing barre ou machine"].s, A["Élévations latérales haltères"].s, A["Élévations latérales poulie"].s, A["Élévations latérales haltères"].rest, A["Face pull"].s, A["Extension triceps poulie haute"].rest], [3, 3, 3, 2, 60, 2, 75]);
   assert.deepEqual([B["Développé militaire haltères"].s, B["Écarté poulie basse"].s, B["Élévations latérales poulie"].s, B["Élévations latérales haltères"].s, B["Élévations latérales poulie"].rest, B["Rear delt machine (reverse pec deck)"].s], [2, 2, 3, 2, 60, 2]);
-  // inchangés : développés, rééduc coude, curls poignets (poignet)
-  assert.deepEqual([A["Développé incliné haltères"].s, A["Développé incliné haltères"].r, B["Tirage vertical prise neutre"].s, B["Curl marteau (prise neutre)"].s, A["Curl poignets pronation"].s, A["Curl poignets pronation"].r, B["Curl poignets supination"].s], [4, "8-10", 4, 3, 2, "10-12", 2]);
+  // inchangés : développés, rééduc coude
+  assert.deepEqual([A["Développé incliné haltères"].s, A["Développé incliné haltères"].r, B["Tirage vertical prise neutre"].s, B["Curl marteau (prise neutre)"].s], [4, "8-10", 4, 3]);
+  // Curls poignets : plus prescrits nulle part, mais gardés (nom, historique, « Ajouter un exercice »).
+  for (const t of Object.keys(TEMPLATES)) assert.ok(!TEMPLATES[t].exos.some((e) => /Curl poignets/.test(e.n)), t);
+  for (const n of ["Curl poignets pronation", "Curl poignets supination"]) {
+    assert.deepEqual([catalogEntry(n).groupe, catalogEntry(n).ex.s, catalogEntry(n).ex.r, catalogEntry(n).type], ["avant-bras", 2, "10-12", null]);
+    assert.equal(metaFor(n).groupe, "avant-bras");
+    assert.ok(DEFAULT_WEIGHTS[n] > 0);
+  }
   assert.equal(DEFAULT_WEIGHTS["Tirage vertical prise neutre"], 85);
   assert.equal(DEFAULT_WEIGHTS["Écarté poulie basse"], 10);
 });
