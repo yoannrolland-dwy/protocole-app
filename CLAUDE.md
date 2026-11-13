@@ -22,7 +22,7 @@ documenter le livré ici, dans CLAUDE.md.
 À tenir à jour à chaque installation.
 - **Installé sur le S25** : v3.164.0, commit `f19e586`, le 13/11/2026 à 18 h 46 (Mobilité élargie
   et démonstrations 3D, étape 1).
-- **Git** : `dev` en avance sur `origin/dev` (rien poussé depuis `3e59fec`), aucune autre branche
+- **Git** : `dev` = `origin/dev` (poussé le 13/11/2026 au soir), dossier propre, aucune autre branche
   de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à
   la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
