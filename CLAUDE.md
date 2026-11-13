@@ -20,8 +20,8 @@ documenter le livré ici, dans CLAUDE.md.
 ## État courant (13/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.166.0, commit `c7b1258`, le 13/11/2026 à 19 h 29 (démonstrations 3D,
-  étapes 1 et 2, gestes corrigés d'après la littérature).
+- **Installé sur le S25** : v3.167.0, commit `b7053b6`, le 13/11/2026 à 22 h 59 (démonstrations 3D,
+  étapes 1 à 3).
 - **Git** : `dev` = `origin/dev` (poussé le 13/11/2026 au soir), dossier propre, aucune autre branche
   de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à
   la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
@@ -35,7 +35,7 @@ documenter le livré ici, dans CLAUDE.md.
 - **Chantier en cours : démonstrations 3D** (sections du 13/11/2026 en fin de fichier). Étape 1
   (Mobilité) et étape 2 (haltères, barre, bancs) installées. Gestes corrigés d'après la
   littérature en v3.166.0, installée (« c'est mieux », Yoann) ; sources dans `docs/demos-3d/`.
-  Étape 3 (poulies et machines) écrite en v3.167.0, pas encore installée. Sans démonstration :
+  Étape 3 (poulies et machines) installée en v3.167.0 ; Yoann doit juger les gestes. Sans démonstration :
   curls poignets, rowing machine à disques, échauffement basket.
 - **En attente hors de ce dépôt** (appli JEFFREY, dépôt `jeffrey-app`) : installer son récepteur du
   signal de record, puis l'essayer casque branché ; envoyer un jeton aux gestes de séance ;
@@ -6494,5 +6494,14 @@ semelles sur le plateau de la presse. Positions des pieds de la presse calculée
 **Vérifications** : 349 tests (nouveau : la leg extension et la presse HSR restent dans 10-60° de
 flexion pendant tout le trajet, l'iso tient à 60°) ; images de toutes les positions clés relues ; à
 375 px, carnet Upper A avec le bouton sur tous ses exercices, écran du face pull, aucune erreur liée
-aux démonstrations. **Pas vérifié** : le téléphone et l'avis de Yoann.
+aux démonstrations.
+
+**Installé sur le S25 le 13/11/2026 à 22 h 59** (`release.mjs build` puis `install`) : commit
+`b7053b6`, empreinte de l'APK `f59204c7c13d32ea…` vérifiée sur le téléphone. Avant : aucune séance
+en cours ; APK 3.166.0 copié dans `~/Documents/protocole-sauvegardes/poulies-machines-2026-11/` ;
+copie serveur manuelle réussie à 22 h 58 ; empreintes relevées. Après : « v3.167.0 » dans les
+Réglages ; 47 clés sur 48 identiques (seule `lastPosition` a changé) ; préférences Android
+identiques ; permission du signal JEFFREY accordée ; aucun plantage. Démonstration du hip thrust
+ouverte depuis Lower B sur le téléphone, sans erreur ; séance de test annulée, rien enregistré.
+**Pas vérifié** : l'avis de Yoann sur ces gestes.
 
