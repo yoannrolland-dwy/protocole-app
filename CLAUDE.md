@@ -33,8 +33,9 @@ documenter le livré ici, dans CLAUDE.md.
   10/11/2026 est faite (lots 1 à 3). Ce qui reste ouvert est dans « Reportés à la fin de la
   campagne », plus bas.
 - **Chantier en cours : démonstrations 3D** (sections du 13/11/2026 en fin de fichier). Étape 1
-  (Mobilité) et étape 2 (haltères, barre, bancs) installées ; Yoann doit juger les gestes. Reste
-  l'étape 3 (machines et poulies, avec le hip thrust et le rowing).
+  (Mobilité) et étape 2 (haltères, barre, bancs) installées. Gestes corrigés d'après la
+  littérature en v3.166.0 (pas encore installée) ; sources dans `docs/demos-3d/`. Reste l'étape 3
+  (machines et poulies, avec le hip thrust et le rowing).
 - **En attente hors de ce dépôt** (appli JEFFREY, dépôt `jeffrey-app`) : installer son récepteur du
   signal de record, puis l'essayer casque branché ; envoyer un jeton aux gestes de séance ;
   afficher en clair le code `restauration`. Notes : `docs/suivi-jeffrey/`.
@@ -6410,4 +6411,41 @@ Lower B, Lower C et Full Body pour ces exercices.
 - **Pas vérifié** : le jugement de Yoann sur la justesse des gestes.
 - **Limites** : la prise exacte (largeur, rotation des poignets) et le placement des omoplates ne
   se voient pas ; le banc Hammer Strength est un banc générique.
+
+## Démonstrations 3D : gestes corrigés d'après la littérature (13/11/2026, apps/perso v3.166.0)
+
+Retour de Yoann sur l'étape 2 : « les mouvements avec haltères ne sont pas les perfect formes ».
+Il a demandé une recherche dans la vraie littérature pour tous les exercices du carnet.
+
+**Recherche** : trois fiches dans `docs/demos-3d/` (index : `README.md`), 109 sources au total
+(NSCA, ACE, ACSM, études publiées, kinésithérapie). Chaque chiffre y porte son origine (source,
+consensus, ou estimation pour l'animation). Plusieurs sources n'ont été lues qu'en résumé, c'est
+indiqué.
+
+**Défauts mesurés avant correction, et corrections** (angles mesurés sur le mannequin) :
+- **Développé couché et incliné** : en bas, coude trop fermé (environ 32°) et avant-bras pas
+  vertical ; en haut, bras pas assez tendus. Désormais : bras à 56-60° du buste, avant-bras
+  verticaux, haltères à hauteur du milieu (ou du haut) de la poitrine, bras presque tendus en haut.
+  Banc incliné gardé à 30° (les sources hésitent entre 30 et 45°).
+- **Développé militaire** : bras trop bas (environ 40°) au départ. Désormais haltères à hauteur
+  d'épaules, avant-bras verticaux, coudes environ 25° en avant du plan du corps.
+- **Élévations latérales** : bras montés exactement sur le côté. Désormais dans le plan de
+  l'omoplate (environ 17° en avant), arrêt à l'horizontale, coude fléchi de 15° fixe, prise neutre.
+- **Curl marteau** : bras parfaitement immobile, flexion jusqu'à 135°.
+- **Oiseau** : coudes trop pliés. Désormais fléchis d'environ 20° et fixes, bras jusqu'au niveau du
+  dos.
+- **Squat sur sécurités** : buste à 30° (25-35° dans les sources), genou toujours à 60°, barre au
+  milieu du pied ; hauteur des sécurités recalculée.
+- **Mollets** : cale de 10 cm, talon environ 22° sous la cale, pause en bas sans rebond.
+- **Mobilité** : fente basse (hanche arrière de 0 à 12°, bassin rentré, au lieu de 36°), rotation
+  externe d'épaule (de −35 à +50°), essuie-glaces (pieds à environ 60 cm, genoux à 90°), anges au
+  mur (talons à 15-20 cm du mur).
+- Consignes et repères « à éviter » réécrits en conséquence.
+
+Les positions des mains sont calculées (scripts de mesure de la session, non gardés). Les gestes
+de mobilité non cités étaient déjà dans les fourchettes des sources (chat-vache, rotation
+thoracique, bascule, 90/90, squat profond, levée de jambe, charnière, genou au mur).
+
+**Vérifications** : 348 tests verts (appuis, portée, barre et sécurités inchangés) ; images relues
+dans l'aperçu. **Pas vérifié** : le téléphone et l'avis de Yoann.
 
