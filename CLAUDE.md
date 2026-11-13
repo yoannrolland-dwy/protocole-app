@@ -20,28 +20,32 @@ documenter le livré ici, dans CLAUDE.md.
 ## État courant (13/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.163.0, commit `6b85f79`, le 13/11/2026 à 16 h 42.
-- **Git** : `dev` = `origin/dev`, dossier propre, aucune autre branche de travail, aucun worktree,
-  rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à la demande de Yoann (il
-  datait du 25/10) : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
+- **Installé sur le S25** : v3.164.0, commit `f19e586`, le 13/11/2026 à 18 h 46 (Mobilité élargie
+  et démonstrations 3D, étape 1).
+- **Git** : `dev` en avance sur `origin/dev` (rien poussé depuis `3e59fec`), aucune autre branche
+  de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à
+  la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
   `avant-campagne-audit`, `apres-lot1-audit`, `apres-lot2-audit`, `avant-jetons-gestes`. APK
   précédents : `~/Documents/protocole-sauvegardes/` (hors Git).
-- **Tests** : 339 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
+- **Tests** : 346 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
 - **Chantiers** : tous ceux de `ROADMAP.md` sont livrés (V, R, S, T, U, J). La campagne d'audit du
   10/11/2026 est faite (lots 1 à 3). Ce qui reste ouvert est dans « Reportés à la fin de la
   campagne », plus bas.
+- **Chantier en cours : démonstrations 3D** (section du 13/11/2026 en fin de fichier). Étape 1
+  (Mobilité) installée ; Yoann doit juger le rendu et la justesse des gestes avant les étapes 2
+  (haltères, barre, banc) et 3 (machines et poulies).
 - **En attente hors de ce dépôt** (appli JEFFREY, dépôt `jeffrey-app`) : installer son récepteur du
   signal de record, puis l'essayer casque branché ; envoyer un jeton aux gestes de séance ;
   afficher en clair le code `restauration`. Notes : `docs/suivi-jeffrey/`.
 - **Jamais essayé sur le téléphone** : voir les lignes « Pas vérifié » et « Pas essayé » des
   sections datées de novembre (restauration réelle, gestes avec jeton, vraie photo de plat avec
-  son détail, record coché casque branché).
+  son détail, record coché casque branché, une vraie séance Mobilité à 18 exercices).
 - **Plusieurs sessions peuvent travailler dans ce dossier en même temps** (celle du pont JEFFREY
   surtout) : relancer `git status` avant de toucher à la version, à ce fichier, et avant chaque
   commit ; commiter par chemins explicites, jamais tout le dossier.
 
-## Jeffrey, état actuel (mis à jour le 13/11/2026, apps/perso v3.163.0)
+## Jeffrey, état actuel (mis à jour le 13/11/2026, apps/perso v3.163.0 ; inchangé en v3.164.0)
 
 Résumé de référence. Les sections datées plus bas (chantier J, 29-31/10/2026) racontent comment on
 en est arrivé là ; **en cas de désaccord, c'est cette section qui fait foi**. À tenir à jour à
@@ -6335,7 +6339,19 @@ ajouter ses mouvements à la séance Mobilité, et voir chaque exercice exécut�
 - Aperçu : planche d'images des 44 positions clés relue à l'œil ; à 375 px, carnet avec intertitres
   et mise en garde, écran de démonstration (lecture, curseur, côté, caméra, fermeture), aucune
   cible sous 44 px, aucun débordement, aucune erreur console.
-- **Pas vérifié** : le téléphone (fluidité, toucher), et le jugement de Yoann sur la justesse de
-  chaque geste.
+- **Installé sur le S25 le 13/11/2026 à 18 h 46** (`release.mjs build` puis `install`) : commit
+  `f19e586`, empreinte de l'APK `5e5a0298e985053f…` vérifiée sur le téléphone, `versionCode` 1,
+  date de première installation inchangée.
+  - Avant : aucune séance en cours ; APK 3.163.0 copié dans
+    `~/Documents/protocole-sauvegardes/mobilite-3d-2026-11/` (empreinte `0be08bc0…`) ; copie
+    serveur manuelle réussie à 18 h 45 ; sauvegarde locale du jour présente ; empreintes des
+    48 clés et des 5 préférences Android relevées (sans les valeurs).
+  - Après : « v3.164.0 » dans les Réglages ; 47 clés sur 48 identiques, seule `lastPosition` a
+    changé ; préférences Android identiques ; permission du signal JEFFREY accordée ; aucun
+    plantage. Séance Mobilité ouverte : 18 exercices, 8 intertitres de zone ; démonstration du
+    chat-vache affichée et animée sur le téléphone. Séance de test annulée, brouillon effacé,
+    rien enregistré.
+- **Pas vérifié** : la fluidité et le toucher (rotation, pincement) à la main ; le jugement de
+  Yoann sur la justesse de chaque geste.
 - **Pas fait** : les exercices hors Mobilité (étapes 2 et 3) ; JEFFREY ne reçoit ni les zones ni
   la mise en garde.
