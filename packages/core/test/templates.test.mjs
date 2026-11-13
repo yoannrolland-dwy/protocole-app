@@ -1,7 +1,7 @@
 // Gabarits de séance (templates.js) — porté de fb-test.mjs (04/10/2026).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TEMPLATES, TYPES, DEFAULT_WEIGHTS } from "../src/session/templates.js";
+import { TEMPLATES, MOBILITY_ZONES, TYPES, DEFAULT_WEIGHTS } from "../src/session/templates.js";
 import { catalogEntry } from "../src/session/exoCatalog.js";
 import { metaFor } from "../src/session/exoMeta.js";
 
@@ -56,15 +56,41 @@ test("Full Body : existe, HSR, tag genou, contenu et ordre figés", () => {
   assert.equal(FB.exos.find((e) => e.n === "Élévations latérales haltères").s, 4);
 });
 
-test("Mobilité (07/10/2026) : aucune charge, core déménagé ici, iso genou + planche + crunch non optionnels", () => {
+test("Mobilité (13/11/2026) : 18 exercices rangés par zone, aucune charge, mise en garde genou sur trois mouvements", () => {
   const M = TEMPLATES["Mobilité"];
   assert.deepEqual(M.chargeTags, []);
   assert.ok(!M.knee && !M.climb);
-  assert.equal(M.exos.map((e) => e.n).join("|"),
-    "Iso leg extension unilatérale @60° (genou)|Hanche 90/90 avec transitions|Cheville : genou au mur|Rotation externe épaule poulie basse|Iso flexion coude prise marteau + supination|Core — Crunch machine|Core — Planche");
-  assert.deepEqual(M.exos.filter((e) => !e.opt).map((e) => e.n), ["Iso leg extension unilatérale @60° (genou)", "Core — Crunch machine", "Core — Planche"]);
+  assert.deepEqual(M.exos.map((e) => e.n), [
+    "Iso leg extension unilatérale @60° (genou)",
+    "Chat-vache", "Rotation thoracique à quatre pattes",
+    "Bascule vers les talons", "Fente basse (ouverture de hanche)", "Hanche 90/90 avec transitions",
+    "Essuie-glaces de hanches", "Pont fessier", "Squat profond assisté",
+    "Levée de jambe tendue, allongé", "Charnière de hanche",
+    "Grands cercles de bras", "Anges au mur", "Rotation externe épaule poulie basse",
+    "Cheville : genou au mur",
+    "Iso flexion coude prise marteau + supination",
+    "Core — Crunch machine", "Core — Planche",
+  ]);
+  // Zones : chacune a un libellé, et une zone n'apparaît qu'en un seul bloc (pas d'aller-retour).
+  const zones = M.exos.map((e) => e.zone);
+  for (const z of zones) assert.ok(MOBILITY_ZONES[z], `zone sans libellé : ${z}`);
+  const blocs = zones.filter((z, i) => z !== zones[i - 1]);
+  assert.deepEqual(blocs, ["genou", "colonne", "hanches", "ischios", "epaules", "chevilles", "coude", "abdos"]);
+  // Les quatre exercices déjà en option le restent ; aucun des onze nouveaux ne l'est (choix de Yoann).
+  assert.deepEqual(M.exos.filter((e) => e.opt).map((e) => e.n), ["Hanche 90/90 avec transitions",
+    "Rotation externe épaule poulie basse", "Cheville : genou au mur", "Iso flexion coude prise marteau + supination"]);
   assert.equal(M.exos.find((e) => e.n.startsWith("Iso leg")).s, 3);
   assert.equal(M.exos.find((e) => e.n === "Rotation externe épaule poulie basse").groupe, "coiffe", "jamais compté dans le volume prioritaire épaules");
+  // Mise en garde : seulement les trois mouvements en flexion profonde du genou.
+  assert.deepEqual(M.exos.filter((e) => e.alerte).map((e) => e.n),
+    ["Bascule vers les talons", "Fente basse (ouverture de hanche)", "Squat profond assisté"]);
+  for (const e of M.exos.filter((x) => x.alerte)) assert.match(e.alerte, /3\/10.*24 h.*kiné/);
+  // Les onze nouveaux : groupe « mobilite », donc hors volume et hors suggestions de surcharge.
+  const anciens = new Set(["Iso leg extension unilatérale @60° (genou)", "Hanche 90/90 avec transitions", "Cheville : genou au mur",
+    "Rotation externe épaule poulie basse", "Iso flexion coude prise marteau + supination", "Core — Crunch machine", "Core — Planche"]);
+  const nouveaux = M.exos.filter((e) => !anciens.has(e.n));
+  assert.equal(nouveaux.length, 11);
+  for (const e of nouveaux) assert.equal(e.groupe, "mobilite", e.n);
 });
 
 test("core retiré des gabarits de muscu : plus aucune planche ni crunch hors Mobilité", () => {

@@ -4,12 +4,12 @@
 // fixe en haut du carnet SEULEMENT pendant le décompte (choix de Yoann — en juillet, une
 // pastille épinglée en permanence gênait le défilement).
 import { useState, useEffect, useMemo, useRef } from "react";
-import { Check, Play, Pause, RotateCcw, Timer, Repeat, Plus, Minus, TrendingUp, Search, X } from "lucide-react";
+import { Check, Play, Pause, RotateCcw, Timer, Repeat, Plus, Minus, TrendingUp, Search, X, Rotate3d } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { store } from "../../store.js";
 import { exerciseSessions, setLabel, recordToBeat, progressiveOverloadSuggestion } from "@rawcare/core/training";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
-import { TEMPLATES, parseSecs } from "@rawcare/core/session/templates";
+import { TEMPLATES, parseSecs, MOBILITY_ZONES } from "@rawcare/core/session/templates";
 import { perfHistory } from "@rawcare/core/session/perf";
 import { catalogGroups } from "@rawcare/core/session/exoCatalog";
 import {
@@ -26,6 +26,8 @@ import { sayStable } from "../../lib/jeffrey.js";
 import { restAnnouncement, holdAnnouncement, genericAnnouncement } from "../../lib/restSpeech.js";
 import { readExoNotes, saveExoNote } from "../../lib/exoNotes.js";
 import { ExoNote } from "./ExoNote.jsx";
+import { hasDemo } from "../../demo/demos.js";
+import { DemoViewer } from "../../demo/DemoViewer.jsx";
 import { recordPayload, firstTime } from "../../lib/recordSignal.js";
 import { signalRecord } from "../../lib/briefNative.js";
 
@@ -90,6 +92,8 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   const [subOpen, setSubOpen] = useState(null);
   // Notes par exercice (09/11/2026) : réglages des machines, attachés au nom de l'exercice.
   const [notes, setNotes] = useState(readExoNotes);
+  // Démonstration 3D ouverte (13/11/2026) : l'exercice montré, ou null.
+  const [demo, setDemo] = useState(null);
   const setNote = (nom, text) => setNotes(saveExoNote(nom, text));
   // « Ajouter un exercice » (31/10/2026) : panneau ouvert et recherche.
   const [addOpen, setAddOpen] = useState(false);
@@ -375,8 +379,14 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
       {exos.map((e, ei) => {
         const isOpen = open === ei;
         const done = e.series.filter((s) => s.fait).length;
+        // Séance rangée par zone du corps (Mobilité) : intertitre à chaque changement de zone ;
+        // les exercices ajoutés en cours de séance, sans zone, passent sous « Ajoutés ».
+        const prevZone = ei > 0 ? exos[ei - 1].zone : undefined;
+        const zoneTitle = e.zone !== prevZone ? (e.zone ? MOBILITY_ZONES[e.zone] || e.zone : "Ajoutés") : null;
         return (
-          <Panel key={ei} tone={isOpen ? "key" : undefined} style={{ gap: 10, padding: isOpen ? 16 : 0 }}>
+          <div key={ei} style={{ display: "grid", gap: 8, gridTemplateColumns: "minmax(0, 1fr)" }}>
+          {zoneTitle && <Eyebrow style={{ marginTop: ei > 0 ? 8 : 0, color: T.c.accent }}>{zoneTitle}</Eyebrow>}
+          <Panel tone={isOpen ? "key" : undefined} style={{ gap: 10, padding: isOpen ? 16 : 0 }}>
             <button type="button" className="p-tap" onClick={() => openExo(ei)} aria-expanded={isOpen} style={{
               display: "grid", gap: 4, width: "100%", minHeight: 64, padding: isOpen ? 0 : "12px 16px",
               background: "none", border: "none", textAlign: "left", color: T.c.text, fontFamily: "inherit",
@@ -399,6 +409,15 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
             {isOpen && (
               <>
                 {e.consigne && <div className="p-sec">{e.consigne}</div>}
+                {e.alerte && <div role="note" style={{ fontSize: 14, lineHeight: 1.4, color: WARN, borderLeft: `3px solid ${WARN}`, paddingLeft: 10 }}>{e.alerte}</div>}
+                {hasDemo(e.nom) && (
+                  <button type="button" className="p-tap" onClick={() => setDemo({ nom: e.nom, consigne: e.consigne, alerte: e.alerte })} style={{
+                    display: "flex", alignItems: "center", gap: 8, minHeight: 44, padding: "0 14px", justifySelf: "start",
+                    background: "none", border: `1.5px solid ${T.c.accent}`, borderRadius: 999, color: T.c.accent, fontSize: 14, fontWeight: 700, fontFamily: "inherit",
+                  }}>
+                    <Rotate3d size={18} aria-hidden="true" />Voir le geste en 3D
+                  </button>
+                )}
                 <ExoNote nom={e.nom} text={notes[e.nom] || ""} onChange={(t) => setNote(e.nom, t)} />
                 {/* Le record à battre est affiché comme un fait, pas comme un objectif à
                     forcer — et il disparaît les jours où un tendon est hors base. */}
@@ -519,8 +538,11 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
               </>
             )}
           </Panel>
+          </div>
         );
       })}
+
+      {demo && <DemoViewer nom={demo.nom} consigne={demo.consigne} alerte={demo.alerte} onClose={() => setDemo(null)} />}
 
       {/* Ajouter un exercice déjà dans l'application (31/10/2026), classé par muscle. */}
       {addOpen ? (

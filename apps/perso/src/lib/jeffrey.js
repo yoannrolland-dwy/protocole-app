@@ -73,6 +73,9 @@ export const PHRASES = {
   noRecipe: ["Aucune recette pour l'instant, Monsieur. Le livre de cuisine attend sa première page."],
   noRecipeMatch: ["Aucune recette ne porte ce nom, Monsieur."],
   noFoodSettings: ["Rien d'épinglé, de masqué ni de corrigé, Monsieur. Vos habituels vivent leur vie."],
+  // Démonstration 3D d'un exercice (13/11/2026).
+  demoLoading: ["Un instant, Monsieur, le mannequin s'échauffe."],
+  demoDown: ["Le mannequin refuse de se montrer sur cet appareil, Monsieur. La consigne écrite reste valable."],
   noRecentExercise: ["Aucun exercice fait ces 60 derniers jours, Monsieur."],
   noExercise: ["Aucun exercice enregistré, Monsieur. Validez une séance de muscu, il apparaîtra ici."],
   firstTime: ["Première fois, Monsieur.", "Terrain vierge, Monsieur."],

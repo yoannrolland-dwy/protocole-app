@@ -6272,3 +6272,70 @@ le même jour par l'autre session, les deux changements partent dans la même in
   été relues. Toutes sont terminées, tout leur travail est commité, poussé sur `dev` et décrit
   dans ce fichier. Rien n'était en attente. La suite part d'une session neuve, avec la section
   « État courant » en tête de ce fichier.
+
+## Mobilité élargie et démonstrations 3D, étape 1 (13/11/2026, apps/perso v3.164.0)
+
+Demande de Yoann, d'après une page publique qui n'est pas la sienne (« Dégrippage mobilité 3D ») :
+ajouter ses mouvements à la séance Mobilité, et voir chaque exercice exécuté par un mannequin 3D.
+**Rien n'est recopié de cette page** : mannequin, poses et textes sont écrits pour PROTOCOLE.
+
+**Choix de Yoann (13/11/2026) :**
+- les nouveaux exercices vont dans la séance Mobilité, **sans mention « option »**, rangés par
+  partie du corps ;
+- une mise en garde sur les trois mouvements en flexion profonde du genou ;
+- la zone qui travaille en **jaune citron** (pas en bleu), on garde le design de l'app ;
+- **étape 1 seule** : la mobilité. Haltères, barre et banc (étape 2), machines et poulies (étape 3)
+  seront décidés après avoir vu le rendu sur le téléphone.
+
+**Séance Mobilité : 18 exercices au lieu de 7** (`templates.js`).
+- Onze nouveaux : Chat-vache, Rotation thoracique à quatre pattes, Bascule vers les talons, Fente
+  basse (ouverture de hanche), Essuie-glaces de hanches, Pont fessier, Squat profond assisté, Levée
+  de jambe tendue allongé, Charnière de hanche, Grands cercles de bras, Anges au mur.
+- Tous en groupe `mobilite` : jamais dans le volume ni dans les suggestions de surcharge. La séance
+  garde `chargeTags: []`.
+- Champ `zone` sur chaque exercice, libellés dans `MOBILITY_ZONES`. Ordre des blocs : Genou,
+  Colonne, Hanches, Ischio-jambiers, Épaules, Chevilles, Coude, Abdos. L'iso genou reste en premier,
+  la planche en dernier. Le carnet affiche un intertitre à chaque changement de zone ; un exercice
+  ajouté en cours de séance passe sous « Ajoutés ».
+- Champ `alerte` (texte `KNEE_DEEP_WARNING`) sur Bascule vers les talons, Fente basse et Squat
+  profond assisté : affiché en orange sous la consigne et dans la démonstration.
+- Les quatre exercices déjà en option le restent. Seul changement d'ordre des anciens : « Cheville :
+  genou au mur » passe après la rotation externe d'épaule.
+- Durée : environ 10 minutes de plus si tout est fait (estimation, non mesurée).
+
+**Démonstrations 3D** (`apps/perso/src/demo/`, bouton « Voir le geste en 3D » sur l'exercice ouvert).
+- `rig.js` : squelette et poses, en angles anatomiques. Le corps se pose au sol tout seul (le point
+  le plus bas touche le sol), un appui peut être fixé (`pin`), et une main ou un pied peut viser un
+  point fixe (bras ou jambe à deux segments). Calcul seul, sans dessin : il tourne sous Node.
+- `timeline.js` : positions clés, passage de l'une à l'autre, boucle, symétrie gauche/droite.
+- `demos.js` : une démonstration par **nom** d'exercice, pour les 18 de Mobilité. Chacune a ses
+  positions, ses consignes, un repère « à sentir » et un « à éviter », la caméra de départ, les
+  parties en jaune et ses accessoires (tapis, mur, montant, caisson, câble). `hasDemo(nom)` décide
+  si le bouton s'affiche : aucun bouton pour un exercice sans démonstration.
+- `scene.js` : le dessin (three.js 0.187, nouvelle dépendance), couleurs du design system, caméra
+  au doigt (glisser, pincer). **Chargé seulement à l'ouverture d'une démonstration** : bloc à part
+  de 549 Ko (138 Ko compressé), embarqué dans l'app, donc utilisable hors ligne.
+- `DemoViewer.jsx` : écran par-dessus le carnet, fermé par la croix. Lecture et pause, curseur de
+  position, ralenti, côté gauche ou droit, cinq vues de caméra.
+- Phrases `demoLoading` et `demoDown` dans le recueil de Jeffrey.
+- Aucune donnée nouvelle : rien n'est stocké.
+
+**Limites dites à Yoann.**
+- Mannequin en formes simples : il montre la trajectoire, l'amplitude et le rythme, pas la prise
+  ni le placement fin (l'écran le dit).
+- La supination de l'iso coude ne se voit pas sur un avant-bras cylindrique.
+- Les machines sont des caissons, pas les machines de sa salle.
+- Les poses sont réglées à la main : chaque lot doit être validé par Yoann avant le suivant.
+
+**Vérifications.**
+- `apps/perso/test/demo.test.mjs` (7 tests, 346 au total) : chaque exercice de Mobilité a sa
+  démonstration ; à chaque position clé et pendant le trajet, des deux côtés : appuis au sol, rien
+  sous le sol, mains et pieds posés à portée, mur respecté, pas de saut du bassin.
+- `templates.test.mjs` : ordre exact des 18 exercices, zones, options, mise en garde.
+- Aperçu : planche d'images des 44 positions clés relue à l'œil ; à 375 px, carnet avec intertitres
+  et mise en garde, écran de démonstration (lecture, curseur, côté, caméra, fermeture), aucune
+  cible sous 44 px, aucun débordement, aucune erreur console.
+- **Pas vérifié** : le téléphone (fluidité, toucher), et le jugement de Yoann sur la justesse de
+  chaque geste.
+- **Pas fait** : les exercices hors Mobilité (étapes 2 et 3) ; JEFFREY ne reçoit ni les zones ni
+  la mise en garde.

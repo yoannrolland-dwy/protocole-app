@@ -44,7 +44,7 @@ export function makeExercise(ex, tpl, { training = [], hsrWeek } = {}) {
   const { last, def, series } = prefill({ training, nom: ex.n, target, perLeg: ex.perLeg, nSeries, mode: ex.mode });
   return { nom: ex.n, mode: ex.mode, perLeg: !!ex.perLeg, opt: !!ex.opt, rest: ex.rest,
     target, scheme: ex.hsr ? hsrForWeek(hsrWeek).scheme : `${nSeries} × ${ex.r}`, consigne: ex.c, def, last,
-    groupe: ex.groupe, mouvement: ex.mouvement, materiel: ex.materiel, tendon: ex.tendon, famille: ex.famille, rir: null, series };
+    groupe: ex.groupe, mouvement: ex.mouvement, materiel: ex.materiel, tendon: ex.tendon, famille: ex.famille, zone: ex.zone, alerte: ex.alerte, rir: null, series };
 }
 
 /** Exercice ajouté en cours de séance (31/10/2026) : prescription de sa définition d'origine.
@@ -76,7 +76,8 @@ export function buildExercises({ type, training = [], hsrWeek, initial }) {
         consigne: lib ? lib.c : ex.c, def: savedDef, last: savedLast,
         groupe: lib ? lib.groupe : ex.groupe, mouvement: lib ? lib.mouvement : ex.mouvement,
         materiel: lib ? lib.materiel : ex.materiel, tendon: lib ? lib.tendon : ex.tendon,
-        famille: ex.famille, origine: wasSubstituted ? ex.n : undefined, rir: savedEx.rir ?? null,
+        famille: ex.famille, zone: ex.zone, alerte: wasSubstituted ? undefined : ex.alerte,
+        origine: wasSubstituted ? ex.n : undefined, rir: savedEx.rir ?? null,
         series: savedEx.series.map((s) => ({ poids: s.poids, val: s.val, fait: s.fait, leg: s.leg })) };
     }
     return makeExercise(ex, template, ctx);

@@ -10,6 +10,9 @@
 // pour une future bibliothèque d'exercices. Voir aussi `./catalog.js` (sports et types de
 // séance supplémentaires, non actifs dans apps/perso).
 
+// Mise en garde des mouvements de mobilité qui plient le genou bien au-delà de l'amplitude de
+// rééducation (13/11/2026). Ce n'est pas un avis médical : à valider avec le kiné.
+const KNEE_DEEP_WARNING = "Flexion profonde du genou, au-delà des 10-60° de la rééducation. Douleur 3/10 au plus et retour à la base sous 24 h ; sinon réduire l'amplitude ou passer l'exercice. À valider avec le kiné.";
 const TEMPLATES = {
   "Upper A": { kind: "muscu", chargeTags: ["tirage"], exos: [
     { n: "Développé incliné haltères", s: 4, r: "8-10", rest: 150, mode: "reps", c: "ouverture pecs, priorité · 1-2 reps en réserve",
@@ -195,28 +198,79 @@ const TEMPLATES = {
   // en avaient — gain de 4-6 min par séance, abdos 3×/semaine, mêmes noms → historique continu).
   // Le recommandeur propose « Mobilité » comme type de récupération (ex-« Récupération
   // active ») : chargeTags vide, jamais une charge, jamais gaté.
+  // Mobilité élargie (13/11/2026, demande de Yoann) : 11 mouvements de « dégrippage » ajoutés aux 7
+  // d'origine, rangés par zone du corps (`zone`, affichée en intertitre dans le carnet — libellés
+  // dans MOBILITY_ZONES). Choix de Yoann : pas de mention « option » sur les nouveaux. Tous en
+  // groupe « mobilite » : jamais comptés dans le volume ni dans les suggestions de surcharge.
+  // `alerte` : mise en garde affichée sous la consigne (flexion profonde du genou, au-delà des
+  // 10-60° de la rééducation). L'iso genou reste en premier, la planche en dernier.
   "Mobilité": { kind: "muscu", chargeTags: [], exos: [
-    { n: "Iso leg extension unilatérale @60° (genou)", s: 3, r: "45 s", rest: 60, mode: "temps",
+    { n: "Iso leg extension unilatérale @60° (genou)", s: 3, r: "45 s", rest: 60, mode: "temps", zone: "genou",
       c: "rééduc tendon quadricipital · effort ~70 %, sous le seuil de douleur · antalgie avant le basket du soir",
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou" },
-    { n: "Hanche 90/90 avec transitions", s: 2, r: "45 s", rest: 20, mode: "temps", opt: true,
+
+    { n: "Chat-vache", s: 1, r: "10", rest: 15, mode: "reps", zone: "colonne",
+      c: "à quatre pattes · expirer en arrondissant le dos, inspirer en le creusant, vertèbre par vertèbre · lent, sans forcer en bout de course · dos plus mobile pour le squat et le soulevé de terre",
+      groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
+    { n: "Rotation thoracique à quatre pattes", s: 2, r: "8", rest: 15, mode: "reps", zone: "colonne",
+      c: "1 série par côté · une main derrière la tête, le coude descend vers le poignet d'appui puis monte vers le plafond · le bassin ne bouge pas · rotation du haut du dos : tirs et passes (basket), torsions (escalade)",
+      groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
+
+    { n: "Bascule vers les talons", s: 1, r: "10", rest: 15, mode: "reps", zone: "hanches", alerte: KNEE_DEEP_WARNING,
+      c: "à quatre pattes · reculer les fesses vers les talons, dos long, puis revenir · s'arrêter avant que le bas du dos s'arrondisse",
+      groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: "genou" },
+    { n: "Fente basse (ouverture de hanche)", s: 2, r: "30 s", rest: 15, mode: "temps", zone: "hanches", alerte: KNEE_DEEP_WARNING,
+      c: "1 série par côté · genou arrière posé sur le tapis, bassin poussé vers l'avant, buste droit, fessier arrière serré · étire l'avant de la hanche : foulée et détente (basket)",
+      groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: "genou" },
+    { n: "Hanche 90/90 avec transitions", s: 2, r: "45 s", rest: 20, mode: "temps", opt: true, zone: "hanches",
       c: "par côté · rotation interne/externe de hanche : défense basse et changements de direction (basket), talon-fesse et haut de pied (escalade)",
       groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
-    { n: "Cheville : genou au mur", s: 2, r: "10", rest: 20, mode: "reps", opt: true,
-      c: "par côté · talon au sol, genou vers le mur, lent, sans rebond · mesure : distance orteils-mur (viser > 10 cm) · amorti des réceptions (basket), adhérence talon bas (escalade)",
+    { n: "Essuie-glaces de hanches", s: 1, r: "10", rest: 15, mode: "reps", zone: "hanches",
+      c: "sur le dos, genoux pliés, pieds écartés · laisser tomber les deux genoux d'un côté puis de l'autre, épaules au sol · 5 par côté",
       groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
-    { n: "Rotation externe épaule poulie basse", s: 2, r: "12", rest: 45, mode: "reps", opt: true,
+    { n: "Pont fessier", s: 1, r: "12", rest: 20, mode: "reps", zone: "hanches",
+      c: "sur le dos, pieds à plat · monter le bassin en serrant les fessiers, 2 s en haut, redescendre lentement · côtes basses, sans cambrer",
+      groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
+    { n: "Squat profond assisté", s: 2, r: "30 s", rest: 20, mode: "temps", zone: "hanches", alerte: KNEE_DEEP_WARNING,
+      c: "en se tenant à un montant · descendre aussi bas que possible, talons au sol, genoux dans l'axe des pieds, buste haut · respirer, ne pas rebondir",
+      groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: "genou" },
+
+    { n: "Levée de jambe tendue, allongé", s: 2, r: "8", rest: 15, mode: "reps", zone: "ischios",
+      c: "1 série par côté · sur le dos, une jambe au sol, l'autre monte tendue puis redescend lentement · le bas du dos reste au sol · mesure : hauteur de la jambe",
+      groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
+    { n: "Charnière de hanche", s: 1, r: "10", rest: 15, mode: "reps", zone: "ischios",
+      c: "debout, genoux déverrouillés · reculer les fesses, dos plat, jusqu'à sentir l'arrière des cuisses, puis se redresser · le geste du soulevé de terre roumain, sans charge",
+      groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
+
+    { n: "Grands cercles de bras", s: 1, r: "10", rest: 15, mode: "reps", zone: "epaules",
+      c: "debout · grands cercles lents, bras tendus, 5 vers l'avant puis 5 vers l'arrière · côtes basses, sans cambrer",
+      groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
+    { n: "Anges au mur", s: 1, r: "10", rest: 20, mode: "reps", zone: "epaules",
+      c: "dos, tête et bras contre le mur · glisser les bras vers le haut puis redescendre, sans décoller les coudes ni cambrer · ouverture des épaules pour les développés et l'escalade",
+      groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
+    { n: "Rotation externe épaule poulie basse", s: 2, r: "12", rest: 45, mode: "reps", opt: true, zone: "epaules",
       c: "par côté, léger · coiffe des rotateurs : contrepoids aux 10 séries d'élévations hebdo et aux tirages bras en l'air (escalade)",
       groupe: "coiffe", mouvement: "isolation", materiel: "poulie", tendon: null },
+
+    { n: "Cheville : genou au mur", s: 2, r: "10", rest: 20, mode: "reps", opt: true, zone: "chevilles",
+      c: "par côté · talon au sol, genou vers le mur, lent, sans rebond · mesure : distance orteils-mur (viser > 10 cm) · amorti des réceptions (basket), adhérence talon bas (escalade)",
+      groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
+
     // Ordre (14/10/2026, demande de Yoann) : iso coude avant les abdos, planche en dernier.
-    { n: "Iso flexion coude prise marteau + supination", s: 2, r: "30 s", rest: 45, mode: "temps", opt: true,
+    { n: "Iso flexion coude prise marteau + supination", s: 2, r: "30 s", rest: 45, mode: "temps", opt: true, zone: "coude",
       c: "prévention coude (sans douleur depuis septembre) · à cocher selon l'escalade de la semaine",
       groupe: "biceps", mouvement: "isolation", materiel: "aucun", tendon: "coude" },
-    { n: "Core — Crunch machine", s: 2, r: "10-12", rest: 60, mode: "reps", c: "contrôlé, 1-2 reps en réserve",
+
+    { n: "Core — Crunch machine", s: 2, r: "10-12", rest: 60, mode: "reps", c: "contrôlé, 1-2 reps en réserve", zone: "abdos",
       groupe: "core", mouvement: "isolation", materiel: "machine", tendon: null },
-    { n: "Core — Planche", s: 2, r: "45-60 s", rest: 60, mode: "temps", c: "anti-extension · progresser par difficulté, pas par durée",
+    { n: "Core — Planche", s: 2, r: "45-60 s", rest: 60, mode: "temps", c: "anti-extension · progresser par difficulté, pas par durée", zone: "abdos",
       groupe: "core", mouvement: "gainage", materiel: "aucun", tendon: null },
   ]},
+};
+// Intertitres du carnet pour une séance rangée par zone du corps (Mobilité, 13/11/2026).
+export const MOBILITY_ZONES = {
+  genou: "Genou", colonne: "Colonne", hanches: "Hanches", ischios: "Ischio-jambiers",
+  epaules: "Épaules", chevilles: "Chevilles", coude: "Coude", abdos: "Abdos",
 };
 export { TEMPLATES };
 export const TYPES = Object.keys(TEMPLATES);
