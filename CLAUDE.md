@@ -20,12 +20,9 @@ documenter le livré ici, dans CLAUDE.md.
 ## État courant (14/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.169.0, commit `6729bd0`, le 14/11/2026 à 11 h 01 (plateau à format égal,
-  historique détaillé du carnet, score de force ; avant : démonstrations 3D, étapes 1 à 3 et
-  échauffement basket).
-- **Prêt, pas encore installé** : v3.170.0 (sous-onglet Force, liste de Progrès par muscle ; section
-  du 14/11/2026 en fin de fichier).
-- **Git** : `dev` = `origin/dev` (poussé le 14/11/2026 à 11 h), dossier propre, aucune autre branche
+- **Installé sur le S25** : v3.170.0, commit `4692a87`, le 14/11/2026 à 11 h 13 (sous-onglet Force,
+  Progrès par muscle ; v3.169.0 : plateau à format égal, historique du carnet, score de force).
+- **Git** : `dev` = `origin/dev` (poussé le 14/11/2026 à 11 h 15), dossier propre, aucune autre branche
   de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à
   la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
@@ -6629,4 +6626,11 @@ Retour de Yoann sur la v3.169.0 : environ 55 exercices dans Progrès, on défile
   (`borderTopStyle` après `border: none`) ; elles ont désormais le filet normal.
 - Vérifié dans l'aperçu à 360 px : cinq sous-onglets lisibles (texte 38 à 55 px pour 60 px de
   bouton), groupes ouverts et fermés, sous-onglet Force, aucun débordement, aucune erreur.
+- **Installé sur le S25 le 14/11/2026 à 11 h 13** (`release.mjs build` puis `install`) : commit
+  `4692a87`, empreinte de l'APK `34142343b8c47c91…` vérifiée sur le téléphone. Avant : aucune séance
+  en cours ; APK 3.169.0 copié dans `~/Documents/protocole-sauvegardes/force-onglet-2026-11/`
+  (`08b50d16…`) ; copie serveur manuelle réussie à 11 h 13 ; sauvegarde locale du jour présente.
+  Après : 48 clés, seule `lastPosition` a changé ; préférences identiques hors widget ; permission du
+  signal JEFFREY accordée ; aucun plantage. Lu sur le téléphone : cinq sous-onglets, Progrès en
+  13 groupes (dont « Mobilité et échauffement », 30 exercices), Force avec la force et le volume.
 
