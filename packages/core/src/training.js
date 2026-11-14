@@ -21,8 +21,11 @@ const byDateAsc = (a, b) => a.date.localeCompare(b.date);
  * Ne compte que les séries cochées ET renseignées : une ligne préremplie jamais faite ne
  * doit pas passer pour une performance.
  */
+/** Séries cochées ET renseignées d'un exercice (celles qui comptent comme performance). */
+export const doneSets = (ex) => (ex.series || []).filter((s) => s.fait && (+s.poids > 0 || +s.val > 0));
+
 export function bestSet(ex) {
-  const done = (ex.series || []).filter((s) => s.fait && (+s.poids > 0 || +s.val > 0));
+  const done = doneSets(ex);
   if (!done.length) return null;
   const b = done.reduce((a, s) => (+s.poids > +a.poids || (+s.poids === +a.poids && +s.val > +a.val) ? s : a), done[0]);
   return { poids: +b.poids || 0, val: +b.val || 0 };
@@ -48,7 +51,7 @@ export function exoProgress(sessions) {
     s.exercices.forEach((e) => {
       const b = bestSet(e);
       if (!b) return;
-      (byExo[e.nom] ||= []).push({ d: s.date, mode: e.mode, rir: e.rir ?? null, ...b });
+      (byExo[e.nom] ||= []).push({ d: s.date, mode: e.mode, rir: e.rir ?? null, ...b, series: doneSets(e) });
     });
   });
   return Object.entries(byExo).map(([nom, hist]) => {
@@ -60,7 +63,9 @@ export function exoProgress(sessions) {
     // "baisse" sur une séance qui venait pourtant de battre un record de charge (ex.
     // 40kg×10 → 45kg×6 : volume en baisse, mais c'est une progression, pas un recul).
     // Baisse confirmée sur deux séances (09/11/2026, `trendOf`).
-    const tendance = { first: "1re fois", up: "hausse", down: "baisse", flat: "stable" }[trendOf(h, last.mode)];
+    // 14/11/2026 : comparaison à format égal (`sessionTrend`), sur toute la fenêtre reçue.
+    const asSess = hist.map((x) => ({ best: { poids: x.poids, val: x.val }, series: x.series, rir: x.rir, mode: x.mode }));
+    const tendance = { first: "1re fois", up: "hausse", down: "baisse", flat: "stable" }[sessionTrend(asSess, last.mode)];
     return {
       exo: nom,
       series_max: h.map((x) => `${x.d.slice(5)} ${isTimeMode(x.mode) ? `${x.val}s` : `${x.poids}x${x.val}`}`),
@@ -83,7 +88,8 @@ export const isTimeMode = (mode) => mode === "temps";
  * Grandeur tracée : le volume de la meilleure série (charge × reps), ou les secondes en
  * mode temps. Pas de 1RM estimé — les formules type Epley n'ont aucun sens sur un protocole
  * HSR à tempo 6 s et amplitude 10-60°, et pousser un 1RM sur un tendon en rééducation est
- * contre-indiqué (décision explicite de la roadmap, ne pas ajouter sans demande).
+ * contre-indiqué (décision explicite de la roadmap, ne pas ajouter sans demande). Le score de force
+ * par groupe (14/11/2026, demandé par Yoann, `strength.js`) en utilise un, quadriceps exclu.
  */
 export const setScore = (best, mode) => (isTimeMode(mode) ? best.val : best.poids * best.val);
 
@@ -106,12 +112,26 @@ export function exerciseSessions(training, nom) {
       return {
         date: s.date, type: s.type, mode: e.mode, perLeg: !!e.perLeg, rir: e.rir ?? null,
         best, score: setScore(best, e.mode),
-        series: (e.series || []).filter((x) => x.fait && (+x.poids > 0 || +x.val > 0)),
+        series: doneSets(e),
       };
     })
     .filter(Boolean)
     .sort(byDateAsc);
 }
+
+/**
+ * Historique détaillé pour le carnet (14/11/2026, demande de Yoann) : les `n` dernières séances
+ * de l'exercice, la plus récente en tête, avec TOUTES les séries cochées et le RIR. La séance
+ * passée en `exclude` (celle qu'on modifie) n'y figure pas.
+ */
+export function recentSessionsDetail(training, nom, { exclude = null, n = 5 } = {}) {
+  const list = (training || []).filter((s) => !(exclude && (s === exclude || (exclude.id && s.id === exclude.id))));
+  return exerciseSessions(list, nom).slice(-n).reverse();
+}
+
+/** Une série lisible pour l'historique : « 34×10 », « G 20×10 », « 60 s ». */
+export const setShort = (s, mode) =>
+  `${s.leg ? `${s.leg} ` : ""}${isTimeMode(mode) ? `${+s.val || 0} s` : `${+s.poids || 0}×${+s.val || 0}`}`;
 
 /**
  * Liste des exercices déjà réalisés (au moins une série cochée), le plus récent en tête.
@@ -191,6 +211,66 @@ function trendOf(h, mode) {
   if (n < 2) return "first";
   if (beats(h[n - 1], h[n - 2], mode)) return "up";
   if (n >= 3 && clearDrop(h[n - 1], h[n - 3], mode) && clearDrop(h[n - 2], h[n - 3], mode)) return "down";
+  return "flat";
+}
+
+/* ------------------------------------------------------------
+   Comparaison À FORMAT ÉGAL (14/11/2026, demande de Yoann)
+   ------------------------------------------------------------
+   Avant, plateau et tendance ne regardaient que la MEILLEURE série : 34×10·10·9·9 puis
+   34×10·10·10·9 était « stable », et le garde-fou du volume comparait une Full Body à 3 séries
+   à une autre Full Body à 3 séries en ignorant les Upper A à 4 séries entre les deux (« plateau
+   depuis 7 séances » le 14/11 alors que les répétitions montaient). Désormais une séance se
+   compare à une séance du MÊME FORMAT (même nombre de séries) : plus de charge, ou plus de
+   répétitions au total à la même charge, c'est une progression. Le mode « temps » garde la
+   règle de la meilleure série (`trendOf`). */
+
+/** Résumé d'une séance d'un exercice : nombre de séries faites, charge la plus lourde,
+ *  répétitions totales, volume (charge × reps), RIR. */
+export function sessionShape(x) {
+  const s = x.series || [];
+  return {
+    n: s.length,
+    top: s.reduce((m, r) => Math.max(m, +r.poids || 0), 0),
+    reps: s.reduce((m, r) => m + (+r.val || 0), 0),
+    vol: s.reduce((m, r) => m + (+r.poids || 0) * (+r.val || 0), 0),
+    rir: x.rir ?? null,
+    best: x.best || null,
+  };
+}
+
+/** `a` progresse-t-elle sur `b` ? Charge plus lourde toujours ; sinon même charge, même nombre de
+ *  séries et plus de volume (= plus de répétitions) ; à volume égal, un RIR plus élevé (T4). */
+export function shapeBetter(a, b) {
+  if (!a || !b) return false;
+  if (a.top !== b.top) return a.top > b.top;
+  if (a.n !== b.n) return false;
+  if (a.vol !== b.vol) return a.vol > b.vol;
+  return a.rir != null && b.rir != null && a.rir > b.rir;
+}
+
+/** `a` est-elle NETTEMENT en dessous de `b` ? Même format : à même charge, au moins une rep de
+ *  moins par série en moyenne (2 au minimum, règle du 09/11/2026) ; plus léger sans plus de
+ *  répétitions. Formats différents : règle de la meilleure série (`clearDrop`). */
+export function shapeDrop(a, b, mode) {
+  if (!a || !b) return false;
+  if (a.n !== b.n) return clearDrop(a.best, b.best, mode);
+  if (a.top === b.top) return a.reps <= b.reps - Math.max(DROP_REPS, a.n);
+  return a.top < b.top && a.reps <= b.reps;
+}
+
+/** Tendance d'une liste de séances (la dernière en dernier) : « hausse » si la dernière progresse
+ *  sur la précédente du même format (sans séance du même format : seulement si la charge monte),
+ *  « baisse » si les deux dernières sont nettement en dessous de celle d'avant. */
+export function sessionTrend(list, mode) {
+  const n = list.length;
+  if (n < 2) return "first";
+  if (isTimeMode(mode)) return trendOf(list.map((x) => x.best), mode);
+  const sh = list.map(sessionShape);
+  const last = sh[n - 1];
+  const ref = sh.slice(0, n - 1).reverse().find((x) => x.n === last.n);
+  if (ref ? shapeBetter(last, ref) : last.top > sh[n - 2].top) return "up";
+  if (n >= 3 && shapeDrop(sh[n - 1], sh[n - 3], mode) && shapeDrop(sh[n - 2], sh[n - 3], mode)) return "down";
   return "flat";
 }
 
@@ -280,7 +360,7 @@ export function exerciseTrend(sessions) {
   if (h.length < 2) return { key: "first", label: "1re fois", delta: null };
   const last = h[h.length - 1], prev = h[h.length - 2];
   const delta = last.score - prev.score;
-  const key = trendOf(h.map((x) => x.best), last.mode);
+  const key = sessionTrend(sessions, last.mode);
   if (key === "up") return { key: "up", label: "hausse", delta };
   if (key === "down") return { key: "down", label: "baisse", delta };
   return { key: "flat", label: "stable", delta: 0 };
@@ -311,25 +391,12 @@ function parseRepRange(r) {
   return { min, max: m[2] ? +m[2] : min };
 }
 
-/** Volume total d'une séance pour cet exercice (somme poids × reps de TOUTES les séries
- * cochées, pas seulement la meilleure) — signal secondaire pour ne pas déclarer un plateau
- * à tort quand la meilleure série stagne mais que les séries suivantes tiennent mieux la
- * charge (ex. 60×8/60×7/60×5 → 60×8/60×8/60×6 : même meilleure série, vraie progression). */
-function sessionVolume(session) {
-  return (session.series || []).reduce((sum, s) => sum + (+s.poids || 0) * (+s.val || 0), 0);
-}
-
 /**
  * Suggestion de progressive overload (viser le haut de la fourchette de reps, puis passer à
- * la charge supérieure) une fois qu'un plateau est détecté. Un plateau, c'est la plus longue
- * série de séances consécutives "stable" sur la meilleure série (même définition que
- * `exerciseTrend`, rejouée pas à pas) qui se termine à la dernière séance — pas juste les
- * `PLATEAU_STABLE_STREAK` dernières : ça sert aussi à dire DEPUIS QUAND (`weeks`), pour
- * l'afficher directement dans le carnet pendant la séance (demande du 10/09/2026), pas
- * seulement sur la fiche Progression. Un plateau nécessite en plus que le volume total
- * n'ait pas non plus progressé sur cette même fenêtre (voir `sessionVolume` — décidé avec
- * Yoann le 10/09/2026 : la charge reste prioritaire pour dire hausse/baisse — historique du
- * 13/08/2026, ne pas rouvrir —, mais un plateau nécessite qu'AUCUN des deux signaux ne bouge).
+ * la charge supérieure) une fois qu'un plateau est détecté. Un plateau = au moins 4 séances
+ * depuis la dernière qui a progressé à format égal (voir le calcul plus bas, 14/11/2026). La
+ * durée réelle (`sessions`) est affichée dans le carnet pendant la séance (10/09/2026) et sur
+ * la fiche Progression. La charge reste prioritaire (13/08/2026, ne pas rouvrir).
  *
  * Exclusions volontaires (décidées avec Yoann le 07/09/2026, pas des oublis) : les exercices
  * HSR — leur charge est déjà pilotée par la table HSR (semaine 1-12, `hsrForWeek`), une
@@ -356,32 +423,29 @@ export function progressiveOverloadSuggestion(sessions, nom) {
   const range = parseRepRange(defs[0].r);
   if (!range) return null;
 
-  // Étend la fenêtre en remontant tant que chaque paire consécutive reste "stable" — pas
-  // figée à PLATEAU_STABLE_STREAK, pour connaître la vraie durée du plateau.
-  // T4 (04/10/2026) : une paire « stable » dont le RIR a AUGMENTÉ n'est pas un plateau — même
-  // série faite avec plus de reps en réserve = effort qui baisse = progression réelle. La paire
-  // ne compte que si les deux RIR sont renseignés ; sinon (donnée absente) la règle d'avant.
-  // 09/11/2026 : même notion de « stable » que la tendance. Une fenêtre est plate si aucune
-  // séance ne bat la première de la fenêtre ni ne tombe nettement en dessous (`clearDrop`) :
-  // une rep de moins puis une de plus (8, 7, 8, 7) reste un plateau.
-  const rirUp = (cur, prev) => cur.rir != null && prev.rir != null && cur.rir > prev.rir;
-  const flatFrom = (k) => {
-    const ref = sessions[k].best;
-    for (let i = k + 1; i < sessions.length; i++) {
-      const cur = sessions[i];
-      if (beats(cur.best, ref, last.mode) || clearDrop(cur.best, ref, last.mode)) return false;
-      if (rirUp(cur, sessions[i - 1])) return false;
-      if (daysBetween(sessions[i - 1].date, cur.date) > PLATEAU_GAP_DAYS) return false;
-    }
-    return true;
-  };
-  // La plus longue fenêtre plate qui finit à la dernière séance (8, 7, 8, 7 : une fenêtre qui
-  // commence à 7 ne l'est pas, celle qui commence au premier 8 l'est).
-  let start = 0;
-  while (start < sessions.length - 1 && !flatFrom(start)) start++;
+  // 14/11/2026 (demande de Yoann) : la fenêtre du plateau commence à la dernière séance qui a
+  // PROGRESSÉ, comparée à la meilleure séance précédente du même format (même nombre de séries,
+  // `shapeBetter` : charge plus lourde, ou plus de répétitions au total à charge égale, ou RIR
+  // plus élevé à volume égal). Plus de charge compte quel que soit le format. Une séance d'un
+  // format jamais vu ne progresse que si la charge monte. Un plateau = 4 séances (la meilleure,
+  // puis 3 qui ne la dépassent pas).
+  // Une séance NETTEMENT en dessous de la meilleure du même format (`shapeDrop`) est un recul,
+  // pas un plateau : elle repart comme nouvelle référence (8, 8, 6, 6 n'est pas un plateau).
+  // 8, 7, 8, 7 à la même charge en reste un (09/11/2026). Une pause de plus de 8 semaines
+  // repart de zéro (25/10/2026).
+  let start = 0, bestByN = {}, maxTop = -Infinity;
+  sessions.forEach((cur, i) => {
+    const sh = sessionShape(cur);
+    if (i > 0 && daysBetween(sessions[i - 1].date, cur.date) > PLATEAU_GAP_DAYS) { bestByN = {}; maxTop = -Infinity; start = i; }
+    const ref = bestByN[sh.n];
+    const progress = sh.top > maxTop || shapeBetter(sh, ref);
+    const drop = !progress && shapeDrop(sh, ref, last.mode);
+    if (progress || drop || !ref) bestByN[sh.n] = sh;
+    if (progress || drop) start = i;
+    maxTop = Math.max(maxTop, sh.top);
+  });
   const streak = sessions.slice(start);
   if (streak.length < PLATEAU_STABLE_STREAK) return null;
-  if (sessionVolume(streak[streak.length - 1]) > sessionVolume(streak[0])) return null; // volume total en hausse → vraie progression, pas un plateau
 
   const { poids, val } = last.best;
   const weeks = Math.max(1, Math.round(daysBetween(streak[0].date, last.date) / 7));

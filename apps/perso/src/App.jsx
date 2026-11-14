@@ -767,7 +767,7 @@ export default function App({ silent = false } = {}) {
                 {corpsSub === "pain" && <PainTab {...{ knee, save, hsrWeek }} />}
               </CorpsTab>
             )}
-            {tab === "train" && <TrainTab {...{ training, save, hsrWeek, setHsrWeek, knee, startType, resumeTick }} onStartConsumed={() => setStartType(null)} />}
+            {tab === "train" && <TrainTab {...{ training, weight, save, hsrWeek, setHsrWeek, knee, startType, resumeTick }} onStartConsumed={() => setStartType(null)} />}
             {tab === "perf" && <PerformanceTab {...{ macros, targets, training, weight, phase, coach }} jeffrey={jeffreyChat} />}
             {tab === "macro" && <NutritionTab targetsFor={(d) => targetsForDate(d, targets)} macros={macros} save={save} training={training} ai={ai} />}
           </>

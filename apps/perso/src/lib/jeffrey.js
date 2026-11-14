@@ -68,6 +68,7 @@ export const PHRASES = {
   noKnee: ["Aucun relevé, Monsieur. Le genou garde le silence."],
   noSession: ["Aucune séance enregistrée, Monsieur. Le carnet attend son premier chapitre."],
   noMuscu: ["Aucune séance de muscu pour l'instant, Monsieur."],
+  noStrength: ["Aucune série de musculation ces 4 dernières semaines, Monsieur : rien à mesurer."],
   noVolume: ["Aucune série de musculation cochée ces 7 derniers jours, Monsieur. Les haltères s'ennuient."],
   noExerciseMatch: ["Aucun exercice ne répond à ce nom, Monsieur. Essayons un autre mot."],
   noRecipe: ["Aucune recette pour l'instant, Monsieur. Le livre de cuisine attend sa première page."],

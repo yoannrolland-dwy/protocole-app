@@ -7,10 +7,9 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Check, Play, Pause, RotateCcw, Timer, Repeat, Plus, Minus, TrendingUp, Search, X, Rotate3d } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { store } from "../../store.js";
-import { exerciseSessions, setLabel, recordToBeat, progressiveOverloadSuggestion } from "@rawcare/core/training";
+import { exerciseSessions, setLabel, recordToBeat, progressiveOverloadSuggestion, recentSessionsDetail, setShort } from "@rawcare/core/training";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
 import { TEMPLATES, parseSecs, MOBILITY_ZONES } from "@rawcare/core/session/templates";
-import { perfHistory } from "@rawcare/core/session/perf";
 import { catalogGroups } from "@rawcare/core/session/exoCatalog";
 import {
   makeAddedExercise, buildExercises, updateSet, toggleSet, addSet, lastRemovable, removeLastSet, setRir,
@@ -508,24 +507,32 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
                     <Timer size={18} aria-hidden="true" />
                     {e.mode === "temps" ? `Maintien ${parseSecs(e.target)} s` : `Repos ${e.rest} s`}
                   </Button>
-                  <IconButton label={hist === e.nom ? "Masquer la progression" : "Voir la progression"} aria-pressed={hist === e.nom} size={52}
+                  <IconButton label={hist === e.nom ? "Masquer les dernières séances" : "Voir les dernières séances"} aria-pressed={hist === e.nom} size={52}
                     onClick={() => setHist(hist === e.nom ? null : e.nom)}>
                     <TrendingUp size={20} aria-hidden="true" />
                   </IconButton>
                 </div>
 
-                {hist === e.nom && (
-                  <div style={{ background: T.c.field, borderRadius: 10, padding: 12, display: "grid", gap: 4 }}>
-                    {perfHistory(training, e.nom).length
-                      ? perfHistory(training, e.nom).map((hh, k) => (
-                          <div key={k} style={{ ...mono, display: "flex", justifyContent: "space-between", fontSize: 13, color: T.c.text2 }}>
-                            <span>{fmt(hh.date)}</span>
-                            <span>{hh.poids || "—"} kg × {hh.val || "—"}{hh.mode === "temps" ? " s" : ""}</span>
+                {hist === e.nom && (() => {
+                  // Les 5 dernières séances, la plus récente en tête, avec toutes les séries
+                  // cochées et le RIR (14/11/2026, demande de Yoann).
+                  const past = recentSessionsDetail(training, e.nom, { exclude: initial, n: 5 });
+                  return (
+                    <div style={{ background: T.c.field, borderRadius: 10, padding: 12, display: "grid", gap: 10 }}>
+                      {past.length ? past.map((hh, k) => (
+                        <div key={k} style={{ display: "grid", gap: 2 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13, color: T.c.text2 }}>
+                            <span><span style={mono}>{fmt(hh.date)}</span> · {hh.type}</span>
+                            {hh.rir != null && <span style={mono}>RIR {hh.rir >= 3 ? "3+" : hh.rir}</span>}
                           </div>
-                        ))
-                      : <div className="p-sec">{sayStable("firstTime")}</div>}
-                  </div>
-                )}
+                          <div style={{ ...mono, fontSize: 15, color: T.c.text, overflowWrap: "anywhere" }}>
+                            {hh.series.map((x) => setShort(x, hh.mode)).join(" · ")}
+                          </div>
+                        </div>
+                      )) : <div className="p-sec">{sayStable("firstTime")}</div>}
+                    </div>
+                  );
+                })()}
 
                 {e.added && !e.series.some((s) => s.fait) && (
                   <button type="button" className="p-tap" onClick={() => dropExercise(ei)} style={{

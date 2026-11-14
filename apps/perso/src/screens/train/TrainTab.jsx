@@ -13,6 +13,7 @@ import { sameSession, upsertSession } from "../../lib/trainingEdit.js";
 import { ProgressScreen } from "./ProgressScreen.jsx";
 import { GeneField } from "./GeneField.jsx";
 import { VolumeCard } from "./VolumeCard.jsx";
+import { StrengthCard } from "./StrengthCard.jsx";
 import { PlanCard, PeriCard } from "../perf/ReferenceCards.jsx";
 import { sayStable } from "../../lib/jeffrey.js";
 import { SubTabs } from "../../components/SubTabs.jsx";
@@ -27,7 +28,7 @@ const TRAIN_TABS = [
 ];
 let lastTrainTab = "seance";
 
-export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType, resumeTick, onStartConsumed }) {
+export function TrainTab({ training, weight, save, hsrWeek, setHsrWeek, knee, startType, resumeTick, onStartConsumed }) {
   // Séance dont la suppression est « armée » (1er tap sur la corbeille), voir Dernières séances.
   const [armed, setArmed] = useState(null);
   const armTimer = useRef(null);
@@ -191,6 +192,8 @@ export function TrainTab({ training, save, hsrWeek, setHsrWeek, knee, startType,
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {tabs}
         <ProgressScreen training={training} knee={knee} />
+        {/* Force par groupe (14/11/2026) : 1RM estimé, base 100, brut et relatif au poids. */}
+        <StrengthCard training={training} weight={weight} />
         {/* Volume hebdo par groupe musculaire (T2, 04/10/2026) : séries cochées sur 7 jours,
             hors gainage — même calcul que `volume_hebdo_series` envoyé au Coach IA. */}
         <VolumeCard training={training} />

@@ -28,7 +28,9 @@ documenter le livré ici, dans CLAUDE.md.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
   `avant-campagne-audit`, `apres-lot1-audit`, `apres-lot2-audit`, `avant-jetons-gestes`. APK
   précédents : `~/Documents/protocole-sauvegardes/` (hors Git).
-- **Tests** : 349 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
+- **Tests** : 358 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
+- **Prêt, pas encore installé** : v3.169.0 (plateau et tendance à format égal, historique détaillé
+  dans le carnet, score de force par groupe ; section du 14/11/2026 en fin de fichier).
 - **Chantiers** : tous ceux de `ROADMAP.md` sont livrés (V, R, S, T, U, J). La campagne d'audit du
   10/11/2026 est faite (lots 1 à 3). Ce qui reste ouvert est dans « Reportés à la fin de la
   campagne », plus bas.
@@ -6538,4 +6540,68 @@ des préférences Android relevées. Après : 47 clés sur 48 identiques (seule 
 changé) ; préférences identiques ; permission du signal JEFFREY accordée ; aucun plantage ; pas
 d'écran de secours. Démonstration ouverte depuis le carnet Basket sur le téléphone, sans erreur ;
 séance de test annulée, brouillon effacé, rien enregistré. **Pas vérifié** : l'avis de Yoann.
+
+## Plateau à format égal, historique détaillé dans le carnet, score de force (14/11/2026, apps/perso v3.169.0)
+
+Trois retours de Yoann, choix tranchés par question.
+
+**Plateau et tendance : comparer à format égal.** Constat sur ses données : développé incliné à
+34 kg, 37 puis 38 puis 39 répétitions au total, et pourtant « plateau depuis 7 séances » le 14/11.
+Deux défauts : seule la meilleure série comptait (10 depuis le 12/10), et le garde-fou du volume
+comparait la première et la dernière séance de la période, deux Full Body à 3 séries, en ignorant
+les Upper A à 4 séries entre les deux.
+- `sessionShape` / `shapeBetter` / `shapeDrop` / `sessionTrend` (`training.js`). Une séance se
+  compare à une séance du **même nombre de séries**. Progression = charge plus lourde (quel que
+  soit le format), ou même charge et plus de volume (= plus de répétitions au total), ou RIR plus
+  élevé à volume égal (T4).
+- **Plateau** (`progressiveOverloadSuggestion`) : 4 séances depuis la dernière qui a progressé sur
+  la meilleure séance précédente du même format (choix de Yoann : 4). Un recul net (au moins une
+  rep de moins par série en moyenne, 2 au minimum, ou plus léger sans plus de reps) repart comme
+  nouvelle référence : ce n'est pas un plateau. 8, 7, 8, 7 reste un plateau ; une pause de plus de
+  8 semaines repart de zéro ; exclusions inchangées (HSR, durée, mobilité, coiffe).
+- **Flèche hausse / stable / baisse** (choix de Yoann : même règle) : hausse = la dernière progresse
+  sur la précédente du même format (sans séance du même format : seulement si la charge monte) ;
+  baisse = les deux dernières nettement en dessous de celle d'avant. Partagée par l'écran Progrès,
+  le recommandeur et `exoProgress` (Jeffrey). Le mode « temps » garde la règle de la meilleure
+  série. Les records (`beats`) ne changent pas.
+- Rejoué sur ses données : le matin du 14/11, la nouvelle règle aurait dit « plateau depuis
+  4 séances » (10-10-9-9 trois fois, puis une Full Body), et plus de plateau après la séance du
+  jour (39 répétitions). Plateaux restants réels : tirage vertical (96 × 10 partout), leg curl
+  (35 × 12 depuis août), soulevé de terre roumain, face pull, extension triceps.
+
+**Historique dans le carnet** (bouton « Voir les dernières séances », ex-« progression ») : les
+5 dernières séances (choix de Yoann), la plus récente en tête, date et type, **toutes les séries
+cochées** (« 34×10 · 34×10 · 34×9 · 34×9 », « G 20×10 », « 60 s ») et le RIR (« 3+ » au-delà de 2).
+La séance qu'on modifie n'y figure pas. `recentSessionsDetail`, `setShort` (`training.js`).
+`perfHistory` n'est plus utilisé par le carnet.
+
+**Score de force par groupe** (`packages/core/src/strength.js`, carte `StrengthCard.jsx` en tête du
+sous-onglet Progrès de Séance, sous la liste des exercices). Choix de Yoann : force brute en
+chiffre principal, force relative au poids à côté.
+- **1RM estimé** par série, formule d'Epley sur reps + RIR (RIR absent = 0), seulement si
+  reps + RIR ≤ 12 (fiable à environ ±5 % dans cette zone). Meilleur de la séance. Aucun test maximal.
+- **Comparé à soi-même** : référence = meilleur 1RM estimé des 4 premières semaines de chaque
+  exercice (base 100). Taille, longueur des membres, leviers et différences de machine s'annulent ;
+  discuté avec Yoann (il demandait si les leviers comptent : oui entre personnes, pas contre soi).
+  Aucune donnée nouvelle à saisir, aucune clé nouvelle.
+- **Groupe** = moyenne géométrique des rapports (meilleur 1RM estimé des 4 dernières semaines /
+  référence) des exercices faits pendant ces 4 semaines, × 100. Un groupe sans séance depuis
+  4 semaines n'apparaît pas. Évolution sur 4 semaines, courbe hebdomadaire (26 semaines au plus),
+  détail par exercice (1RM estimé, « par haltère » pour les haltères, départ et date, %).
+- **Relatif** = même indice × (poids de référence / poids actuel)^0,67 (mise à l'échelle
+  allométrique, Jaric 2002), poids = moyenne des pesées des 7 derniers jours. Il monte aussi quand
+  le poids baisse sans changement du muscle (dit à l'écran).
+- **Exclus** : quadriceps en entier (protocole du genou : HSR, presse, squat sur sécurités),
+  mobilité, coiffe, cardio, exercices en durée.
+- Il mesure la force maximale (la meilleure série) : des répétitions gagnées sur les séries
+  suivantes à charge égale font progresser la flèche et lever le plateau, pas forcément le score.
+- Sur ses données (14/11) : pectoraux 107 (relatif 109), épaules 105, dos 122 (rowing +37 % : sans
+  doute un changement de barre à machine sous le même nom, non vérifié), biceps 111, triceps 102,
+  ischios 112.
+- Pas envoyé à Jeffrey ni au pont.
+
+**Vérifié** : 358 tests (régression du 14/11 avec son historique réel, format égal, recul,
+historique du carnet, 1RM estimé, groupes, indice et relatif, poids) ; aperçu à 360 px avec des
+données inventées (carte, courbe, détail, historique du carnet), sans débordement ni erreur.
+**Pas vérifié sur le téléphone** (pas installé).
 

@@ -53,3 +53,48 @@ test("plateau : 8, 7, 8, 7 reps à la même charge reste un plateau ; une vraie 
   assert.ok(r && r.sessions === 4, JSON.stringify(r));
   assert.equal(progressiveOverloadSuggestion(exerciseSessions(seq([8, 8, 6, 6]), NOM), NOM), null);
 });
+
+// ---------- 14/11/2026 : comparaison à format égal (même nombre de séries)
+import { recentSessionsDetail, setShort } from "../src/training.js";
+const multi = (daysAgo, reps, poids = 34, rir = 0, type = "Upper A") => ({ date: d(daysAgo), type,
+  exercices: [{ nom: NOM, mode: "reps", rir, series: reps.map((v) => ({ poids, val: v, fait: true })) }] });
+
+test("régression 14/11 : plus de répétitions sur les séries suivantes = progression, pas un plateau", () => {
+  // Historique réel du développé incliné (34 kg) : Full Body à 3 séries entre des Upper A à 4 séries.
+  const tr = [multi(35, [10, 9, 9], 34, 0, "Full Body"), multi(32, [10, 9, 9, 9]), multi(27, [10, 9, 9, 9]),
+    multi(22, [10, 10, 9, 9]), multi(15, [10, 10, 9, 9]), multi(9, [10, 10, 9, 9]), multi(7, [10, 9, 9], 34, 0, "Full Body")];
+  const before = progressiveOverloadSuggestion(exerciseSessions(tr, NOM), NOM);
+  assert.equal(before?.sessions, 4, "10-10-9-9 trois fois puis une Full Body : 4 séances sans progrès");
+  const today = [...tr, multi(0, [10, 10, 10, 9])];
+  assert.equal(progressiveOverloadSuggestion(exerciseSessions(today, NOM), NOM), null, "39 répétitions après 38 : plus de plateau");
+  assert.equal(exerciseTrend(exerciseSessions(today, NOM)).key, "up", "comparée à la dernière séance à 4 séries");
+});
+
+test("format égal : une séance à 3 séries ne se compare pas à une séance à 4 ; la charge prime toujours", () => {
+  const tr = [multi(10, [10, 10, 10, 10]), multi(5, [10, 10, 10])];
+  assert.equal(exerciseTrend(exerciseSessions(tr, NOM)).key, "flat", "moins de séries n'est pas une baisse");
+  const heavier = [multi(10, [10, 10, 10, 10]), multi(5, [8, 8, 8], 36)];
+  assert.equal(exerciseTrend(exerciseSessions(heavier, NOM)).key, "up", "plus lourd = hausse, quel que soit le format");
+  // Une séance d'un format jamais vu ne fait pas progresser le plateau si la charge ne monte pas
+  const seq = [multi(20, [10, 10, 10, 10]), multi(15, [10, 10, 10, 10]), multi(10, [10, 10]), multi(5, [10, 10, 10, 10])];
+  assert.equal(progressiveOverloadSuggestion(exerciseSessions(seq, NOM), NOM)?.sessions, 4);
+});
+
+test("format égal : une baisse nette d'au moins une rep par série coupe le plateau", () => {
+  const seq = [multi(20, [10, 10, 10, 10]), multi(15, [10, 10, 10, 10]), multi(10, [9, 9, 9, 9]), multi(5, [9, 9, 9, 9])];
+  assert.equal(progressiveOverloadSuggestion(exerciseSessions(seq, NOM), NOM), null, "recul, pas plateau");
+  const small = [multi(20, [10, 10, 10, 10]), multi(15, [10, 10, 10, 9]), multi(10, [10, 10, 10, 10]), multi(5, [10, 10, 9, 9])];
+  assert.equal(progressiveOverloadSuggestion(exerciseSessions(small, NOM), NOM)?.sessions, 4, "une ou deux reps de moins sur 4 séries : plateau");
+});
+
+test("historique du carnet : 5 dernières séances, la plus récente en tête, toutes les séries et le RIR ; séance modifiée exclue", () => {
+  const tr = [1, 2, 3, 4, 5, 6].map((k) => multi(30 - k * 4, [10, 9], 34, k % 2));
+  const out = recentSessionsDetail(tr, NOM);
+  assert.equal(out.length, 5);
+  assert.equal(out[0].date, tr[5].date);
+  assert.deepEqual(out[0].series.map((x) => setShort(x, "reps")), ["34×10", "34×9"]);
+  assert.equal(out[0].rir, 0);
+  assert.equal(recentSessionsDetail(tr, NOM, { exclude: tr[5] })[0].date, tr[4].date);
+  assert.equal(setShort({ poids: 20, val: 10, leg: "G" }, "reps"), "G 20×10");
+  assert.equal(setShort({ poids: 0, val: 60 }, "temps"), "60 s");
+});
