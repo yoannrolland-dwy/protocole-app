@@ -22,8 +22,10 @@ import { SubTabs } from "../../components/SubTabs.jsx";
 // ouvert est retenu pendant la session ; une séance en cours ou « Démarrer » ramène sur Séance.
 const TRAIN_TABS = [
   { key: "seance", label: "Séance" },
-  { key: "historique", label: "Historique" },
+  // « Historique » devient « Journal » le 14/11/2026 : cinq sous-onglets doivent tenir sur 360 px.
+  { key: "historique", label: "Journal" },
   { key: "progression", label: "Progrès" },
+  { key: "force", label: "Force" },
   { key: "reperes", label: "Repères" },
 ];
 let lastTrainTab = "seance";
@@ -192,6 +194,15 @@ export function TrainTab({ training, weight, save, hsrWeek, setHsrWeek, knee, st
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {tabs}
         <ProgressScreen training={training} knee={knee} />
+      </div>
+    );
+  }
+  // Sous-onglet « Force » (14/11/2026, demande de Yoann : la liste de Progrès était trop longue) :
+  // tout ce qui se lit par groupe musculaire.
+  if (sub === "force") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {tabs}
         {/* Force par groupe (14/11/2026) : 1RM estimé, base 100, brut et relatif au poids. */}
         <StrengthCard training={training} weight={weight} />
         {/* Volume hebdo par groupe musculaire (T2, 04/10/2026) : séries cochées sur 7 jours,

@@ -7,6 +7,8 @@ import { splitExerciseList, exerciseSessions, exerciseTrend, isTimeMode, setLabe
 import { C, today, fmt, Card, Label, Body, Empty, Btn, ScreenHeader, chartAxis, tooltipStyle, tooltipItemStyle } from "../../design/compat.jsx";
 import { trendColor } from "../../lib/helpers.js";
 import { sayStable } from "../../lib/jeffrey.js";
+import { metaFor } from "@rawcare/core/session/exoMeta";
+import { GROUP_LABELS, GROUP_ORDER } from "@rawcare/core/volume";
 
 function ExerciseDetail({ training, knee, nom, onBack }) {
   const sessions = useMemo(() => exerciseSessions(training, nom), [training, nom]);
@@ -94,19 +96,44 @@ function ExerciseDetail({ training, knee, nom, onBack }) {
   );
 }
 
+// Regroupement de la liste par muscle (14/11/2026, demande de Yoann : 55 exercices à faire défiler).
+// Mobilité, échauffement, coiffe et tout ce qui se mesure en secondes vont dans un bloc à part.
+const OTHER_KEY = "mobilite-echauffement";
+const OTHER_GROUPS = new Set(["mobilite", "cardio", "coiffe"]);
+const listGroupOf = (nom) => {
+  const m = metaFor(nom);
+  if (!m?.groupe || m.mode === "temps" || OTHER_GROUPS.has(m.groupe)) return OTHER_KEY;
+  return m.groupe;
+};
+const LIST_ORDER = [...GROUP_ORDER, OTHER_KEY];
+const listLabel = (g) => (g === OTHER_KEY ? "Mobilité et échauffement" : GROUP_LABELS[g] || g);
+
 export function ProgressScreen({ training, knee, onBack }) {
   const [sel, setSel] = useState(null);
   // Les exercices pas faits depuis plus de 60 j sont repliés dans « Anciens exercices » (25/10/2026,
   // demande de Yoann) : toujours consultables, jamais supprimés.
   const { active: list, stale } = useMemo(() => splitExerciseList(training), [training]);
   const [showOld, setShowOld] = useState(false);
+  const [openGroups, setOpenGroups] = useState(() => new Set());
+  const painRedToday = painOutOfBase([knee], today());
+  // Tendance et plateau calculés une fois par exercice, puis rangés par groupe.
+  const groups = useMemo(() => {
+    const by = {};
+    list.forEach((e) => {
+      const sessions = exerciseSessions(training, e.nom);
+      const row = { ...e, trend: exerciseTrend(sessions), plateau: !!progressiveOverloadSuggestion(sessions, e.nom) };
+      (by[listGroupOf(e.nom)] ||= []).push(row);
+    });
+    return LIST_ORDER.filter((g) => by[g]).map((g) => ({ key: g, label: listLabel(g), rows: by[g] }));
+  }, [list, training]);
+  const toggleGroup = (g) => setOpenGroups((cur) => { const n = new Set(cur); n.has(g) ? n.delete(g) : n.add(g); return n; });
   if (sel) return <ExerciseDetail training={training} knee={knee} nom={sel} onBack={() => setSel(null)} />;
 
   const oldRow = (e) => (
     <button type="button" className="p-tap" key={e.nom} onClick={() => setSel(e.nom)} style={{
       display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", minHeight: 60,
-      padding: "11px 0", borderTop: `1px solid ${C.divider}`, gap: 10,
-      background: "none", border: "none", borderTopStyle: "solid", textAlign: "left", fontFamily: "inherit", color: C.text,
+      padding: "11px 0", gap: 10,
+      background: "none", border: "none", borderTop: `1px solid ${C.divider}`, textAlign: "left", fontFamily: "inherit", color: C.text,
     }}>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13, color: C.text2, fontWeight: 700 }}>{e.nom}</div>
@@ -124,22 +151,38 @@ export function ProgressScreen({ training, knee, onBack }) {
       {onBack && <ScreenHeader title="Progression"
         right={<Btn variant="ghost" onClick={onBack} aria-label="Fermer" style={{ width: 52, padding: 0 }}><X size={20} aria-hidden="true" /></Btn>} />}
       <Card style={{ padding: "6px 14px" }}>
-        {list.length ? list.map((e) => {
-          // Tendance calculée par exercice : c'est l'information qu'on vient chercher, la
-          // liste seule ne dirait pas si ça monte ou si ça stagne.
-          const sessions = exerciseSessions(training, e.nom);
-          const t = exerciseTrend(sessions);
+        {list.length ? groups.map((g, gi) => {
+          const open = openGroups.has(g.key);
+          const plateaus = painRedToday ? 0 : g.rows.filter((r) => r.plateau).length;
+          const ups = g.rows.filter((r) => r.trend.key === "up").length;
+          return (
+            <div key={g.key} style={{ borderTop: gi ? `1px solid ${C.divider}` : "none" }}>
+              <button type="button" className="p-tap" aria-expanded={open} onClick={() => toggleGroup(g.key)} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", minHeight: 56,
+                padding: "8px 0", gap: 10, background: "none", border: "none", textAlign: "left", fontFamily: "inherit", color: C.text,
+              }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{g.label}</div>
+                  <div style={{ fontSize: 12, color: C.muted, fontFamily: C.mono, marginTop: 2 }}>
+                    {g.rows.length} exercice{g.rows.length > 1 ? "s" : ""}
+                    {ups > 0 && <span style={{ color: C.accent }}> · {ups} en hausse</span>}
+                    {plateaus > 0 && <span style={{ color: C.warn }}> · {plateaus} plateau{plateaus > 1 ? "x" : ""}</span>}
+                  </div>
+                </div>
+                <ChevronRight size={18} color={C.text2} aria-hidden="true" style={{ transform: open ? "rotate(90deg)" : "none", flexShrink: 0 }} />
+              </button>
+              {open && g.rows.map((e) => {
           // Plateau visible directement dans la liste (10/09/2026, demande explicite), pas
           // seulement en ouvrant la fiche détail — même garde-fou douleur que la fiche
           // (ExerciseDetail) et les records (V4) : pas de nudge de surcharge affiché un jour
           // où le genou est hors base.
-          const overload = progressiveOverloadSuggestion(sessions, e.nom);
-          const showPlateau = overload && !painOutOfBase([knee], today());
+          const t = e.trend;
+          const showPlateau = e.plateau && !painRedToday;
           return (
             <button type="button" className="p-tap" key={e.nom} onClick={() => setSel(e.nom)} style={{
               display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", minHeight: 60,
-              padding: "11px 0", borderTop: `1px solid ${C.divider}`, gap: 10,
-              background: "none", border: "none", borderTopStyle: "solid", textAlign: "left", fontFamily: "inherit", color: C.text,
+              padding: "11px 0 11px 12px", gap: 10,
+              background: "none", border: "none", borderTop: `1px solid ${C.divider}`, textAlign: "left", fontFamily: "inherit", color: C.text,
             }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 13, color: C.text, fontWeight: 700 }}>{e.nom}</div>
@@ -157,6 +200,9 @@ export function ProgressScreen({ training, knee, onBack }) {
                 <ChevronRight size={18} color={C.text2} aria-hidden="true" />
               </div>
             </button>
+          );
+              })}
+            </div>
           );
         }) : <Empty>{stale.length
           ? sayStable("noRecentExercise")

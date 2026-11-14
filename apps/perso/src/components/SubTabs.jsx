@@ -17,7 +17,8 @@ export function SubTabs({ label, tabs, value, onChange, sticky = false }) {
             style={{
               flex: 1, minWidth: 0, minHeight: 48, borderRadius: 10, border: "none",
               background: on ? T.c.accent : "transparent", color: on ? T.c.onAccent : T.c.text2,
-              fontSize: 15, fontWeight: 700, fontFamily: "inherit",
+              // Cinq sous-onglets (Séance, 14/11/2026) : 14 px pour tenir sur 360 px.
+              fontSize: tabs.length >= 5 ? 14 : 15, fontWeight: 700, fontFamily: "inherit",
             }}>{text}</button>
         );
       })}

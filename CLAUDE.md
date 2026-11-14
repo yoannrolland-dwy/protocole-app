@@ -23,6 +23,8 @@ documenter le livré ici, dans CLAUDE.md.
 - **Installé sur le S25** : v3.169.0, commit `6729bd0`, le 14/11/2026 à 11 h 01 (plateau à format égal,
   historique détaillé du carnet, score de force ; avant : démonstrations 3D, étapes 1 à 3 et
   échauffement basket).
+- **Prêt, pas encore installé** : v3.170.0 (sous-onglet Force, liste de Progrès par muscle ; section
+  du 14/11/2026 en fin de fichier).
 - **Git** : `dev` = `origin/dev` (poussé le 14/11/2026 à 11 h), dossier propre, aucune autre branche
   de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à
   la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
@@ -6611,4 +6613,20 @@ réussie à 11 h 01 ; sauvegarde locale du jour présente ; empreintes relevées
 identiques hors widget ; permission du signal JEFFREY accordée ; aucun plantage. Carte « Force par
 groupe » lue sur le téléphone, mêmes chiffres que le calcul. **Pas essayé sur le téléphone** :
 l'historique du carnet (il faudrait ouvrir une séance) et le nouvel affichage du plateau.
+
+## Séance : sous-onglet Force, liste de Progrès regroupée par muscle (14/11/2026, apps/perso v3.170.0)
+
+Retour de Yoann sur la v3.169.0 : environ 55 exercices dans Progrès, on défile sans fin. Choix de Yoann :
+- **Sous-onglets de Séance** : Séance · **Journal** (ex-« Historique », renommé pour que cinq
+  tiennent sur 360 px) · Progrès · **Force** · Repères. Texte des sous-onglets en 14 px dès qu'il y en
+  a cinq (`SubTabs`), 15 px sinon. **Force** = carte « Force par groupe » puis « Volume · 7 jours »
+  (sortis de Progrès).
+- **Progrès regroupé par muscle** (`ProgressScreen.jsx`) : un groupe par muscle (ordre `GROUP_ORDER`),
+  fermé par défaut, avec le nombre d'exercices, combien sont en hausse et combien en plateau
+  (plateaux masqués genou hors base, comme avant). Mobilité, échauffement, coiffe et tout exercice en
+  durée sont regroupés dans « Mobilité et échauffement ». « Anciens exercices » inchangé.
+- Correctif au passage : les lignes de la liste avaient une bordure blanche de 3 px
+  (`borderTopStyle` après `border: none`) ; elles ont désormais le filet normal.
+- Vérifié dans l'aperçu à 360 px : cinq sous-onglets lisibles (texte 38 à 55 px pour 60 px de
+  bouton), groupes ouverts et fermés, sous-onglet Force, aucun débordement, aucune erreur.
 
