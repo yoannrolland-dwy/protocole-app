@@ -11,6 +11,7 @@
 // - `rest` : points posés sur un banc ou une cale, à cette hauteur (au lieu du sol) ;
 // - `sides` : exercice d'un seul côté, on peut voir l'autre ; `side` : le côté qui travaille ici ;
 // - `props` : accessoires (tapis, mur, montant, caisson, câble, rack, barre, haltères) ;
+// - `jump` : le corps quitte le sol (saut) : les tests acceptent un déplacement rapide ;
 // - `sentir`, `eviter` : un repère chacun.
 
 const LR = (key, v) => ({ [key + "L"]: v, [key + "R"]: v });
@@ -713,6 +714,133 @@ export const DEMOS = {
     sentir: "Les mollets, étirés puis contractés.",
     eviter: "Plier les genoux ou rebondir en bas.",
   },
+
+  // ---------------------------------------------------------------- Échauffement basket
+  // Repères : docs/demos-3d/technique-mobilite-gainage.md, § 17. Positions du bassin calculées pour
+  // l'angle de genou visé, le centre du corps au-dessus des pieds.
+
+  "Cardio léger (vélo ou trot)": {
+    view: { az: 70, el: 8 }, active: ["cuisseL", "cuisseR", "jambeL", "jambeR"],
+    frames: [
+      { d: 0.35, hold: 0, cue: "Trotter tranquillement (ou pédaler) pendant 3 minutes, pour se réchauffer",
+        pose: { root: [8, 0, 0], hipL: [45, 0, 0], kneeL: 75, ankleL: -15, hipR: [-12, 0, 0], kneeR: 15, shL: [-30, 8, 0], shR: [35, 8, 0], ...LR("el", 90) } },
+      { d: 0.35, hold: 0, cue: "Allure facile : on peut parler en trottant",
+        pose: { root: [8, 0, 0], hipR: [45, 0, 0], kneeR: 75, ankleR: -15, hipL: [-12, 0, 0], kneeL: 15, shR: [-30, 8, 0], shL: [35, 8, 0], ...LR("el", 90) } },
+    ],
+    sentir: "Le souffle qui s'accélère un peu, les jambes qui se réchauffent.",
+    eviter: "Partir trop vite : c'est une mise en route, pas un sprint.",
+  },
+
+  "Mobilité dynamique": (() => {
+    const base = { footL: [0.11, 0.085, 0.42], footR: [-0.11, 0.085, -0.38], kneePoleL: [0.05, 0, 1], kneePoleR: [-0.05, -0.2, 1], ...LR("sh", [0, 8, 0]), ...LR("el", 20) };
+    return {
+      view: "profilG", active: ["hancheL", "hancheR", "cuisseL", "cuisseR"], touch: ["toeL", "heelL"], sides: true, side: "L",
+      frames: [
+        { d: 1, hold: 0.3, cue: "Un grand pas en avant, buste droit", pose: { ...base, pos: [0, 0.868, 0.025], root: [0, 0, 0] } },
+        { d: 1.6, hold: 0.4, cue: "Descendre en fente, genou avant au-dessus de la cheville, genou arrière vers le sol", pose: { ...base, pos: [0, 0.608, 0.02], root: [0, 0, 0] } },
+        { d: 1.2, hold: 0.2, cue: "Remonter et changer de jambe en avançant ; finir par des balancements de jambe", pose: { ...base, pos: [0, 0.868, 0.025], root: [0, 0, 0] } },
+      ],
+      sentir: "L'avant de la hanche arrière qui s'étire, les fessiers qui travaillent.",
+      eviter: "Laisser le genou avant rentrer vers l'intérieur ou se pencher en avant.",
+    };
+  })(),
+
+  // Dos au mur, genoux à 60° au-dessus des chevilles, pieds à ~40-50 cm du mur (Rio 2015 pour
+  // l'isométrie à 60°).
+  "Primer iso genou (wall-sit @60°)": {
+    view: "profilG", active: ["cuisseL", "cuisseR", "genouL", "genouR"], touch: ["toeL", "heelL", "toeR", "heelR"],
+    props: { wall: { z: -0.12, side: "back" } },
+    frames: [
+      { d: 1.5, hold: 0.4, cue: "Dos contre le mur, pieds à 40-50 cm du mur, largeur des hanches",
+        pose: { pos: [0, 0.87, 0.0], root: [0, 0, 0], footL: [0.11, 0.085, 0.372], footR: [-0.11, 0.085, 0.372], ...LR("sh", [0, 8, 0]), ...LR("el", 10) } },
+      { d: 2, hold: 4, cue: "Glisser jusqu'à 60° de genou et tenir 40 secondes, sous le seuil de douleur",
+        pose: { pos: [0, 0.76, 0.0], root: [0, 0, 0], footL: [0.11, 0.085, 0.372], footR: [-0.11, 0.085, 0.372], ...LR("sh", [0, 8, 0]), ...LR("el", 10) } },
+    ],
+    sentir: "Les quadriceps qui chauffent, une tension stable au genou.",
+    eviter: "Descendre plus bas que 60°, décoller le dos du mur ou laisser les genoux dépasser les orteils.",
+  },
+
+  // Amplitude progressive : un premier squat à ~55°, puis vers 85° si c'est indolore (au-delà de
+  // 60°, on sort de la plage de rééducation : profondeur selon la douleur).
+  "Montée en charge : squats": (() => {
+    const base = { footL: [0.17, 0.085, 0], footR: [-0.17, 0.085, 0], yawL: 15, yawR: 15, kneePoleL: [0.3, 0, 1], kneePoleR: [-0.3, 0, 1], ...LR("sh", [80, 10, 0]), ...LR("el", 10) };
+    const up = { ...base, pos: [0, 0.97, 0.03], root: [5, 0, 0], ...LR("sh", [10, 10, 0]) };
+    return {
+      view: { az: 60, el: 8 }, active: ["cuisseL", "cuisseR", "bassin"], touch: ["toeL", "heelL", "toeR", "heelR"],
+      frames: [
+        { d: 1, hold: 0.3, cue: "Pieds largeur d'épaules, pointes un peu ouvertes", pose: up },
+        { d: 2, hold: 0.2, cue: "Premier squat à mi-hauteur, bras devant pour l'équilibre", pose: { ...base, pos: [0, 0.865, -0.07], root: [30, 0, 0] } },
+        { d: 1, hold: 0.3, cue: "Remonter en poussant dans les talons", pose: up },
+        { d: 2, hold: 0.2, cue: "Puis plus bas si c'est indolore, talons au sol, genoux dans l'axe", pose: { ...base, pos: [0, 0.735, -0.07], root: [30, 0, 0] } },
+        { d: 1, hold: 0.3, cue: "Remonter en 1 seconde", pose: up },
+      ],
+      cut: true,
+      sentir: "Les cuisses et les fessiers ; au genou, une gêne de 3/10 au plus.",
+      eviter: "Décoller les talons, arrondir le dos ou descendre plus bas que la douleur ne le permet.",
+    };
+  })(),
+
+  // Impulsion bras et jambes, réception souple : genou fléchi à plus de 30° au contact, dans l'axe
+  // des pieds.
+  "Montée en charge : sauts": (() => {
+    const F = (y) => ({ footL: [0.15, y, 0], footR: [-0.15, y, 0], kneePoleL: [0.2, 0, 1], kneePoleR: [-0.2, 0, 1] });
+    return {
+      view: { az: 60, el: 8 }, active: ["cuisseL", "cuisseR", "jambeL", "jambeR", "bassin"], jump: true,
+      frames: [
+        { d: 1, hold: 0.3, cue: "Debout, pieds largeur de hanches", pose: { ...F(0.085), pos: [0, 0.97, 0.0], root: [3, 0, 0], ...LR("sh", [0, 8, 0]), ...LR("el", 15) } },
+        { d: 0.6, hold: 0.1, cue: "Fléchir et lancer les bras en arrière", pose: { ...F(0.085), pos: [0, 0.823, -0.09], root: [35, 0, 0], ...LR("sh", [-40, 10, 0]), ...LR("el", 15) } },
+        { d: 0.3, hold: 0.1, cue: "Sauter en poussant fort, bras vers le haut", pose: { ...F(0.29), pos: [0, 1.175, 0.0], root: [3, 0, 0], ...LR("sh", [165, 10, 0]), ...LR("el", 10) } },
+        { d: 0.3, hold: 0.5, cue: "Se réceptionner en souplesse, genoux fléchis et dans l'axe des pieds", pose: { ...F(0.085), pos: [0, 0.905, -0.03], root: [20, 0, 0], ...LR("sh", [40, 10, 0]), ...LR("el", 30) } },
+        { d: 0.8, hold: 0.3, cue: "Se redresser ; hauteur augmentée seulement si c'est indolore", pose: { ...F(0.085), pos: [0, 0.97, 0.0], root: [3, 0, 0], ...LR("sh", [0, 8, 0]), ...LR("el", 15) } },
+      ],
+      cut: true,
+      sentir: "Une impulsion franche et une réception silencieuse.",
+      eviter: "Atterrir jambes tendues ou genoux qui rentrent vers l'intérieur.",
+    };
+  })(),
+
+  // Accélération : buste penché, poussée vers l'arrière. Freinage : centre de gravité abaissé, pied
+  // posé devant le bassin, genou dans l'axe, buste droit.
+  "Spécifique basket : accél/décél": (() => {
+    const arms = (a, b) => ({ shL: [a, 15, 0], shR: [b, 15, 0], ...LR("el", 75) });
+    const athletic = { pos: [0, 0.91, -0.05], root: [25, 0, 0], footL: [0.2, 0.085, 0], footR: [-0.2, 0.085, 0], yawL: 10, yawR: 10, kneePoleL: [0.25, 0, 1], kneePoleR: [-0.25, 0, 1], ...LR("sh", [25, 20, 0]), ...LR("el", 70) };
+    const accel = { pos: [0, 0.75, 0.03], root: [35, 0, 0], footL: [0.12, 0.085, 0.3], footR: [-0.12, 0.085, -0.55], yawL: 0, yawR: 0, kneePoleL: [0.05, 0, 1], kneePoleR: [-0.05, 0, 1], ...arms(-30, 60) };
+    const brake = { pos: [0, 0.73, 0.0], root: [0, 0, 0], footL: [0.17, 0.085, 0.38], footR: [-0.2, 0.085, -0.25], yawL: 0, yawR: 30, kneePoleL: [0.1, 0, 1], kneePoleR: [-0.3, 0, 1], ...arms(20, 20) };
+    return {
+      view: { az: 70, el: 8 }, active: ["cuisseL", "cuisseR", "bassin"], touch: ["toeL", "heelL", "toeR", "heelR"],
+      frames: [
+        { d: 1, hold: 0.4, cue: "Position athlétique : genoux fléchis, poids sur l'avant des pieds", pose: athletic },
+        { d: 0.5, hold: 0.3, cue: "Accélérer : buste penché en avant, pousser fort vers l'arrière", pose: accel },
+        { d: 0.6, hold: 0.5, cue: "Freiner : pied planté devant le bassin, hanches basses, buste droit, genou dans l'axe", pose: brake },
+        { d: 0.8, hold: 0.3, cue: "Revenir en position athlétique, intensité qui monte à chaque passage", pose: athletic },
+      ],
+      cut: true,
+      sentir: "Les cuisses et les fessiers qui encaissent le freinage.",
+      eviter: "Freiner jambe tendue, genou qui rentre vers l'intérieur au changement de direction.",
+    };
+  })(),
+
+  "Spécifique basket : tirs en mouvement": (() => {
+    const F = (y) => ({ footL: [0.15, y, 0], footR: [-0.15, y, 0], kneePoleL: [0.2, 0, 1], kneePoleR: [-0.2, 0, 1] });
+    const elbows = { elbowL: [0.6, -1, -0.2], elbowR: [-0.3, -1, 0.1] };
+    const catchPose = { ...F(0.085), pos: [0, 0.908, -0.01], root: [15, 0, 0], ...elbows, handL: [0.12, 1.15, 0.3], handR: [-0.12, 1.15, 0.3] };
+    return {
+      view: { az: 50, el: 8 }, active: ["epauleR", "brasR", "avantBrasR", "cuisseL", "cuisseR"], jump: true,
+      props: { ball: { at: "mains", offset: [0, 0.04, 0.06] } },
+      frames: [
+        { d: 0.8, hold: 0.3, cue: "Recevoir la balle à hauteur de poitrine, genoux fléchis", pose: catchPose },
+        { d: 0.4, hold: 0, cue: "Fléchir les jambes pour prendre l'impulsion", pose: { ...F(0.085), pos: [0, 0.855, -0.04], root: [22, 0, 0], ...elbows, handL: [0.12, 1.08, 0.3], handR: [-0.12, 1.08, 0.3] } },
+        { d: 0.35, hold: 0, cue: "Monter la balle au-dessus du front en sautant, coude du bras de tir sous la balle",
+          pose: { ...F(0.24), pos: [0, 1.12, 0.0], root: [3, 0, 0], elbowL: [0.6, -1, -0.2], elbowR: [-0.1, -1, 0.3], handL: [0.04, 1.98, 0.17], handR: [-0.1, 1.95, 0.2] } },
+        { d: 0.25, hold: 0.4, cue: "Tendre le bras de tir vers le panier au sommet du saut, poignet cassé",
+          pose: { ...F(0.24), pos: [0, 1.12, 0.0], root: [3, 0, 0], elbowL: [0.6, -1, -0.2], elbowR: [-0.1, -1, 0.3], handL: [0.0, 2.08, 0.22], handR: [-0.13, 2.12, 0.26] } },
+        { d: 0.35, hold: 0.3, cue: "Se réceptionner en souplesse au même endroit, genoux fléchis", pose: catchPose },
+      ],
+      cut: true,
+      sentir: "Une seule poussée continue des jambes jusqu'au bout des doigts.",
+      eviter: "Tirer avec les bras seuls ou se réceptionner jambes tendues.",
+    };
+  })(),
 };
 
 // Une position de retour écrite `pose: null` reprend la première position.

@@ -77,6 +77,7 @@ export function mirrorDemo(d) {
     cable: d.props.cable && { from: flipX(d.props.cable.from), to: swapSide(d.props.cable.to) },
     cables: d.props.cables?.map((c) => ({ from: flipX(c.from), to: swapSide(c.to) })),
     rope: d.props.rope && { pulley: flipX(d.props.rope.pulley) },
+    ball: d.props.ball && { ...d.props.ball, offset: d.props.ball.offset && flipX(d.props.ball.offset) },
     pads: d.props.pads?.map((pd) => ({ ...pd, joint: swapSide(pd.joint), at: flipX(pd.at) })),
     follow: d.props.follow?.map((fo) => ({ ...fo, at: swapSide(fo.at), offset: fo.offset && flipX(fo.offset) })),
   };

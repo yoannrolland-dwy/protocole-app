@@ -35,8 +35,8 @@ documenter le livré ici, dans CLAUDE.md.
 - **Chantier en cours : démonstrations 3D** (sections du 13/11/2026 en fin de fichier). Étape 1
   (Mobilité) et étape 2 (haltères, barre, bancs) installées. Gestes corrigés d'après la
   littérature en v3.166.0, installée (« c'est mieux », Yoann) ; sources dans `docs/demos-3d/`.
-  Étape 3 (poulies et machines) installée en v3.167.0 ; Yoann doit juger les gestes. Sans démonstration :
-  curls poignets, rowing machine à disques, échauffement basket.
+  Étape 3 (poulies et machines) installée en v3.167.0 ; échauffement basket écrit en v3.168.0, pas
+  encore installé. Sans démonstration : curls poignets, rowing machine à disques.
 - **En attente hors de ce dépôt** (appli JEFFREY, dépôt `jeffrey-app`) : installer son récepteur du
   signal de record, puis l'essayer casque branché ; envoyer un jeton aux gestes de séance ;
   afficher en clair le code `restauration`. Notes : `docs/suivi-jeffrey/`.
@@ -6504,4 +6504,28 @@ Réglages ; 47 clés sur 48 identiques (seule `lastPosition` a changé) ; préf�
 identiques ; permission du signal JEFFREY accordée ; aucun plantage. Démonstration du hip thrust
 ouverte depuis Lower B sur le téléphone, sans erreur ; séance de test annulée, rien enregistré.
 **Pas vérifié** : l'avis de Yoann sur ces gestes.
+
+## Démonstrations 3D : échauffement basket (13/11/2026, apps/perso v3.168.0)
+
+Demande de Yoann : « fais aussi l'échauffement basket en 3D ». Les 7 étapes du gabarit Basket ont
+leur démonstration (repères : `docs/demos-3d/technique-mobilite-gainage.md`, § 17) :
+- **Cardio léger** : trot sur place, allure facile ;
+- **Mobilité dynamique** : fente avant (jambe avant puis l'autre, `sides`), genou avant au-dessus
+  de la cheville ; les balancements de jambe sont cités dans la consigne, pas animés ;
+- **Primer iso genou (wall-sit à 60°)** : dos au mur, pieds à 40-50 cm du mur, genoux à 60°, tenue ;
+- **Squats** : amplitude progressive, un premier à ~55° puis vers 85° « si c'est indolore »
+  (au-delà de 60°, hors de la plage de rééducation : profondeur selon la douleur) ;
+- **Sauts** : flexion et bras en arrière, impulsion, réception souple genoux fléchis dans l'axe ;
+- **Accél/décél** : position athlétique, accélération buste penché, freinage pied planté devant le
+  bassin, hanches basses ;
+- **Tirs en mouvement** : réception de la balle, flexion, saut, balle au-dessus du front puis bras
+  de tir tendu, réception.
+
+Positions du bassin calculées pour l'angle de genou visé, le centre du corps au-dessus des pieds.
+Dessin : un ballon (`props.ball`) qui suit les mains. Démonstration `jump` : le corps quitte le sol,
+les tests acceptent alors un déplacement rapide du bassin (un vrai saut approche 2 m/s).
+
+**Vérifications** : 349 tests (chaque étape du gabarit Basket a sa démonstration) ; images relues ;
+à 375 px, carnet Basket avec le bouton sur ses 7 étapes, écran du tir sans erreur. **Pas vérifié** :
+le téléphone et l'avis de Yoann.
 

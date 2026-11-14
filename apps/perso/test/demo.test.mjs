@@ -22,7 +22,9 @@ const beyondWall = (s, w) => Math.max(...Object.entries(s).map(([n, p]) => (w.si
 
 test("chaque exercice de la séance Mobilité a sa démonstration, et chaque démonstration est un exercice de l'app", () => {
   for (const e of TEMPLATES["Mobilité"].exos) assert.ok(hasDemo(e.n), `pas de démonstration : ${e.n}`);
-  const noms = new Set(EXERCISE_CATALOG.map((c) => c.ex.n));
+  // Le catalogue « Ajouter un exercice » laisse de côté l'échauffement Basket : ses noms viennent du gabarit.
+  const noms = new Set([...EXERCISE_CATALOG.map((c) => c.ex.n), ...TEMPLATES.Basket.exos.map((e) => e.n)]);
+  for (const e of TEMPLATES.Basket.exos) assert.ok(hasDemo(e.n), `pas de démonstration : ${e.n}`);
   for (const nom of Object.keys(DEMOS)) assert.ok(noms.has(nom), `démonstration sans exercice : ${nom}`);
   // Étape 2 : haltères, barre et bancs. Le hip thrust et le rowing (machines) viendront à l'étape 3 ;
   // les curls poignets restent sans démonstration (le mannequin n'a pas de poignet articulé).
@@ -134,7 +136,8 @@ test("pendant le trajet : rien ne s'enfonce, rien ne se décroche, le corps ne s
       assert.ok(lowest(s) > -0.03, `${where} : un point s'enfonce (${lowest(s).toFixed(3)} m)`);
       for (const [k, v] of Object.entries(reach)) assert.ok(v < 0.02, `${where} : ${k} se décroche de ${v.toFixed(3)} m`);
       if (d.props?.wall) assert.ok(beyondWall(s, d.props.wall) < 0.03, `${where} : le corps traverse le mur`);
-      if (prev) assert.ok(Math.hypot(s.pelvis[0] - prev[0], s.pelvis[1] - prev[1], s.pelvis[2] - prev[2]) < 0.08, `${where} : le bassin saute`);
+      // Un vrai saut est rapide (près de 2 m/s à l'impulsion) : seuil relevé pour les démonstrations de saut.
+      if (prev) assert.ok(Math.hypot(s.pelvis[0] - prev[0], s.pelvis[1] - prev[1], s.pelvis[2] - prev[2]) < (d.jump ? 0.2 : 0.08), `${where} : le bassin saute`);
       prev = s.pelvis;
     }
   });

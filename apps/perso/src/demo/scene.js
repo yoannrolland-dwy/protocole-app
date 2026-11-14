@@ -122,6 +122,7 @@ export function createDemoScene(canvas, { onTick } = {}) {
     weight: new MeshStandardMaterial({ color: "#3d3d38", roughness: 0.7, metalness: 0.2 }),
     safety: new MeshStandardMaterial({ color: COLORS.text2, roughness: 0.4, metalness: 0.3 }),
     pad: new MeshStandardMaterial({ color: "#2e2e2a", roughness: 0.9, metalness: 0 }),
+    ball: new MeshStandardMaterial({ color: COLORS.warn, roughness: 0.8, metalness: 0 }),
     rope: new LineBasicMaterial({ color: COLORS.text }),
     cable: new LineBasicMaterial({ color: COLORS.text2 }),
     edge: new MeshBasicMaterial({ color: COLORS.line }),
@@ -133,7 +134,7 @@ export function createDemoScene(canvas, { onTick } = {}) {
   scene.add(propGroup);
 
   let demo = null, tl = null, t = 0, playing = true, speed = 1, raf = 0, last = 0, dirty = true, disposed = false;
-  let cables = [], lastTick = 0, barbell = null, dumbbells = null, rope = null, handle = null, pads = [], follows = [];
+  let cables = [], lastTick = 0, barbell = null, dumbbells = null, rope = null, handle = null, pads = [], follows = [], ball = null;
   const cam = { az: 90, el: 10, dist: 4, base: 4, target: new Vector3(0, 0.8, 0) };
 
   function placeCamera() {
@@ -151,7 +152,7 @@ export function createDemoScene(canvas, { onTick } = {}) {
       propGroup.remove(o);
       o.traverse((x) => x.geometry?.dispose?.());
     }
-    cables = []; barbell = null; dumbbells = null; rope = null; handle = null; pads = []; follows = [];
+    cables = []; barbell = null; dumbbells = null; rope = null; handle = null; pads = []; follows = []; ball = null;
   }
 
   function buildProps(d, b) {
@@ -252,6 +253,11 @@ export function createDemoScene(canvas, { onTick } = {}) {
       propGroup.add(m);
       pads.push({ m, ...pd });
     }
+    // Ballon tenu à deux mains (tir).
+    if (p.ball) {
+      ball = { m: new Mesh(new SphereGeometry(0.12, 28, 20), mats.ball), at: p.ball.at || "mains", offset: p.ball.offset || [0, 0, 0] };
+      propGroup.add(ball.m);
+    }
     // Plateaux qui suivent les pieds ou les orteils (presse), inclinaison fixe.
     for (const fo of p.follow || []) {
       const m = new Mesh(new BoxGeometry(...fo.size), mats.prop);
@@ -320,6 +326,7 @@ export function createDemoScene(canvas, { onTick } = {}) {
       pd.m.quaternion.copy(q).multiply(new Quaternion().setFromUnitVectors(UP, new Vector3(1, 0, 0)));
     }
     for (const fo of follows) fo.m.position.copy(pointOf(fo.at)).add(new Vector3(...(fo.offset || [0, 0, 0])));
+    if (ball) ball.m.position.copy(pointOf(ball.at)).add(new Vector3(...ball.offset));
     return cur;
   }
 
