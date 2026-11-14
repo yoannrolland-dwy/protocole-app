@@ -20,17 +20,16 @@ documenter le livré ici, dans CLAUDE.md.
 ## État courant (14/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.168.0, commit `b83d7db`, le 14/11/2026 à 7 h 28 (démonstrations 3D,
-  étapes 1 à 3 et échauffement basket).
-- **Git** : `dev` = `origin/dev` (poussé le 14/11/2026 au matin), dossier propre, aucune autre branche
+- **Installé sur le S25** : v3.169.0, commit `6729bd0`, le 14/11/2026 à 11 h 01 (plateau à format égal,
+  historique détaillé du carnet, score de force ; avant : démonstrations 3D, étapes 1 à 3 et
+  échauffement basket).
+- **Git** : `dev` = `origin/dev` (poussé le 14/11/2026 à 11 h), dossier propre, aucune autre branche
   de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à
   la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
   `avant-campagne-audit`, `apres-lot1-audit`, `apres-lot2-audit`, `avant-jetons-gestes`. APK
   précédents : `~/Documents/protocole-sauvegardes/` (hors Git).
 - **Tests** : 358 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
-- **Prêt, pas encore installé** : v3.169.0 (plateau et tendance à format égal, historique détaillé
-  dans le carnet, score de force par groupe ; section du 14/11/2026 en fin de fichier).
 - **Chantiers** : tous ceux de `ROADMAP.md` sont livrés (V, R, S, T, U, J). La campagne d'audit du
   10/11/2026 est faite (lots 1 à 3). Ce qui reste ouvert est dans « Reportés à la fin de la
   campagne », plus bas.
@@ -6603,5 +6602,13 @@ chiffre principal, force relative au poids à côté.
 **Vérifié** : 358 tests (régression du 14/11 avec son historique réel, format égal, recul,
 historique du carnet, 1RM estimé, groupes, indice et relatif, poids) ; aperçu à 360 px avec des
 données inventées (carte, courbe, détail, historique du carnet), sans débordement ni erreur.
-**Pas vérifié sur le téléphone** (pas installé).
+**Installé sur le S25 le 14/11/2026 à 11 h 01** (`release.mjs build` puis `install`) : commit `6729bd0`,
+empreinte de l'APK `08b50d1644b9520d…` vérifiée sur le téléphone, date de première installation
+inchangée. Avant : aucune séance en cours ; APK 3.168.0 copié dans
+`~/Documents/protocole-sauvegardes/force-plateau-2026-11/` (`c29ab3c6…`) ; copie serveur manuelle
+réussie à 11 h 01 ; sauvegarde locale du jour présente ; empreintes relevées. Après : 48 clés, seules
+`lastPosition` et `serverBackup` (la copie faite juste avant) ont changé ; préférences Android
+identiques hors widget ; permission du signal JEFFREY accordée ; aucun plantage. Carte « Force par
+groupe » lue sur le téléphone, mêmes chiffres que le calcul. **Pas essayé sur le téléphone** :
+l'historique du carnet (il faudrait ouvrir une séance) et le nouvel affichage du plateau.
 
