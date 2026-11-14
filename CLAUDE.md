@@ -17,12 +17,12 @@ les pièges identifiés et les tests attendus — ne pas les rouvrir sans raison
 À la fin d'une étape : cocher son état dans le tableau de `ROADMAP.md`, et
 documenter le livré ici, dans CLAUDE.md.
 
-## État courant (13/11/2026) : à lire en premier dans une session neuve
+## État courant (14/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.167.0, commit `b7053b6`, le 13/11/2026 à 22 h 59 (démonstrations 3D,
-  étapes 1 à 3).
-- **Git** : `dev` = `origin/dev` (poussé le 13/11/2026 au soir), dossier propre, aucune autre branche
+- **Installé sur le S25** : v3.168.0, commit `b83d7db`, le 14/11/2026 à 7 h 28 (démonstrations 3D,
+  étapes 1 à 3 et échauffement basket).
+- **Git** : `dev` = `origin/dev` (poussé le 14/11/2026 au matin), dossier propre, aucune autre branche
   de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à
   la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
@@ -35,8 +35,9 @@ documenter le livré ici, dans CLAUDE.md.
 - **Chantier en cours : démonstrations 3D** (sections du 13/11/2026 en fin de fichier). Étape 1
   (Mobilité) et étape 2 (haltères, barre, bancs) installées. Gestes corrigés d'après la
   littérature en v3.166.0, installée (« c'est mieux », Yoann) ; sources dans `docs/demos-3d/`.
-  Étape 3 (poulies et machines) installée en v3.167.0 ; échauffement basket écrit en v3.168.0, pas
-  encore installé. Sans démonstration : curls poignets, rowing machine à disques.
+  Étape 3 (poulies et machines) installée en v3.167.0 ; échauffement basket installé en v3.168.0.
+  Tous les exercices des séances ont leur démonstration. Sans démonstration : curls poignets,
+  rowing machine à disques (hors séances). Reste : l'avis de Yoann sur les gestes.
 - **En attente hors de ce dépôt** (appli JEFFREY, dépôt `jeffrey-app`) : installer son récepteur du
   signal de record, puis l'essayer casque branché ; envoyer un jeton aux gestes de séance ;
   afficher en clair le code `restauration`. Notes : `docs/suivi-jeffrey/`.
@@ -6526,6 +6527,15 @@ Dessin : un ballon (`props.ball`) qui suit les mains. Démonstration `jump` : le
 les tests acceptent alors un déplacement rapide du bassin (un vrai saut approche 2 m/s).
 
 **Vérifications** : 349 tests (chaque étape du gabarit Basket a sa démonstration) ; images relues ;
-à 375 px, carnet Basket avec le bouton sur ses 7 étapes, écran du tir sans erreur. **Pas vérifié** :
-le téléphone et l'avis de Yoann.
+à 375 px, carnet Basket avec le bouton sur ses 7 étapes, écran du tir sans erreur.
+
+**Installé sur le S25 le 14/11/2026 à 7 h 28** (`release.mjs build` puis `install`) : commit
+`b83d7db`, empreinte de l'APK `c29ab3c62f73d82c…` vérifiée sur le téléphone, date de première
+installation inchangée. Avant : aucune séance en cours ; APK 3.167.0 copié dans
+`~/Documents/protocole-sauvegardes/echauffement-basket-3d-2026-11/` (empreinte `f59204c7…`) ; copie
+serveur manuelle réussie à 7 h 28 ; sauvegarde locale du jour présente ; empreintes des 48 clés et
+des préférences Android relevées. Après : 47 clés sur 48 identiques (seule `lastPosition` a
+changé) ; préférences identiques ; permission du signal JEFFREY accordée ; aucun plantage ; pas
+d'écran de secours. Démonstration ouverte depuis le carnet Basket sur le téléphone, sans erreur ;
+séance de test annulée, brouillon effacé, rien enregistré. **Pas vérifié** : l'avis de Yoann.
 
