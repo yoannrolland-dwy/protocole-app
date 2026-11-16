@@ -24,9 +24,10 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
   Étape 3 (poulies et machines) installée en v3.167.0 ; échauffement basket installé en v3.168.0.
   Tous les exercices des séances ont leur démonstration. Sans démonstration : curls poignets,
   rowing machine à disques (hors séances). Reste : l'avis de Yoann sur les gestes.
-- **En attente hors de ce dépôt** (appli JEFFREY, dépôt `jeffrey-app`) : installer son récepteur du
-  signal de record, puis l'essayer casque branché ; envoyer un jeton aux gestes de séance ;
-  afficher en clair le code `restauration`. Notes : `docs/suivi-jeffrey/`.
+- **Côté appli JEFFREY** (dépôt `jeffrey-app`, dont le journal fait foi) : récepteur du signal de
+  record installé et validé en réel le 13/11/2026 ; jeton des gestes de séance installé le
+  12/11/2026, pas encore validé sur le téléphone ; affichage en clair du code `restauration` :
+  état à confirmer. Notes : `docs/suivi-jeffrey/`.
 - **Jamais essayé sur le téléphone** : voir les lignes « Pas vérifié » et « Pas essayé » des
   sections de `docs/journal/2026-11.md` (restauration réelle, gestes avec jeton, vraie photo de plat avec
   son détail, record coché casque branché, une vraie séance Mobilité à 18 exercices).
@@ -36,7 +37,8 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 
 ## Qui je suis (Yoann)
 
-43 ans, athlète (musculation / basket / escalade), en phase de sèche.
+43 ans, athlète (musculation / basket / escalade), en recomposition corporelle depuis le
+02/10/2026, sans poids cible.
 Novice en développement — je suis les instructions étape par étape, je
 n'écris pas de code moi-même. J'aime être challengé et qu'on me pose des
 questions avant de coder si ma demande est ambiguë, plutôt qu'on suppose.
@@ -131,7 +133,8 @@ versions plus anciennes que Claude connaîtrait mieux par défaut) :
    ouvrir demandée par JEFFREY, valable 10 minutes) ; `lastPosition` (position du téléphone, propre à l'appareil). `climbScheme` reste
    dans `DATA_KEYS` mais n'est plus lu depuis le 08/10/2026 (même cas qu'`elbowLog`).
 2. **Toujours vérifier que le build passe** (`npm run build --workspace=apps/perso`,
-   depuis la racine du monorepo) **et que `npm test` est vert** avant de considérer une
+   toujours depuis la racine du monorepo : contrôle rapide seulement ; avant une installation, la
+   seule commande est `release.mjs build`) **et que `npm test` est vert** avant de considérer une
    modification terminée. Depuis le chantier T1 (04/10/2026), un hook pre-commit lance
    `npm test` et bloque le commit s'il échoue — ne jamais le contourner ; si une capture
    datée (`packages/core/test/snapshots/`) diffère, c'est soit une régression à corriger,
