@@ -7,8 +7,10 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 
 À tenir à jour à chaque installation.
 - **Installé sur le S25** : v3.173.0, commit `28ca45d`, le 17/11/2026 à 18 h 06 (envoi des trois
-  écrans à la montre). **Appli de la montre (Galaxy Watch 7) : construite, pas encore installée**
-  (débogage sans fil à activer par Yoann, puis `release.mjs install-montre`).
+  écrans à la montre).
+- **Installé sur la montre (Galaxy Watch 7, SM-L310, Wear OS 6)** : appli `wear` v3.173.0, commit
+  `8b04a78`, le 17/11/2026 à 18 h 19, sans fil (`release.mjs install-montre`). `adb` doit être démarré
+  depuis le Terminal de macOS : lancé depuis l'app Claude, macOS lui bloque le réseau local.
 - **Git** : `dev` en avance sur `origin/dev` (commits de la montre du 17/11/2026 non poussés), dossier propre, aucune autre branche
   de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à
   la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
@@ -26,8 +28,8 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
   Tous les exercices des séances ont leur démonstration. Sans démonstration : curls poignets,
   rowing machine à disques (hors séances). Reste : l'avis de Yoann sur les gestes.
 - **Chantier en cours : montre** (section du 17/11/2026 de `docs/journal/2026-11.md`) : Bord, Journal et
-  Dépense en lecture seule sur la Galaxy Watch 7 (module `android/wear`). Reste : installer sur la
-  montre, puis essai réel (réception, balayage, pas relus toutes les 30 min).
+  Dépense en lecture seule sur la Galaxy Watch 7 (module `android/wear`). Installé et vérifié par
+  captures. Reste : l'avis de Yoann au poignet, et la relecture des pas des 30 min, pas encore observée.
 - **Côté appli JEFFREY** (dépôt `jeffrey-app`, dont le journal fait foi) : récepteur du signal de
   record installé et validé en réel le 13/11/2026 ; fin d'exercice et compte rendu (v3.172.0) : contrat
   `docs/suivi-jeffrey/2026-11-17-fin-exercice-compte-rendu.md`, partie JEFFREY à coder ; jeton des gestes de séance installé le
