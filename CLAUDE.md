@@ -6,15 +6,16 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 ## État courant (14/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.172.0, commit `ee1a90f`, le 17/11/2026 à 11 h 48 (fin d'exercice et
-  compte rendu dits par JEFFREY, séances rouvertes comprises, annonce redite).
-- **Git** : `dev` = `origin/dev` (poussé le 17/11/2026 à 11 h 50), dossier propre, aucune autre branche
+- **Installé sur le S25** : v3.173.0, commit `28ca45d`, le 17/11/2026 à 18 h 06 (envoi des trois
+  écrans à la montre). **Appli de la montre (Galaxy Watch 7) : construite, pas encore installée**
+  (débogage sans fil à activer par Yoann, puis `release.mjs install-montre`).
+- **Git** : `dev` en avance sur `origin/dev` (commits de la montre du 17/11/2026 non poussés), dossier propre, aucune autre branche
   de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à
   la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
   `avant-campagne-audit`, `apres-lot1-audit`, `apres-lot2-audit`, `avant-jetons-gestes`. APK
   précédents : `~/Documents/protocole-sauvegardes/` (hors Git).
-- **Tests** : 373 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
+- **Tests** : 384 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
 - **Chantiers** : tous ceux de `ROADMAP.md` sont livrés (V, R, S, T, U, J). La campagne d'audit du
   10/11/2026 est faite (lots 1 à 3). Ce qui reste ouvert est dans « Reportés à la fin de la
   campagne » (`docs/journal/2026-11.md`).
@@ -24,6 +25,9 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
   Étape 3 (poulies et machines) installée en v3.167.0 ; échauffement basket installé en v3.168.0.
   Tous les exercices des séances ont leur démonstration. Sans démonstration : curls poignets,
   rowing machine à disques (hors séances). Reste : l'avis de Yoann sur les gestes.
+- **Chantier en cours : montre** (section du 17/11/2026 de `docs/journal/2026-11.md`) : Bord, Journal et
+  Dépense en lecture seule sur la Galaxy Watch 7 (module `android/wear`). Reste : installer sur la
+  montre, puis essai réel (réception, balayage, pas relus toutes les 30 min).
 - **Côté appli JEFFREY** (dépôt `jeffrey-app`, dont le journal fait foi) : récepteur du signal de
   record installé et validé en réel le 13/11/2026 ; fin d'exercice et compte rendu (v3.172.0) : contrat
   `docs/suivi-jeffrey/2026-11-17-fin-exercice-compte-rendu.md`, partie JEFFREY à coder ; jeton des gestes de séance installé le
