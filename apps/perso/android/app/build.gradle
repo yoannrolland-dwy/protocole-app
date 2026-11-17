@@ -40,7 +40,13 @@ dependencies {
     // Lecteur natif Health Connect (macros complètes : kcal + P/G/L/fibres + eau)
     implementation 'androidx.health.connect:connect-client:1.1.0'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0'
+    // Montre (17/11/2026) : couche de données Wear OS, pour publier l'instantané (WatchBridge.kt).
+    // Même version que le module `wear`.
+    implementation 'com.google.android.gms:play-services-wearable:19.0.0'
     testImplementation "junit:junit:$junitVersion"
+    // Tests seulement (17/11/2026) : le vrai org.json, celui d'Android n'existe pas hors du téléphone
+    // (WatchSyncUnitTest, relecture des pas pour la montre). N'entre pas dans l'APK.
+    testImplementation 'org.json:json:20250517'
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')

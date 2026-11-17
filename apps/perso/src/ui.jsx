@@ -27,24 +27,9 @@ export { lastN, daysBetween, fmtHM } from "@rawcare/core/dateUtils";
 export { T, COLORS } from "./design/tokens.js";
 
 /* ---------- jetons de design (v1, en cours de remplacement) ---------- */
-export const C = {
-  bg: "#050505",
-  card: "#121212",
-  border: "#2a2a2a",
-  borderDim: "#232323",
-  divider: "#1c1c1c",
-  accent: "#d7ff3f",
-  accentRow: "#0d1000",
-  text: "#f5f5f0",
-  text2: "#8a8a84",
-  muted: "#6b6b66",
-  dim: "#4a4a46",
-  danger: "#ff3b30",
-  dangerBg: "#1a0e0c",
-  dangerBorder: "#4a1c14",
-  dangerText: "#cc9999",
-  mono: "ui-monospace, Menlo, Monaco, monospace",
-};
+// Valeurs dans design/colorsV1.js depuis le 17/11/2026 (inchangées), pour les tests Node.
+import { C } from "./design/colorsV1.js";
+export { C };
 
 /* ============================================================
    PRIMITIVES UI (design "Affirmée")

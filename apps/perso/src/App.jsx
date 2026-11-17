@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
-import { store, getSync, STORAGE_ERROR_EVENT } from "./store.js";
-import { scheduleBackupReminder } from "./cloudBackup.js";
+import { store, getSync, STORAGE_ERROR_EVENT, STORAGE_SAVED_EVENT } from "./store.js";
+import { scheduleBackupReminder, isBackupStale, daysSinceBackup } from "./cloudBackup.js";
 import { computeEnergyScore, scoreLabel } from "@rawcare/core/energy";
 import { PHASES, DEFAULT_TARGETS, targetsForDate, kcalFromMacros, kcalOfEntry, buildKcalByDate, weightTrend7, recompWindows } from "@rawcare/core/targets";
 import { recommendTargets, palierWeekOf, loggedRateLastDays } from "@rawcare/core/palier";
@@ -15,6 +15,8 @@ import { JeffreyOverlay } from "./components/JeffreyOverlay.jsx";
 import { syncHealthConnect } from "./healthSync.js";
 import { mergeSteps, mergeSleep, mergeWeight, mergeRhr, mergeNaps } from "@rawcare/core/healthMerge";
 import { updateDashboardWidget, consumeWidgetTab } from "./widgetSync.js";
+import { updateWatch } from "./watchSync.js";
+import { buildWatchSnapshot } from "./lib/watchSnapshot.js";
 import { runAutoBackup } from "./autoBackup.js";
 import { C, today, shiftDateKey, fmt, round, longDate, byDate, upsert, lastN, fmtHM } from "./ui.jsx";
 import { Empty } from "./design/compat.jsx"; // « Chargement… » en gris lisible v2
@@ -127,6 +129,9 @@ export default function App({ silent = false } = {}) {
   // revérification au retour au premier plan (la semaine a pu changer entre-temps).
   const [palierWeekly, setPalierWeekly] = useState(null);
   const [palierTick, setPalierTick] = useState(0);
+  // Montre (17/11/2026) : force un nouvel envoi à la montre (retour au premier plan, journal
+  // alimentaire enregistré par l'onglet Nutrition). Voir l'effet « Montre » plus bas.
+  const [watchTick, setWatchTick] = useState(0);
   const [apiKey, setApiKeyState] = useState("");
   const [model, setModelState] = useState("claude-sonnet-5-5");
   // Fournisseur IA (26/10/2026) : "anthropic" (direct, défaut) ou "litellm" (serveur de Yoann).
@@ -394,7 +399,7 @@ export default function App({ silent = false } = {}) {
     if (!Capacitor.isNativePlatform()) return;
     // Une réponse depuis la notification (J4.3) ou une action de JEFFREY (G3) a pu écrire pendant
     // que l'app dormait : relue AVANT la synchro Health Connect, qui part de l'état en mémoire.
-    const handle = CapacitorApp.addListener("resume", () => { reloadExternal(); runHealthSync(); doAutoBackup(); setPalierTick((t) => t + 1); openWidgetTab(); setBriefTick((t) => t + 1); setServerBackupTick((t) => t + 1); notePosition(); });
+    const handle = CapacitorApp.addListener("resume", () => { reloadExternal(); runHealthSync(); doAutoBackup(); setPalierTick((t) => t + 1); openWidgetTab(); setBriefTick((t) => t + 1); setServerBackupTick((t) => t + 1); notePosition(); setWatchTick((t) => t + 1); });
     return () => { handle.then((h) => h.remove()); };
   }, []);
 
@@ -458,6 +463,35 @@ export default function App({ silent = false } = {}) {
     // `rhr` : le score d'énergie en dépend ; sans lui, le widget gardait l'ancien score quand seule la
     // FC repos changeait à la synchro (audit du 10/11/2026, point 15).
   }, [loading, weight, sleep, macros, steps, training, targets, naps, rhr]);
+
+  // Montre (Galaxy Watch, 17/11/2026) : Bord, Nutrition › Journal et Analyse › Dépense, calculés ici
+  // avec les mêmes fonctions que les écrans (lib/watchSnapshot.js) puis poussés à la montre
+  // (watchSync.js). Envoi à l'ouverture, au retour au premier plan et à chaque saisie ; 1,5 s
+  // d'attente pour grouper les écritures en rafale (synchro Health Connect, plusieurs aliments).
+  // Les pas sont en plus relus toutes les 30 min par le natif, app fermée (WatchBridgePlugin.kt).
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const WATCH_KEYS = ["foodLog", "foodOverrides"];
+    const onSaved = (e) => { if (WATCH_KEYS.includes(e.detail?.key)) setWatchTick((t) => t + 1); };
+    window.addEventListener(STORAGE_SAVED_EVENT, onSaved);
+    return () => window.removeEventListener(STORAGE_SAVED_EVENT, onSaved);
+  }, []);
+  useEffect(() => {
+    if (loading || !Capacitor.isNativePlatform()) return;
+    const id = setTimeout(() => {
+      try {
+        updateWatch(buildWatchSnapshot({
+          weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, basketSchedule,
+          palier: palierWeekly, foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}),
+          backup: { stale: isBackupStale(lastOffPhone), days: lastOffPhone ? daysSinceBackup(lastOffPhone) : null, last: lastOffPhone },
+        }));
+      } catch (e) {
+        // Un calcul qui échoue ne doit jamais gêner l'app : la montre garde le dernier instantané.
+        console.log("montre : " + (e?.message || e));
+      }
+    }, 1500);
+    return () => clearTimeout(id);
+  }, [loading, weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, basketSchedule, palierWeekly, lastOffPhone, watchTick]);
 
   const save = {
     weight: (v) => { setWeight(v); store.set("weightLog", v); },

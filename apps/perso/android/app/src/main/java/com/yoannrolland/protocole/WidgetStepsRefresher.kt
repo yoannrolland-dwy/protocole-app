@@ -51,12 +51,13 @@ object WidgetStepsRefresher {
         hc.features.getFeatureStatus(HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_IN_BACKGROUND) ==
             HealthConnectFeatures.FEATURE_STATUS_AVAILABLE
 
-    /** Relit les pas du jour et met le widget à jour. Faux si rien n'a été écrit. */
-    suspend fun refresh(context: Context): Boolean {
-        val hc = client(context) ?: return false
-        if (!backgroundSupported(hc)) return false
+    /** Pas du jour relus dans Health Connect, ou null si la lecture en arrière-plan n'est pas
+     *  permise. Sortie de refresh() le 17/11/2026 pour servir aussi à la montre (WatchBridge.kt). */
+    suspend fun readTodaySteps(context: Context): Int? {
+        val hc = client(context) ?: return null
+        if (!backgroundSupported(hc)) return null
         val granted = hc.permissionController.getGrantedPermissions()
-        if (!granted.containsAll(setOf(STEPS_PERMISSION, BACKGROUND_PERMISSION))) return false
+        if (!granted.containsAll(setOf(STEPS_PERMISSION, BACKGROUND_PERMISSION))) return null
 
         val zone = ZoneId.systemDefault()
         val todayDate = LocalDate.now(zone)
@@ -78,7 +79,13 @@ object WidgetStepsRefresher {
             }
             pageToken = resp.pageToken
         } while (!pageToken.isNullOrEmpty())
-        val steps = (bySource.values.maxOrNull() ?: 0L).toInt()
+        return (bySource.values.maxOrNull() ?: 0L).toInt()
+    }
+
+    /** Relit les pas du jour et met le widget à jour. Faux si rien n'a été écrit. */
+    suspend fun refresh(context: Context): Boolean {
+        val steps = readTodaySteps(context) ?: return false
+        val zone = ZoneId.systemDefault()
 
         // Mêmes règles que l'instantané JS (App.jsx) : chiffre blanc tant que la cible n'est pas
         // atteinte, bleu ensuite ; barre citron en cours, bleue une fois la cible atteinte.

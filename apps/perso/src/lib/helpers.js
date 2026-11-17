@@ -1,6 +1,8 @@
 // Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) : code déplacé tel quel.
 import { phaseTarget as phaseTargetCore } from "@rawcare/core/targets";
-import { C, today, daysBetween } from "../ui.jsx";
+// Imports directs (17/11/2026) plutôt que via ui.jsx : mêmes objets, mais lisibles par les tests Node.
+import { today, daysBetween } from "@rawcare/core/dateUtils";
+import { C } from "../design/colorsV1.js";
 import { COLORS } from "../design/tokens.js";
 
 // Courbe des protéines du graphique hebdo (09/10/2026) : ambre déjà utilisé ailleurs dans l'app

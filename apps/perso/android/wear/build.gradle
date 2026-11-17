@@ -1,0 +1,49 @@
+// Appli PROTOCOLE pour la montre (Galaxy Watch 7, Wear OS), 17/11/2026. Lecture seule : elle
+// affiche l'instantané que le téléphone publie sur la couche de données Wear OS (voir
+// app/.../WatchBridge.kt et src/lib/watchSnapshot.js) et ne calcule rien.
+//
+// Même `applicationId` que l'app du téléphone, et même clé de signature (la clé de débogage du Mac,
+// comme le téléphone) : sans ces deux conditions, la couche de données ne relie pas les deux applis.
+apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
+
+android {
+    namespace = "com.yoannrolland.protocole.wear"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.yoannrolland.protocole"
+        // Wear OS 3 et plus (la Galaxy Watch 7 est en Wear OS 5 ou plus).
+        minSdkVersion 30
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+    }
+    buildFeatures {
+        compose true
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+    }
+}
+
+dependencies {
+    implementation "androidx.activity:activity-compose:$androidxActivityVersion"
+    implementation 'androidx.wear.compose:compose-foundation:1.6.2'
+    implementation 'androidx.wear.compose:compose-material3:1.6.2'
+    // Couche de données Wear OS : même version que l'app du téléphone.
+    implementation 'com.google.android.gms:play-services-wearable:19.0.0'
+    testImplementation "junit:junit:$junitVersion"
+}

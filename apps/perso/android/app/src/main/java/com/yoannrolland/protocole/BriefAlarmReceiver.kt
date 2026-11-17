@@ -21,6 +21,8 @@ class BriefBootReceiver : BroadcastReceiver() {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             BriefScheduler.cancel(context)
             BackupScheduler.scheduleNext(context)
+            // Montre (17/11/2026) : la relecture des pas des 30 min ne survit pas à un redémarrage.
+            WatchSync.scheduleStepsRefresh(context)
         }
     }
 }

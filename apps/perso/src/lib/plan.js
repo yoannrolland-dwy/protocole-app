@@ -1,5 +1,5 @@
 // Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) : code déplacé tel quel.
-import { today, shiftDateKey } from "../ui.jsx";
+import { today, shiftDateKey } from "@rawcare/core/dateUtils"; // direct (17/11/2026) : lisible par les tests Node
 
 // Planning hebdomadaire idéal (01/09/2026) — affiché à titre de référence dans l'onglet TDEE,
 // jamais lu par le recommandeur ni le Coach IA : c'est un repère pour Yoann, pas une règle

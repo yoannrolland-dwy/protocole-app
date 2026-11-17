@@ -12,6 +12,8 @@ buildscript {
         // Kotlin : requis par le lecteur natif Health Connect (HealthNutritionPlugin).
         // Version alignée sur celle du plugin @capgo/capacitor-health.
         classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.10'
+        // Compose (écrans de l'appli montre, module `wear`, 17/11/2026) : même version que Kotlin.
+        classpath 'org.jetbrains.kotlin:compose-compiler-gradle-plugin:2.4.10'
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files

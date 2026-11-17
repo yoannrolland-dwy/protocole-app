@@ -9,13 +9,14 @@ import { isBackupStale, daysSinceBackup } from "../../cloudBackup.js";
 import { TEMPLATES } from "@rawcare/core/session/templates";
 import { computeEnergyScore, scoreLabel } from "@rawcare/core/energy";
 import { computeFreeInsights } from "@rawcare/core/insights";
-import { PHASES, targetsForDate, kcalFromMacros, kcalOfEntry, tdeeNow, weightTrend7 } from "@rawcare/core/targets";
+import { PHASES, targetsForDate, kcalFromMacros, kcalOfEntry, tdeeNow } from "@rawcare/core/targets";
 import { nextSessions } from "@rawcare/core/nextSession";
-import { today, fmt, round, lastN, fmtHM } from "../../ui.jsx";
+import { today, fmt } from "../../ui.jsx";
 import { T, COLORS } from "../../design/tokens.js";
 import { progressColor } from "../../lib/progress.js";
 import { Panel, Eyebrow, Button } from "../../design/primitives.jsx";
-import { phaseTarget, recompTrendColor, scoreColor, STEPS_TARGET } from "../../lib/helpers.js";
+import { scoreColor, STEPS_TARGET } from "../../lib/helpers.js";
+import { weightView, nightNote as nightNoteOf } from "../../lib/bordView.js";
 import { KneeQuickLog } from "./KneeQuickLog.jsx";
 import { WhyNot } from "./WhyNot.jsx";
 import { InsightsCard } from "./InsightsCard.jsx";
@@ -52,14 +53,11 @@ function Tile({ label, value, unit, note, extra, bar, barColor, onClick, big = f
 }
 
 export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targets, training, phase, setTab, lastCloudBackup, openSettings, basketSchedule, planFor, palier, onApplyPalier, saveKnee, onStart, jeffreyEntries, onOpenJeffrey, briefWaiting, onBriefNow }) {
-  const tgtW = phaseTarget(phase, targets);
-  const wLast = lastN(weight, 1)[0];
-  const wDelta = wLast && tgtW != null ? round(wLast.kg - tgtW) : null;
   // Recomposition (chantier R) : pas de poids cible, la tuile montre la moyenne 7 j et son
-  // delta hebdo à la place (même calcul que l'onglet Poids et le Coach IA).
-  const wTrend = tgtW == null ? weightTrend7(weight, today()) : null;
+  // delta hebdo à la place (même calcul que l'onglet Poids et le Coach IA). Textes et couleurs
+  // dans lib/bordView.js depuis le 17/11/2026, partagés avec la montre.
+  const wv = weightView(weight, phase, targets, today());
 
-  const lastNightDash = lastN(sleep, 1)[0];
   const energy = useMemo(() => computeEnergyScore(today(), { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps }), [rhr, sleep, steps, naps]);
 
   const mToday = macros.find((m) => m.date === today());
@@ -97,17 +95,8 @@ export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targe
     [training, weight, macros, sleep, rhr, steps, knee, targets, tdeeForInsights, kcalTgt]
   );
 
-  // Poids : delta à la cible (sèche/prise) ou tendance hebdo (recomposition).
-  // Recomposition (05/10/2026) : ±0,3 kg/sem = attendu (citron), au-delà dans un sens ou
-  // l'autre = ambre (perte trop rapide → muscle à risque ; prise nette → gras/eau), jamais
-  // rouge — mêmes seuils que le moteur Palier (R3). La logique sèche (prise = rouge) ne
-  // s'applique qu'avec un poids cible.
-  const wExtra = wDelta != null ? { txt: `${wDelta > 0 ? "▲" : "▼"} ${Math.abs(wDelta)} kg de la cible`, col: wDelta > 0 ? T.c.danger : T.c.accent }
-    : wTrend?.deltaWeek != null ? { txt: `${wTrend.deltaWeek > 0 ? "▲" : "▼"} ${Math.abs(wTrend.deltaWeek)} kg/sem`, col: recompTrendColor(wTrend.deltaWeek) }
-    : null;
-  const nightNote = lastNightDash
-    ? `nuit ${fmtHM(lastNightDash.hours)}${lastNightDash.quality != null ? " · " + "★".repeat(lastNightDash.quality) : ""}${lastNightDash.date !== today() ? ` (${fmt(lastNightDash.date)})` : ""}`
-    : "nuit non synchronisée";
+  // Poids : delta à la cible (sèche/prise) ou tendance hebdo (recomposition), voir weightView.
+  const nightNote = nightNoteOf(sleep, today());
   const top = suggestions[0];
 
   return (
@@ -140,10 +129,10 @@ export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targe
           note={energy.status === "ok" ? nightNote : "pas assez de données"} />
         {/* La PESÉE est la valeur principale, la moyenne 7 j passe en note (25/10/2026, demande de
             Yoann : « la pesée du jour doit être primordiale »). */}
-        <Tile big label={wLast && wLast.date !== today() ? `Poids · ${fmt(wLast.date)}` : "Poids"} onClick={() => setTab("weight")}
-          value={wLast ? wLast.kg : "—"} unit="kg"
-          extra={wExtra}
-          note={tgtW != null ? `cible ${tgtW} kg` : `moy. 7 j ${wTrend?.avg7 ?? "—"} kg`} />
+        <Tile big label={wv.label} onClick={() => setTab("weight")}
+          value={wv.value} unit="kg"
+          extra={wv.extra}
+          note={wv.note} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
         {/* Couleurs d'avancement partagées (lib/progress.js) : calories orange/rouge au-delà de la

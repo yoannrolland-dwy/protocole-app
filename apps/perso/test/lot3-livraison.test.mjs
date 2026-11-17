@@ -35,7 +35,8 @@ test("livraison : l'installation n'accepte que l'APK de la construction réussie
 test("livraison : chaque étape arrête la chaîne à la première erreur, le manifeste s'écrit en dernier", () => {
   const s = src("../scripts/release.mjs");
   assert.match(s, /execFileSync\(cmd, args, \{ cwd, env, stdio: "inherit" \}\)/); // lève sur code ≠ 0
-  const b = s.slice(s.indexOf("function build()"), s.indexOf("function install()"));
+  // « function install( » : depuis le 17/11/2026 elle prend l'appareil visé (téléphone ou montre).
+  const b = s.slice(s.indexOf("function build()"), s.indexOf("function install("));
   // Tests JS puis tests unitaires Android avant la construction de l'APK ; manifeste en dernier.
   const order = ["buildProblems", "rmSync(MANIFEST", '"test"', '"build", "--workspace=apps/perso"', '"cap", "sync"', '"testDebugUnitTest"', '"assembleDebug"', "writeFileSync(MANIFEST"]
     .map((k) => b.indexOf(k));
@@ -43,7 +44,7 @@ test("livraison : chaque étape arrête la chaîne à la première erreur, le ma
   assert.deepEqual([...order].sort((x, y) => x - y), order);
   // Chemins depuis la racine du dépôt, quel que soit le dossier courant (cause de l'incident).
   assert.match(s, /const ROOT = join\(dirname\(fileURLToPath\(import\.meta\.url\)\), "\.\.", "\.\.", "\.\."\)/);
-  const i = s.slice(s.indexOf("function install()"));
+  const i = s.slice(s.indexOf("function install("));
   assert.ok(i.indexOf("installProblems") < i.indexOf('"install", "-r"'));
   assert.doesNotMatch(s, /"uninstall"|"-d"|pm clear/);
 });

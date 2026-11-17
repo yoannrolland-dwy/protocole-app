@@ -14,6 +14,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(RestTimerPlugin.class);
         // Pont vers le widget d'écran d'accueil (voir WidgetBridgePlugin.kt)
         registerPlugin(WidgetBridgePlugin.class);
+        // Montre (Galaxy Watch, 17/11/2026) : instantané des 3 écrans publié pour la montre (voir WatchBridge.kt)
+        registerPlugin(WatchBridgePlugin.class);
         // Relais HTTP en flux vers LiteLLM pour Jeffrey (voir JeffreyHttpPlugin.kt)
         registerPlugin(JeffreyHttpPlugin.class);
         // Brief du matin : réveils et notification Jeffrey (voir BriefPlugin.kt, BriefRunner.kt)

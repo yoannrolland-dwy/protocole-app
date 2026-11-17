@@ -1,4 +1,6 @@
 include ':app'
+// Appli de la montre (Galaxy Watch, Wear OS), 17/11/2026 : voir wear/build.gradle.
+include ':wear'
 include ':capacitor-cordova-android-plugins'
 project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')
 

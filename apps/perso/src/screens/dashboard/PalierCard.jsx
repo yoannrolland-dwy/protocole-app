@@ -1,24 +1,23 @@
 // Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; v2 à l'étape 4 d'U3.
-import { kcalFromMacros } from "@rawcare/core/targets";
 import { fmt } from "../../ui.jsx";
 import { T } from "../../design/tokens.js";
 import { Panel, Eyebrow, Button } from "../../design/primitives.jsx";
+import { palierView, palierMacroLine } from "../../lib/bordView.js";
 
 // « Palier de la semaine » (chantier R, R3, 02/10/2026) : la proposition figée de la semaine
 // (voir l'effet dédié dans `App`), ses raisons chiffrées, et le bouton « Appliquer » — un tap
 // écrit les cibles via `save.targets` (source "palier") et date `appliedAt`. Un `hold` n'a pas
 // de bouton. Visible seulement en phase Recomposition ET s'il y a une proposition (U3 étape 4 :
 // l'attente « première proposition dimanche » n'occupe plus le tableau de bord).
-const PALIER_COLOR = { up: T.c.accent, down: T.c.warn, hold: T.c.text2 };
 const mono = { fontFamily: T.f.num, fontVariantNumeric: "tabular-nums" };
 export function PalierCard({ palier, targets, onApply }) {
-  const r = palier?.result;
-  if (!r) return null;
-  const cur = { protein: targets.protein, carbs: targets.carbs, fat: targets.fat, fiber: targets.fiber, kcal: Math.round(kcalFromMacros(targets.protein, targets.carbs, targets.fat, targets.fiber)) };
-  const p = r.proposed;
-  const alreadyInPlace = p && ["protein", "carbs", "fat", "fiber"].every((k) => cur[k] === p[k]);
-  const verdict = r.action === "up" ? `+${r.deltaKcal} kcal/j` : r.action === "down" ? `−${Math.abs(r.deltaKcal)} kcal/j` : "Maintenir";
-  const macroLine = (t) => `${t.kcal} kcal · ${t.protein} P / ${t.carbs} G / ${t.fat} L / ${t.fiber} F`;
+  // Verdict, couleurs et macros calculés dans lib/bordView.js (17/11/2026), partagés avec la montre.
+  const v = palierView(palier, targets);
+  if (!v) return null;
+  const r = palier.result;
+  const { cur, alreadyInPlace, verdict } = v;
+  const p = v.proposed;
+  const macroLine = palierMacroLine;
   return (
     <Panel aria-label="Palier de la semaine">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
@@ -26,7 +25,7 @@ export function PalierCard({ palier, targets, onApply }) {
         <span style={{ ...mono, fontSize: 13, color: T.c.text2 }}>semaine du {fmt(palier.weekOf)}</span>
       </div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <span style={{ ...mono, fontSize: 24, fontWeight: 700, color: PALIER_COLOR[r.action] }}>{verdict}</span>
+        <span style={{ ...mono, fontSize: 24, fontWeight: 700, color: v.color }}>{verdict}</span>
         {r.blocked && <span className="p-label">en attente</span>}
       </div>
       <div style={{ display: "grid", gap: 4 }}>

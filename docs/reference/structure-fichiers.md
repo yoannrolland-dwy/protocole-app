@@ -86,6 +86,9 @@ protocole-app/                    (racine = workspaces npm uniquement)
           RestTimerPlugin.kt, RestAlarmReceiver.kt  # minuteur de repos, réveil, voix
           DashboardWidgetProvider.kt, WidgetBridgePlugin.kt,
           WidgetStepsRefresher.kt   # widget d'écran d'accueil
+          WatchBridge.kt            # montre : publie l'instantané, relit les pas (30 min)
+        wear/                       # appli de la montre (Wear OS, Compose), lecture seule,
+                                    # même identifiant et même clé que le téléphone
   docs/                            # maquettes (refonte-ihm), prompts et comptes rendus
                                     # (sauvegarde-oracle), archive RawCare (archive/rawcare)
 ```

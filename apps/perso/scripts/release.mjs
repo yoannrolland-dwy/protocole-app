@@ -5,6 +5,8 @@
 //   node apps/perso/scripts/release.mjs build    tests JS → build → synchro Capacitor →
 //                                                tests unitaires Android → Gradle
 //   node apps/perso/scripts/release.mjs install  adb install -r de l'APK construit, puis vérification
+//   node apps/perso/scripts/release.mjs install-montre   même chose pour l'appli de la montre
+//                                                (module `wear`, débogage sans fil, 17/11/2026)
 //
 // `build` s'arrête à la PREMIÈRE erreur (chaque étape lève une exception sur un code de sortie non
 // nul) et refuse un arbre avec des fichiers non commités. Une fois tout réussi, il écrit à côté de
@@ -18,12 +20,15 @@ import { readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
-import { buildProblems, installProblems, installedMatches } from "./releaseCheck.mjs";
+import { buildProblems, installProblems, installedMatches, pickDevice, readySerials } from "./releaseCheck.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const APP = join(ROOT, "apps", "perso");
 const APK = join(APP, "android", "app", "build", "outputs", "apk", "debug", "app-debug.apk");
 const MANIFEST = join(dirname(APK), "release.json");
+// Appli de la montre (17/11/2026) : construite par le même `assembleDebug`, son empreinte est notée
+// dans le même manifeste (`wearApkSha256`).
+const WEAR_APK = join(APP, "android", "wear", "build", "outputs", "apk", "debug", "wear-debug.apk");
 const env = {
   ...process.env,
   ANDROID_HOME: process.env.ANDROID_HOME || "/opt/homebrew/share/android-commandlinetools",
@@ -57,27 +62,48 @@ function build() {
   const v = version();
   const apkSha256 = sha(APK);
   if (!apkSha256) stop(["APK absent après Gradle"]);
-  const manifest = { commit, version: v, apkSha256, builtAt: new Date().toISOString() };
+  const wearApkSha256 = sha(WEAR_APK);
+  if (!wearApkSha256) stop(["APK de la montre absent après Gradle"]);
+  const manifest = { commit, version: v, apkSha256, wearApkSha256, builtAt: new Date().toISOString() };
   writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2));
   console.log(`\n✔ APK prêt : v${v}, commit ${commit.slice(0, 7)}, empreinte ${apkSha256.slice(0, 16)}`);
 }
 
-function install() {
-  const manifest = existsSync(MANIFEST) ? JSON.parse(readFileSync(MANIFEST, "utf8")) : null;
-  const p = installProblems({ manifest, head: head(), dirty: dirty(), apkSha256: sha(APK), version: version() });
+// Appareil visé : le téléphone ou la montre, désigné par son numéro de série (`-s`), sinon adb
+// refuse dès que les deux sont connectés.
+function device(want) {
+  const devices = readySerials(out("adb", ["devices"])).map((serial) => ({
+    serial,
+    characteristics: (() => { try { return out("adb", ["-s", serial, "shell", "getprop", "ro.build.characteristics"]); } catch { return ""; } })(),
+  }));
+  const { serial, problems } = pickDevice(devices, want);
+  if (problems.length) stop(problems);
+  return serial;
+}
+
+// `want` = "phone" (APK du téléphone) ou "watch" (APK de la montre, même identifiant d'appli).
+function install(want = "phone") {
+  const raw = existsSync(MANIFEST) ? JSON.parse(readFileSync(MANIFEST, "utf8")) : null;
+  const watch = want === "watch";
+  const apk = watch ? WEAR_APK : APK;
+  // Pour la montre, l'empreinte de référence est celle de son APK (`wearApkSha256`).
+  const manifest = raw && watch ? { ...raw, apkSha256: raw.wearApkSha256 } : raw;
+  const p = installProblems({ manifest, head: head(), dirty: dirty(), apkSha256: sha(apk), version: version() });
   if (p.length) stop(p);
-  if (!/\tdevice$/m.test(out("adb", ["devices"]))) stop(["téléphone non branché ou non autorisé"]);
-  run("adb", ["install", "-r", APK]); // jamais de désinstallation, jamais -d
-  const path = out("adb", ["shell", "pm", "path", "com.yoannrolland.protocole"]).replace(/^package:/, "").trim();
+  const s = device(want);
+  run("adb", ["-s", s, "install", "-r", apk]); // jamais de désinstallation, jamais -d
+  const path = out("adb", ["-s", s, "shell", "pm", "path", "com.yoannrolland.protocole"]).replace(/^package:/, "").trim();
   const copy = join(tmpdir(), `protocole-installe-${Date.now()}.apk`);
-  run("adb", ["pull", path, copy]);
+  run("adb", ["-s", s, "pull", path, copy]);
   const installedSha256 = sha(copy);
   rmSync(copy, { force: true });
-  if (!installedMatches({ manifest, installedSha256 })) stop(["l'APK en place sur le téléphone n'est pas celui construit"]);
-  console.log(`\n✔ Installé : v${manifest.version}, commit ${manifest.commit.slice(0, 7)}, empreinte vérifiée sur le téléphone`);
+  const where = watch ? "la montre" : "le téléphone";
+  if (!installedMatches({ manifest, installedSha256 })) stop([`l'APK en place sur ${where} n'est pas celui construit`]);
+  console.log(`\n✔ Installé : v${manifest.version}, commit ${manifest.commit.slice(0, 7)}, empreinte vérifiée sur ${where}`);
 }
 
 const cmd = process.argv[2];
 if (cmd === "build") build();
-else if (cmd === "install") install();
-else stop(["commande attendue : build ou install"]);
+else if (cmd === "install") install("phone");
+else if (cmd === "install-montre") install("watch");
+else stop(["commande attendue : build, install ou install-montre"]);

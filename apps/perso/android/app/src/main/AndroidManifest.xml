@@ -58,6 +58,12 @@
                 android:resource="@xml/dashboard_widget_info" />
         </receiver>
 
+        <!-- Montre (17/11/2026) : relecture des pas toutes les 30 min pour la montre, app fermée
+             (WatchBridge.kt). Non exporté : seul le réveil de l'app l'appelle. -->
+        <receiver
+            android:name=".WatchStepsReceiver"
+            android:exported="false" />
+
         <!-- Brief du matin de Jeffrey (J4.1) : réveil exact → page sans écran (BriefRunner.kt).
              Le second récepteur remet le réveil après un redémarrage ou une mise à jour. -->
         <receiver

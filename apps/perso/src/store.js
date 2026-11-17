@@ -21,6 +21,10 @@ export function getSync(key, fallback) {
 // Désormais l'échec est retenu (`storageError`) et annoncé par cet événement, que l'app affiche
 // en bandeau. `set` rend `true` si la valeur est bien écrite, `false` sinon.
 export const STORAGE_ERROR_EVENT = "protocole:storage-error";
+// Écriture réussie (17/11/2026) : `detail.key` = la clé écrite. Sert à la montre (watchSync,
+// App.jsx) : le journal alimentaire est écrit par l'onglet Nutrition sans passer par l'état d'App,
+// et déplacer un aliment d'un repas à l'autre ne change aucun total. Annonce seulement, ne bloque rien.
+export const STORAGE_SAVED_EVENT = "protocole:saved";
 let lastError = null;
 // Après une restauration (`importData`), plus rien n'est écrit jusqu'au rechargement de la page :
 // l'état React encore en mémoire (synchro Health Connect, effets d'enregistrement) réécrirait
@@ -86,7 +90,15 @@ export const store = {
     if (raw === undefined) {
       try { localStorage.removeItem(PREFIX + key); return true; } catch { return false; }
     }
-    return writeRaw(key, raw);
+    const ok = writeRaw(key, raw);
+    if (ok) {
+      try {
+        if (typeof window !== "undefined" && typeof CustomEvent === "function") {
+          window.dispatchEvent(new CustomEvent(STORAGE_SAVED_EVENT, { detail: { key } }));
+        }
+      } catch { /* l'annonce ne doit jamais faire échouer l'appelant */ }
+    }
+    return ok;
   },
   async del(key) {
     if (storageFrozen()) return false;

@@ -150,3 +150,4 @@ Une ligne par section, dans l'ordre des dates. Chercher ici d'abord, puis ouvrir
 - Séance : sous-onglet Force, liste de Progrès regroupée par muscle (14/11/2026, apps/perso v3.170.0)
 - Fin d'exercice et compte rendu de séance dits par JEFFREY (17/11/2026, apps/perso v3.171.0)
 - Fin d'exercice : séances rouvertes et annonce redite (17/11/2026, apps/perso v3.172.0)
+- Appli PROTOCOLE sur la montre Galaxy Watch 7 : Bord, Journal, Dépense en lecture seule (17/11/2026, apps/perso v3.173.0)
