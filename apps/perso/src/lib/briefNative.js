@@ -36,6 +36,17 @@ export async function signalRecord(payload) {
   try { return (await Brief.signalRecord({ json: JSON.stringify(payload) })).sent === true; } catch (e) { console.warn("brief", e); return false; }
 }
 
+/** Fin d'exercice et compte rendu (17/11/2026) → { sent, raison } ; hors natif : { sent: false }. */
+export async function signalExercise(payload) {
+  if (!native()) return { sent: false, raison: "web" };
+  try { return await Brief.signalExercise({ json: JSON.stringify(payload) }); } catch (e) { console.warn("brief", e); return { sent: false, raison: "erreur" }; }
+}
+
+export async function signalSession(payload) {
+  if (!native()) return { sent: false, raison: "web" };
+  try { return await Brief.signalSession({ json: JSON.stringify(payload) }); } catch (e) { console.warn("brief", e); return { sent: false, raison: "erreur" }; }
+}
+
 export async function signalJeffrey({ date, manque }) {
   if (!native()) return false;
   try { return (await Brief.signalJeffrey({ json: JSON.stringify({ date, manque }) })).sent === true; } catch (e) { console.warn("brief", e); return false; }

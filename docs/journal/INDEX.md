@@ -148,3 +148,4 @@ Une ligne par section, dans l'ordre des dates. Chercher ici d'abord, puis ouvrir
 - Démonstrations 3D : échauffement basket (13/11/2026, apps/perso v3.168.0)
 - Plateau à format égal, historique détaillé dans le carnet, score de force (14/11/2026, apps/perso v3.169.0)
 - Séance : sous-onglet Force, liste de Progrès regroupée par muscle (14/11/2026, apps/perso v3.170.0)
+- Fin d'exercice et compte rendu de séance dits par JEFFREY (17/11/2026, apps/perso v3.171.0)

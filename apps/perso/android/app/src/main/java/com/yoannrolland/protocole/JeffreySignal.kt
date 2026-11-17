@@ -73,30 +73,42 @@ object JeffreySignal {
     const val ACTION_RECORD = "fr.yrolland.jeffrey.action.PROTOCOLE_RECORD"
     private const val RECORD_RECEIVER = "fr.yrolland.jeffrey.protocole.RecordSignalReceiver"
 
-    private fun recordIntent(json: String) = Intent(ACTION_RECORD)
+    // Fin d'exercice et compte rendu de séance (17/11/2026, cadrage TENDANCE_EXERCICE_COMPTE_RENDU) :
+    // mêmes règles que le record (casque, permission, diffusion explicite).
+    const val ACTION_EXERCISE = "fr.yrolland.jeffrey.action.PROTOCOLE_EXERCICE"
+    private const val EXERCISE_RECEIVER = "fr.yrolland.jeffrey.protocole.ExerciseSignalReceiver"
+    const val ACTION_SESSION = "fr.yrolland.jeffrey.action.PROTOCOLE_SEANCE"
+    private const val SESSION_RECEIVER = "fr.yrolland.jeffrey.protocole.SessionSignalReceiver"
+
+    private fun signalIntent(action: String, receiver: String, json: String) = Intent(action)
         .setPackage(JEFFREY)
-        .setComponent(ComponentName(JEFFREY, RECORD_RECEIVER))
+        .setComponent(ComponentName(JEFFREY, receiver))
         .putExtra("json", json)
 
     /**
-     * → "envoye", ou la raison de ne pas envoyer : "sans_casque", "jeffrey_absent". Le casque est
-     * vérifié ici, au moment même : sans lui, JEFFREY n'est pas réveillé du tout.
+     * → "envoye", ou la raison de ne pas envoyer : "sans_casque", "jeffrey_absent" (appli absente,
+     * permission refusée ou récepteur pas encore installé). Le casque est vérifié ici, au moment
+     * même : sans lui, JEFFREY n'est pas réveillé du tout.
      */
-    fun sendRecord(context: Context, json: String): String {
+    private fun send(context: Context, action: String, receiver: String, json: String, label: String): String {
         if (Headset.connected(context) == null) return "sans_casque"
         val pm = context.packageManager
         val installed = try { pm.getPackageInfo(JEFFREY, 0); true } catch (e: PackageManager.NameNotFoundException) { false }
         if (!installed || context.checkSelfPermission(PERMISSION) != PackageManager.PERMISSION_GRANTED ||
-            pm.queryBroadcastReceivers(recordIntent("{}"), 0).isEmpty()) return "jeffrey_absent"
+            pm.queryBroadcastReceivers(signalIntent(action, receiver, "{}"), 0).isEmpty()) return "jeffrey_absent"
         return try {
-            context.sendBroadcast(recordIntent(json))
-            Log.i(TAG, "record signalé à JEFFREY")
+            context.sendBroadcast(signalIntent(action, receiver, json))
+            Log.i(TAG, "$label signalé à JEFFREY")
             "envoye"
         } catch (e: Exception) {
-            Log.w(TAG, "signal de record refusé : ${e.javaClass.simpleName}")
+            Log.w(TAG, "signal ($label) refusé : ${e.javaClass.simpleName}")
             "jeffrey_absent"
         }
     }
+
+    fun sendRecord(context: Context, json: String): String = send(context, ACTION_RECORD, RECORD_RECEIVER, json, "record")
+    fun sendExercise(context: Context, json: String): String = send(context, ACTION_EXERCISE, EXERCISE_RECEIVER, json, "fin d'exercice")
+    fun sendSession(context: Context, json: String): String = send(context, ACTION_SESSION, SESSION_RECEIVER, json, "compte rendu")
 
     private fun checkIntent(context: Context, flags: Int) = PendingIntent.getBroadcast(
         context, REQ, Intent(context, BriefSignalCheckReceiver::class.java), flags or PendingIntent.FLAG_IMMUTABLE,

@@ -19,6 +19,7 @@ import { TEMPLATES } from "./templates.js";
 import { metaFor } from "./exoMeta.js";
 import { buildExercises, currentSet, recordSetIndexes, doneExercises, sessionRecord, spokenName } from "./engine.js";
 import { exerciseSessions, recordToBeat, progressiveOverloadSuggestion, painOutOfBase } from "../training.js";
+import { exerciseEnd, sessionReport, elapsedMinutes } from "./exerciseEnd.js";
 
 const fail = (raison, extra = {}) => ({ ok: false, raison, ...extra });
 const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -170,12 +171,18 @@ export function logSet(d, p, ctx) {
   const ref = painRed ? null : recordToBeat(ctx.training || [], e.nom, editedOf(d, ctx));
   const record = !!ref && recordSetIndexes(exos[cur.ei], ref).has(cur.si);
   const plateau = firstOfExercise ? plateauOf(e.nom, d, ctx) : null;
-  const draft = { ...d, exos, courant, voix: { last: { ei: cur.ei, si: cur.si, before } } };
+  // Fin d'exercice (17/11/2026) : tendance quand la dernière série est notée, une seule fois par
+  // exercice (`finAnnonces`). Record sur cette même série : il est dit DANS la phrase de fin.
+  const announced = d.finAnnonces || [];
+  const fin = exerciseEnd({ exos, ei: cur.ei, si: cur.si, ref, training: ctx.training || [], date: d.date,
+    exclude: d.editingId ? editedOf(d, ctx) ?? { id: d.editingId } : null, painRed, announced, rand: ctx.rand });
+  const draft = { ...d, exos, courant, voix: { last: { ei: cur.ei, si: cur.si, before } },
+    ...(fin ? { finAnnonces: [...announced, fin.exercice] } : {}) };
   // Exercice sans repos prévu (échauffement basket) : on ne dit pas « repos 0 secondes ».
   const restSecs = Number(e.rest) > 0 ? Number(e.rest) : 0;
   const phrase = `${where(exos, cur)} notée, ${setWords(exos[cur.ei], after)}${restSecs ? `, repos ${restText(restSecs)}` : ""}.`
-    + (record ? " Record battu, Monsieur." : "") + (plateau ? ` ${plateau}` : "");
-  return { ok: true, draft, ei: cur.ei, si: cur.si, restSecs, phrase, record, plateau };
+    + (record && !fin?.record ? " Record battu, Monsieur." : "") + (plateau ? ` ${plateau}` : "");
+  return { ok: true, draft, ei: cur.ei, si: cur.si, restSecs, phrase, record, plateau, ...(fin ? { finExercice: fin } : {}) };
 }
 
 /** « Annule » : la dernière série notée à la voix revient comme avant. */
@@ -263,7 +270,7 @@ export function restAction(d, action, now) {
  * Fin de séance : vérifie et décrit (résumé relu, puis « oui »). Basket : la durée et l'effort
  * sont demandés d'abord (`besoin`). → { ok, record, resume, question } ou un refus.
  */
-export function finishCheck(d, p, { nowMs }) {
+export function finishCheck(d, p, { nowMs, training = [], knee = [], today = null, rand } = {}) {
   if (!isSession(d)) return fail("aucune séance en cours dans PROTOCOLE");
   const sets = countSets(d.exos);
   if (!sets) return fail("aucune série n'est faite : rien à enregistrer. Pour arrêter sans rien garder : annuler_seance");
@@ -284,8 +291,13 @@ export function finishCheck(d, p, { nowMs }) {
   const counts = `${n} exercice${n > 1 ? "s" : ""}, ${sets} série${sets > 1 ? "s" : ""} faite${sets > 1 ? "s" : ""}`;
   const metaText = meta ? `, ${duration} min, effort ${rpe} sur 10` : "";
   const record = sessionRecord({ id: d.editingId ?? `${d.date}-${d.type}-${nowMs}`, date: d.date, type: d.type, start: d.start, duration, rpe, exos: d.exos });
+  // Compte rendu (17/11/2026) : séance du jour seulement, jamais une séance passée modifiée.
+  const compteRendu = !d.editingId && (!today || d.date === today)
+    ? sessionReport({ type: d.type, exos: d.exos, training, date: d.date, painRed: painOutOfBase([knee], d.date),
+      minutes: meta ? duration : elapsedMinutes(d.start, nowMs), rand })
+    : null;
   return {
-    ok: true, record, editingId: d.editingId ?? null,
+    ok: true, record, editingId: d.editingId ?? null, ...(compteRendu ? { compteRendu } : {}),
     resume: `Enregistrer la séance ${d.type} : ${counts}${metaText}`,
     question: `Dois-je enregistrer la séance ${d.type}, Monsieur ? ${cap(counts)}${metaText}.`,
   };

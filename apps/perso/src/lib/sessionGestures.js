@@ -108,6 +108,9 @@ function writeGesture(action, p, r, now) {
   const out = { fait: true, resume: r.phrase };
   if (r.record) out.record = true;
   if (r.plateau) out.plateau = r.plateau;
+  // Fin d'exercice (17/11/2026) : JEFFREY dit `resume`, puis `fin_exercice.phrase`. Si
+  // `fin_exercice.record` est là, le record est déjà dans cette phrase : pas de compliment en plus.
+  if (r.finExercice) out.fin_exercice = r.finExercice;
   draft = markJeffreyRest(draft, action);
   writeDraft(draft);
   if (action === "noter_serie" || action === "annuler_serie" || action === "repos") nativeRest(draft.rest);

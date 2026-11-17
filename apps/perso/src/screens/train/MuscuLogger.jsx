@@ -28,7 +28,8 @@ import { ExoNote } from "./ExoNote.jsx";
 import { hasDemo } from "../../demo/demos.js";
 import { DemoViewer } from "../../demo/DemoViewer.jsx";
 import { recordPayload, firstTime } from "../../lib/recordSignal.js";
-import { signalRecord } from "../../lib/briefNative.js";
+import { signalRecord, signalExercise, signalSession } from "../../lib/briefNative.js";
+import { exerciseEnd, sessionReport, elapsedMinutes } from "@rawcare/core/session/exerciseEnd";
 
 const mono = { fontFamily: T.f.num, fontVariantNumeric: "tabular-nums" };
 const WARN = T.c.warn;
@@ -170,9 +171,22 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
     const after = toggleSet(base, ei, si);
     mutate(() => after);
     // Record battu à l'écran → JEFFREY félicite, casque branché seulement (13/11/2026).
+    // Fin d'exercice (17/11/2026) : dernière série cochée → tendance dite par JEFFREY, une seule fois
+    // par exercice (`finAnnonces` du brouillon), séance du jour seulement. Record sur cette même
+    // série : une seule phrase, dans le signal de fin d'exercice (pas de signal « record » en plus,
+    // sauf si JEFFREY n'a pas encore le récepteur de fin d'exercice).
     if (!base[ei].series[si].fait) {
       const p = recordPayload({ after, ei, si, ref: refRecords[base[ei].nom], painRed, date });
-      if (p && firstTime(p)) signalRecord(p);
+      const announced = readDraft()?.finAnnonces || [];
+      const fin = !initial && date === today()
+        ? exerciseEnd({ exos: after, ei, si, ref: painRed ? null : refRecords[base[ei].nom], training, date, painRed, announced })
+        : null;
+      if (fin) {
+        patchDraft({ finAnnonces: [...announced, fin.exercice] });
+        const rec = fin.record && p && firstTime(p) ? p : null;
+        signalExercise({ date, ...fin }).then((r) => { if (rec && !r?.sent && r?.raison === "jeffrey_absent") signalRecord(rec); });
+        if (!fin.record && p && firstTime(p)) signalRecord(p);
+      } else if (p && firstTime(p)) signalRecord(p);
     }
     // coche = fin de série → relance le minuteur sur le dernier temps utilisé pour cet exercice (fin de série uniquement, pas décoche)
     if (!base[ei].series[si].fait) {
@@ -224,6 +238,12 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
 
   const validate = () => {
     const final = currentExos();
+    // Compte rendu dit par JEFFREY (17/11/2026), casque branché : séance du jour, jamais une
+    // séance passée modifiée. Historique d'avant l'enregistrement (`training`).
+    if (!initial && date === today()) {
+      const minutes = TEMPLATES[type]?.withMeta ? Number(duration) || null : elapsedMinutes(start, Date.now());
+      signalSession({ date, type, ...sessionReport({ type, exos: final, training, date, painRed, minutes }) });
+    }
     store.set("trainingDraft", null);
     restTimer.stop();
     onSave(sessionRecord({ id: initial?.id ?? `${date}-${type}-${Date.now()}`, date, type, start, duration, rpe, exos: final }));

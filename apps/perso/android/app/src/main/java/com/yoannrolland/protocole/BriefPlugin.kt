@@ -59,6 +59,22 @@ class BriefPlugin : Plugin() {
         call.resolve(JSObject().put("sent", r == "envoye").put("raison", r))
     }
 
+    /** Fin d'exercice cochée à l'écran (17/11/2026) → { sent, raison }. */
+    @PluginMethod
+    fun signalExercise(call: PluginCall) {
+        val json = call.getString("json") ?: return call.reject("json manquant")
+        val r = JeffreySignal.sendExercise(context, json)
+        call.resolve(JSObject().put("sent", r == "envoye").put("raison", r))
+    }
+
+    /** Compte rendu de séance à l'enregistrement (17/11/2026) → { sent, raison }. */
+    @PluginMethod
+    fun signalSession(call: PluginCall) {
+        val json = call.getString("json") ?: return call.reject("json manquant")
+        val r = JeffreySignal.sendSession(context, json)
+        call.resolve(JSObject().put("sent", r == "envoye").put("raison", r))
+    }
+
     @PluginMethod
     fun isEnabled(call: PluginCall) {
         call.resolve(JSObject().put("enabled", BriefScheduler.enabled(context)))

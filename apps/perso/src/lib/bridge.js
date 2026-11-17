@@ -153,7 +153,8 @@ export async function runAgir(args, { now = Date.now(), ctx = agirContext() } = 
   const res = await check();
   if (!res.ok) return { fait: false, raison: res.raison };
   if (res.resume !== p.resume) return { fait: false, raison: `les données ont changé depuis la relecture ; relisez à Monsieur : ${res.resume}` };
-  if (res.apply) { res.apply(); return { fait: true, resume: res.done }; }
+  // `compte_rendu` (17/11/2026) : JEFFREY dit `compte_rendu.phrase` à la place de `resume`.
+  if (res.apply) { res.apply(); return { fait: true, resume: res.done, ...(res.compteRendu ? { compte_rendu: res.compteRendu } : {}) }; }
   const change = applyActionStored(res.act);
   const out = { fait: true, resume: doneSummary(res.act, change) };
   // G4-A : séance démarrée → JEFFREY ouvre PROTOCOLE (le service ne peut pas lancer une activité
@@ -181,10 +182,12 @@ const SESSION_CONFIRM = new Set(["terminer_seance", "annuler_seance"]);
 function sessionConfirmCheck(action, p, now) {
   const d = readDraft();
   if (action === "terminer_seance") {
-    const r = finishCheck(d, p, { nowMs: now });
+    // Compte rendu (17/11/2026) : calculé avec l'historique AVANT l'enregistrement de la séance.
+    const r = finishCheck(d, p, { nowMs: now, training: getSync("trainingLog", []), knee: getSync("kneeLog", []), today: today() });
     if (!r.ok) return r;
     return {
       ok: true, resume: r.resume, question: r.question, done: `Séance ${d.type} enregistrée, Monsieur.`,
+      ...(r.compteRendu ? { compteRendu: r.compteRendu } : {}),
       apply: () => {
         const log = getSync("trainingLog", []);
         const next = r.editingId ? log.map((t) => (t.id === r.editingId ? r.record : t)) : [...log, r.record];
