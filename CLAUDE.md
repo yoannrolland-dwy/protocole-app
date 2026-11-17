@@ -6,18 +6,18 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 ## État courant (14/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.173.0, commit `28ca45d`, le 17/11/2026 à 18 h 06 (envoi des trois
-  écrans à la montre).
-- **Installé sur la montre (Galaxy Watch 7, SM-L310, Wear OS 6)** : appli `wear` v3.173.0, commit
-  `8b04a78`, le 17/11/2026 à 18 h 19, sans fil (`release.mjs install-montre`). `adb` doit être démarré
+- **Installé sur le S25** : v3.174.0, commit `8dbd7bb`, le 17/11/2026 à 18 h 32 (envoi des trois
+  écrans et des trois cartes à la montre).
+- **Installé sur la montre (Galaxy Watch 7, SM-L310, Wear OS 6)** : appli `wear` v3.174.0, commit
+  `8dbd7bb`, le 17/11/2026 à 18 h 33, sans fil (`release.mjs install-montre`). `adb` doit être démarré
   depuis le Terminal de macOS : lancé depuis l'app Claude, macOS lui bloque le réseau local.
-- **Git** : `dev` = `origin/dev` (poussé le 17/11/2026 à 18 h 23), dossier propre, aucune autre branche
+- **Git** : `dev` = `origin/dev` (poussé le 17/11/2026 à 18 h 35), dossier propre, aucune autre branche
   de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à
   la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
   `avant-campagne-audit`, `apres-lot1-audit`, `apres-lot2-audit`, `avant-jetons-gestes`. APK
   précédents : `~/Documents/protocole-sauvegardes/` (hors Git).
-- **Tests** : 384 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
+- **Tests** : 385 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
 - **Chantiers** : tous ceux de `ROADMAP.md` sont livrés (V, R, S, T, U, J). La campagne d'audit du
   10/11/2026 est faite (lots 1 à 3). Ce qui reste ouvert est dans « Reportés à la fin de la
   campagne » (`docs/journal/2026-11.md`).
@@ -27,9 +27,10 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
   Étape 3 (poulies et machines) installée en v3.167.0 ; échauffement basket installé en v3.168.0.
   Tous les exercices des séances ont leur démonstration. Sans démonstration : curls poignets,
   rowing machine à disques (hors séances). Reste : l'avis de Yoann sur les gestes.
-- **Chantier en cours : montre** (section du 17/11/2026 de `docs/journal/2026-11.md`) : Bord, Journal et
-  Dépense en lecture seule sur la Galaxy Watch 7 (module `android/wear`). Installé et vérifié par
-  captures. Reste : l'avis de Yoann au poignet, et la relecture des pas des 30 min, pas encore observée.
+- **Chantier en cours : montre** (sections du 17/11/2026 de `docs/journal/2026-11.md`) : Bord, Journal et
+  Dépense en lecture seule sur la Galaxy Watch 7 (module `android/wear`), en appli et en trois cartes
+  à côté du cadran. Installé et vérifié par captures. Reste : l'avis de Yoann au poignet, et la
+  relecture des pas des 30 min, pas encore observée.
 - **Côté appli JEFFREY** (dépôt `jeffrey-app`, dont le journal fait foi) : récepteur du signal de
   record installé et validé en réel le 13/11/2026 ; fin d'exercice et compte rendu (v3.172.0) : contrat
   `docs/suivi-jeffrey/2026-11-17-fin-exercice-compte-rendu.md`, partie JEFFREY à coder ; jeton des gestes de séance installé le
