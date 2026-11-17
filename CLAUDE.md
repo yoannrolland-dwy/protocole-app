@@ -11,7 +11,7 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 - **Installé sur la montre (Galaxy Watch 7, SM-L310, Wear OS 6)** : appli `wear` v3.173.0, commit
   `8b04a78`, le 17/11/2026 à 18 h 19, sans fil (`release.mjs install-montre`). `adb` doit être démarré
   depuis le Terminal de macOS : lancé depuis l'app Claude, macOS lui bloque le réseau local.
-- **Git** : `dev` en avance sur `origin/dev` (commits de la montre du 17/11/2026 non poussés), dossier propre, aucune autre branche
+- **Git** : `dev` = `origin/dev` (poussé le 17/11/2026 à 18 h 23), dossier propre, aucune autre branche
   de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à
   la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
