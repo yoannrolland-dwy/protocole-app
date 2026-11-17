@@ -14,7 +14,9 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
   `avant-campagne-audit`, `apres-lot1-audit`, `apres-lot2-audit`, `avant-jetons-gestes`. APK
   précédents : `~/Documents/protocole-sauvegardes/` (hors Git).
-- **Tests** : 366 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
+- **Prêt, pas encore installé** : v3.172.0 (fin d'exercice dans les séances rouvertes, annonce
+  redite ; `docs/journal/2026-11.md`).
+- **Tests** : 373 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
 - **Chantiers** : tous ceux de `ROADMAP.md` sont livrés (V, R, S, T, U, J). La campagne d'audit du
   10/11/2026 est faite (lots 1 à 3). Ce qui reste ouvert est dans « Reportés à la fin de la
   campagne » (`docs/journal/2026-11.md`).

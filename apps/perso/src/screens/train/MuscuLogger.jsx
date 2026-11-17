@@ -171,18 +171,14 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
     const after = toggleSet(base, ei, si);
     mutate(() => after);
     // Record battu à l'écran → JEFFREY félicite, casque branché seulement (13/11/2026).
-    // Fin d'exercice (17/11/2026) : dernière série cochée → tendance dite par JEFFREY, une seule fois
-    // par exercice (`finAnnonces` du brouillon), séance du jour seulement. Record sur cette même
-    // série : une seule phrase, dans le signal de fin d'exercice (pas de signal « record » en plus,
-    // sauf si JEFFREY n'a pas encore le récepteur de fin d'exercice).
+    // Fin d'exercice (17/11/2026) : dernière série cochée → tendance dite par JEFFREY, chaque fois que
+    // l'exercice redevient complet, séance rouverte comprise (retour d'essai de Yoann). Record sur
+    // cette même série : une seule phrase, dans le signal de fin d'exercice (pas de signal « record »
+    // en plus, sauf si JEFFREY n'a pas encore le récepteur de fin d'exercice).
     if (!base[ei].series[si].fait) {
       const p = recordPayload({ after, ei, si, ref: refRecords[base[ei].nom], painRed, date });
-      const announced = readDraft()?.finAnnonces || [];
-      const fin = !initial && date === today()
-        ? exerciseEnd({ exos: after, ei, si, ref: painRed ? null : refRecords[base[ei].nom], training, date, painRed, announced })
-        : null;
+      const fin = exerciseEnd({ exos: after, ei, si, ref: painRed ? null : refRecords[base[ei].nom], training, date, exclude: initial, painRed });
       if (fin) {
-        patchDraft({ finAnnonces: [...announced, fin.exercice] });
         const rec = fin.record && p && firstTime(p) ? p : null;
         signalExercise({ date, ...fin }).then((r) => { if (rec && !r?.sent && r?.raison === "jeffrey_absent") signalRecord(rec); });
         if (!fin.record && p && firstTime(p)) signalRecord(p);
@@ -238,11 +234,11 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
 
   const validate = () => {
     const final = currentExos();
-    // Compte rendu dit par JEFFREY (17/11/2026), casque branché : séance du jour, jamais une
-    // séance passée modifiée. Historique d'avant l'enregistrement (`training`).
-    if (!initial && date === today()) {
-      const minutes = TEMPLATES[type]?.withMeta ? Number(duration) || null : elapsedMinutes(start, Date.now());
-      signalSession({ date, type, ...sessionReport({ type, exos: final, training, date, painRed, minutes }) });
+    // Compte rendu dit par JEFFREY (17/11/2026), casque branché, séance rouverte comprise (sans
+    // durée : seule l'heure de début est connue). Historique d'avant l'enregistrement (`training`).
+    {
+      const minutes = TEMPLATES[type]?.withMeta ? Number(duration) || null : initial ? null : elapsedMinutes(start, Date.now());
+      signalSession({ date, type, ...sessionReport({ type, exos: final, training, exclude: initial, date, painRed, minutes }) });
     }
     store.set("trainingDraft", null);
     restTimer.stop();

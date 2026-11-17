@@ -2,7 +2,7 @@
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import { exerciseEnd, exerciseEndPhrase, sessionReport, elapsedMinutes, trendWithToday } from "../src/session/exerciseEnd.js";
-import { newSessionDraft, logSet, finishCheck } from "../src/session/voiceSession.js";
+import { newSessionDraft, logSet, finishCheck, undoLastSet } from "../src/session/voiceSession.js";
 import { fixClock, T0, d } from "./_helpers.mjs";
 
 before(() => fixClock());
@@ -23,13 +23,60 @@ test("fin d'exercice : seulement quand toutes les séries sont faites", () => {
   assert.ok(!r.record);
 });
 
-test("fin d'exercice : stable, première fois ; jamais deux fois, jamais genou hors base, jamais séance modifiée", () => {
+test("fin d'exercice : stable, première fois ; jamais genou hors base (scénario 15)", () => {
   const same = [ex([S(34, 10), S(34, 10), S(34, 9), S(34, 9)])];
   assert.equal(exerciseEnd({ exos: same, ei: 0, si: 3, training, date: T0 }).tendance, "stable");
   assert.equal(exerciseEnd({ exos: same, ei: 0, si: 3, training: [], date: T0 }).tendance, "premiere");
-  assert.equal(exerciseEnd({ exos: same, ei: 0, si: 3, training, date: T0, announced: [NOM] }), null, "série ajoutée après la fin");
   assert.equal(exerciseEnd({ exos: same, ei: 0, si: 3, training, date: T0, painRed: true }), null);
-  assert.equal(exerciseEnd({ exos: same, ei: 0, si: 3, training, date: T0, exclude: training[0] }), null);
+});
+
+// ---------- Retour d'essai de Yoann (17/11/2026) : scénarios du cadrage §12 où PROTOCOLE décide
+const full = (last = S(34, 9)) => [ex([S(34, 10), S(34, 10), S(34, 10), last])];
+
+test("scénarios 4 et 5 : dernière série décochée = silence ; recochée = phrase de nouveau", () => {
+  const unchecked = full(S(34, 9, false));
+  assert.equal(exerciseEnd({ exos: unchecked, ei: 0, si: 3, training, date: T0 }), null, "4 : décochée");
+  const a = exerciseEnd({ exos: full(), ei: 0, si: 3, training, date: T0 });
+  const b = exerciseEnd({ exos: full(), ei: 0, si: 3, training, date: T0 });
+  assert.ok(a && b, "5 : redite à chaque fois que l'exercice redevient complet");
+});
+
+test("scénario 6 : valeurs changées entre les deux, la phrase est recalculée", () => {
+  assert.equal(exerciseEnd({ exos: [ex([S(34, 10), S(34, 10), S(34, 9), S(34, 9)])], ei: 0, si: 3, training, date: T0 }).tendance, "stable");
+  assert.equal(exerciseEnd({ exos: full(S(34, 10)), ei: 0, si: 3, training, date: T0 }).tendance, "hausse");
+});
+
+test("scénarios 7 et 8 : série ajoutée après la fin puis cochée = phrase ; exercice quitté avant la fin = silence", () => {
+  const added = [ex([S(34, 10), S(34, 10), S(34, 10), S(34, 9), S(34, 8)])];
+  assert.ok(exerciseEnd({ exos: added, ei: 0, si: 4, training, date: T0 }), "7");
+  const left = [ex([S(34, 10), S(34, 10), S(34, 10, false), S(34, 9, false)])];
+  assert.equal(exerciseEnd({ exos: left, ei: 0, si: 1, training, date: T0 }), null, "8");
+});
+
+test("scénarios 9 et 10 : séance rouverte (du jour ou d'un autre jour) = phrase ; tendance jusqu'à sa date, elle exclue", () => {
+  const today = { id: "t", date: T0, type: "Upper A", exercices: [{ nom: NOM, mode: "reps", series: [S(34, 10), S(34, 10), S(34, 10), S(34, 10)] }] };
+  const r9 = exerciseEnd({ exos: full(), ei: 0, si: 3, training: [...training, today], date: T0, exclude: today });
+  assert.equal(r9.tendance, "hausse", "9 : comparée à la séance d'il y a 7 jours, pas à sa propre version enregistrée");
+  const old = { id: "o", date: d(7), type: "Upper A", exercices: training[0].exercices };
+  const before = past(14, [S(32, 10), S(32, 10), S(32, 10), S(32, 10)]);
+  const after = past(2, [S(40, 10), S(40, 10), S(40, 10), S(40, 10)]);
+  const r10 = exerciseEnd({ exos: [ex([S(34, 10), S(34, 10), S(34, 9), S(34, 9)])], ei: 0, si: 3, training: [before, old, after], date: d(7), exclude: old });
+  assert.equal(r10.tendance, "hausse", "10 : 34 kg contre 32 kg avant sa date ; la séance d'après (40 kg) est ignorée");
+});
+
+test("scénario 11 : record dans une séance rouverte, comparé à tout l'historique (comme l'étoile)", () => {
+  const old = { id: "o", date: d(7), type: "Upper A", exercices: training[0].exercices };
+  const r = exerciseEnd({ exos: full(S(36, 8)), ei: 0, si: 3, ref: { poids: 34, val: 10 }, training: [old], date: d(7), exclude: old, rand: first });
+  assert.deepEqual(r.record, { kg: 36, reps: 8 });
+  assert.match(r.phrase, /^Nouveau record/);
+});
+
+test("scénarios 12 et 13 : compte rendu pour la séance du jour et pour une séance rouverte (sans durée)", () => {
+  const old = { id: "o", date: d(7), type: "Upper A", exercices: training[0].exercices };
+  const r = sessionReport({ type: "Upper A", exos: full(), training: [old], exclude: old, date: d(7), minutes: null, rand: first });
+  assert.equal(r.hausse, 0, "la séance rouverte ne se compare pas à elle-même");
+  assert.equal(r.premiere, 1);
+  assert.equal(r.phrase, "Séance Upper A enregistrée, Monsieur : un exercice, quatre séries. Aucun exercice en hausse, aucun stable, aucun en baisse, un fait pour la première fois.");
 });
 
 test("record sur la dernière série : une seule phrase avec le record et la tendance", () => {
@@ -83,7 +130,7 @@ test("durée : depuis l'heure de début, null si absurde", () => {
   assert.equal(elapsedMinutes("07:00", new Date(2026, 9, 4, 7, 0).getTime()), null);
 });
 
-test("voix : la dernière série notée porte fin_exercice, une seule fois ; record dit une seule fois", () => {
+test("voix (scénarios 19 à 21) : fin_exercice à la dernière série, redite après « annule » ; record dit une seule fois", () => {
   const tr = [past(7, [S(30, 9), S(30, 8), S(30, 8), S(30, 8)])];
   const c = { training: tr, knee: [], now: Date.UTC(2026, 9, 4, 8), rand: first };
   let dr = newSessionDraft({ type: "Upper A", training: tr, hsrWeek: 9, date: T0, start: "07:00" });
@@ -97,12 +144,28 @@ test("voix : la dernière série notée porte fin_exercice, une seule fois ; rec
   assert.equal(last.finExercice.tendance, "hausse");
   assert.deepEqual(last.finExercice.record, { kg: 30, reps: 10 });
   assert.ok(!last.phrase.includes("Record battu"), "le record n'est dit qu'une fois, dans fin_exercice");
-  assert.deepEqual(last.draft.finAnnonces, [NOM]);
+  // Scénario 20 : série annulée puis notée de nouveau → phrase de nouveau, recalculée
+  const undone = undoLastSet(last.draft);
+  const again = logSet(undone.draft, { reps: 9, kg: 30 }, c);
+  assert.ok(again.finExercice, "redite après « annule »");
+  assert.ok(!again.finExercice.record, "recalculée : 30 × 9 n'est plus un record");
   // compte rendu à la fin de séance
-  const f = finishCheck(last.draft, {}, { nowMs: new Date(2026, 9, 4, 7, 40).getTime(), training: tr, knee: [], today: T0, rand: first });
+  const f = finishCheck(last.draft, {}, { nowMs: new Date(2026, 9, 4, 7, 40).getTime(), training: tr, knee: [], rand: first });
   assert.match(f.compteRendu.phrase, /^Séance Upper A enregistrée, Monsieur : un exercice, \w+ séries, 40 minutes\./);
-  // séance passée modifiée : pas de compte rendu
-  assert.ok(!finishCheck({ ...last.draft, editingId: "x" }, {}, { nowMs: 1, training: tr, today: T0 }).compteRendu);
+  // séance rouverte : compte rendu aussi, sans durée
+  const reopened = finishCheck({ ...last.draft, editingId: "p7" }, {}, { nowMs: new Date(2026, 9, 4, 7, 40).getTime(), training: tr, rand: first });
+  assert.ok(reopened.compteRendu && reopened.compteRendu.minutes === null);
+  assert.ok(!/minutes/.test(reopened.compteRendu.phrase));
+});
+
+test("voix, séance rouverte : la dernière série notée porte aussi fin_exercice", () => {
+  const tr = [past(7, [S(30, 9), S(30, 8), S(30, 8), S(30, 8)])];
+  const c = { training: tr, knee: [], now: Date.UTC(2026, 9, 4, 8), rand: first };
+  let dr = { ...newSessionDraft({ type: "Upper A", training: tr, hsrWeek: 9, date: d(7), start: "07:00" }), editingId: "p7" };
+  const n = dr.exos[0].series.length;
+  let r;
+  for (let i = 0; i < n; i++) { r = logSet(dr, { reps: 9, kg: 30 }, c); dr = r.draft; }
+  assert.equal(r.finExercice.tendance, "premiere", "la séance rouverte est exclue de sa propre comparaison");
 });
 
 test("tendance avec la séance du jour : même règle que l'écran Progrès", () => {

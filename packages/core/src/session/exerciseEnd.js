@@ -9,9 +9,15 @@
 // - compte rendu court (2 à 3 phrases) à la validation de la séance ;
 // - phrases fixes, plusieurs tournures, aucun appel au modèle ;
 // - genou hors base : ni tendance ni record (compte rendu réduit aux chiffres) ;
-// - exercice quitté avant la fin : rien ; série ajoutée après la fin : pas de seconde annonce
-//   (`finAnnonces` dans le brouillon) ; séance passée modifiée : rien ;
+// - exercice quitté avant la fin : rien ;
 // - compte rendu : un exercice non terminé compte dans les séries, pas dans les tendances.
+// Après le premier essai de Yoann (17/11/2026, remplace deux hypothèses du cadrage) :
+// - une séance ROUVERTE depuis l'historique (du jour ou d'un autre jour) parle comme une séance en
+//   cours ; sa tendance se compare aux séances jusqu'à sa date (elle-même exclue), ses records à
+//   tout l'historique (même règle que l'étoile du carnet), et son compte rendu ne dit pas de durée
+//   (seule l'heure de début est connue) ;
+// - l'annonce est redite CHAQUE fois que l'exercice redevient complet (décocher puis recocher, série
+//   ajoutée puis cochée), recalculée avec les valeurs du moment.
 
 import { exerciseSessions, recordToBeat, sessionTrend, doneSets, bestSet } from "../training.js";
 import { recordSetIndexes, spokenName, ofName } from "./engine.js";
@@ -89,12 +95,12 @@ export function exerciseEndPhrase({ nom, tendance, record = null, rand }) {
 /**
  * Annonce de fin d'exercice après qu'une série a été cochée (écran) ou notée (voix).
  * `exos` = exercices APRÈS la série ; `ei`/`si` = la série ; `ref` = record à battre (hors séance
- * en cours, null si le genou est hors base) ; `announced` = `finAnnonces` du brouillon.
+ * en cours, null si le genou est hors base) ; `exclude` = la séance rouverte (exclue de la tendance).
  * → null (rien à dire) ou { exercice, tendance, phrase, record?: { kg, reps | secondes, jambe? } }.
  */
-export function exerciseEnd({ exos, ei, si, ref = null, training = [], date, exclude = null, painRed = false, announced = [], rand }) {
+export function exerciseEnd({ exos, ei, si, ref = null, training = [], date, exclude = null, painRed = false, rand }) {
   const e = exos?.[ei];
-  if (painRed || exclude || !e || !exerciseComplete(e) || announced.includes(e.nom)) return null;
+  if (painRed || !e || !exerciseComplete(e)) return null;
   const tendance = trendWithToday(e, { training, date, exclude });
   if (!tendance) return null;
   const s = e.series[si];

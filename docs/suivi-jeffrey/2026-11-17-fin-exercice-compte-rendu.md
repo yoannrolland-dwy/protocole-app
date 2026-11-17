@@ -1,9 +1,26 @@
-# Fin d'exercice et compte rendu de séance : contrat implémenté dans PROTOCOLE (17/11/2026, v3.171.0)
+# Fin d'exercice et compte rendu de séance : contrat implémenté dans PROTOCOLE (17/11/2026, v3.171.0, revu en v3.172.0)
 
 Pour la session JEFFREY. Cadrage d'origine : `jeffrey-app/docs/cadrage/TENDANCE_EXERCICE_COMPTE_RENDU.md`.
 **État** : commité (`5206110`) et installé sur le S25 le 17/11/2026 à 11 h 27 (détail dans
 `docs/journal/2026-11.md`). Tant que JEFFREY n'a pas les deux nouveaux
 récepteurs, rien ne change pour lui (voir « Compatibilité »).
+
+## Revu après le premier essai de Yoann (17/11/2026, v3.172.0) — fait foi sur la suite
+
+Deux règles changées (cadrage §11), formats inchangés :
+- **Séance rouverte depuis l'historique** (du jour ou d'un autre jour) : elle parle comme une séance
+  en cours, à l'écran et à la voix : fin d'exercice, record, compte rendu. `date` = la date de la
+  séance (passée possible). Tendance : séances jusqu'à sa date, elle-même exclue. Record : comparé
+  à tout l'historique (même règle que l'étoile du carnet, choix de Yoann). Compte rendu : `minutes`
+  vaut `null` et la phrase ne dit pas de durée (seule l'heure de début est connue), sauf le Basket
+  (durée saisie).
+- **Annonce redite** chaque fois que l'exercice redevient complet : dernière série décochée puis
+  recochée, série ajoutée après la fin puis cochée, et à la voix série annulée puis notée de nouveau.
+  Recalculée avec les valeurs du moment. Décocher seul : rien. Le champ `finAnnonces` du brouillon
+  n'est plus utilisé.
+- Les points ci-dessous qui disent « séance du jour seulement », « jamais une séance passée
+  rouverte », « absent pour une séance passée modifiée » ou « série ajoutée après la fin → pas de
+  seconde annonce » sont remplacés par ces deux règles.
 
 ## Décisions de Yoann (17/11/2026)
 

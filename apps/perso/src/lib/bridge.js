@@ -183,7 +183,7 @@ function sessionConfirmCheck(action, p, now) {
   const d = readDraft();
   if (action === "terminer_seance") {
     // Compte rendu (17/11/2026) : calculé avec l'historique AVANT l'enregistrement de la séance.
-    const r = finishCheck(d, p, { nowMs: now, training: getSync("trainingLog", []), knee: getSync("kneeLog", []), today: today() });
+    const r = finishCheck(d, p, { nowMs: now, training: getSync("trainingLog", []), knee: getSync("kneeLog", []) });
     if (!r.ok) return r;
     return {
       ok: true, resume: r.resume, question: r.question, done: `Séance ${d.type} enregistrée, Monsieur.`,
