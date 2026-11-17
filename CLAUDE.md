@@ -6,16 +6,14 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 ## État courant (14/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.170.0, commit `4692a87`, le 14/11/2026 à 11 h 13 (sous-onglet Force,
-  Progrès par muscle ; v3.169.0 : plateau à format égal, historique du carnet, score de force).
-- **Git** : `dev` = `origin/dev` (poussé le 14/11/2026 à 11 h 15), dossier propre, aucune autre branche
+- **Installé sur le S25** : v3.171.0, commit `5206110`, le 17/11/2026 à 11 h 27 (fin d'exercice et
+  compte rendu dits par JEFFREY ; v3.170.0 : sous-onglet Force, Progrès par muscle).
+- **Git** : `dev` = `origin/dev` (poussé le 17/11/2026 à 11 h 30), dossier propre, aucune autre branche
   de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à
   la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
   `avant-campagne-audit`, `apres-lot1-audit`, `apres-lot2-audit`, `avant-jetons-gestes`. APK
   précédents : `~/Documents/protocole-sauvegardes/` (hors Git).
-- **Prêt, pas encore installé** : v3.171.0 (fin d'exercice et compte rendu dits par JEFFREY ;
-  `docs/journal/2026-11.md`, contrat `docs/suivi-jeffrey/2026-11-17-fin-exercice-compte-rendu.md`).
 - **Tests** : 366 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
 - **Chantiers** : tous ceux de `ROADMAP.md` sont livrés (V, R, S, T, U, J). La campagne d'audit du
   10/11/2026 est faite (lots 1 à 3). Ce qui reste ouvert est dans « Reportés à la fin de la
@@ -27,7 +25,8 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
   Tous les exercices des séances ont leur démonstration. Sans démonstration : curls poignets,
   rowing machine à disques (hors séances). Reste : l'avis de Yoann sur les gestes.
 - **Côté appli JEFFREY** (dépôt `jeffrey-app`, dont le journal fait foi) : récepteur du signal de
-  record installé et validé en réel le 13/11/2026 ; jeton des gestes de séance installé le
+  record installé et validé en réel le 13/11/2026 ; fin d'exercice et compte rendu (v3.171.0) : contrat
+  `docs/suivi-jeffrey/2026-11-17-fin-exercice-compte-rendu.md`, partie JEFFREY à coder ; jeton des gestes de séance installé le
   12/11/2026, pas encore validé sur le téléphone ; affichage en clair du code `restauration` :
   état à confirmer. Notes : `docs/suivi-jeffrey/`.
 - **Jamais essayé sur le téléphone** : voir les lignes « Pas vérifié » et « Pas essayé » des

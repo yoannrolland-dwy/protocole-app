@@ -1,8 +1,8 @@
 # Fin d'exercice et compte rendu de séance : contrat implémenté dans PROTOCOLE (17/11/2026, v3.171.0)
 
 Pour la session JEFFREY. Cadrage d'origine : `jeffrey-app/docs/cadrage/TENDANCE_EXERCICE_COMPTE_RENDU.md`.
-**État** : codé et testé dans PROTOCOLE, **pas encore commité ni installé** au moment d'écrire ces
-lignes (suite dans `docs/journal/2026-11.md`). Tant que JEFFREY n'a pas les deux nouveaux
+**État** : commité (`5206110`) et installé sur le S25 le 17/11/2026 à 11 h 27 (détail dans
+`docs/journal/2026-11.md`). Tant que JEFFREY n'a pas les deux nouveaux
 récepteurs, rien ne change pour lui (voir « Compatibilité »).
 
 ## Décisions de Yoann (17/11/2026)
