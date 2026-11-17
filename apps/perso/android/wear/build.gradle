@@ -43,6 +43,11 @@ dependencies {
     implementation "androidx.activity:activity-compose:$androidxActivityVersion"
     implementation 'androidx.wear.compose:compose-foundation:1.6.2'
     implementation 'androidx.wear.compose:compose-material3:1.6.2'
+    // Cartes de la montre (17/11/2026) : les écrans à côté du cadran (Tiles.kt). Guava : type de
+    // retour exigé par TileService (ListenableFuture).
+    implementation 'androidx.wear.tiles:tiles:1.5.0'
+    implementation 'androidx.wear.protolayout:protolayout:1.3.0'
+    implementation 'com.google.guava:guava:33.7.2-android'
     // Couche de données Wear OS : même version que l'app du téléphone.
     implementation 'com.google.android.gms:play-services-wearable:19.0.0'
     testImplementation "junit:junit:$junitVersion"

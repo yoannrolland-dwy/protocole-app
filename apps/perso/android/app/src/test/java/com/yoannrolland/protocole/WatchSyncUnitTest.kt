@@ -14,6 +14,9 @@ class WatchSyncUnitTest {
             .put(JSONObject().put("t", "tile").put("label", "Kcal").put("value", "400"))
             .put(JSONObject().put("t", "tile").put("id", "pas").put("count", count).put("target", 10000)
                 .put("value", "x").put("pct", 0).put("barCol", "#d7ff3f").put("valueCol", "#f5f5f0")))))
+        .put("cards", JSONObject().put("bord", JSONObject().put("rows", org.json.JSONArray()
+            .put(JSONObject().put("t", "pair"))
+            .put(JSONObject().put("t", "stat").put("id", "pas").put("count", count).put("target", 10000).put("value", "x")))))
         .toString()
 
     private fun pas(json: String) = JSONObject(json).getJSONArray("pages").getJSONObject(0).getJSONArray("items").getJSONObject(1)
@@ -26,6 +29,14 @@ class WatchSyncUnitTest {
         assertEquals("#d7ff3f", p.getString("barCol"))
         assertEquals("15:02", JSONObject(out).getString("stepsAt"))
         assertEquals("14:32", JSONObject(out).getString("at")) // l'heure du calcul complet ne bouge pas
+    }
+
+    @Test fun laCarteBordSuitLaTuile() {
+        val out = JSONObject(WatchSync.patchSteps(snapshot("2026-11-17", 4000), 6543, "2026-11-17", "15:02")!!)
+        val row = out.getJSONObject("cards").getJSONObject("bord").getJSONArray("rows").getJSONObject(1)
+        assertEquals(6543, row.getInt("count"))
+        assertEquals(65, row.getInt("pct"))
+        assertEquals(pas(out.toString()).getString("value"), row.getString("value"))
     }
 
     @Test fun objectifAtteintPasseEnBleu() {

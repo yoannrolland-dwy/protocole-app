@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.wear.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,13 +67,13 @@ private fun col(s: String?, fallback: Color): Color = try {
 private fun JSONObject.str(k: String): String? = if (has(k) && !isNull(k)) optString(k).ifEmpty { null } else null
 
 @Composable
-fun WatchApp(snapshot: Snapshot?) {
+fun WatchApp(snapshot: Snapshot?, wantedPage: Pair<String, Int>? = null) {
     MaterialTheme {
         Box(Modifier.fillMaxSize().background(BG)) {
             if (snapshot == null || snapshot.pages.isEmpty()) {
                 Waiting()
             } else {
-                Pages(snapshot)
+                Pages(snapshot, wantedPage)
             }
             TimeText()
         }
@@ -96,8 +97,13 @@ private fun Waiting() {
 }
 
 @Composable
-private fun Pages(s: Snapshot) {
+private fun Pages(s: Snapshot, wantedPage: Pair<String, Int>?) {
     val pagerState = rememberPagerState { s.pages.size }
+    // Toucher sur une carte : l'appli s'ouvre (ou revient) sur la page de cette carte.
+    LaunchedEffect(wantedPage) {
+        val i = s.pages.indexOfFirst { it.key == wantedPage?.first }
+        if (i >= 0) pagerState.scrollToPage(i)
+    }
     val (status, warn) = statusLine(s.date, s.at, s.stepsAt, LocalDate.now().toString(), s.version)
     Box(Modifier.fillMaxSize()) {
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { index ->

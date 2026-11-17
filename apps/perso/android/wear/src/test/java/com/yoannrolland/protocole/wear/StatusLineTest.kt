@@ -24,3 +24,15 @@ class StatusLineTest {
         assertEquals(true, statusLine("2026-11-17", "14:32", null, "2026-11-17", version = 2).second)
     }
 }
+
+class CardStatusTest {
+    @Test
+    fun carte_heureSeule() {
+        assertEquals("14:32" to false, cardStatus("2026-11-17", "14:32", "2026-11-17"))
+    }
+
+    @Test
+    fun carte_autreJour_avertitEnCourt() {
+        assertEquals("Chiffres du 16/11" to true, cardStatus("2026-11-16", "22:10", "2026-11-17"))
+    }
+}

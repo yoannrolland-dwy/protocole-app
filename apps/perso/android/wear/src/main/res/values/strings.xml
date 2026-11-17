@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">PROTOCOLE</string>
+    <string name="tile_bord">PROTOCOLE · Bord</string>
+    <string name="tile_journal">PROTOCOLE · Journal</string>
+    <string name="tile_depense">PROTOCOLE · Dépense</string>
 </resources>

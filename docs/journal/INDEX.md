@@ -151,3 +151,4 @@ Une ligne par section, dans l'ordre des dates. Chercher ici d'abord, puis ouvrir
 - Fin d'exercice et compte rendu de séance dits par JEFFREY (17/11/2026, apps/perso v3.171.0)
 - Fin d'exercice : séances rouvertes et annonce redite (17/11/2026, apps/perso v3.172.0)
 - Appli PROTOCOLE sur la montre Galaxy Watch 7 : Bord, Journal, Dépense en lecture seule (17/11/2026, apps/perso v3.173.0)
+- Montre : trois cartes à côté du cadran (Bord, Journal, Dépense) (17/11/2026, apps/perso v3.174.0)

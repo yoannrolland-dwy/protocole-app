@@ -1,6 +1,6 @@
 package com.yoannrolland.protocole.wear
 
-import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -20,16 +20,30 @@ import com.google.android.gms.wearable.Wearable
 class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     companion object {
-        const val PATH = "/protocole/snapshot"
-        private const val PREFS = "snapshot"
+        const val PATH = SnapshotStore.PATH
+        /** Page à ouvrir (« bord », « journal », « depense ») : posé par un toucher sur une carte. */
+        const val EXTRA_PAGE = "page"
     }
 
     private val snapshot = mutableStateOf<Snapshot?>(null)
+    // Page demandée par une carte, et un compteur pour que deux touchers de suite sur la même carte comptent.
+    private val wantedPage = mutableStateOf<Pair<String, Int>?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("json", null)?.let { snapshot.value = parseSnapshot(it) }
-        setContent { WatchApp(snapshot.value) }
+        snapshot.value = SnapshotStore.load(this)
+        readWantedPage(intent)
+        setContent { WatchApp(snapshot.value, wantedPage.value) }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        readWantedPage(intent)
+    }
+
+    private fun readWantedPage(intent: Intent?) {
+        val key = intent?.getStringExtra(EXTRA_PAGE) ?: return
+        wantedPage.value = key to ((wantedPage.value?.second ?: 0) + 1)
     }
 
     override fun onResume() {
@@ -65,8 +79,6 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
     }
 
     private fun accept(json: String) {
-        val s = parseSnapshot(json) ?: return
-        snapshot.value = s
-        getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("json", json).apply()
+        SnapshotStore.save(this, json)?.let { snapshot.value = it }
     }
 }

@@ -108,25 +108,32 @@ object WatchSync {
     fun patchSteps(json: String, steps: Int, today: String, at: String): String? {
         val o = JSONObject(json)
         if (o.optString("date") != today) return null
-        val pages = o.optJSONArray("pages") ?: return null
-        for (p in 0 until pages.length()) {
+        var changed = false
+        // La tuile de la page Bord…
+        val pages = o.optJSONArray("pages")
+        if (pages != null) for (p in 0 until pages.length()) {
             val items = pages.getJSONObject(p).optJSONArray("items") ?: continue
-            for (i in 0 until items.length()) {
-                val it = items.getJSONObject(i)
-                if (it.optString("id") != "pas") continue
-                if (it.optInt("count", -1) == steps) return null
-                val target = it.optInt("target", WidgetStepsRefresher.STEPS_TARGET)
-                val reached = steps >= target
-                it.put("count", steps)
-                it.put("value", NumberFormat.getIntegerInstance(Locale.FRANCE).format(steps))
-                it.put("pct", Math.round(steps * 100.0 / target).toInt().coerceIn(0, 100))
-                it.put("barCol", if (reached) OVER else ACCENT)
-                it.put("valueCol", if (reached) OVER else TEXT)
-                o.put("stepsAt", at)
-                return o.toString()
-            }
+            for (i in 0 until items.length()) if (patchStepsBlock(items.getJSONObject(i), steps)) changed = true
         }
-        return null
+        // … et la ligne Pas de la carte Bord (`cards.bord.rows`, même forme, 17/11/2026).
+        val rows = o.optJSONObject("cards")?.optJSONObject("bord")?.optJSONArray("rows")
+        if (rows != null) for (i in 0 until rows.length()) if (patchStepsBlock(rows.getJSONObject(i), steps)) changed = true
+        if (!changed) return null
+        o.put("stepsAt", at)
+        return o.toString()
+    }
+
+    /** Met à jour un bloc `id: "pas"` ; faux si ce n'en est pas un ou si le compte n'a pas changé. */
+    private fun patchStepsBlock(it: JSONObject, steps: Int): Boolean {
+        if (it.optString("id") != "pas" || it.optInt("count", -1) == steps) return false
+        val target = it.optInt("target", WidgetStepsRefresher.STEPS_TARGET)
+        val reached = steps >= target
+        it.put("count", steps)
+        it.put("value", NumberFormat.getIntegerInstance(Locale.FRANCE).format(steps))
+        it.put("pct", Math.round(steps * 100.0 / target).toInt().coerceIn(0, 100))
+        it.put("barCol", if (reached) OVER else ACCENT)
+        it.put("valueCol", if (reached) OVER else TEXT)
+        return true
     }
 }
 

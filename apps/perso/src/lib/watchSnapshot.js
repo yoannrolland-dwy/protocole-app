@@ -19,6 +19,15 @@
 //   chart { points: [nombre|null], from, to, col, min, max }   courbe simple (tendance de la dépense)
 //   sep   {}                                   filet
 // Couleurs : toujours en hex (#rrggbb), la montre n'a pas les variables CSS.
+//
+// Cartes (17/11/2026 — les « cartes » de Wear OS, qu'on fait défiler à côté du cadran) : `cards` =
+// { bord, journal, depense }, chacune { rows: [ligne…] }, un seul écran sans défilement. Les lignes
+// sont tirées des blocs ci-dessus marqués `ck` (clé de carte), jamais recalculées :
+//   pair { items: [{ label, value, unit?, extra? }] }        deux grands chiffres côte à côte
+//   hero { label?, labelCol?, value, unit?, note?, extra?, pct?, barCol? }   un grand chiffre
+//   stat { id?, label, value, note?, pct, barCol, valueCol? }  une ligne chiffre + barre
+//   grid { items: [{ label, value, target, col }] }           quatre macros, 2 × 2
+//   line { label, value, valueCol?, note?, noteCol? }          libellé à gauche, valeur à droite
 import { computeEnergyScore, scoreLabel } from "@rawcare/core/energy";
 import { computeFreeInsights } from "@rawcare/core/insights";
 import { PHASES, targetsForDate, kcalFromMacros, kcalOfEntry, tdeeNow, buildKcalByDate, recompWindows } from "@rawcare/core/targets";
@@ -54,13 +63,13 @@ function bordPage(d, todayKey, now) {
   }
 
   const energy = computeEnergyScore(todayKey, { rhrLog: rhr, sleepLog: sleep, stepsLog: steps, napLog: naps });
-  items.push({ t: "tile", big: true, label: "Énergie",
+  items.push({ t: "tile", ck: "energie", big: true, label: "Énergie",
     value: energy.status === "ok" ? String(energy.total) : "—", unit: energy.status === "ok" ? "/100" : "",
     extra: energy.status === "ok" ? { txt: scoreLabel(energy.total), col: scoreColor(energy.total) } : null,
     note: energy.status === "ok" ? nightNote(sleep, todayKey) : "pas assez de données" });
 
   const wv = weightView(weight, phase, targets, todayKey);
-  items.push({ t: "tile", big: true, label: wv.label, value: String(wv.value), unit: "kg", extra: wv.extra, note: wv.note });
+  items.push({ t: "tile", ck: "poids", big: true, label: wv.label, value: String(wv.value), unit: "kg", extra: wv.extra, note: wv.note });
 
   const mToday = macros.find((m) => m.date === todayKey);
   const kcalToday = mToday ? Math.round(kcalOfEntry(mToday)) : null;
@@ -73,13 +82,13 @@ function bordPage(d, todayKey, now) {
   const kc = progressColor(kcalToday, kcalTgt, "limit");
   const st = progressColor(stepsToday, STEPS_TARGET, "goal");
   const wa = progressColor(waterToday, waterTgt, "goal");
-  items.push({ t: "tile", label: "Kcal", value: kcalToday != null ? String(kcalToday) : "—", note: `/ ${kcalTgt}`,
+  items.push({ t: "tile", ck: "kcal", label: "Kcal", value: kcalToday != null ? String(kcalToday) : "—", note: `/ ${kcalTgt}`,
     pct: kcalToday != null ? pct(kcalToday, kcalTgt) : 0, barCol: kc, valueCol: valColor(kc) });
   // `id: "pas"` : le téléphone remplace ce bloc toutes les 30 min avec les pas relus dans Health
   // Connect (WatchBridge.kt), sans rouvrir l'app — mêmes règles de couleur (objectif atteint = bleu).
-  items.push({ t: "tile", id: "pas", label: "Pas", value: stepsToday.toLocaleString("fr-FR"), note: `/ ${STEPS_TARGET.toLocaleString("fr-FR")}`,
+  items.push({ t: "tile", ck: "pas", id: "pas", label: "Pas", value: stepsToday.toLocaleString("fr-FR"), note: `/ ${STEPS_TARGET.toLocaleString("fr-FR")}`,
     pct: pct(stepsToday, STEPS_TARGET), barCol: st, valueCol: valColor(st), count: stepsToday, target: STEPS_TARGET });
-  items.push({ t: "tile", label: "Eau", value: (waterToday / 1000).toFixed(2), unit: "L",
+  items.push({ t: "tile", ck: "eau", label: "Eau", value: (waterToday / 1000).toFixed(2), unit: "L",
     note: `/ ${(waterTgt / 1000).toFixed(1)} L${basketToday ? " · basket" : ""}`, pct: pct(waterToday, waterTgt), barCol: wa, valueCol: valColor(wa) });
 
   // Prochaine séance : même appel que le Bord (`nextSessions`, recommandeur temporel S2).
@@ -176,10 +185,12 @@ function journalDay(items, { date, label, log, overrides, macros, targets, train
   const kcalTarget = Math.round(tg.protein * 4 + tg.carbs * 4 + tg.fat * 9 + (tg.fiber ?? 0) * 2);
   const left = kcalTarget - t.kcal;
   const kcalColor = progressColor(t.kcal, kcalTarget, "limit");
-  items.push({ t: "tile", label: "Calories", value: String(n0(t.kcal)), note: `/ ${kcalTarget}`,
+  // `ck` : seul le jour d'aujourd'hui alimente la carte Journal.
+  const ck = (k) => (withEmptyTotals ? { ck: k } : {});
+  items.push({ t: "tile", ...ck("cal"), label: "Calories", value: String(n0(t.kcal)), note: `/ ${kcalTarget}`,
     extra: { txt: left >= 0 ? `Il reste ${n0(left)}` : `Dépassement +${n0(-left)}`, col: kcalColor },
     pct: pct(t.kcal, kcalTarget), barCol: kcalColor });
-  items.push({ t: "macros", items: ["prot", "gluc", "lip", "fib"].map((m) => {
+  items.push({ t: "macros", ...ck("macros"), items: ["prot", "gluc", "lip", "fib"].map((m) => {
     const target = tg[TARGET_KEY[m]];
     const col = progressColor(t[m], target, MACRO_KIND[m]);
     return { label: MACRO_SHORT[m], value: `${n0(t[m])}${t.missing[m] > 0 ? "+?" : ""}`, target: `/ ${target} g`, pct: pct(t[m], target), col: valColor(col), barCol: col };
@@ -189,7 +200,7 @@ function journalDay(items, { date, label, log, overrides, macros, targets, train
     const basketDay = training.some((tr) => tr.type === "Basket" && tr.date === date);
     const waterTgt = tg.water + (basketDay ? 1000 : 0);
     const wc = progressColor(water, waterTgt, "goal");
-    items.push({ t: "tile", label: "Eau", value: (water / 1000).toFixed(2), unit: "L", note: `/ ${(waterTgt / 1000).toFixed(1)} L`,
+    items.push({ t: "tile", ...ck("eau"), label: "Eau", value: (water / 1000).toFixed(2), unit: "L", note: `/ ${(waterTgt / 1000).toFixed(1)} L`,
       pct: pct(water, waterTgt), barCol: wc, valueCol: valColor(wc) });
   }
   for (const meal of MEALS) {
@@ -240,21 +251,21 @@ function depensePage(d, todayKey) {
 
   const items = [{ t: "head", text: "Dépense estimée" }];
   if (result.status !== "ok") {
-    items.push({ t: "text", size: "s", col: COLORS.text2,
+    items.push({ t: "text", ck: "nodata", size: "s", col: COLORS.text2,
       text: `Pas encore assez de données (${result.reason}). Il faut ${MIN_WINDOW_DAYS} jours de pesées et d'apports, dont 70 % loggés.` });
   } else {
     const col = TDEE_RELIABILITY_COLOR[result.reliability];
-    items.push({ t: "tile", big: true, label: `Confiance ${TDEE_RELIABILITY_LABEL[result.reliability]}`, labelCol: col, value: String(result.tdee),
+    items.push({ t: "tile", ck: "tdee", big: true, label: `Confiance ${TDEE_RELIABILITY_LABEL[result.reliability]}`, labelCol: col, value: String(result.tdee),
       unit: result.margin != null ? `± ${result.margin}` : "", note: `kcal/j · sur ${result.days} j` });
-    items.push({ t: "kv", label: "Déficit réel", value: `${deficitReel > 0 ? "+" : ""}${deficitReel} kcal/j`,
+    items.push({ t: "kv", ck: "deficit", label: "Déficit réel", value: `${deficitReel > 0 ? "+" : ""}${deficitReel} kcal/j`,
       valueCol: deficitReel < 0 ? COLORS.accent : COLORS.danger, note: "contre la cible affichée" });
   }
   if (recomp) {
     items.push({ t: "head", text: "Zone de recomposition" });
     const rows = [["14 j", recomp.j14], ["21 j", recomp.j21]];
     for (const [lbl, r] of rows) {
-      if (r.status === "ok") items.push({ t: "kv", label: lbl, value: `${r.reading.deficit > 0 ? "−" : "+"}${Math.abs(r.reading.deficit)} kcal/j`, note: r.reading.label, noteCol: RECOMP_ZONE_COLOR[r.reading.zone] });
-      else items.push({ t: "kv", label: lbl, value: "—", note: r.reason });
+      if (r.status === "ok") items.push({ t: "kv", ck: "recomp", label: lbl, value: `${r.reading.deficit > 0 ? "−" : "+"}${Math.abs(r.reading.deficit)} kcal/j`, note: r.reading.label, noteCol: RECOMP_ZONE_COLOR[r.reading.zone] });
+      else items.push({ t: "kv", ck: "recomp", label: lbl, value: "—", note: r.reason });
     }
     const ok = rows.filter(([, r]) => r.status === "ok");
     if (ok.length === 2 && ok[0][1].reading.zone !== ok[1][1].reading.zone) {
@@ -288,6 +299,46 @@ function depensePage(d, todayKey) {
   return { key: "depense", title: "Dépense", items };
 }
 
+/* ---------------------------------------------------------------- Cartes */
+
+// Une ligne « chiffre + barre » à partir d'une tuile (mêmes valeurs et couleurs ; `id`, `count` et
+// `target` gardés pour la relecture des pas en arrière-plan).
+const statRow = (i) => ({
+  t: "stat", ...(i.id ? { id: i.id, count: i.count, target: i.target } : {}), label: i.label.toUpperCase(),
+  value: `${i.value}${i.unit ? ` ${i.unit}` : ""}`, note: i.note, pct: i.pct ?? 0, barCol: i.barCol, valueCol: i.valueCol,
+});
+
+/** Les trois cartes de la montre, tirées des blocs marqués `ck` des pages (aucun nouveau calcul). */
+function buildCards([bord, journal, depense]) {
+  const pick = (page, k) => page.items.filter((i) => i.ck === k);
+  const one = (page, k) => pick(page, k)[0];
+
+  // Bord : Énergie et Poids en grand, puis Kcal, Pas, Eau (choix de Yoann, 17/11/2026).
+  const bordRows = [
+    { t: "pair", items: ["energie", "poids"].map((k) => one(bord, k)).filter(Boolean).map((i) => ({ label: i.label, value: i.value, unit: i.unit, extra: i.extra })) },
+    ...["kcal", "pas", "eau"].map((k) => one(bord, k)).filter(Boolean).map(statRow),
+  ];
+
+  // Journal : aujourd'hui seulement (calories et reste, quatre macros, eau).
+  const cal = one(journal, "cal"), macros = one(journal, "macros"), eau = one(journal, "eau");
+  const journalRows = [];
+  if (cal) journalRows.push({ t: "hero", value: cal.value, note: `${cal.note} kcal`, extra: cal.extra, pct: cal.pct, barCol: cal.barCol });
+  if (macros) journalRows.push({ t: "grid", items: macros.items.map((m) => ({ label: m.label.toUpperCase(), value: m.value, target: m.target.replace(" g", ""), col: m.col })) });
+  if (eau) journalRows.push(statRow(eau));
+
+  // Dépense : estimation (ou la raison de son absence), déficit réel, zone de recomposition.
+  const tdee = one(depense, "tdee"), deficit = one(depense, "deficit"), nodata = one(depense, "nodata");
+  const depenseRows = [];
+  if (tdee) depenseRows.push({ t: "hero", label: tdee.label, labelCol: tdee.labelCol, value: tdee.value, unit: tdee.unit, note: tdee.note });
+  else if (nodata) depenseRows.push({ t: "line", label: "Pas encore assez de données", value: "" });
+  if (deficit) depenseRows.push({ t: "line", label: deficit.label, value: deficit.value, valueCol: deficit.valueCol });
+  for (const r of pick(depense, "recomp")) {
+    depenseRows.push({ t: "line", label: `Recomp. ${r.label}`, value: r.value, note: r.note, noteCol: r.noteCol });
+  }
+
+  return { bord: { rows: bordRows }, journal: { rows: journalRows }, depense: { rows: depenseRows } };
+}
+
 /* ---------------------------------------------------------------- Ensemble */
 
 /**
@@ -298,10 +349,13 @@ function depensePage(d, todayKey) {
 export function buildWatchSnapshot(data, now = new Date()) {
   const todayKey = todayKeyNow();
   const d = { foodLog: [], overrides: {}, knee: [], naps: [], rhr: [], ...data };
+  const pages = [bordPage(d, todayKey, now), journalPage(d, todayKey), depensePage(d, todayKey)];
   return {
     v: WATCH_SNAPSHOT_VERSION,
     date: todayKey,
     at: hhmm(now),
-    pages: [bordPage(d, todayKey, now), journalPage(d, todayKey), depensePage(d, todayKey)],
+    pages,
+    // Cartes de la montre (17/11/2026) : ajout compatible, une montre plus ancienne l'ignore.
+    cards: buildCards(pages),
   };
 }

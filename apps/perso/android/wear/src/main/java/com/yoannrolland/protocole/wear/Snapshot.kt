@@ -8,7 +8,11 @@ import org.json.JSONObject
  */
 data class Page(val key: String, val title: String, val items: List<JSONObject>)
 
-data class Snapshot(val version: Int, val date: String, val at: String, val stepsAt: String?, val pages: List<Page>)
+/** [cards] : lignes des cartes (« bord », « journal », « depense »), vide si le téléphone est plus ancien. */
+data class Snapshot(
+    val version: Int, val date: String, val at: String, val stepsAt: String?, val pages: List<Page>,
+    val cards: Map<String, List<JSONObject>> = emptyMap(),
+)
 
 /** Version de la forme que cette montre sait lire (WATCH_SNAPSHOT_VERSION côté téléphone). */
 const val SNAPSHOT_VERSION = 1
@@ -25,12 +29,19 @@ fun parseSnapshot(json: String): Snapshot? = try {
             items = if (items == null) emptyList() else (0 until items.length()).map { items.getJSONObject(it) },
         )
     }
+    val cardsJson = o.optJSONObject("cards")
+    val cards = HashMap<String, List<JSONObject>>()
+    cardsJson?.keys()?.forEach { k ->
+        val rows = cardsJson.optJSONObject(k)?.optJSONArray("rows")
+        if (rows != null) cards[k] = (0 until rows.length()).map { rows.getJSONObject(it) }
+    }
     Snapshot(
         version = o.optInt("v", 0),
         date = o.optString("date"),
         at = o.optString("at"),
         stepsAt = o.optString("stepsAt").ifEmpty { null },
         pages = pages,
+        cards = cards,
     )
 } catch (e: Exception) {
     null
@@ -49,4 +60,14 @@ fun statusLine(date: String, at: String, stepsAt: String?, today: String, versio
         return "Chiffres du $d · ouvre PROTOCOLE" to true
     }
     return ("MAJ $at" + (stepsAt?.let { " · pas $it" } ?: "")) to false
+}
+
+/**
+ * État en tête d'une carte : la place manque (haut d'un écran rond), donc seulement l'heure du
+ * dernier calcul, ou « Chiffres du 16/11 » si l'instantané est d'un autre jour. Second élément :
+ * vrai = avertissement.
+ */
+fun cardStatus(date: String, at: String, today: String, version: Int = SNAPSHOT_VERSION): Pair<String, Boolean> {
+    val (line, warn) = statusLine(date, at, null, today, version)
+    return if (warn) line.substringBefore(" · ") to true else at to false
 }

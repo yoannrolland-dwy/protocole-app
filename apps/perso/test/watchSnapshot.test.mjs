@@ -99,3 +99,34 @@ test("taille : un mois de données tient très largement sous 100 Ko", () => {
   const json = JSON.stringify(buildWatchSnapshot(data(), new Date()));
   assert.ok(json.length < 30_000, `${json.length} caractères`);
 });
+
+test("cartes : trois cartes d'un écran, tirées des mêmes blocs que les pages", () => {
+  const s = buildWatchSnapshot(data(), new Date());
+  assert.deepEqual(Object.keys(s.cards), ["bord", "journal", "depense"]);
+  const tile = (label) => page(s, "bord").items.find((i) => i.t === "tile" && i.label === label);
+
+  // Bord : Énergie et Poids en grand, puis Kcal, Pas, Eau (choix de Yoann).
+  const b = s.cards.bord.rows;
+  assert.deepEqual(b.map((r) => r.t), ["pair", "stat", "stat", "stat"]);
+  assert.deepEqual(b[0].items.map((i) => i.label), ["Énergie", "Poids"]);
+  assert.equal(b[0].items[1].value, tile("Poids").value);
+  assert.deepEqual(b.slice(1).map((r) => r.label), ["KCAL", "PAS", "EAU"]);
+  const pas = b.find((r) => r.id === "pas");
+  assert.equal(pas.count, 12345);
+  assert.equal(pas.value, tile("Pas").value);
+  assert.equal(pas.barCol, tile("Pas").barCol);
+
+  // Journal : aujourd'hui seulement.
+  const j = s.cards.journal.rows;
+  assert.deepEqual(j.map((r) => r.t), ["hero", "grid", "stat"]);
+  assert.equal(j[0].value, "400");
+  assert.match(j[0].extra.txt, /^Il reste/);
+  assert.deepEqual(j[1].items.map((m) => m.label), ["PROT", "GLUC", "LIP", "FIB"]);
+  assert.equal(j[2].label, "EAU");
+
+  // Dépense : estimation ou raison, puis les lignes déjà calculées pour la page.
+  const d = s.cards.depense.rows;
+  assert.ok(["hero", "line"].includes(d[0].t));
+  assert.ok(d.some((r) => r.t === "line" && /^Recomp\. 14 j$/.test(r.label)));
+  assert.ok(d.length <= 4, "une carte tient sur un écran");
+});
