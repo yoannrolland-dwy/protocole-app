@@ -39,7 +39,7 @@ import { COLORS } from "../design/tokens.js";
 import { progressColor, MACRO_KIND } from "./progress.js";
 import { scoreColor, STEPS_TARGET, TDEE_RELIABILITY_COLOR, TDEE_RELIABILITY_LABEL, loggedPct } from "./helpers.js";
 import { planForDate } from "./plan.js";
-import { weightView, nightNote, insightRows, palierView, palierMacroLine } from "./bordView.js";
+import { weightView, nightNote, insightRows, palierView } from "./bordView.js";
 
 export const WATCH_SNAPSHOT_VERSION = 1;
 
@@ -140,17 +140,18 @@ function bordPage(d, todayKey, now) {
   }
 
   // Palier de la semaine : recomposition seulement, et seulement s'il y a une proposition.
-  const pv = PHASES[phase]?.noTarget ? palierView(palier, targets) : null;
+  const pv = PHASES[phase]?.noTarget ? palierView(palier, targets, todayKey) : null;
   if (pv) {
     items.push({ t: "sep" });
-    items.push({ t: "head", text: `Palier · semaine du ${fmt(pv.weekOf)}` });
-    items.push({ t: "text", size: "l", bold: true, mono: true, col: pv.color, text: pv.verdict + (pv.blocked ? "  (en attente)" : "") });
-    pv.reasons.forEach((x, i) => items.push({ t: "text", size: "s", col: i === 0 ? COLORS.text : COLORS.text2, text: `· ${x}` }));
+    items.push({ t: "head", text: `Palier · ${pv.weekLabel}` });
+    items.push({ t: "text", size: "m", bold: true, col: pv.color, text: pv.title });
+    pv.lines.forEach((x, i) => items.push({ t: "text", size: "s", col: i === 0 ? COLORS.text : COLORS.text2, text: x }));
+    if (pv.progress) items.push({ t: "kv", label: pv.progress.text, note: pv.progress.next });
+    (pv.rows || []).forEach((x) => items.push({ t: "kv", label: x.label, value: `${x.cur} → ${x.next}` }));
+    if (pv.unchanged) items.push({ t: "text", size: "s", col: COLORS.text2, text: pv.unchanged });
+    if (pv.targetsLine) items.push({ t: "text", size: "s", col: COLORS.text2, text: pv.targetsLine });
     if (pv.proposed) {
-      items.push({ t: "text", size: "s", mono: true, col: COLORS.text2, text: `Actuel : ${palierMacroLine(pv.cur)}` });
-      items.push({ t: "text", size: "s", mono: true, col: COLORS.text, text: `Proposé : ${palierMacroLine(pv.proposed)}` });
-      items.push(pv.appliedAt ? { t: "text", size: "s", bold: true, col: COLORS.accent, text: `Appliqué ✓ le ${fmt(pv.appliedAt)}` }
-        : pv.alreadyInPlace ? { t: "text", size: "s", col: COLORS.text2, text: "Déjà en place dans tes cibles." }
+      items.push(pv.status ? { t: "text", size: "s", bold: !!pv.appliedAt, col: pv.appliedAt ? COLORS.accent : COLORS.text2, text: pv.status }
         : { t: "text", size: "s", col: COLORS.text2, text: "À appliquer depuis le téléphone." });
     }
   }

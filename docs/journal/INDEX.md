@@ -152,3 +152,4 @@ Une ligne par section, dans l'ordre des dates. Chercher ici d'abord, puis ouvrir
 - Fin d'exercice : séances rouvertes et annonce redite (17/11/2026, apps/perso v3.172.0)
 - Appli PROTOCOLE sur la montre Galaxy Watch 7 : Bord, Journal, Dépense en lecture seule (17/11/2026, apps/perso v3.173.0)
 - Montre : trois cartes à côté du cadran (Bord, Journal, Dépense) (17/11/2026, apps/perso v3.174.0)
+- Palier de la semaine : carte en clair (quoi faire, pourquoi, compteur, tableau) et décision le samedi autour du 14e jour (19/11/2026, apps/perso v3.175.0)

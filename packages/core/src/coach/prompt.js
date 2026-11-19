@@ -345,7 +345,7 @@ export function buildCoachPrompt(data, note) {
     } } : {}),
   };
   const palierInstr = palier?.result
-    ? ` Le champ \`palier_semaine\` est la proposition de cibles de la semaine, déjà calculée par le JS (observation 14 j après un palier, déficit réel 14/21 j, tendance de poids) : commente-la, nuance-la ou signale un désaccord argumenté, mais ne propose JAMAIS un autre palier chiffré de ton côté, et ne pousse pas à l'appliquer si \`applique\` vaut "non" — c'est son choix.`
+    ? ` Le champ \`palier_semaine\` est la proposition de cibles de la semaine, déjà calculée par le JS (observation d'environ 14 j après un palier, décision toujours un samedi, déficit réel 14/21 j, tendance de poids) : commente-la, nuance-la ou signale un désaccord argumenté, mais ne propose JAMAIS un autre palier chiffré de ton côté, et ne pousse pas à l'appliquer si \`applique\` vaut "non" — c'est son choix.`
     : "";
   const recompInstr = recompSummary
     ? ` En Recomposition, \`depense_estimee.recomposition\` donne le déficit RÉEL (apports moyens loggés − dépense, PAS la cible) sur 14 et 21 j avec sa zone (visée 100-300, haut 300-500, trop élevé > 500, surplus = hors objectif) : c'est la lecture de référence, utilise-la telle quelle ; si les deux fenêtres ne tombent pas dans la même zone, dis-le au lieu d'en choisir une.`

@@ -3,7 +3,7 @@
 // portaient sur l'ancien barème sont alignées sur le comportement actuel.
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import { recommendTargets, palierWeekOf, splitDelta, loggedRateLastDays, isPalierEntry, lastPalier, PALIER } from "../src/palier.js";
+import { recommendTargets, palierWeekOf, nextPalierDecision, splitDelta, loggedRateLastDays, isPalierEntry, lastPalier, PALIER } from "../src/palier.js";
 import { recompZone } from "../src/tdee.js";
 import { shiftDateKey } from "../src/dateUtils.js";
 import { fixClock, T0, d } from "./_helpers.mjs";
@@ -77,11 +77,33 @@ test("cibles réelles 200/280/90/35 (2800) : +100 → 200 P / 300 G / 95 L = 292
   assert.deepEqual([b.deltaKcal, b.proposed.carbs, b.proposed.fat], [-100, 260, 85]);
 });
 
-test("palierWeekOf : dimanche 13h59 → lundi en cours ; 14h01 → lundi suivant ; jeudi / lundi", () => {
-  assert.equal(palierWeekOf(new Date(2026, 9, 4, 13, 59)), "2026-09-28");
-  assert.equal(palierWeekOf(new Date(2026, 9, 4, 14, 1)), "2026-10-05");
-  assert.equal(palierWeekOf(now), "2026-09-28");
-  assert.equal(palierWeekOf(new Date(2026, 9, 5, 8)), "2026-10-05");
+test("palierWeekOf (19/11/2026) : samedi 9h59 → samedi d'avant ; 10h → ce samedi ; dimanche / jeudi / vendredi", () => {
+  assert.equal(palierWeekOf(new Date(2026, 9, 3, 9, 59)), "2026-09-26");
+  assert.equal(palierWeekOf(new Date(2026, 9, 3, 10, 0)), "2026-10-03");
+  assert.equal(palierWeekOf(new Date(2026, 9, 4, 8)), "2026-10-03");
+  assert.equal(palierWeekOf(now), "2026-09-26");
+  assert.equal(palierWeekOf(new Date(2026, 9, 9, 23)), "2026-10-03");
+});
+
+test("décision toujours un samedi : le premier à partir de J+11 (J+11 à J+17, J+14 pile après un samedi)", () => {
+  assert.equal(nextPalierDecision("2026-11-09"), "2026-11-21", "lundi → samedi J+12");
+  assert.equal(nextPalierDecision("2026-11-21"), "2026-12-05", "samedi → samedi J+14");
+  assert.equal(nextPalierDecision("2026-11-10"), "2026-11-21", "mardi → samedi J+11");
+  assert.equal(nextPalierDecision("2026-11-11"), "2026-11-28", "mercredi → samedi J+17");
+  const T2 = { protein: 200, carbs: 380, fat: 105, fiber: 35 };
+  const at = (y, m, d, h, last) => recommendTargets({ now: new Date(y, m, d, h, 5), targets: T2, loggedRate7: 1, recomp: recomp(600), trend: trend(-0.2, -0.1),
+    targetHistory: [{ date: last, kcal: 3300, prevKcal: 3200, source: "palier" }] });
+  const attente = at(2026, 10, 14, 10, "2026-11-09"); // samedi J+5
+  assert.equal(attente.action, "hold");
+  assert.deepEqual(attente.facts, { why: "observation", lastDate: "2026-11-09", next: "2026-11-21" });
+  const decide = at(2026, 10, 21, 10, "2026-11-09"); // samedi J+12, 10 h 05
+  assert.equal(decide.action, "up", "le samedi le plus proche du 14e jour, on juge");
+  assert.equal(decide.blocked, null);
+  // Recalcul en milieu de semaine (cibles retouchées, app pas ouverte samedi) : jamais de
+  // décision hors samedi, même si J+11 est passé entre-temps.
+  const mardi = at(2026, 10, 24, 9, "2026-11-11"); // mardi J+13, samedi 21/11 = J+10
+  assert.equal(mardi.action, "hold");
+  assert.equal(mardi.facts.next, "2026-11-28");
 });
 
 test("loggedRateLastDays : 5 des 7 jours terminés → 5/7, jour en cours ignoré", () => {

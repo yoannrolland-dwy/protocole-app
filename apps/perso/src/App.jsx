@@ -124,7 +124,7 @@ export default function App({ silent = false } = {}) {
   // Historique des paliers de cibles (chantier R, R2, 02/10/2026) : une entrée par changement
   // des kcal de base, voir `save.targets`. Clé `targetHistory` (DATA_KEYS).
   const [targetHistory, setTargetHistory] = useState([]);
-  // "Palier de la semaine" (R3) : proposition FIGÉE par semaine (`weekOf` = lundi), jamais un
+  // "Palier de la semaine" (R3) : proposition FIGÉE par semaine (`weekOf` = samedi, 19/11/2026), jamais un
   // chiffre recalculé chaque jour au gré du bruit de la balance. `palierTick` force une
   // revérification au retour au premier plan (la semaine a pu changer entre-temps).
   const [palierWeekly, setPalierWeekly] = useState(null);
@@ -532,8 +532,8 @@ export default function App({ silent = false } = {}) {
   };
   // "Palier de la semaine" (R3) — calcul figé par semaine. Ne tourne qu'une fois les données
   // chargées (`loading`), en phase Recomposition, et seulement si la semaine stockée n'est
-  // plus la semaine courante (`palierWeekOf`, bascule dimanche 14 h) : idempotent, l'app
-  // peut être ouverte dix fois le dimanche sans recalcul. Mêmes fonctions que le reste de
+  // plus la semaine courante (`palierWeekOf`, bascule samedi 10 h) : idempotent, l'app
+  // peut être ouverte dix fois le samedi sans recalcul. Mêmes fonctions que le reste de
   // l'app (`weightTrend7`, `recompWindows`) — jamais deux chiffres différents.
   // Correctif du 02/10/2026 : la proposition mémorise les cibles sur lesquelles elle s'est
   // basée (`baseTargets`). Si Yoann les modifie à la main ensuite (et qu'elle n'a pas été
