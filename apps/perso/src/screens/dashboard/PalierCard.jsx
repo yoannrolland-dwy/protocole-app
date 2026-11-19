@@ -1,4 +1,7 @@
 // Extrait d'App.jsx le 25/10/2026 (chantier U, étape U0) ; v2 à l'étape 4 d'U3.
+import { useMemo } from "react";
+import { today } from "@rawcare/core/dateUtils";
+import { getSync } from "../../store.js";
 import { T } from "../../design/tokens.js";
 import { Panel, Eyebrow, Button } from "../../design/primitives.jsx";
 import { palierView } from "../../lib/bordView.js";
@@ -12,11 +15,18 @@ import { palierView } from "../../lib/bordView.js";
 // En clair depuis le 19/11/2026 (demande de Yoann, la carte parlait en abréviations) : d'abord
 // quoi faire, puis pourquoi en phrases entières, le compteur des jours d'observation (recalculé
 // chaque jour), et un tableau Aujourd'hui / Proposé. Textes dans lib/bordView.js, partagés avec
-// la montre.
+// la montre. Pendant l'attente, à partir du 8e jour : vers quoi penche la prochaine décision
+// (hausse, baisse, maintien), recalculé chaque jour, à titre indicatif.
 const mono = { fontFamily: T.f.num, fontVariantNumeric: "tabular-nums" };
 const cell = { ...mono, fontSize: 15, textAlign: "right" };
-export function PalierCard({ palier, targets, onApply }) {
-  const v = palierView(palier, targets);
+export function PalierCard({ palier, targets, weight, macros, onApply }) {
+  // Tendance du jour pendant l'attente : lecture fraîche du journal alimentaire, comme la carte
+  // Dépense du Bord (jamais mise en état React).
+  const day = today(); // dans les dépendances : le compteur et la tendance changent avec le jour
+  const v = useMemo(
+    () => palierView(palier, targets, day, { weight, macros, foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}) }),
+    [palier, targets, weight, macros, day],
+  );
   if (!v) return null;
   return (
     <Panel aria-label="Palier de la semaine">
@@ -43,6 +53,13 @@ export function PalierCard({ palier, targets, onApply }) {
             <span style={{ ...mono, color: T.c.text, fontWeight: 700 }}>{v.progress.text}</span>
             <span style={{ color: T.c.text2 }}>{v.progress.next}</span>
           </div>
+        </div>
+      )}
+      {v.outlook && (
+        <div style={{ display: "grid", gap: 4, paddingTop: 12, borderTop: `1px solid ${T.c.lineSoft}` }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: T.c.text, lineHeight: 1.3 }}>{v.outlook.title}</div>
+          {v.outlook.text && <div style={{ fontSize: 14, color: T.c.text2, lineHeight: 1.45 }}>{v.outlook.text}</div>}
+          {v.outlook.note && <div style={{ fontSize: 13, color: T.c.muted, lineHeight: 1.4 }}>{v.outlook.note}</div>}
         </div>
       )}
       {v.rows && (

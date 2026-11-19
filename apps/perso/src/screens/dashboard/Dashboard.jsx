@@ -240,7 +240,7 @@ export function Dashboard({ weight, sleep, knee, rhr, naps, macros, steps, targe
       <InsightsCard insights={insights} />
 
       {/* Palier de la semaine (R3) — recomposition seulement, et seulement s'il y a une proposition */}
-      {PHASES[phase]?.noTarget && palier?.result && <PalierCard palier={palier} targets={targets} onApply={onApplyPalier} />}
+      {PHASES[phase]?.noTarget && palier?.result && <PalierCard palier={palier} targets={targets} weight={weight} macros={macros} onApply={onApplyPalier} />}
 
     </div>
   );

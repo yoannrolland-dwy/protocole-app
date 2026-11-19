@@ -140,13 +140,18 @@ function bordPage(d, todayKey, now) {
   }
 
   // Palier de la semaine : recomposition seulement, et seulement s'il y a une proposition.
-  const pv = PHASES[phase]?.noTarget ? palierView(palier, targets, todayKey) : null;
+  const pv = PHASES[phase]?.noTarget ? palierView(palier, targets, todayKey, { weight, macros, foodLog, overrides }) : null;
   if (pv) {
     items.push({ t: "sep" });
     items.push({ t: "head", text: `Palier · ${pv.weekLabel}` });
     items.push({ t: "text", size: "m", bold: true, col: pv.color, text: pv.title });
     pv.lines.forEach((x, i) => items.push({ t: "text", size: "s", col: i === 0 ? COLORS.text : COLORS.text2, text: x }));
     if (pv.progress) items.push({ t: "kv", label: pv.progress.text, note: pv.progress.next });
+    if (pv.outlook) {
+      items.push({ t: "text", size: "m", bold: true, text: pv.outlook.title });
+      if (pv.outlook.text) items.push({ t: "text", size: "s", col: COLORS.text2, text: pv.outlook.text });
+      if (pv.outlook.note) items.push({ t: "text", size: "s", col: COLORS.muted, text: pv.outlook.note });
+    }
     (pv.rows || []).forEach((x) => items.push({ t: "kv", label: x.label, value: `${x.cur} → ${x.next}` }));
     if (pv.unchanged) items.push({ t: "text", size: "s", col: COLORS.text2, text: pv.unchanged });
     if (pv.targetsLine) items.push({ t: "text", size: "s", col: COLORS.text2, text: pv.targetsLine });

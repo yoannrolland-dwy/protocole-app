@@ -4,8 +4,8 @@
 // InsightsCard.jsx et PalierCard.jsx. JS pur (aucun JSX) : testable en Node.
 import { VOLUME_TARGET } from "@rawcare/core/volume";
 import { fmt, today, lastN, fmtHM, round, shiftDateKey, daysBetween } from "@rawcare/core/dateUtils";
-import { PALIER, nextPalierDecision } from "@rawcare/core/palier";
-import { weightTrend7, kcalFromMacros } from "@rawcare/core/targets";
+import { PALIER, nextPalierDecision, recommendTargets, loggedRateLastDays } from "@rawcare/core/palier";
+import { weightTrend7, kcalFromMacros, buildKcalByDate, recompWindows } from "@rawcare/core/targets";
 import { COLORS } from "../design/tokens.js";
 import { phaseTarget, recompTrendColor, TDEE_RELIABILITY_LABEL } from "./helpers.js";
 
@@ -104,13 +104,62 @@ const PALIER_JUDGE = {
   visee: `C'est dans la zone visée (${ZONE}) : rien à changer.`,
 };
 
+// Tendance de la prochaine décision pendant l'attente (19/11/2026, demande de Yoann, choix par
+// formulaire) : affichée à partir du 8e jour seulement (avant, les fenêtres de 14 et 21 jours
+// regardent surtout les jours d'AVANT le changement), recalculée chaque jour, le sens et une
+// phrase. Simple indication : la décision reste celle du samedi (palier.js), rien n'est stocké.
+export const OUTLOOK_FROM_DAY = 8;
+
+/** Ce que la règle du palier déciderait aujourd'hui s'il n'y avait pas de période d'observation.
+ *  Mêmes entrées que la proposition du samedi (App.jsx), sans l'historique des paliers. */
+export function palierOutlook({ weight, macros, targets, foodLog, overrides }, todayKey = today()) {
+  const kcalByDate = buildKcalByDate({ foodLog, overrides, macros, today: todayKey });
+  return recommendTargets({
+    targets, trend: weightTrend7(weight, todayKey),
+    recomp: recompWindows({ foodLog, overrides, macros, weight, targets }),
+    targetHistory: [], loggedRate7: loggedRateLastDays(kcalByDate, todayKey),
+  });
+}
+
+const spend = (d) => `Tu dépenses environ ${d} kcal de plus que tu ne manges chaque jour`;
+const OUTLOOK_REASON = {
+  trop: (f) => `${spend(f.deficit)}, au-dessus de la zone visée (${ZONE}).`,
+  haut: (f) => `${spend(f.deficit)}, au-dessus de la zone visée (${ZONE}).`,
+  perteRapide: () => `Tu perds plus de ${frNum(PALIER.LOSS_TOO_FAST_KG_WEEK)} kg par semaine depuis deux semaines.`,
+  surplus: (f) => (f.deficit < 0 ? `Tu manges environ ${-f.deficit} kcal de plus que tu ne dépenses chaque jour.` : "Tu manges autant que tu dépenses."),
+  poidsMonte: () => "Ton poids moyen monte depuis deux semaines.",
+  sous: (f) => `${spend(f.deficit)}, juste sous la zone visée (${ZONE}).`,
+  visee: (f) => `${spend(f.deficit)}, dans la zone visée (${ZONE}).`,
+  peuLogge: (f) => `Seulement ${f.pct} % des 7 derniers jours ont des repas notés.`,
+  sansDonnees: () => "Pas encore assez de pesées et de repas notés.",
+  desaccord: () => "Tes 2 dernières semaines et tes 3 dernières ne disent pas la même chose.",
+};
+
+/** Bloc « tendance » de la carte : null sans données du jour, « trop tôt » avant le 8e jour. */
+function outlookView(day, live, asOf) {
+  if (!live) return null;
+  if (day < OUTLOOK_FROM_DAY) {
+    return { tone: "early", title: "Tendance de la prochaine décision : trop tôt pour le dire",
+      text: `Elle s'affichera à partir du jour ${OUTLOOK_FROM_DAY} : avant, le calcul regarde surtout les jours d'avant ton changement.`, note: null };
+  }
+  const o = palierOutlook(live, asOf);
+  const tone = o.blocked ? "unknown" : o.action;
+  return {
+    tone,
+    title: tone === "up" ? "Pour l'instant, ça va vers une hausse" : tone === "down" ? "Pour l'instant, ça va vers une baisse"
+      : tone === "hold" ? "Pour l'instant, ça va vers un maintien" : "Pour l'instant, impossible à dire",
+    text: OUTLOOK_REASON[o.facts?.why]?.(o.facts) ?? "",
+    note: "Indication du jour : la décision se prend samedi.",
+  };
+}
+
 /** Le « pourquoi » en phrases entières, et le compteur de la période d'observation (recalculé au
  *  jour `asOf` : la proposition est figée pour la semaine, pas le compteur). */
-function palierWhy(r, asOf) {
+function palierWhy(r, asOf, live) {
   // Proposition figée avant le 19/11/2026 : pas de `facts`. L'observation se retrouve par sa date
   // de fin ; pour le reste on garde les raisons d'origine.
   const f = r.facts || (r.observation ? { why: "observation", lastDate: shiftDateKey(r.observation.until, -PALIER.OBSERVATION_DAYS) } : null);
-  if (!f) return { lines: r.reasons || [], progress: null };
+  if (!f) return { lines: r.reasons || [], progress: null, outlook: null };
   if (f.why === "observation") {
     // La décision tombe le samedi le plus proche du 14e jour (palier.js) : le compteur va
     // jusqu'à ce samedi-là, pas jusqu'à 14.
@@ -124,16 +173,17 @@ function palierWhy(r, asOf) {
         text: `Jour ${day} sur ${total}`,
         next: `Prochaine décision : samedi ${fmt(next)}${day >= total ? ", à partir de 10 h" : ""}`,
       },
+      outlook: outlookView(daysBetween(f.lastDate, asOf), live, asOf),
     };
   }
   if (f.why === "peuLogge") {
-    return { lines: [`Seulement ${f.pct} % des 7 derniers jours ont des repas notés. Il en faut au moins ${Math.round(PALIER.MIN_LOGGED_RATE * 100)} % pour que l'app puisse juger.`], progress: null };
+    return { lines: [`Seulement ${f.pct} % des 7 derniers jours ont des repas notés. Il en faut au moins ${Math.round(PALIER.MIN_LOGGED_RATE * 100)} % pour que l'app puisse juger.`], progress: null, outlook: null };
   }
   if (f.why === "sansDonnees") {
-    return { lines: ["L'app n'a pas encore assez de pesées et de repas notés (2 à 3 semaines) pour estimer ta dépense."], progress: null };
+    return { lines: ["L'app n'a pas encore assez de pesées et de repas notés (2 à 3 semaines) pour estimer ta dépense."], progress: null, outlook: null };
   }
   if (f.why === "desaccord") {
-    return { lines: [`Tes 2 dernières semaines et tes 3 dernières ne disent pas la même chose (14 j : ${f.label14} ; 21 j : ${f.label21}). L'app attend qu'elles soient d'accord.`], progress: null };
+    return { lines: [`Tes 2 dernières semaines et tes 3 dernières ne disent pas la même chose (14 j : ${f.label14} ; 21 j : ${f.label21}). L'app attend qu'elles soient d'accord.`], progress: null, outlook: null };
   }
   const balance = f.deficit > 0 ? `Chaque jour, tu dépenses environ ${f.deficit} kcal de plus que tu ne manges`
     : f.deficit < 0 ? `Chaque jour, tu manges environ ${-f.deficit} kcal de plus que tu ne dépenses`
@@ -142,16 +192,18 @@ function palierWhy(r, asOf) {
   if (f.weekDelta != null) {
     lines.push(`Ton poids moyen : ${signedKg(f.weekDelta)} en 7 jours${f.weekDeltaPrev != null ? `, ${signedKg(f.weekDeltaPrev)} les 7 jours d'avant` : ""}.`);
   }
-  return { lines, progress: null };
+  return { lines, progress: null, outlook: null };
 }
 
 /**
  * Carte Palier de la semaine (R3), en clair depuis le 19/11/2026 (demande de Yoann : la carte
  * parlait en abréviations). D'abord quoi faire (`title`), puis pourquoi (`lines`), le compteur
  * d'observation (`progress`), et le tableau Aujourd'hui / Proposé (`rows`) quand il y a un
- * changement à appliquer. Partagée avec la montre. null sans proposition.
+ * changement à appliquer. `live` = { weight, macros, foodLog, overrides } du jour : pendant
+ * l'attente, il sert à dire vers quoi penche la prochaine décision (`outlook`). Partagée avec la
+ * montre. null sans proposition.
  */
-export function palierView(palier, targets, asOf = today()) {
+export function palierView(palier, targets, asOf = today(), live = null) {
   const r = palier?.result;
   if (!r) return null;
   const cur = { protein: targets.protein, carbs: targets.carbs, fat: targets.fat, fiber: targets.fiber, kcal: Math.round(kcalFromMacros(targets.protein, targets.carbs, targets.fat, targets.fiber)) };
@@ -169,7 +221,7 @@ export function palierView(palier, targets, asOf = today()) {
       : r.action === "down" ? `Mange ${Math.abs(r.deltaKcal)} kcal de moins par jour`
       : "Garde tes calories actuelles",
     color: PALIER_COLOR[r.action],
-    ...palierWhy(r, asOf),
+    ...palierWhy(r, asOf, live ? { ...live, targets } : null),
     cur,
     proposed: p,
     // Tableau seulement tant que le changement reste à appliquer : une fois en place, les deux

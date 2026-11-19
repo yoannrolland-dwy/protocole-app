@@ -107,3 +107,54 @@ test("proposition figée avant ce changement, hors observation : les raisons d'o
   assert.equal(palierView(null, T), null);
   assert.equal(palierView({ weekOf: "2026-11-09", result: null }, T), null);
 });
+
+// ---------- Tendance de la prochaine décision pendant l'attente (19/11/2026)
+import { palierOutlook, OUTLOOK_FROM_DAY } from "../src/lib/bordView.js";
+import { today, shiftDateKey } from "@rawcare/core/dateUtils";
+
+const T0 = today();
+const dayKey = (n) => shiftDateKey(T0, n);
+/** 40 jours de pesées (pente `kgPerDay`) et d'apports notés à `kcal`. */
+function live(kgPerDay, kcal = 3000) {
+  const weight = [], macros = [];
+  for (let i = 40; i >= 0; i--) {
+    weight.push({ date: dayKey(-i), kg: 92 + (40 - i) * kgPerDay });
+    if (i > 0) macros.push({ date: dayKey(-i), kcal, protein: 200, carbs: 380, fat: 80, fiber: 35 });
+  }
+  return { weight, macros, foodLog: [], overrides: {} };
+}
+const waiting = (daysAgo) => {
+  const last = dayKey(-daysAgo);
+  return wrap({ weekOf: last, action: "hold", deltaKcal: 0, proposed: null, reasons: ["x"], blocked: "x",
+    observation: { since: 0, until: shiftDateKey(last, 14) }, facts: { why: "observation", lastDate: last } });
+};
+
+test("tendance : rien sans données du jour, « trop tôt » avant le 8e jour, puis le sens et une phrase", () => {
+  assert.equal(OUTLOOK_FROM_DAY, 8);
+  assert.equal(palierView(waiting(9), T, T0).outlook, null, "sans données du jour : pas de bloc");
+  const tot = palierView(waiting(7), T, T0, live(-0.08));
+  assert.equal(tot.outlook.tone, "early");
+  assert.equal(tot.outlook.title, "Tendance de la prochaine décision : trop tôt pour le dire");
+  assert.match(tot.outlook.text, /à partir du jour 8/);
+  const v = palierView(waiting(8), T, T0, live(-0.08)); // −0,56 kg par semaine : perte nette
+  assert.equal(v.outlook.tone, "up");
+  assert.equal(v.outlook.title, "Pour l'instant, ça va vers une hausse");
+  assert.match(v.outlook.text, /^Tu (dépenses environ \d+ kcal de plus que tu ne manges chaque jour, au-dessus de la zone visée|perds plus de 0,3 kg par semaine)/);
+  assert.equal(v.outlook.note, "Indication du jour : la décision se prend samedi.");
+  // La décision affichée, elle, ne change pas : on attend toujours.
+  assert.equal(v.title, "Garde tes calories actuelles");
+});
+
+test("tendance : baisse quand le poids monte, même calcul que la règle du samedi, rien hors attente", () => {
+  const up = live(0.05);
+  const v = palierView(waiting(10), T, T0, up);
+  assert.equal(v.outlook.tone, "down");
+  assert.equal(v.outlook.title, "Pour l'instant, ça va vers une baisse");
+  assert.equal(palierOutlook({ ...up, targets: T }, T0).action, "down", "même moteur, sans la période d'observation");
+  const peu = { ...live(-0.02), macros: [] };
+  const inconnu = palierView(waiting(10), T, T0, peu);
+  assert.equal(inconnu.outlook.tone, "unknown");
+  assert.equal(inconnu.outlook.title, "Pour l'instant, impossible à dire");
+  const decide = palierView(wrap(run({ recomp: recomp(200), trend: trend(-0.1, 0) })), T, "2026-11-16", up);
+  assert.equal(decide.outlook, null, "la carte qui vient de décider n'affiche que sa décision");
+});
