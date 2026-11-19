@@ -6,18 +6,19 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 ## État courant (14/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.174.0, commit `8dbd7bb`, le 17/11/2026 à 18 h 32 (envoi des trois
-  écrans et des trois cartes à la montre).
+- **Installé sur le S25** : v3.175.0, commit `9a04e63`, le 19/11/2026 à 10 h 05 (palier de la
+  semaine : carte en clair, décision le samedi à partir de 10 h).
 - **Installé sur la montre (Galaxy Watch 7, SM-L310, Wear OS 6)** : appli `wear` v3.174.0, commit
-  `8dbd7bb`, le 17/11/2026 à 18 h 33, sans fil (`release.mjs install-montre`). `adb` doit être démarré
+  `8dbd7bb`, le 17/11/2026 à 18 h 33, sans fil (`release.mjs install-montre`) ; inchangée en v3.175.0
+  (même empreinte), elle reçoit le nouveau texte du palier par l'instantané. `adb` doit être démarré
   depuis le Terminal de macOS : lancé depuis l'app Claude, macOS lui bloque le réseau local.
-- **Git** : `dev` = `origin/dev` (poussé le 17/11/2026 à 18 h 35), dossier propre, aucune autre branche
+- **Git** : `dev` = `origin/dev` (poussé le 19/11/2026), dossier propre, aucune autre branche
   de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à
   la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
   `avant-campagne-audit`, `apres-lot1-audit`, `apres-lot2-audit`, `avant-jetons-gestes`. APK
   précédents : `~/Documents/protocole-sauvegardes/` (hors Git).
-- **Tests** : 385 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
+- **Tests** : 393 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
 - **Chantiers** : tous ceux de `ROADMAP.md` sont livrés (V, R, S, T, U, J). La campagne d'audit du
   10/11/2026 est faite (lots 1 à 3). Ce qui reste ouvert est dans « Reportés à la fin de la
   campagne » (`docs/journal/2026-11.md`).
