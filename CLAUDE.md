@@ -6,8 +6,8 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 ## État courant (14/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.177.0, commit `ca851ae`, le 23/11/2026 à 10 h 08 (Full Body allégée,
-  une seule notification de repos, notifications retirées à la validation).
+- **Installé sur le S25** : v3.178.0, commit `10faf31`, le 23/11/2026 à 11 h 02 (pont JEFFREY :
+  repas détaillés dans `macros`, sujets `jour` et `periode` ; partie JEFFREY à faire dans sa session).
 - **Installé sur la montre (Galaxy Watch 7, SM-L310, Wear OS 6)** : appli `wear` v3.174.0, commit
   `8dbd7bb`, le 17/11/2026 à 18 h 33, sans fil (`release.mjs install-montre`) ; inchangée en v3.177.0
   (même empreinte), elle reçoit le nouveau texte du palier par l'instantané. `adb` doit être démarré
@@ -18,7 +18,7 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
   `avant-campagne-audit`, `apres-lot1-audit`, `apres-lot2-audit`, `avant-jetons-gestes`. APK
   précédents : `~/Documents/protocole-sauvegardes/` (hors Git).
-- **Tests** : 395 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
+- **Tests** : 406 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
 - **Chantiers** : tous ceux de `ROADMAP.md` sont livrés (V, R, S, T, U, J). La campagne d'audit du
   10/11/2026 est faite (lots 1 à 3). Ce qui reste ouvert est dans « Reportés à la fin de la
   campagne » (`docs/journal/2026-11.md`).
