@@ -30,6 +30,24 @@ export const MEALS = [
   { key: "autre", label: "Extra" },
 ];
 
+// Horaires habituels des repas de Yoann (23/11/2026, ses mots) : petit-déjeuner avant 10 h,
+// déjeuner 12 h-14 h, goûter 16 h-17 h, dîner 19 h-20 h. Pré-training, post-training et Extra
+// n'ont pas d'horaire fixe. `fin` exclue : à 14:00 le déjeuner est passé. Source unique du pont
+// JEFFREY (`coach/bridgeHistory.js`) et de la consigne du Coach (`coach/prompt.js`).
+export const MEAL_WINDOWS = {
+  petitdej: { fin: "10:00", texte: "avant 10 h" },
+  dejeuner: { debut: "12:00", fin: "14:00", texte: "12 h-14 h" },
+  gouter: { debut: "16:00", fin: "17:00", texte: "16 h-17 h" },
+  diner: { debut: "19:00", fin: "20:00", texte: "19 h-20 h" },
+};
+
+/** Repères horaires des repas pour la consigne du Coach (« avant 10h … entre 19h et 20h le dîner »). */
+export function mealHoursSentence() {
+  const h = (s) => `${Number(s.slice(0, 2))}h`;
+  const { petitdej, dejeuner, gouter, diner } = MEAL_WINDOWS;
+  return `avant ${h(petitdej.fin)} seul le petit-déjeuner est normalement pris, entre ${h(dejeuner.debut)} et ${h(dejeuner.fin)} le déjeuner s'ajoute, entre ${h(gouter.debut)} et ${h(gouter.fin)} le goûter, entre ${h(diner.debut)} et ${h(diner.fin)} le dîner`;
+}
+
 export const MACROS = ["kcal", "prot", "gluc", "lip", "fib"];
 
 // randomUUID exige un contexte sécurisé. La WebView Capacitor sert bien depuis un origine

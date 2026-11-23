@@ -20,7 +20,7 @@ import { sessionLoad, sessionGenes, geneZoneLabel } from "../sessionLoad.js";
 import { PHASES, phaseTarget, targetsForDate, kcalFromMacros, kcalOfEntry, isCutWindow, tdeeNow, weightTrend7, recompWindows, hasIntake, kcalTargetOn } from "../targets.js";
 import { realDeficit } from "../tdee.js";
 import { isPalierEntry } from "../palier.js";
-import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor, alcoholGramsFor } from "../nutrition/foodStore.js";
+import { MEALS as FOOD_MEALS, entriesFor as foodEntriesFor, alcoholGramsFor, mealHoursSentence } from "../nutrition/foodStore.js";
 
 // Amorçage du profil permanent : reprend mot pour mot les règles de coaching qui étaient
 // codées en dur dans le prompt jusqu'au 30/07/2026. Écrit une seule fois, à la première
@@ -406,7 +406,7 @@ ${profile.trim()}` : "";
   const system = `Tu es le coach personnel tout-en-un ${who} : à la fois coach sportif, kinésithérapeute, nutritionniste et coach de vie. ${phaseClause} ${tendinopathiesClause}Protéines hautes prioritaires. Escalade = volume de tirage : pas le jour où des séries de tirage ou de flexion du coude ont déjà été cochées.${tempBlock}${profileBlock}`;
 
 
-  const user = `TEMPS RÉEL — hier vs aujourd'hui (regarde d'abord ça, c'est le plus actionnable). "heure_analyse" est l'heure EXACTE de cette analyse : les champs "_aujourdhui"/"_en_cours" (pas, macros, eau) ne couvrent que depuis ce matin jusqu'à cette heure-là, jamais la journée entière — ne les juge JAMAIS insuffisants par rapport à une cible de journée complète (3000 pas ou 600 kcal à 8h du matin, c'est juste tôt, pas un problème). Pour macros/eau spécifiquement, base-toi sur "repas_aujourdhui" (par nom de repas) plutôt que sur le total brut : avant midi seul le petit-déjeuner est normalement pris, entre midi et 15h le déjeuner s'ajoute, entre 15h et 18h le goûter, entre 19h et 22h le dîner — "Pré-training", "Post-training" et "Extra" sont des repas flexibles, jamais un repère horaire (les deux premiers sont liés à une séance, pas à l'heure de la journée). Un repas plus tardif déjà rempli n'est pas suspect : ${authorLabel} planifie parfois ses repas à l'avance dans la journée.
+  const user = `TEMPS RÉEL — hier vs aujourd'hui (regarde d'abord ça, c'est le plus actionnable). "heure_analyse" est l'heure EXACTE de cette analyse : les champs "_aujourdhui"/"_en_cours" (pas, macros, eau) ne couvrent que depuis ce matin jusqu'à cette heure-là, jamais la journée entière — ne les juge JAMAIS insuffisants par rapport à une cible de journée complète (3000 pas ou 600 kcal à 8h du matin, c'est juste tôt, pas un problème). Pour macros/eau spécifiquement, base-toi sur "repas_aujourdhui" (par nom de repas) plutôt que sur le total brut : ${mealHoursSentence()} — "Pré-training", "Post-training" et "Extra" sont des repas flexibles, jamais un repère horaire (les deux premiers sont liés à une séance, pas à l'heure de la journée). Un repas plus tardif déjà rempli n'est pas suspect : ${authorLabel} planifie parfois ses repas à l'avance dans la journée.
 ${JSON.stringify(realtime)}
 
 RÉSUMÉ 14 JOURS (moyennes fiables, tendance de fond) :

@@ -8,21 +8,15 @@
 //   passé ou futur, et des totaux / moyennes calculés ici (Jeffrey ne recalcule rien).
 // Même principe que bridge.js : PROTOCOLE calcule les faits, Jeffrey les juge et parle.
 
-import { MEALS, entriesFor, totals, resolveLog, alcoholGramsFor } from "../nutrition/foodStore.js";
+import { MEALS, MEAL_WINDOWS, entriesFor, totals, resolveLog, alcoholGramsFor } from "../nutrition/foodStore.js";
 import { targetsForDate, kcalOfEntry, hasIntake, kcalTargetOn } from "../targets.js";
 import { computeSleepScore } from "../energy.js";
 import { isBasketPlanned } from "../nextSession.js";
 import { shiftDateKey, daysBetween } from "../dateUtils.js";
 
-// Horaires habituels des repas de Yoann (23/11/2026, ses mots) : petit-déjeuner avant 10 h,
-// déjeuner 12 h-14 h, goûter 16 h-17 h, dîner 19 h-20 h. Pré-training, post-training et Extra
-// n'ont pas d'horaire fixe. `fin` exclue : à 14:00 le déjeuner est passé.
-export const MEAL_WINDOWS = {
-  petitdej: { fin: "10:00", texte: "avant 10 h" },
-  dejeuner: { debut: "12:00", fin: "14:00", texte: "12 h-14 h" },
-  gouter: { debut: "16:00", fin: "17:00", texte: "16 h-17 h" },
-  diner: { debut: "19:00", fin: "20:00", texte: "19 h-20 h" },
-};
+// Horaires habituels des repas de Yoann : `MEAL_WINDOWS` (nutrition/foodStore.js), partagés avec
+// la consigne du Coach. Réexportés ici pour les lecteurs du pont.
+export { MEAL_WINDOWS };
 
 /** Plus longue période lisible d'un coup (un an) : la réponse reste loin de la limite de 200 000 caractères. */
 export const MAX_PERIOD_DAYS = 366;
