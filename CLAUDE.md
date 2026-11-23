@@ -14,8 +14,8 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
   (même empreinte), elle reçoit le nouveau texte du palier par l'instantané. `adb` doit être démarré
   depuis le Terminal de macOS : lancé depuis l'app Claude, macOS lui bloque le réseau local.
 - **Git** : `dev` = `origin/dev` (poussé le 23/11/2026), dossier propre, aucune autre branche
-  de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à
-  la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
+  de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 23/11/2026 (`9bd5814`),
+  à la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
   `avant-campagne-audit`, `apres-lot1-audit`, `apres-lot2-audit`, `avant-jetons-gestes`. APK
   précédents : `~/Documents/protocole-sauvegardes/` (hors Git).
