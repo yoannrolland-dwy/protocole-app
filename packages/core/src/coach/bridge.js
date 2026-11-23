@@ -11,15 +11,21 @@
 
 import { JEFFREY_RULES, BRIEF_ORDER, allowedSessions } from "./jeffrey.js";
 import { computeSleepScore, scoreLabel } from "../energy.js";
+import { mealsDetail, dayFacts, periodFacts, checkDay, checkPeriod } from "./bridgeHistory.js";
+import { shiftDateKey } from "../dateUtils.js";
 
 export const BRIDGE_VERSION = 1;
-export const BRIDGE_SUBJECTS = ["sport_du_jour", "macros", "forme", "brief", "point", "bilan"];
+// `jour` ({ date }) et `periode` ({ du, au }) : ajout du 23/11/2026 (bridgeHistory.js).
+export const BRIDGE_SUBJECTS = ["sport_du_jour", "macros", "forme", "brief", "point", "bilan", "jour", "periode"];
 
 const COMPETENCES = "Ces règles viennent de PROTOCOLE, l'application de suivi de Monsieur (Yoann) : sport, nutrition, récupération. Derrière le majordome : coach sportif, kinésithérapeute, nutritionniste et coach de vie. Ce n'est pas un avis médical.";
 const DONNEES = "DONNÉES : les faits sont calculés par PROTOCOLE, ne les recalculez pas. Une donnée absente (null, ou listée dans « manque ») se dit absente, ne l'inventez jamais. « heure » est l'heure du calcul : un total du jour en cours n'est jamais jugé contre une cible de journée complète.";
 const SEANCES = "SÉANCES : ne proposez qu'une séance de « seances_autorisees » (aujourd'hui ou demain). Vous pouvez nuancer le choix du recommandeur selon ce que Monsieur vous dit (fatigue ressentie, temps disponible, envie) ; une séance « a_eviter » reste écartée.";
 const ALERTES = "ALERTES D'ABORD : une douleur hors base, une séance écartée pour la sécurité ou une donnée du jour qui manque se disent en premier, en une phrase nette.";
 const MACROS = "MACROS : « reste » = cible du jour moins consommé ; une valeur négative est un dépassement.";
+// 23/11/2026 : ajoutées seulement aux sujets qui portent des repas ou des dates (macros, jour, periode).
+const REPAS = "REPAS : Monsieur saisit ses repas à l'avance et les corrige dans la journée ; un repas saisi n'est pas forcément mangé. « par_repas » donne chaque repas avec son « moment » : « fait » (jour passé), « prevu » (jour futur), et aujourd'hui « passe », « en_cours » ou « a_venir » d'après ses horaires habituels, ou « sans_horaire » (pré-training, post-training, Extra : demandez si besoin). « total_passe_ou_en_cours » additionne les repas passés ou en cours. Dites « saisi » ou « prévu » pour le reste, jamais « mangé ».";
+const HISTORIQUE = "HISTORIQUE : « statut_jour » (ou « statut ») dit si le jour est passé, aujourd'hui ou futur. Un jour futur ne porte que du prévu (repas saisis, basket du calendrier, planning idéal qui n'est qu'un repère). Les totaux et moyennes d'une période sont calculés sur ses jours passés seulement ; « jours » = nombre de jours où la mesure existe. Une mesure absente se dit absente.";
 
 /**
  * Règles de coach de PROTOCOLE pour JEFFREY (sans la personnalité). `coachSystem` : le
@@ -28,6 +34,8 @@ const MACROS = "MACROS : « reste » = cible du jour moins consommé ; une valeu
  */
 export function bridgeRules(coachSystem, sujet) {
   const parts = [COMPETENCES, `CONTEXTE DU COACH (contraintes permanentes) : ${coachSystem}`, JEFFREY_RULES, DONNEES, SEANCES, ALERTES, MACROS];
+  if (sujet === "macros" || sujet === "jour" || sujet === "periode") parts.push(REPAS);
+  if (sujet === "jour" || sujet === "periode") parts.push(HISTORIQUE);
   // Mêmes consignes de forme que le brief de PROTOCOLE (jeffreyAsk « brief ») : ordre, 150 mots,
   // texte simple, première phrase courte, donnée absente dite et jamais inventée (G2, 05/11/2026).
   if (sujet === "brief") parts.push(`BRIEF DU MATIN : dans cet ordre, 150 mots au plus, texte simple (pas de titres, de gras ni de listes) : ${BRIEF_ORDER}. La première phrase est courte : c'est elle qu'on voit ou qu'on entend d'abord. S'il manque la nuit, la pesée ou le genou (« manque »), dites-le en une phrase et n'inventez jamais la valeur absente. Les rappels sont dans « rappels ». PROTOCOLE ne fournit pas la météo : sans météo de votre côté, n'en dites rien.`);
@@ -118,6 +126,9 @@ function formeOf({ facts, energy, napMinutes }) {
  *   missing : briefMissing(...) (« nuit », « pesée », « genou »),
  *   reminders : rappels calculés par l'app (sauvegarde en retard…),
  *   bilan : buildBilanPrompt(...) (sujet « bilan » seulement),
+ *   data : loadData() + foodLog/overrides lus frais (macros, jour, periode ; 23/11/2026),
+ *   planFor : (date) => { weeklyPlan, … } (planning idéal, jour et periode),
+ *   demande : paramètres de la question ({ date } pour jour, { du, au } pour periode),
  * }.
  */
 export function buildReading(sujet, ctx) {
@@ -133,6 +144,8 @@ export function buildReading(sujet, ctx) {
     faits = {
       heure: ctx.heure, phase: s.phase ?? null, cible, ...macrosOf(r, cible),
       repas_aujourdhui: r.repas_aujourdhui ?? null,
+      // 23/11/2026 : chiffres et repère de chaque repas (bridgeHistory.js), en plus du total.
+      ...mealsDetail({ foodLog: ctx.data?.foodLog, overrides: ctx.data?.overrides, date: ctx.date, statut: "aujourdhui", heure: ctx.heure }),
       moyenne_7j: s.macros_moy_7j ?? null,
       depense_estimee: s.depense_estimee ?? null,
       palier_semaine: s.palier_semaine ?? null,
@@ -155,6 +168,20 @@ export function buildReading(sujet, ctx) {
       seances_autorisees: allowedSessions(ctx.nextSession), carnet: facts.journal || null,
       cibles_du_jour: facts.cibles_du_jour ?? null,
     };
+  } else if (sujet === "jour") {
+    // 23/11/2026 : un jour passé, aujourd'hui ou futur ({ date }, défaut aujourd'hui).
+    const date = checkDay(ctx.demande?.date, ctx.date);
+    const ns = ctx.nextSession;
+    const recommandeur = date === ctx.date ? dayOf(ns?.today, { isToday: true })
+      : date === shiftDateKey(ctx.date, 1) ? dayOf(ns?.tomorrow, { isToday: false }) : null;
+    faits = dayFacts(date, ctx.data || {}, { today: ctx.date, heure: ctx.heure, planFor: ctx.planFor, recommandeur });
+    // « manque » ne parle que d'aujourd'hui (nuit, pesée, genou du jour).
+    return { date: ctx.date, regles: bridgeRules(facts.system, sujet), faits, manque: date === ctx.date ? ctx.missing || [] : [] };
+  } else if (sujet === "periode") {
+    // 23/11/2026 : une période ({ du, au }, bornes comprises, un an au plus).
+    const [du, au] = checkPeriod(ctx.demande?.du, ctx.demande?.au);
+    faits = periodFacts(du, au, ctx.data || {}, { today: ctx.date, planFor: ctx.planFor });
+    return { date: ctx.date, regles: bridgeRules(facts.system, sujet), faits, manque: [] };
   } else {
     faits = { ...(ctx.bilan?.faits || {}), notes: ctx.bilan?.notes || null, carnet: facts.journal || null };
   }

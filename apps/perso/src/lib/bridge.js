@@ -27,14 +27,18 @@ import { briefAfterKnee } from "@rawcare/core/coach/brief";
 import { jeffreyTurn, newId, hhmm } from "./jeffreyTurn.js";
 import { dispatchBridge } from "./restoreGuard.js";
 import { aiMissing } from "./ai.js";
+import { planForDate } from "./plan.js";
 
 /** Erreur du pont : un code court, jamais un texte technique ni une donnée. */
 const fail = (code) => Object.assign(new Error(code), { bridgeCode: code });
 
 export const bridgeVersion = () => ({ pont: BRIDGE_VERSION, appli: APP_VERSION });
 
-/** `lire {sujet}` → { date, regles, faits, manque }. Rien n'est écrit. */
-export function readSubject(sujet) {
+/**
+ * `lire {sujet}` → { date, regles, faits, manque }. Rien n'est écrit. `args` : la question entière,
+ * pour `jour` ({ date }) et `periode` ({ du, au }) (23/11/2026).
+ */
+export function readSubject(sujet, args = {}) {
   // G4-C3 : la séance en cours (brouillon), pour la séance à la voix.
   if (sujet === "seance") return { date: today(), ...readSession(readDraft(), sessionCtx(Date.now())) };
   if (!BRIDGE_SUBJECTS.includes(sujet)) throw fail("inconnu");
@@ -51,6 +55,10 @@ export function readSubject(sujet) {
     missing: briefMissing({ today: date, sleep: data.sleep, weight: data.weight, knee: data.knee }),
     reminders: briefReminders(),
     bilan: sujet === "bilan" ? coach.buildBilan() : null,
+    // Journal alimentaire lu frais, comme le Coach (un repas ajouté à l'instant compte).
+    data: { ...data, foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}) },
+    planFor: planForDate(data.basketSchedule),
+    demande: args || {},
   });
 }
 
@@ -220,7 +228,7 @@ export async function handleBridgeRequest(op, json, { transport } = {}) {
     // jamais un succès : refusée avant, résultat écarté si le gel apparaît pendant (restoreGuard.js).
     return await dispatchBridge(op, async () => {
       if (op === "version") return { ok: true, json: bridgeVersion() };
-      if (op === "lire") return { ok: true, json: readSubject(args?.sujet) };
+      if (op === "lire") return { ok: true, json: readSubject(args?.sujet, args) };
       if (op === "analyse") return { ok: true, json: await runAnalyse({ type: args?.type, transport }) };
       // G2 : JEFFREY confirme qu'il fait le brief du jour, avant de parler ou de notifier.
       if (op === "brief_fait") return { ok: true, json: briefDoneFromJeffrey(args) };

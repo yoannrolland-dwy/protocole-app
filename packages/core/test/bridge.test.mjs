@@ -39,7 +39,8 @@ function ctxFor(data, extra = {}) {
 }
 
 test("forme générale : { date, regles, faits, manque } pour chaque sujet, sans personnalité", () => {
-  const ctx = ctxFor(base, { bilan: { faits: { fenetre_jours: 90 }, notes: "" } });
+  // `demande` : bornes de la période (sujet `periode`, 23/11/2026) ; ignorée par les autres sujets.
+  const ctx = ctxFor(base, { bilan: { faits: { fenetre_jours: 90 }, notes: "" }, demande: { du: d(6), au: T0 } });
   for (const s of BRIDGE_SUBJECTS) {
     const r = buildReading(s, ctx);
     assert.deepEqual(Object.keys(r), ["date", "regles", "faits", "manque"], s);

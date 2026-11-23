@@ -155,3 +155,4 @@ Une ligne par section, dans l'ordre des dates. Chercher ici d'abord, puis ouvrir
 - Palier de la semaine : carte en clair (quoi faire, pourquoi, compteur, tableau) et décision le samedi autour du 14e jour (19/11/2026, apps/perso v3.175.0)
 - Palier : tendance de la prochaine décision pendant l'attente, à partir du 8e jour (19/11/2026, apps/perso v3.176.0)
 - Full Body allégée (hip thrust retiré, élévations poulie), une seule notification de repos, notifications retirées à la validation (23/11/2026, apps/perso v3.177.0)
+- Pont JEFFREY : repas détaillés (passé, en cours, à venir) dans `macros`, sujets `jour` et `periode` (23/11/2026, apps/perso v3.178.0)

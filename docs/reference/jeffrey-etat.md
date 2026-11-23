@@ -2,7 +2,7 @@
 
 Fiche de référence, sortie de CLAUDE.md le 16/11/2026. À lire avant de toucher à Jeffrey.
 
-## Jeffrey, état actuel (mis à jour le 13/11/2026, apps/perso v3.163.0 ; inchangé en v3.164.0)
+## Jeffrey, état actuel (mis à jour le 23/11/2026, apps/perso v3.178.0 : pont, repas détaillés, jour et période)
 
 Résumé de référence. Les sections datées plus bas (chantier J, 29-31/10/2026) racontent comment on
 en est arrivé là ; **en cas de désaccord, c'est cette section qui fait foi**. À tenir à jour à
@@ -84,6 +84,12 @@ PROTOCOLE calcule les faits, JEFFREY parle. Cadrage et contrat : `jeffrey-app`,
   `manque` = `briefMissing`. `analyse { type: point|bilan }` → `{ texte }` : exactement le point ou
   le bilan d'ici (même demande, même tour, configuration IA des Réglages, donc Opus), écrit dans la
   conversation du jour, carnet de bord mis à jour.
+- **Repas détaillés, jour et période (23/11/2026, v3.178.0)** : `macros` donne aussi `par_repas`
+  (chiffres et `moment` de chaque repas : `passe`/`en_cours`/`a_venir` selon les horaires de Yoann,
+  `sans_horaire` pour pré/post-training et Extra) et `total_passe_ou_en_cours` ; deux sujets nouveaux,
+  `lire { sujet: "jour", date }` (passé, aujourd'hui ou futur) et `lire { sujet: "periode", du, au }`
+  (totaux et moyennes des jours passés, une ligne par jour, un an au plus). Contrat et exemples :
+  `docs/suivi-jeffrey/2026-11-23-pont-repas-jour-periode.md`.
 - Jamais par le pont : aucune clé, aucun réglage d'IA, aucun export complet, aucune écriture hors
   du point/bilan, de `brief_fait` et des actions de `agir`.
 - **G3, actions à la voix (v3.154.0)** : op `agir { action, parametres, verifier, jeton }` (20 s).
