@@ -6,8 +6,9 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 ## État courant (14/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.178.0, commit `10faf31`, le 23/11/2026 à 11 h 02 (pont JEFFREY :
-  repas détaillés dans `macros`, sujets `jour` et `periode` ; partie JEFFREY à faire dans sa session).
+- **Installé sur le S25** : v3.179.0, commit `88edcae`, le 23/11/2026 à 11 h 14 (horaires des repas du
+  Coach alignés sur ceux de Yoann ; v3.178.0 : pont JEFFREY, repas détaillés dans `macros`, sujets `jour`
+  et `periode`, partie JEFFREY à faire dans sa session).
 - **Installé sur la montre (Galaxy Watch 7, SM-L310, Wear OS 6)** : appli `wear` v3.174.0, commit
   `8dbd7bb`, le 17/11/2026 à 18 h 33, sans fil (`release.mjs install-montre`) ; inchangée en v3.177.0
   (même empreinte), elle reçoit le nouveau texte du palier par l'instantané. `adb` doit être démarré
