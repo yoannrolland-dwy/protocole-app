@@ -161,4 +161,4 @@ eau +1 L un jour de basket fait, règle de l'app).
 ## Validation
 - PROTOCOLE v3.178.0 installé le 23/11/2026 à 11 h 02 (v3.179.0 à 11 h 14, contrat inchangé). Partie
   JEFFREY codée et installée dans sa session (11 h 18). Validé par Yoann le 23/11/2026 : réponses justes
-  sur la nutrition, les pas d'hier et la moyenne de la semaine. Pas essayé : un jour futur.
+  sur la nutrition, les pas d'hier et la moyenne de la semaine, puis sur un jour futur (OK).
