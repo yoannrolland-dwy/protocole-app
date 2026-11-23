@@ -20,6 +20,7 @@ import { T } from "../../design/tokens.js";
 import { Panel, Eyebrow, Button, IconButton, Chip, NumberField, TextField } from "../../design/primitives.jsx";
 import { mmss } from "../../lib/helpers.js";
 import { restTimer, useRestTimer, syncRestFromDraft, restState } from "../../lib/restTimer.js";
+import { clearAppNotifications } from "../../timerNotify.js";
 import { readDraft, writeDraft, patchDraft, isForeign, acknowledge, DRAFT_EVENT } from "../../lib/sessionDraft.js";
 import { sayStable } from "../../lib/jeffrey.js";
 import { restAnnouncement, holdAnnouncement, genericAnnouncement } from "../../lib/restSpeech.js";
@@ -242,9 +243,10 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
     }
     store.set("trainingDraft", null);
     restTimer.stop();
+    clearAppNotifications(); // 23/11/2026 : séance validée, plus aucune notification PROTOCOLE
     onSave(sessionRecord({ id: initial?.id ?? `${date}-${type}-${Date.now()}`, date, type, start, duration, rpe, exos: final }));
   };
-  const cancel = () => { store.set("trainingDraft", null); restTimer.stop(); onCancel(); };
+  const cancel = () => { store.set("trainingDraft", null); restTimer.stop(); clearAppNotifications(); onCancel(); };
 
   const doneCount = doneExercises(exos);
   const GRID = "28px minmax(0, 1fr) minmax(0, 1fr) 52px";

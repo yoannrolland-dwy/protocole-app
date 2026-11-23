@@ -131,27 +131,30 @@ const TEMPLATES = {
   // perdu). RDL/hip thrust : chaîne postérieure déjà chargée par le match → 2-3 reps en
   // réserve, jamais à l'échec. Mêmes noms d'exercices qu'Upper/Lower : historique, records et
   // progression partagés. Pas de planche (séance déjà longue, ~65 min).
+  // Allégée le 23/11/2026 (demande de Yoann, séance trop longue : 77, 82 et 106 min mesurées, soit
+  // ~4,5 min par série repos compris) : 3 séries par exercice, 2 pour les épaules, hip thrust
+  // retiré (le soulevé de terre roumain travaille déjà les fessiers et le match a chargé la chaîne
+  // arrière), élévations à la poulie à la place des haltères (même exercice qu'Upper A/B :
+  // historique et records partagés). Leg extension HSR inchangée (table du protocole du genou).
+  // 26 → 20 séries prévues, ~75 min estimées.
   "Full Body": { kind: "muscu", knee: true, hsr: true, chargeTags: ["genou", "tirage"], exos: [
-    { n: "Squat sur sécurités", s: 4, r: "4-6", rest: 180, mode: "reps", c: "descente lente 3 s jusqu'aux sécurités (~60°) · arrêt complet · remontée explosive",
+    { n: "Squat sur sécurités", s: 3, r: "4-6", rest: 180, mode: "reps", c: "descente lente 3 s jusqu'aux sécurités (~60°) · arrêt complet · remontée explosive",
       groupe: "quadriceps", mouvement: "genou", materiel: "barre", tendon: "genou", famille: "presse-cuisses" },
-    { n: "Mollets debout à la barre", s: 4, r: "8-12", rest: 90, mode: "reps", c: "en superset avec le squat · cale sous l'avant du pied · montée rapide, descente 2 s", supersetAvec: "Squat sur sécurités",
+    { n: "Mollets debout à la barre", s: 3, r: "8-12", rest: 90, mode: "reps", c: "en superset avec le squat · cale sous l'avant du pied · montée rapide, descente 2 s", supersetAvec: "Squat sur sécurités",
       groupe: "mollets", mouvement: "isolation", materiel: "barre", tendon: null, famille: "mollets-presse" },
     { n: "Soulevé de terre roumain", s: 3, r: "8-10", rest: 150, mode: "reps", c: "lendemain de match : 2-3 reps en réserve, jamais à l'échec",
       groupe: "ischios-fessiers", mouvement: "hanche", materiel: "barre", tendon: null },
-    { n: "Hip thrust", s: 3, r: "8-10", rest: 120, mode: "reps", c: "lendemain de match : 2-3 reps en réserve",
-      groupe: "fessiers", mouvement: "hanche", materiel: "machine", tendon: null },
     // Leg extension en dernier exercice de jambes (10/10/2026), avant de passer au haut du corps.
     { n: "Leg extension unilatérale", s: 3, r: "table HSR", rest: 120, mode: "reps", hsr: true, c: "tempo 6 s",
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou", famille: "leg-extension-unilaterale" },
     { n: "Développé incliné haltères", s: 3, r: "8-10", rest: 150, mode: "reps", c: "pecs, priorité · 1-2 reps en réserve",
       groupe: "pecs", mouvement: "poussee", materiel: "halteres", tendon: null, famille: "developpe-incline" },
-    // Spécialisation (05/10/2026) : tirage vertical à la place du rowing (largeur des dorsaux),
-    // élévations latérales 3 → 4. Bas du corps et HSR intacts. Pas de rééduc coude ici (reste en
-    // Upper A/B) pour tenir ~1 h — choix de Yoann.
+    // Spécialisation (05/10/2026) : tirage vertical à la place du rowing (largeur des dorsaux).
+    // Pas de rééduc coude ici (reste en Upper A/B) pour tenir la durée — choix de Yoann.
     { n: "Tirage vertical prise neutre", s: 3, r: "8-10", rest: 120, mode: "reps", c: "prise neutre (coude) · largeur des dorsaux",
       groupe: "dos", mouvement: "tirage", materiel: "machine", tendon: "coude", famille: "tirage-vertical" },
-    { n: "Élévations latérales haltères", s: 4, r: "10-12", rest: 60, mode: "reps", c: "priorité carrure · sans élan",
-      groupe: "epaules", mouvement: "isolation", materiel: "halteres", tendon: null },
+    { n: "Élévations latérales poulie", s: 2, r: "10-12", rest: 60, mode: "reps", c: "priorité carrure · poulie à hauteur de main, câble derrière le corps",
+      groupe: "epaules", mouvement: "isolation", materiel: "poulie", tendon: null },
   ]},
   // Échauffement (04/09/2026) : déménagé depuis ROUTINES.basket (routine "jouée" hors
   // trainingLog, onglet Douleurs) — devient un vrai carnet d'exercices, suivi pas à pas comme

@@ -33,7 +33,10 @@ test("mollets en superset : autant de séries que le squat (09/11/2026), quelle 
   const mol = (t) => TEMPLATES[t].exos.find((e) => e.n === "Mollets debout à la barre");
   for (const t of ["Lower A", "Lower B", "Lower C", "Full Body"]) {
     assert.ok(!TEMPLATES[t].exos.some((e) => e.n === "Mollets à la presse"), `${t} : plus de mollets à la presse`);
-    for (const w of [1, 4, 9]) assert.equal(exoSeriesCount(TEMPLATES[t], mol(t), w), 4, `${t} semaine ${w}`);
+    // Full Body allégée le 23/11/2026 : squat et mollets à 3.
+    const n = t === "Full Body" ? 3 : 4;
+    assert.equal(mol(t).s, TEMPLATES[t].exos.find((e) => e.n === "Squat sur sécurités").s, `${t} : mollets = squat`);
+    for (const w of [1, 4, 9]) assert.equal(exoSeriesCount(TEMPLATES[t], mol(t), w), n, `${t} semaine ${w}`);
   }
   // Un exo HSR suit la table, un exo ordinaire garde ses séries.
   const legExt = TEMPLATES["Lower A"].exos.find((e) => e.hsr);

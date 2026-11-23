@@ -1,6 +1,5 @@
 package com.yoannrolland.protocole
 
-import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -8,8 +7,6 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 
 /**
@@ -21,14 +18,7 @@ import androidx.core.content.ContextCompat
  * 01/11/2026, le bip est joué par RestAudioService, au premier plan. Depuis le 07/11/2026, plus
  * de phrase de Jeffrey ni de priorité audio : le bip seul (voir RestAudioService.kt).
  */
-/** Fin de repos dans la voix de Jeffrey (lot JT, 29/10/2026) : très court, lu entre deux séries. */
-private val END_TITLES = listOf(
-    "Repos terminé, Monsieur.",
-    "À vous, Monsieur.",
-    "La barre vous attend, Monsieur.",
-    "Fin de la récréation, Monsieur.",
-)
-
+// Titres et texte de la fin de repos : RestNotif (une seule notification de repos, 23/11/2026).
 class RestAlarmReceiver : BroadcastReceiver() {
 
     // Casque connecté : le bip va dans le casque seul (demande explicite, ne pas gêner toute la
@@ -37,17 +27,17 @@ class RestAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val exercise = intent.getStringExtra("exercise") ?: ""
 
-        // Le repos est terminé quel que soit l'état de l'app JS : on retire le décompte
-        // persistant nous-mêmes plutôt que de compter sur un rappel JS à temps.
-        try { NotificationManagerCompat.from(context).cancel(RestTimerPlugin.NOTIF_COUNTDOWN) } catch (_: Exception) { }
+        // Le décompte n'est plus retiré ici (23/11/2026) : la fin de repos le remplace, sous le même
+        // identifiant (RestNotif), affichée par le service du bip.
 
         // Le bip, dans un service au premier plan (01/11/2026) qui garde l'app en vie le temps du
         // son. Si Android refuse le service, on joue quand même ici (goAsync garde le réveil en
         // vie 10 s). Bip seul depuis le 07/11/2026 : ni phrase ni priorité audio.
         try {
-            ContextCompat.startForegroundService(context, Intent(context, RestAudioService::class.java))
+            ContextCompat.startForegroundService(context, Intent(context, RestAudioService::class.java).putExtra("exercise", exercise))
         } catch (e: Exception) {
             android.util.Log.w(RestEndAudio.TAG, "service refusé, son joué par le réveil : ${e.javaClass.simpleName}")
+            RestNotif.postEnd(context, exercise)
             val pending = goAsync()
             RestEndAudio.play(context) { pending.finish() }
         }
@@ -68,24 +58,5 @@ class RestAlarmReceiver : BroadcastReceiver() {
             }
         } catch (_: Exception) { }
 
-        try {
-            RestTimerPlugin.ensureChannels(context)
-            val open = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            val pi = open?.let {
-                PendingIntent.getActivity(context, 0, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-            }
-            val n = NotificationCompat.Builder(context, RestTimerPlugin.CHANNEL_ALARM)
-                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-                // Jeffrey (lot JT) : titre court, lu entre deux séries ; une variante au hasard.
-                .setContentTitle(END_TITLES.random())
-                .setContentText(if (exercise.isEmpty()) "Série suivante, Monsieur." else "$exercise — série suivante.")
-                .setAutoCancel(true)
-                .setSilent(true) // le son est déjà joué explicitement ci-dessus, pas de doublon
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_ALARM)
-                .setContentIntent(pi)
-                .build()
-            NotificationManagerCompat.from(context).notify(RestTimerPlugin.NOTIF_ALARM, n)
-        } catch (_: Exception) { }
     }
 }

@@ -9,6 +9,7 @@ import { TEMPLATES, TYPES, hsrForWeek } from "@rawcare/core/session/templates";
 import { C, today, fmt, round, byDate, lastN, daysBetween, Card, Label, Body, Empty, Btn, inputStyle, Stepper, Field, DateField } from "../../design/compat.jsx";
 import { MuscuLogger } from "./MuscuLogger.jsx";
 import { restTimer } from "../../lib/restTimer.js";
+import { clearAppNotifications } from "../../timerNotify.js";
 import { sameSession, upsertSession } from "../../lib/trainingEdit.js";
 import { ProgressScreen } from "./ProgressScreen.jsx";
 import { GeneField } from "./GeneField.jsx";
@@ -107,6 +108,7 @@ export function TrainTab({ training, weight, save, hsrWeek, setHsrWeek, knee, st
       // la même entrée qu'avant. Les anciens `blocs` d'une séance rééditée ne sont pas repris.
       ...(type === "Escalade" && gene && Object.keys(gene).length ? { gene } : {}) };
     store.set("trainingDraft", null);
+    clearAppNotifications(); // 23/11/2026 : séance validée, plus aucune notification PROTOCOLE
     save.training(upsertSession(training, editing, rec).list.sort(byDate));
     setOpen(null); setEditing(null);
   };
@@ -286,7 +288,7 @@ export function TrainTab({ training, weight, save, hsrWeek, setHsrWeek, knee, st
             <Btn variant="primary" onClick={() => logSession(open)} style={{ flex: 1 }}>
               <CheckCircle2 size={14} style={{ display: "inline", marginRight: 4 }} />{editing ? "Enregistrer les modifications" : "Enregistrer"}
             </Btn>
-            <Btn variant="ghost" onClick={() => { store.set("trainingDraft", null); setOpen(null); setEditing(null); }}>Annuler</Btn>
+            <Btn variant="ghost" onClick={() => { store.set("trainingDraft", null); clearAppNotifications(); setOpen(null); setEditing(null); }}>Annuler</Btn>
           </div>
         </Card>
       )}

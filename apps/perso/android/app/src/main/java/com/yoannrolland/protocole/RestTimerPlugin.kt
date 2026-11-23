@@ -43,8 +43,9 @@ class RestTimerPlugin : Plugin() {
         // ALARME) — l'ancien son de canal aurait fait doublon.
         const val CHANNEL_ALARM = "protocole-rest-alarm-v3"
         const val CHANNEL_COUNTDOWN = "protocole-rest-countdown-v2"
-        const val NOTIF_COUNTDOWN = 4202
-        const val NOTIF_ALARM = 4201
+        // Une seule notification de repos depuis le 23/11/2026 (RestNotif) : décompte et fin de
+        // repos partagent l'identifiant 4202 et se remplacent.
+        const val NOTIF_COUNTDOWN = RestNotif.ID
         private const val ALARM_REQUEST_CODE = 4201
         // Ancienne annonce de Jeffrey après le bip (31/10 → 06/11/2026), retirée le 07/11/2026 :
         // ces préférences ne servent plus qu'à effacer ce qu'une version précédente y avait rangé.
@@ -56,6 +57,7 @@ class RestTimerPlugin : Plugin() {
         /** Décompte persistant dans la barre d'état (partagé avec le pont, G4-C3). */
         fun countdown(context: Context, endsAt: Long, exercise: String) {
             ensureChannels(context)
+            RestNotif.countdownShown(context)
             val open = context.packageManager.getLaunchIntentForPackage(context.packageName)?.let {
                 android.app.PendingIntent.getActivity(
                     context, 0, it,
@@ -73,9 +75,9 @@ class RestTimerPlugin : Plugin() {
                 .setWhen(endsAt)
                 .setShowWhen(true)
                 .setOngoing(true)          // non balayable tant que le repos court
-                // Sans ça, une notification `ongoing` resterait bloquée si le repos se termine
-                // app fermée (aucun JS pour l'annuler) : Android la retire lui-même à échéance.
-                .setTimeoutAfter(maxOf(1000L, endsAt - System.currentTimeMillis() + 500L))
+                // Plus de retrait automatique à échéance (23/11/2026) : à la fin du repos, le réveil
+                // remplace ce décompte par la fin de repos, sous le même identifiant. Un retrait
+                // programmé aurait pu effacer cette fin de repos une demi-seconde après.
                 .setOnlyAlertOnce(true)
                 .setSilent(true)
                 .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
@@ -106,7 +108,7 @@ class RestTimerPlugin : Plugin() {
         fun cancelFromBridge(context: Context) {
             runCatching { context.getSystemService(AlarmManager::class.java).cancel(alarmPendingIntent(context, "")) }
             storeVoice(context, null)
-            runCatching { NotificationManagerCompat.from(context).cancel(NOTIF_COUNTDOWN) }
+            RestNotif.hideCountdown(context)
             // 06/11/2026 : un bip (ou une phrase de fin de repos) déjà en train de sonner s'arrête.
             RestEndAudio.stop()
         }
@@ -219,7 +221,14 @@ class RestTimerPlugin : Plugin() {
 
     @PluginMethod
     fun hideCountdown(call: PluginCall) {
-        try { NotificationManagerCompat.from(context).cancel(NOTIF_COUNTDOWN) } catch (_: Exception) {}
+        RestNotif.hideCountdown(context)
+        call.resolve()
+    }
+
+    /** Séance validée ou abandonnée (23/11/2026) : toutes les notifications de PROTOCOLE retirées. */
+    @PluginMethod
+    fun clearAll(call: PluginCall) {
+        RestNotif.clearAll(context)
         call.resolve()
     }
 }

@@ -11,7 +11,6 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
-import androidx.core.app.NotificationCompat
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -34,23 +33,27 @@ class RestAudioService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        BriefRunner.ensureChannel(this)
-        val n = NotificationCompat.Builder(this, BriefRunner.CHANNEL)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Jeffrey")
-            .setContentText("Fin du repos, Monsieur.")
-            .setOngoing(true)
-            .setSilent(true)
-            .build()
+        // Une seule notification de repos (23/11/2026) : le service porte la fin de repos elle-même,
+        // sous l'identifiant du décompte qu'elle remplace (RestNotif), au lieu d'une notification
+        // « Jeffrey · Fin du repos » de plus.
+        val exercise = intent?.getStringExtra("exercise") ?: ""
+        val n = RestNotif.endNotification(this, exercise)
         var foreground = true
         try {
-            if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-            else startForeground(NOTIF_ID, n)
+            if (Build.VERSION.SDK_INT >= 29) startForeground(RestNotif.ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            else startForeground(RestNotif.ID, n)
+            RestNotif.showingEnd = true
         } catch (e: Exception) {
             Log.w(RestEndAudio.TAG, "service au premier plan refusé : ${e.javaClass.simpleName}")
             foreground = false
+            RestNotif.postEnd(this, exercise)
         }
-        RestEndAudio.play(this) { stopSelf(startId) }
+        RestEndAudio.play(this) {
+            // Le son est fini : le service s'arrête, mais la fin de repos RESTE affichée (détachée
+            // du service) jusqu'au décompte suivant, au toucher, ou à la validation de la séance.
+            if (foreground) runCatching { stopForeground(STOP_FOREGROUND_DETACH) }
+            stopSelf(startId)
+        }
         // Premier plan refusé (audit du 10/11/2026, point 20) : le service s'arrête tout de suite,
         // sinon Android fait planter l'app quelques secondes plus tard (service demandé au premier
         // plan qui ne l'a jamais été). Le bip, lancé juste avant, joue quand même.
@@ -58,9 +61,6 @@ class RestAudioService : Service() {
         return START_NOT_STICKY
     }
 
-    companion object {
-        const val NOTIF_ID = 5053
-    }
 }
 
 /** Le bip seul. Utilisé par le service, et par le réveil lui-même si Android refuse le service. */

@@ -18,6 +18,7 @@ import { searchCiqual, getCiqual } from "@rawcare/core/nutrition/ciqual";
 import { applyActionStored } from "./jeffreyNotify.js";
 import { readDraft } from "./sessionDraft.js";
 import { nativeRest } from "./bridgeRest.js";
+import { clearAppNotifications } from "../timerNotify.js";
 import { readSession, finishCheck, abandonCheck } from "@rawcare/core/session/voiceSession";
 import { SESSION_NOW, sessionCtx, runSessionNow } from "./sessionGestures.js";
 import { AGIR_KEY, AGIR_TTL_MS, pendingAgir, newJeton, keptAgir } from "./agirTokens.js";
@@ -194,6 +195,7 @@ function sessionConfirmCheck(action, p, now) {
         store.set("trainingLog", next.sort(byDate));
         store.set("trainingDraft", null);
         nativeRest(null);
+        clearAppNotifications(); // 23/11/2026 : séance validée à la voix, plus aucune notification PROTOCOLE
       },
     };
   }
@@ -201,7 +203,7 @@ function sessionConfirmCheck(action, p, now) {
   if (!r.ok) return r;
   return {
     ok: true, resume: r.resume, question: r.question, done: `Séance ${d.type} abandonnée : rien n'a été enregistré.`,
-    apply: () => { store.set("trainingDraft", null); nativeRest(null); },
+    apply: () => { store.set("trainingDraft", null); nativeRest(null); clearAppNotifications(); },
   };
 }
 

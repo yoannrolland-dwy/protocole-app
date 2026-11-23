@@ -77,6 +77,16 @@ export async function hideRestCountdown() {
   try { await RestTimer.hideCountdown(); } catch { /* ignore */ }
 }
 
+/**
+ * Séance validée ou abandonnée (23/11/2026, demande de Yoann) : plus de réveil de repos ni de bip,
+ * et TOUTES les notifications de PROTOCOLE retirées (repos, brief de Jeffrey, rappel de sauvegarde).
+ * Voir RestNotif.kt. Sans effet hors app native.
+ */
+export async function clearAppNotifications() {
+  if (!Capacitor.isNativePlatform()) return;
+  try { await RestTimer.clearAll(); } catch { /* ignore */ }
+}
+
 /** Annule l'alarme et retire le décompte (pause, remise à zéro, sortie du carnet). */
 export async function cancelRestAlarm() {
   if (!Capacitor.isNativePlatform()) return;

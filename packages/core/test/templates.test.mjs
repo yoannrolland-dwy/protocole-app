@@ -47,13 +47,18 @@ test("volume hebdo Upper A + Upper B : épaules latérales 10, tirage vertical 7
   assert.equal(sum(["Rowing barre ou machine", "Face pull", "Rear delt machine (reverse pec deck)"]), 7);
 });
 
-test("Full Body : existe, HSR, tag genou, contenu et ordre figés", () => {
+test("Full Body (allégée le 23/11/2026) : HSR, tag genou, contenu, ordre et séries figés", () => {
   const FB = TEMPLATES["Full Body"];
   assert.ok(TYPES.includes("Full Body"));
   assert.ok(FB.hsr && FB.chargeTags.includes("genou"));
   assert.equal(FB.exos.map((e) => e.n).join("|"),
-    "Squat sur sécurités|Mollets debout à la barre|Soulevé de terre roumain|Hip thrust|Leg extension unilatérale|Développé incliné haltères|Tirage vertical prise neutre|Élévations latérales haltères");
-  assert.equal(FB.exos.find((e) => e.n === "Élévations latérales haltères").s, 4);
+    "Squat sur sécurités|Mollets debout à la barre|Soulevé de terre roumain|Leg extension unilatérale|Développé incliné haltères|Tirage vertical prise neutre|Élévations latérales poulie");
+  // 3 séries partout, 2 pour les épaules ; la leg extension suit la table HSR (`s` ignoré).
+  assert.deepEqual(FB.exos.filter((e) => !e.hsr).map((e) => e.s), [3, 3, 3, 3, 3, 2]);
+  const poulie = FB.exos.find((e) => e.n === "Élévations latérales poulie");
+  assert.equal(poulie.materiel, "poulie");
+  assert.equal(poulie.c, TEMPLATES["Upper B"].exos.find((e) => e.n === "Élévations latérales poulie").c, "même consigne qu'Upper B");
+  assert.ok(!FB.exos.some((e) => e.n === "Hip thrust" || e.n === "Élévations latérales haltères"));
 });
 
 test("Mobilité (13/11/2026) : 18 exercices rangés par zone, aucune charge, mise en garde genou sur trois mouvements", () => {
