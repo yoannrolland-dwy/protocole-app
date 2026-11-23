@@ -6,13 +6,13 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 ## État courant (14/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.176.0, commit `f414e30`, le 19/11/2026 à 10 h 16 (palier de la
-  semaine : carte en clair, décision le samedi à partir de 10 h, tendance pendant l'attente).
+- **Installé sur le S25** : v3.177.0, commit `ca851ae`, le 23/11/2026 à 10 h 08 (Full Body allégée,
+  une seule notification de repos, notifications retirées à la validation).
 - **Installé sur la montre (Galaxy Watch 7, SM-L310, Wear OS 6)** : appli `wear` v3.174.0, commit
-  `8dbd7bb`, le 17/11/2026 à 18 h 33, sans fil (`release.mjs install-montre`) ; inchangée en v3.176.0
+  `8dbd7bb`, le 17/11/2026 à 18 h 33, sans fil (`release.mjs install-montre`) ; inchangée en v3.177.0
   (même empreinte), elle reçoit le nouveau texte du palier par l'instantané. `adb` doit être démarré
   depuis le Terminal de macOS : lancé depuis l'app Claude, macOS lui bloque le réseau local.
-- **Git** : `dev` = `origin/dev` (poussé le 19/11/2026), dossier propre, aucune autre branche
+- **Git** : `dev` = `origin/dev` (poussé le 23/11/2026), dossier propre, aucune autre branche
   de travail, aucun worktree, rien de mis de côté. `main` a été aligné sur `dev` le 13/11/2026, à
   la demande de Yoann : il ne déclenche plus rien et n'est mis à jour que sur sa demande.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
