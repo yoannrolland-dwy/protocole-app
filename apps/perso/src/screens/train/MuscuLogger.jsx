@@ -14,6 +14,7 @@ import { catalogGroups } from "@rawcare/core/session/exoCatalog";
 import {
   makeAddedExercise, buildExercises, updateSet, toggleSet, addSet, lastRemovable, removeLastSet, setRir,
   appendExercise, removeExercise, substitutionCandidates, substituteExercise, doneExercises, sessionRecord, recordSetIndexes,
+  isLightSession, showsWeight,
 } from "@rawcare/core/session/engine";
 import { fmt, today } from "../../ui.jsx";
 import { T } from "../../design/tokens.js";
@@ -56,6 +57,9 @@ function SetField({ value, onChange, unit, inputMode, placeholder, label, inputR
    ============================================================ */
 export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onCancel, initial, painRed = false }) {
   const template = TEMPLATES[type];
+  // Séance simple (Mobilité, 24/11/2026) : ni reps en réserve, ni records, ni plateau, ni JEFFREY au
+  // cochage ; poids seulement sur les exercices qui en ont besoin (engine.js).
+  const light = isLightSession(type);
 
   // Moteur de séance (G4-C1, 05/11/2026) : construction des exercices et opérations sur les
   // séries dans packages/core/src/session/engine.js, à l'identique de ce qui vivait ici.
@@ -176,7 +180,7 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
     // l'exercice redevient complet, séance rouverte comprise (retour d'essai de Yoann). Record sur
     // cette même série : une seule phrase, dans le signal de fin d'exercice (pas de signal « record »
     // en plus, sauf si JEFFREY n'a pas encore le récepteur de fin d'exercice).
-    if (!base[ei].series[si].fait) {
+    if (!light && !base[ei].series[si].fait) {
       const p = recordPayload({ after, ei, si, ref: refRecords[base[ei].nom], painRed, date });
       const fin = exerciseEnd({ exos: after, ei, si, ref: painRed ? null : refRecords[base[ei].nom], training, date, exclude: initial, painRed });
       if (fin) {
@@ -239,7 +243,8 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
     // durée : seule l'heure de début est connue). Historique d'avant l'enregistrement (`training`).
     {
       const minutes = TEMPLATES[type]?.withMeta ? Number(duration) || null : initial ? null : elapsedMinutes(start, Date.now());
-      signalSession({ date, type, ...sessionReport({ type, exos: final, training, exclude: initial, date, painRed, minutes }) });
+      // Séance simple : compte rendu réduit aux chiffres (ni record, ni tendance), comme un jour de douleur.
+      signalSession({ date, type, ...sessionReport({ type, exos: final, training, exclude: initial, date, painRed: painRed || light, minutes }) });
     }
     store.set("trainingDraft", null);
     restTimer.stop();
@@ -250,6 +255,7 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
 
   const doneCount = doneExercises(exos);
   const GRID = "28px minmax(0, 1fr) minmax(0, 1fr) 52px";
+  const GRID_NO_KG = "28px minmax(0, 1fr) 52px"; // sans colonne Poids (séance simple)
 
   // ---- records (V4) ----
   // Référence à battre = meilleure série de TOUT l'historique hors séance en cours (une
@@ -278,21 +284,24 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
   const renderRows = (e, ei, legFilter) => {
     // Douleur hors base aujourd'hui : le record est calculé et enregistré normalement, il
     // n'est simplement pas mis en avant (voir painOutOfBase dans training.js).
-    const recs = painRed ? new Set() : recordIdx(e);
+    const recs = painRed || light ? new Set() : recordIdx(e);
+    const kg = showsWeight(type, e);
     return e.series
     .map((s, si) => ({ s, si }))
     .filter(({ s }) => legFilter == null || s.leg === legFilter)
     .map(({ s, si }, n) => (
-      <div key={si} style={{ display: "grid", gridTemplateColumns: GRID, gap: 8, alignItems: "center" }}>
+      <div key={si} style={{ display: "grid", gridTemplateColumns: kg ? GRID : GRID_NO_KG, gap: 8, alignItems: "center" }}>
         <span style={{ ...mono, fontSize: 15, textAlign: "center", color: recs.has(si) ? T.c.accent : T.c.text2, fontWeight: 700 }}>
           {n + 1}{recs.has(si) && <span style={{ fontSize: 12 }}>★</span>}
         </span>
         <SetField value={s.val} inputMode="numeric" placeholder={e.mode === "temps" ? "sec" : e.target}
           unit={e.mode === "temps" ? "s" : "reps"} label={`Série ${n + 1}, ${e.mode === "temps" ? "secondes" : "répétitions"}`}
-          done={s.fait} onChange={(v) => upd(ei, si, "val", v)} onEnter={() => poidsRefs.current[`${ei}-${si}`]?.focus()} />
-        <SetField value={s.poids} inputMode="decimal" placeholder="kg" unit="kg" label={`Série ${n + 1}, poids`}
-          done={s.fait} inputRef={(el) => { poidsRefs.current[`${ei}-${si}`] = el; }}
-          onChange={(v) => upd(ei, si, "poids", v)} />
+          done={s.fait} onChange={(v) => upd(ei, si, "val", v)} onEnter={kg ? () => poidsRefs.current[`${ei}-${si}`]?.focus() : undefined} />
+        {kg && (
+          <SetField value={s.poids} inputMode="decimal" placeholder="kg" unit="kg" label={`Série ${n + 1}, poids`}
+            done={s.fait} inputRef={(el) => { poidsRefs.current[`${ei}-${si}`] = el; }}
+            onChange={(v) => upd(ei, si, "poids", v)} />
+        )}
         <button type="button" className="p-tap" onClick={() => toggle(ei, si)} aria-pressed={s.fait}
           aria-label={s.fait ? `Série ${n + 1} faite, décocher` : `Valider la série ${n + 1}`}
           style={{
@@ -416,7 +425,9 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
                 <span style={{ ...mono, fontSize: 13, color: T.c.text2, whiteSpace: "nowrap" }}>{e.scheme}</span>
               </span>
               <span style={{ fontSize: 14, color: T.c.accent, fontWeight: 600 }}>
-                {e.last
+                {!showsWeight(type, e)
+                  ? (e.last ? `Dernière fois ${e.last.val || "—"}${e.mode === "temps" ? " s" : " reps"}` : "Première fois")
+                  : e.last
                   ? `Dernière fois ${e.last.poids || "—"} kg × ${e.last.val || "—"}${e.mode === "temps" ? " s" : ""}`
                   : e.def != null ? `Défaut ${e.def} kg` : "Première fois"}
                 {done > 0 && <span style={{ color: T.c.text2, fontWeight: 500 }}> · {done} série{done > 1 ? "s" : ""} ✓</span>}
@@ -438,10 +449,10 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
                 <ExoNote nom={e.nom} text={notes[e.nom] || ""} onChange={(t) => setNote(e.nom, t)} />
                 {/* Le record à battre est affiché comme un fait, pas comme un objectif à
                     forcer — et il disparaît les jours où un tendon est hors base. */}
-                {!painRed && refRecords[e.nom] && (
+                {!painRed && !light && refRecords[e.nom] && (
                   <div style={{ ...mono, fontSize: 13, color: T.c.text2 }}>★ record {setLabel(refRecords[e.nom], e.mode)}</div>
                 )}
-                {!painRed && plateauByExo[e.nom] && (
+                {!painRed && !light && plateauByExo[e.nom] && (
                   <div style={{ ...mono, fontSize: 13, color: WARN }}>⏸ plateau depuis {plateauByExo[e.nom].sessions} séances</div>
                 )}
 
@@ -479,10 +490,10 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
                   );
                 })()}
 
-                <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 8, marginTop: 2 }}>
+                <div style={{ display: "grid", gridTemplateColumns: showsWeight(type, e) ? GRID : GRID_NO_KG, gap: 8, marginTop: 2 }}>
                   <span className="p-label" style={{ textAlign: "center" }}>N°</span>
                   <span className="p-label" style={{ textAlign: "center" }}>{e.mode === "temps" ? "Sec" : "Reps"}</span>
-                  <span className="p-label" style={{ textAlign: "center" }}>Poids</span>
+                  {showsWeight(type, e) && <span className="p-label" style={{ textAlign: "center" }}>Poids</span>}
                   <span className="p-label" style={{ textAlign: "center" }}>Fait</span>
                 </div>
 
@@ -501,7 +512,7 @@ export function MuscuLogger({ type, training, hsrWeek, date, onDate, onSave, onC
 
                 {/* Reps en réserve (T4, 04/10/2026) : un choix par EXERCICE, pas par série ;
                     optionnel — rien de présélectionné, re-tap pour effacer. Pas en mode temps. */}
-                {e.mode !== "temps" && (
+                {e.mode !== "temps" && !light && (
                   <div style={{ display: "grid", gap: 6 }}>
                     <Eyebrow>Reps en réserve</Eyebrow>
                     <div style={{ display: "flex", gap: 6 }}>

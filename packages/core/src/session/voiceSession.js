@@ -17,7 +17,7 @@
 
 import { TEMPLATES } from "./templates.js";
 import { metaFor } from "./exoMeta.js";
-import { buildExercises, currentSet, recordSetIndexes, doneExercises, sessionRecord, spokenName } from "./engine.js";
+import { buildExercises, currentSet, recordSetIndexes, doneExercises, sessionRecord, spokenName, isLightSession, showsWeight } from "./engine.js";
 import { exerciseSessions, recordToBeat, progressiveOverloadSuggestion, painOutOfBase } from "../training.js";
 import { exerciseEnd, sessionReport, elapsedMinutes } from "./exerciseEnd.js";
 
@@ -107,8 +107,9 @@ export function readSession(d, ctx) {
   const e = exos[cur.ei];
   const s = e.series[cur.si];
   const painRed = painRedOf(d, ctx);
-  const ref = painRed ? null : recordToBeat(ctx.training || [], e.nom, editedOf(d, ctx));
-  const plateau = plateauOf(e.nom, d, ctx);
+  const light = isLightSession(d.type); // Mobilité : ni record à battre, ni plateau (24/11/2026)
+  const ref = painRed || light ? null : recordToBeat(ctx.training || [], e.nom, editedOf(d, ctx));
+  const plateau = light ? null : plateauOf(e.nom, d, ctx);
   out.courant = {
     exercice: e.nom, serie: cur.n, ...(cur.leg ? { jambe: cur.leg } : {}),
     prevu: isTime(e) ? { secondes: s.val === "" ? null : +s.val } : { kg: s.poids === "" ? null : +s.poids, reps: s.val === "" ? null : +s.val },
@@ -159,7 +160,7 @@ export function logSet(d, p, ctx) {
     const kg = Math.round(num(p.kg) * 10) / 10;
     if (!Number.isFinite(kg) || kg < 0 || kg > 500) return fail("charge hors de 0 à 500 kg");
     poids = kg;
-  } else if (!isTime(e) && before.poids === "" && !isBodyweight(e)) {
+  } else if (!isTime(e) && before.poids === "" && !isBodyweight(e) && showsWeight(d.type, e)) {
     // Exercice au poids du corps (squats de l'échauffement basket, cheville au mur) : aucune charge
     // à demander, la série se note sans kilos, comme à l'écran (audit du 10/11/2026, point 15).
     return fail(`charge inconnue pour ${e.nom} : demandez-la à Monsieur`, { besoin: "kg" });
@@ -168,13 +169,15 @@ export function logSet(d, p, ctx) {
   const after = { ...before, val, poids, fait: true };
   exos = exos.map((x, i) => (i !== cur.ei ? x : { ...x, series: x.series.map((s, j) => (j !== cur.si ? s : after)) }));
   const painRed = painRedOf(d, ctx);
-  const ref = painRed ? null : recordToBeat(ctx.training || [], e.nom, editedOf(d, ctx));
+  // Séance simple (Mobilité, 24/11/2026) : la série est notée, sans record, plateau ni fin d'exercice.
+  const light = isLightSession(d.type);
+  const ref = painRed || light ? null : recordToBeat(ctx.training || [], e.nom, editedOf(d, ctx));
   const record = !!ref && recordSetIndexes(exos[cur.ei], ref).has(cur.si);
-  const plateau = firstOfExercise ? plateauOf(e.nom, d, ctx) : null;
+  const plateau = firstOfExercise && !light ? plateauOf(e.nom, d, ctx) : null;
   // Fin d'exercice (17/11/2026) : tendance chaque fois que la dernière série est notée (aussi après
   // « annule » puis une nouvelle note, et dans une séance rouverte). Record sur cette même série :
   // il est dit DANS la phrase de fin.
-  const fin = exerciseEnd({ exos, ei: cur.ei, si: cur.si, ref, training: ctx.training || [], date: d.date,
+  const fin = light ? null : exerciseEnd({ exos, ei: cur.ei, si: cur.si, ref, training: ctx.training || [], date: d.date,
     exclude: d.editingId ? editedOf(d, ctx) ?? { id: d.editingId } : null, painRed, rand: ctx.rand });
   const draft = { ...d, exos, courant, voix: { last: { ei: cur.ei, si: cur.si, before } } };
   // Exercice sans repos prévu (échauffement basket) : on ne dit pas « repos 0 secondes ».
@@ -294,7 +297,7 @@ export function finishCheck(d, p, { nowMs, training = [], knee = [], rand } = {}
   // est connue ; le Basket garde la durée donnée).
   const edited = d.editingId ? training.find((t) => t.id === d.editingId) ?? { id: d.editingId } : null;
   const compteRendu = sessionReport({ type: d.type, exos: d.exos, training, exclude: edited, date: d.date,
-    painRed: painOutOfBase([knee], d.date), minutes: meta ? duration : edited ? null : elapsedMinutes(d.start, nowMs), rand });
+    painRed: painOutOfBase([knee], d.date) || isLightSession(d.type), minutes: meta ? duration : edited ? null : elapsedMinutes(d.start, nowMs), rand });
   return {
     ok: true, record, editingId: d.editingId ?? null, ...(compteRendu ? { compteRendu } : {}),
     resume: `Enregistrer la séance ${d.type} : ${counts}${metaText}`,

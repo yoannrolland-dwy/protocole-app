@@ -207,8 +207,11 @@ const TEMPLATES = {
   // groupe « mobilite » : jamais comptés dans le volume ni dans les suggestions de surcharge.
   // `alerte` : mise en garde affichée sous la consigne (flexion profonde du genou, au-delà des
   // 10-60° de la rééducation). L'iso genou reste en premier, la planche en dernier.
-  "Mobilité": { kind: "muscu", chargeTags: [], exos: [
-    { n: "Iso leg extension unilatérale @60° (genou)", s: 3, r: "45 s", rest: 60, mode: "temps", zone: "genou",
+  // Séance simple (24/11/2026, demande de Yoann) : `light` = ni reps en réserve, ni records, ni
+  // indicateur de progression, ni JEFFREY au cochage (le minuteur de repos et son bip restent).
+  // Le poids n'est saisi que sur les exercices marqués `poids` (et ceux ajoutés en cours de séance).
+  "Mobilité": { kind: "muscu", chargeTags: [], light: true, exos: [
+    { n: "Iso leg extension unilatérale @60° (genou)", s: 3, r: "45 s", rest: 60, mode: "temps", zone: "genou", poids: true,
       c: "rééduc tendon quadricipital · effort ~70 %, sous le seuil de douleur · antalgie avant le basket du soir",
       groupe: "quadriceps", mouvement: "genou", materiel: "machine", tendon: "genou" },
 
@@ -251,7 +254,7 @@ const TEMPLATES = {
     { n: "Anges au mur", s: 1, r: "10", rest: 20, mode: "reps", zone: "epaules",
       c: "dos, tête et bras contre le mur · glisser les bras vers le haut puis redescendre, sans décoller les coudes ni cambrer · ouverture des épaules pour les développés et l'escalade",
       groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
-    { n: "Rotation externe épaule poulie basse", s: 2, r: "12", rest: 45, mode: "reps", opt: true, zone: "epaules",
+    { n: "Rotation externe épaule poulie basse", s: 2, r: "12", rest: 45, mode: "reps", opt: true, zone: "epaules", poids: true,
       c: "par côté, léger · coiffe des rotateurs : contrepoids aux 10 séries d'élévations hebdo et aux tirages bras en l'air (escalade)",
       groupe: "coiffe", mouvement: "isolation", materiel: "poulie", tendon: null },
 
@@ -260,11 +263,11 @@ const TEMPLATES = {
       groupe: "mobilite", mouvement: "mobilite", materiel: "aucun", tendon: null },
 
     // Ordre (14/10/2026, demande de Yoann) : iso coude avant les abdos, planche en dernier.
-    { n: "Iso flexion coude prise marteau + supination", s: 2, r: "30 s", rest: 45, mode: "temps", opt: true, zone: "coude",
+    { n: "Iso flexion coude prise marteau + supination", s: 2, r: "30 s", rest: 45, mode: "temps", opt: true, zone: "coude", poids: true,
       c: "prévention coude (sans douleur depuis septembre) · à cocher selon l'escalade de la semaine",
       groupe: "biceps", mouvement: "isolation", materiel: "aucun", tendon: "coude" },
 
-    { n: "Core — Crunch machine", s: 2, r: "10-12", rest: 60, mode: "reps", c: "contrôlé, 1-2 reps en réserve", zone: "abdos",
+    { n: "Core — Crunch machine", s: 2, r: "10-12", rest: 60, mode: "reps", c: "contrôlé", zone: "abdos", poids: true,
       groupe: "core", mouvement: "isolation", materiel: "machine", tendon: null },
     { n: "Core — Planche", s: 2, r: "45-60 s", rest: 60, mode: "temps", c: "anti-extension · progresser par difficulté, pas par durée", zone: "abdos",
       groupe: "core", mouvement: "gainage", materiel: "aucun", tendon: null },

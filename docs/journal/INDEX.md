@@ -157,3 +157,4 @@ Une ligne par section, dans l'ordre des dates. Chercher ici d'abord, puis ouvrir
 - Full Body allégée (hip thrust retiré, élévations poulie), une seule notification de repos, notifications retirées à la validation (23/11/2026, apps/perso v3.177.0)
 - Pont JEFFREY : repas détaillés (passé, en cours, à venir) dans `macros`, sujets `jour` et `periode` (23/11/2026, apps/perso v3.178.0)
 - Coach : horaires des repas alignés sur ceux de Yoann, source unique avec le pont (23/11/2026, apps/perso v3.179.0)
+- Séance Mobilité simplifiée : ni reps en réserve, ni records, ni JEFFREY au cochage, poids sur 4 exercices (24/11/2026, apps/perso v3.180.0)

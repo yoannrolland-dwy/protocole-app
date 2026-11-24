@@ -220,6 +220,22 @@ export function currentSet(exos, { ei } = {}) {
 /** Exercices avec au moins une série cochée (« 3/9 exos »). */
 export const doneExercises = (exos) => exos.filter((e) => e.series.some((s) => s.fait)).length;
 
+/** Séance simple (Mobilité, 24/11/2026, demande de Yoann) : ni reps en réserve, ni records, ni
+ *  indicateur de progression, et JEFFREY ne dit rien au cochage. Gabarit marqué `light`. */
+export const isLightSession = (type) => !!TEMPLATES[type]?.light;
+
+/**
+ * Le champ poids est-il montré pour cet exercice ? Toujours, sauf en séance simple : là, seuls les
+ * exercices marqués `poids` dans le gabarit (retrouvés aussi après une substitution, par `origine`)
+ * et les exercices ajoutés en cours de séance le gardent.
+ */
+export function showsWeight(type, e) {
+  const tpl = TEMPLATES[type];
+  if (!tpl?.light || e?.added) return true;
+  const ex = tpl.exos.find((x) => x.n === (e?.origine ?? e?.nom));
+  return !!ex?.poids;
+}
+
 /**
  * Ligne `trainingLog` de la séance validée — exactement ce qu'enregistre « Valider la séance ».
  * Séries vides retirées (ni poids, ni reps, ni cochée), exercice sans série retiré ; RIR et
