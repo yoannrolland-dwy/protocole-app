@@ -6,7 +6,8 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 ## État courant (14/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.182.0, commit `842f7d9`, le 25/11/2026 à 10 h 31 (modifier à la voix, lots 2 et 3 :
+- **Installé sur le S25** : v3.183.0, commit `a005207`, le 25/11/2026 à 10 h 39 (modifier à la voix, lot 4 :
+  séances passées ; les quatre lots du cadrage sont faits). Avant : v3.182.0, commit `842f7d9`, le 25/11/2026 à 10 h 31 (modifier à la voix, lots 2 et 3 :
   un aliment, les mesures d'un jour, sur 7 jours). Avant : v3.181.0, commit `19411fc`, le 25/11/2026 à 10 h 18 (modifier à la voix, lot 1 :
   heure de début et séries de la séance en cours, relues avec l'avant et l'après ; contrat
   `docs/suivi-jeffrey/2026-11-25-modifier-seance.md`). Avant : v3.180.0, commit `718c3c8`, le 24/11/2026 à 11 h 48 (séance Mobilité
