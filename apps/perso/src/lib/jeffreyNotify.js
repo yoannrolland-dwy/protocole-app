@@ -8,7 +8,8 @@
 // rapide proposée par Jeffrey. Une action en attente prend la place de la réponse rapide
 // (« Confirmer ») ; une douleur au genou sans réponse sur la base donne « Base » / « Pas la base ».
 import { applyWater, applyKnee, appendNote, foodEntriesFor } from "@rawcare/core/coach/jeffrey";
-import { deriveMacroLog, resolveLog } from "@rawcare/core/nutrition/foodStore";
+import { deriveMacroLog, resolveLog, syncMacroLog } from "@rawcare/core/nutrition/foodStore";
+import { editedFoodLog, withoutDay, waterTotal } from "@rawcare/core/coach/bridgeEdits";
 import { today, upsert, byDate } from "@rawcare/core/dateUtils";
 import { getSync, store } from "../store.js";
 import { TEMPLATES } from "@rawcare/core/session/templates";
@@ -85,6 +86,23 @@ export function applyActionStored(act) {
     const notes = getSync("noteLog", []);
     const text = appendNote(notes.find((n) => n.date === date)?.text || "", act.text);
     store.set("noteLog", [...notes.filter((n) => n.date !== date), { date, text }].sort(byDate));
+  }
+  // Modifier à la voix, lots 2 et 3 (25/11/2026) : mêmes écritures que les écrans (Nutrition, Poids,
+  // Genou, eau, note du jour) ; les totaux du jour sont refaits par syncMacroLog, qui garde l'eau et
+  // vide un jour devenu sans aliment.
+  if (act.kind === "aliment_modif" || act.kind === "aliment_retrait") {
+    const next = editedFoodLog(getSync("foodLog", []), act);
+    store.set("foodLog", next);
+    const { macros: synced } = syncMacroLog(macros, resolveLog(next, getSync("foodOverrides", {})), [date]);
+    store.set("macroLog", synced);
+    return null;
+  }
+  if (act.kind === "poids_efface") store.set("weightLog", withoutDay(getSync("weightLog", []), date));
+  if (act.kind === "genou_efface") store.set("kneeLog", withoutDay(getSync("kneeLog", []), date));
+  if (act.kind === "eau_total") store.set("macroLog", waterTotal(macros, date, act.ml));
+  if (act.kind === "note_remplace") {
+    const notes = getSync("noteLog", []).filter((n) => n.date !== date);
+    store.set("noteLog", (act.text ? [...notes, { date, text: act.text }] : notes).sort(byDate));
   }
   if (act.kind === "repas" || act.kind === "habituel" || act.kind === "aliment") {
     const raw = getSync("foodLog", []);

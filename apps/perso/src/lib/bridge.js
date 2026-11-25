@@ -116,6 +116,8 @@ export function agirContext() {
     foodLog: getSync("foodLog", []), overrides: getSync("foodOverrides", {}),
     mealPins: getSync("foodMealPins", {}), mealMuted: getSync("foodMealMuted", {}),
     recipes: getSync("foodRecipes", []),
+    // Modifier à la voix, lot 3 (25/11/2026) : la note d'un jour.
+    notes: getSync("noteLog", []),
     ciqual: { search: (q, limit) => searchCiqual(q, { limit }), get: getCiqual },
     // G4-A : séances.
     now: new Date(), nowMs: Date.now(),
@@ -174,7 +176,8 @@ export async function runAgir(args, { now = Date.now(), ctx = agirContext() } = 
   }
   // Genou noté : si la règle du brief le lancerait maintenant, JEFFREY enchaîne sur le brief (même
   // app fermée). Réglage Activé / Désactivé lu par le natif ; absent (aperçu) = activé.
-  if (res.act.kind === "genou") {
+  // Une correction d'un autre jour (25/11/2026) ne lance pas le brief d'aujourd'hui.
+  if (res.act.kind === "genou" && res.act.date === ctx.today) {
     const enabled = window.JeffreyBridgePage?.briefEnabled ? window.JeffreyBridgePage.briefEnabled() : true;
     const b = briefAfterKnee({ now: new Date(now), today: ctx.today, knee: getSync("kneeLog", []), state: getSync("jeffreyBrief", {}) || {}, enabled });
     if (b) out.brief_du_jour = b;

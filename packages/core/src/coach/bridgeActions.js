@@ -24,6 +24,7 @@ import {
 } from "../nutrition/foodStore.js";
 import { TEMPLATES } from "../session/templates.js";
 import { GENE_ZONES } from "../sessionLoad.js";
+import { EDIT_ACTIONS, checkEdit } from "./bridgeEdits.js";
 
 export const MEAL_ACTIONS = new Set(["reprendre_repas", "ajouter_habituel", "ajouter_aliment"]);
 
@@ -33,6 +34,8 @@ export const AGIR_ACTIONS = [
   "reprendre_repas", "ajouter_habituel", "ajouter_aliment",
   // G4-A (05/11/2026) : séances.
   "demarrer_seance", "noter_seance_faite",
+  // Modifier à la voix, lots 2 et 3 (25/11/2026) : corriger un aliment, les mesures d'un jour (bridgeEdits.js).
+  ...EDIT_ACTIONS,
 ];
 
 // --- G4-A : séances (05/11/2026) ---------------------------------------------------------------
@@ -234,6 +237,7 @@ const namesOf = (items) => {
 export async function checkAgir(action, parametres, ctx) {
   if (!AGIR_ACTIONS.includes(action)) throw Object.assign(new Error("action inconnue"), { code: "inconnu" });
   const p = parametres && typeof parametres === "object" ? parametres : {};
+  if (EDIT_ACTIONS.includes(action)) return checkEdit(action, p, ctx);
   const d = dayOf(action, p, ctx.today);
   if (!d.ok) return d;
   const { jour, date } = d;
@@ -272,6 +276,7 @@ export async function checkAgir(action, parametres, ctx) {
 /** Phrase de ce qui a été écrit (réponse de `agir` avec `verifier: false`). `change` : eau
  *  avant/après rendue par l'écriture. */
 export function doneSummary(act, change) {
+  if (["aliment_modif", "aliment_retrait", "poids_efface", "genou_efface", "eau_total", "note_remplace"].includes(act.kind)) return "C'est corrigé dans PROTOCOLE";
   if (act.kind === "eau" && change) return `${act.ml} ml d'eau ajoutés : ${change.after} ml aujourd'hui`;
   if (act.kind === "genou") return `Genou noté à ${act.pain} sur 10, ${act.baseline ? "revenu à la base" : "pas revenu à la base"}`;
   if (act.kind === "note") return `Note du jour complétée : « ${act.text} »`;
