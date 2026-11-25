@@ -276,7 +276,7 @@ export async function checkAgir(action, parametres, ctx) {
 /** Phrase de ce qui a été écrit (réponse de `agir` avec `verifier: false`). `change` : eau
  *  avant/après rendue par l'écriture. */
 export function doneSummary(act, change) {
-  if (["aliment_modif", "aliment_retrait", "poids_efface", "genou_efface", "eau_total", "note_remplace"].includes(act.kind)) return "C'est corrigé dans PROTOCOLE";
+  if (["aliment_modif", "aliment_retrait", "poids_efface", "genou_efface", "eau_total", "note_remplace", "seance_modif", "seance_retrait"].includes(act.kind)) return "C'est corrigé dans PROTOCOLE";
   if (act.kind === "eau" && change) return `${act.ml} ml d'eau ajoutés : ${change.after} ml aujourd'hui`;
   if (act.kind === "genou") return `Genou noté à ${act.pain} sur 10, ${act.baseline ? "revenu à la base" : "pas revenu à la base"}`;
   if (act.kind === "note") return `Note du jour complétée : « ${act.text} »`;

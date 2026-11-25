@@ -9,7 +9,7 @@
 // (« Confirmer ») ; une douleur au genou sans réponse sur la base donne « Base » / « Pas la base ».
 import { applyWater, applyKnee, appendNote, foodEntriesFor } from "@rawcare/core/coach/jeffrey";
 import { deriveMacroLog, resolveLog, syncMacroLog } from "@rawcare/core/nutrition/foodStore";
-import { editedFoodLog, withoutDay, waterTotal } from "@rawcare/core/coach/bridgeEdits";
+import { editedFoodLog, editedTraining, withoutDay, waterTotal } from "@rawcare/core/coach/bridgeEdits";
 import { today, upsert, byDate } from "@rawcare/core/dateUtils";
 import { getSync, store } from "../store.js";
 import { TEMPLATES } from "@rawcare/core/session/templates";
@@ -97,6 +97,8 @@ export function applyActionStored(act) {
     store.set("macroLog", synced);
     return null;
   }
+  // Lot 4 : séance passée corrigée ou supprimée (mêmes écritures que le Journal de l'onglet Séance).
+  if (act.kind === "seance_modif" || act.kind === "seance_retrait") store.set("trainingLog", editedTraining(getSync("trainingLog", []), act));
   if (act.kind === "poids_efface") store.set("weightLog", withoutDay(getSync("weightLog", []), date));
   if (act.kind === "genou_efface") store.set("kneeLog", withoutDay(getSync("kneeLog", []), date));
   if (act.kind === "eau_total") store.set("macroLog", waterTotal(macros, date, act.ml));

@@ -15,6 +15,8 @@ import { MEALS, isQuickRef } from "../nutrition/foodStore.js";
 export const EDIT_ACTIONS = [
   "modifier_aliment", "retirer_aliment",
   "corriger_poids", "corriger_genou", "corriger_eau", "corriger_note",
+  // Lot 4 (25/11/2026) : séances déjà enregistrées.
+  "modifier_seance_passee", "supprimer_seance",
 ];
 export const EDIT_DAYS = 7;
 
@@ -158,6 +160,67 @@ function checkNoteEdit(p, ctx, date) {
     resume: cur ? `Remplacer la note ${day} par « ${text} » ; elle disait « ${cur} »` : `Écrire la note ${day} : « ${text} »` };
 }
 
+// --- Lot 4 : séances passées (25/11/2026) ---
+// Choix de Yoann : heure de début, durée et effort (RPE) quand la séance en a, ou suppression ; jamais les
+// séries (à l'écran, il faut rouvrir le carnet, ce qui efface une séance en cours). Refus si la séance est
+// rouverte à l'écran (brouillon avec son `editingId`). Les records se recalculent seuls (training.js).
+
+const SESSION_WORDS = { Escalade: "d'escalade", Basket: "de basket", "Mobilité": "de mobilité" };
+const sessionWord = (type) => SESSION_WORDS[type] ? `la séance ${SESSION_WORDS[type]}` : `la séance ${type}`;
+
+/** La séance du jour visé (et du type si donné) → { ok, row } ou un refus. */
+function findSession(training, draft, date, today, p) {
+  const day = (training || []).filter((t) => t.date === date);
+  const asked = p?.type != null ? norm(p.type) : null;
+  const found = asked ? day.filter((t) => norm(t.type) === asked || norm(t.type).includes(asked)) : day;
+  const when = dayWords(date, today);
+  if (!found.length) return fail(`aucune séance${p?.type ? ` ${p.type}` : ""} enregistrée ${when}`);
+  if (found.length > 1) {
+    const types = [...new Set(found.map((t) => t.type))];
+    if (types.length > 1) return fail(`plusieurs séances ${when} : demandez à Monsieur laquelle`, { choix: types.slice(0, 5) });
+    return fail(`deux séances ${types[0]} ${when} : à corriger dans PROTOCOLE, onglet Séance, Journal`);
+  }
+  const row = found[0];
+  if (draft?.editingId && draft.editingId === row.id) return fail(`${sessionWord(row.type)} ${when} est ouverte à l'écran pour modification : il faut la valider ou la fermer d'abord`);
+  return { ok: true, row };
+}
+
+function checkPastSession(action, p, ctx, date) {
+  const f = findSession(ctx.training, ctx.draft, date, ctx.today, p);
+  if (!f.ok) return f;
+  const t = f.row;
+  const what = `${sessionWord(t.type)} ${dayWords(date, ctx.today)}`;
+  if (action === "supprimer_seance") {
+    const sets = (t.exercices || []).reduce((n, e) => n + (e.series || []).filter((s) => s.fait).length, 0);
+    const detail = [t.start ? `commencée à ${t.start}` : null, t.duration ? `${t.duration} min` : null, sets ? `${sets} série${sets > 1 ? "s" : ""}` : null].filter(Boolean).join(", ");
+    return { ok: true, act: { kind: "seance_retrait", date, id: t.id }, resume: `Supprimer ${what}${detail ? ` (${detail})` : ""}, définitivement` };
+  }
+  if (p?.debut == null && p?.duree == null && p?.rpe == null) return fail("rien à corriger : debut, duree ou rpe", { besoin: "valeur" });
+  const patch = {};
+  const parts = [];
+  if (p?.debut != null) {
+    const m = /^(\d{1,2})[:h](\d{2})$/.exec(String(p.debut).trim());
+    if (!m || +m[1] > 23 || +m[2] > 59) return fail("heure de début illisible (HH:MM)", { besoin: "debut" });
+    const start = `${String(+m[1]).padStart(2, "0")}:${m[2]}`;
+    if (start !== t.start) { patch.start = start; parts.push(t.start ? `début ${start} au lieu de ${t.start}` : `début ${start}`); }
+  }
+  if (p?.duree != null || p?.rpe != null) {
+    if (t.duration == null && t.rpe == null) return fail(`${sessionWord(t.type)} ne note ni durée ni effort`);
+  }
+  if (p?.duree != null) {
+    const du = Math.round(num(p.duree));
+    if (!Number.isFinite(du) || du < 5 || du > 300) return fail("durée hors de 5 à 300 minutes");
+    if (du !== t.duration) { patch.duration = du; parts.push(`${du} min au lieu de ${t.duration} min`); }
+  }
+  if (p?.rpe != null) {
+    const r = Math.round(num(p.rpe));
+    if (!Number.isFinite(r) || r < 1 || r > 10) return fail("effort ressenti (RPE) hors de 1 à 10");
+    if (r !== t.rpe) { patch.rpe = r; parts.push(`effort ${r} sur 10 au lieu de ${t.rpe}`); }
+  }
+  if (!parts.length) return fail(`rien ne change pour ${what}`);
+  return { ok: true, act: { kind: "seance_modif", date, id: t.id, patch }, resume: `Corriger ${what} : ${parts.join(", ")}` };
+}
+
 /** Vérifie et décrit une correction. `ctx` : celui de `checkAgir`, plus `notes` (noteLog). */
 export function checkEdit(action, p, ctx) {
   const d = editDay(p, ctx.today);
@@ -167,6 +230,7 @@ export function checkEdit(action, p, ctx) {
   if (action === "corriger_poids") return checkWeightEdit(p, ctx, date);
   if (action === "corriger_genou") return checkKneeEdit(p, ctx, date);
   if (action === "corriger_eau") return checkWaterEdit(p, ctx, date);
+  if (action === "modifier_seance_passee" || action === "supprimer_seance") return checkPastSession(action, p, ctx, date);
   return checkNoteEdit(p, ctx, date);
 }
 
@@ -177,6 +241,12 @@ export function editedFoodLog(foodLog, act) {
   const log = foodLog || [];
   if (act.kind === "aliment_retrait") return log.filter((e) => e.id !== act.id);
   return log.map((e) => (e.id === act.id ? { ...e, ...act.patch } : e));
+}
+/** Historique des séances après une correction ou une suppression (lot 4). */
+export function editedTraining(training, act) {
+  const log = training || [];
+  if (act.kind === "seance_retrait") return log.filter((t) => t.id !== act.id);
+  return log.map((t) => (t.id === act.id ? { ...t, ...act.patch } : t));
 }
 /** Poids ou genou d'un jour effacé. */
 export const withoutDay = (arr, date) => (arr || []).filter((e) => e.date !== date);

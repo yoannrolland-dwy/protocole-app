@@ -3,7 +3,7 @@
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import { checkAgir, doneSummary } from "../src/coach/bridgeActions.js";
-import { dayWords, editDay, editedFoodLog, withoutDay, waterTotal } from "../src/coach/bridgeEdits.js";
+import { dayWords, editDay, editedFoodLog, editedTraining, withoutDay, waterTotal } from "../src/coach/bridgeEdits.js";
 import { syncMacroLog, resolveLog } from "../src/nutrition/foodStore.js";
 import { fixClock, T0, d } from "./_helpers.mjs";
 
@@ -105,3 +105,34 @@ test("eau : le total du jour, avant / après ; note : remplacer ou effacer", asy
   assert.deepEqual(del.act, { kind: "note_remplace", date: T0, text: "" });
   assert.equal((await checkAgir("corriger_note", { effacer: true, jour: "hier" }, ctx())).ok, false);
 });
+
+// --- Lot 4 : séances passées ---
+const training = [
+  { id: "e1", date: d(1), type: "Escalade", start: "18:00", duration: 75, rpe: 7 },
+  { id: "u1", date: d(1), type: "Upper A", start: "07:00", exercices: [{ nom: "Rowing", series: [{ poids: 50, val: 10, fait: true }, { poids: 50, val: 9, fait: true }] }] },
+  { id: "m1", date: T0, type: "Mobilité", start: "08:00", duration: 20, rpe: 3 },
+];
+
+test("séance passée : durée et effort avant / après, heure de début ; jamais les séries", async () => {
+  const r = await checkAgir("modifier_seance_passee", { jour: "hier", type: "escalade", duree: 90 }, ctx({ training }));
+  assert.equal(r.resume, "Corriger la séance d'escalade d'hier : 90 min au lieu de 75 min");
+  assert.deepEqual(editedTraining(training, r.act).find((t) => t.id === "e1").duration, 90);
+  const up = await checkAgir("modifier_seance_passee", { jour: "hier", type: "Upper A", debut: "18h" + "00" }, ctx({ training }));
+  assert.equal(up.resume, "Corriger la séance Upper A d'hier : début 18:00 au lieu de 07:00");
+  assert.match((await checkAgir("modifier_seance_passee", { jour: "hier", type: "Upper A", duree: 60 }, ctx({ training }))).raison, /ni durée ni effort/);
+  const both = await checkAgir("modifier_seance_passee", { jour: "hier", rpe: 8 }, ctx({ training }));
+  assert.deepEqual(both.choix, ["Escalade", "Upper A"]);
+  assert.equal((await checkAgir("modifier_seance_passee", { jour: "hier", type: "escalade" }, ctx({ training }))).besoin, "valeur");
+});
+
+test("séance passée : supprimer, définitivement ; refus si rouverte à l'écran ; 7 jours", async () => {
+  const del = await checkAgir("supprimer_seance", { type: "mobilité" }, ctx({ training }));
+  assert.equal(del.resume, "Supprimer la séance de mobilité d'aujourd'hui (commencée à 08:00, 20 min), définitivement");
+  assert.deepEqual(editedTraining(training, del.act).map((t) => t.id), ["e1", "u1"]);
+  const upDel = await checkAgir("supprimer_seance", { jour: "hier", type: "upper" }, ctx({ training }));
+  assert.equal(upDel.resume, "Supprimer la séance Upper A d'hier (commencée à 07:00, 2 séries), définitivement");
+  assert.match((await checkAgir("supprimer_seance", { jour: "hier", type: "upper" }, ctx({ training, draft: { type: "Upper A", editingId: "u1" } }))).raison, /ouverte à l'écran/);
+  assert.match((await checkAgir("supprimer_seance", { type: "basket" }, ctx({ training }))).raison, /aucune séance basket/);
+  assert.equal((await checkAgir("supprimer_seance", { jour: d(9) }, ctx({ training }))).ok, false);
+});
+

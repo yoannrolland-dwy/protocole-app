@@ -37,7 +37,8 @@ const base = (over = {}) => ({
 
 test("catalogue : action inconnue → code « inconnu » ; les neuf actions, puis les six corrections (25/11/2026)", async () => {
   assert.deepEqual(AGIR_ACTIONS, ["ajouter_eau", "noter_genou", "ecrire_note", "noter_poids", "reprendre_repas", "ajouter_habituel", "ajouter_aliment", "demarrer_seance", "noter_seance_faite",
-    "modifier_aliment", "retirer_aliment", "corriger_poids", "corriger_genou", "corriger_eau", "corriger_note"]);
+    "modifier_aliment", "retirer_aliment", "corriger_poids", "corriger_genou", "corriger_eau", "corriger_note",
+    "modifier_seance_passee", "supprimer_seance"]);
   await assert.rejects(() => checkAgir("supprimer_tout", {}, base()), (e) => e.code === "inconnu");
 });
 

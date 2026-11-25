@@ -39,3 +39,14 @@ jour : lots suivants du cadrage.
 - `besoin` possibles : `aliment`, `repas` (même aliment à plusieurs repas), `valeur`, `kg`, `douleur`,
   `retour_base`, `ml`, `texte` ; `choix` : noms exacts d'aliments différents.
 
+## Lot 4 (v3.183.0) : les séances passées
+
+| Action | Paramètres | Relecture (`resume`) |
+|---|---|---|
+| `modifier_seance_passee` | `type?` ; `debut?` (HH:MM) ; `duree?` (5 à 300) et `rpe?` (1 à 10) si la séance en a ; `jour?` | « Corriger la séance d'escalade d'hier : 90 min au lieu de 75 min » |
+| `supprimer_seance` | `type?` ; `jour?` | « Supprimer la séance Upper A d'hier (commencée à 07:00, 2 séries), définitivement » |
+
+- `choix` : les types quand plusieurs séances ce jour-là ; refus : séance rouverte à l'écran, deux séances du même
+  type le même jour, durée ou effort sur une séance qui n'en a pas.
+- Écrit : `{ fait: true, resume: "C'est corrigé dans PROTOCOLE" }`.
+
