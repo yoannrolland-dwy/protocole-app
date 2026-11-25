@@ -16,10 +16,10 @@ import { makeCoach } from "./coachInputs.js";
 import { checkAgir, doneSummary, paramsKey } from "@rawcare/core/coach/bridgeActions";
 import { searchCiqual, getCiqual } from "@rawcare/core/nutrition/ciqual";
 import { applyActionStored } from "./jeffreyNotify.js";
-import { readDraft } from "./sessionDraft.js";
+import { readDraft, writeDraft } from "./sessionDraft.js";
 import { nativeRest } from "./bridgeRest.js";
 import { clearAppNotifications } from "../timerNotify.js";
-import { readSession, finishCheck, abandonCheck } from "@rawcare/core/session/voiceSession";
+import { readSession, finishCheck, abandonCheck, editStartCheck, editSetCheck } from "@rawcare/core/session/voiceSession";
 import { SESSION_NOW, sessionCtx, runSessionNow } from "./sessionGestures.js";
 import { AGIR_KEY, AGIR_TTL_MS, pendingAgir, newJeton, keptAgir } from "./agirTokens.js";
 import { byDate } from "@rawcare/core/dateUtils";
@@ -185,11 +185,23 @@ export async function runAgir(args, { now = Date.now(), ctx = agirContext() } = 
 // --- G4-C3 : la séance à la voix (05/11/2026) ----------------------------------------------------
 // Règles pures : packages/core/src/session/voiceSession.js ; gestes immédiats et leur jeton :
 // lib/sessionGestures.js ; ici, la fin et l'abandon de la séance (relecture et jeton ordinaires).
-const SESSION_CONFIRM = new Set(["terminer_seance", "annuler_seance"]);
+// Modifier à la voix, lot 1 (25/11/2026) : heure de début et séries de la séance en cours, relues
+// avec l'avant et l'après ; à l'écriture, la vérification est refaite sur le brouillon du moment et
+// refusée si la relecture a changé (runAgir).
+const SESSION_CONFIRM = new Set(["terminer_seance", "annuler_seance", "modifier_seance", "corriger_serie"]);
 
 /** Fin ou abandon de la séance : relecture (résumé, question), puis écriture après « oui ». */
 function sessionConfirmCheck(action, p, now) {
   const d = readDraft();
+  if (action === "modifier_seance" || action === "corriger_serie") {
+    const r = action === "modifier_seance" ? editStartCheck(d, p, { now: new Date(now) }) : editSetCheck(d, p);
+    if (!r.ok) return r;
+    return {
+      ok: true, resume: r.resume,
+      done: action === "modifier_seance" ? `Heure de début corrigée, Monsieur.` : `Série corrigée, Monsieur.`,
+      apply: () => { writeDraft(r.draft); },
+    };
+  }
   if (action === "terminer_seance") {
     // Compte rendu (17/11/2026) : calculé avec l'historique AVANT l'enregistrement de la séance.
     const r = finishCheck(d, p, { nowMs: now, training: getSync("trainingLog", []), knee: getSync("kneeLog", []) });

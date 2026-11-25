@@ -316,3 +316,100 @@ export function abandonCheck(d) {
     question: `Dois-je abandonner la séance ${d.type} sans l'enregistrer, Monsieur ?${sets ? ` ${cap(lost.slice(2, -1))}.` : ""}`,
   };
 }
+
+// --- Modifier à la voix, lot 1 (25/11/2026) -----------------------------------------------------
+// Choix de Yoann (cadrage JEFFREY `docs/cadrage/PROTOCOLE_MODIFIER.md`) : pendant la séance en cours,
+// corriger l'heure de début et n'importe quelle série nommée (valeurs, cochée ou non), toujours
+// relu avec l'avant et l'après, puis « oui ». La date reste à l'écran : changée par le pont pendant
+// que le carnet est ouvert, le carnet la réécrirait (MuscuLogger, `matches`).
+
+const sameValue = (a, b) => String(a ?? "") === String(b ?? "");
+
+// Pas de `question` : JEFFREY fait de la phrase « Corriger … » sa question (« Dois-je corriger … ? »),
+// entendue comme une question dès le premier mot.
+
+/** Heure de début de la séance en cours. `p` = { debut: "HH:MM" } ; `now` (Date) refuse une heure à venir. */
+export function editStartCheck(d, p, { now = new Date() } = {}) {
+  if (!isSession(d)) return fail("aucune séance en cours dans PROTOCOLE");
+  const m = /^(\d{1,2})[:h](\d{2})$/.exec(String(p?.debut ?? "").trim());
+  if (!m || +m[1] > 23 || +m[2] > 59) return fail("heure de début illisible (HH:MM)", { besoin: "debut" });
+  const start = `${String(+m[1]).padStart(2, "0")}:${m[2]}`;
+  if (start === d.start) return fail(`la séance ${d.type} commence déjà à ${start}`);
+  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  if (d.date === todayKey && +m[1] * 60 + +m[2] > now.getHours() * 60 + now.getMinutes()) return fail(`${start} est une heure à venir`);
+  return {
+    ok: true, draft: { ...d, start },
+    resume: `Corriger l'heure de début de la séance ${d.type} : ${start} au lieu de ${d.start}`,
+  };
+}
+
+/**
+ * Une série de la séance en cours, désignée par son exercice (l'exercice en cours sinon), son numéro
+ * et sa jambe (exercice jambe par jambe). `p` = { exercice?, serie, jambe?, reps | secondes?, kg?, cochee? }.
+ * → { ok, draft, resume } ou un refus. Si c'est la série que « annule » vise, « annule »
+ * ne la vise plus : il ne défait jamais une correction.
+ */
+export function editSetCheck(d, p) {
+  if (!isSession(d)) return fail("aucune séance en cours dans PROTOCOLE");
+  const exos = d.exos;
+  let ei;
+  if (p?.exercice != null) {
+    const f = findExercise(exos, p.exercice);
+    if (!f.ok) return f;
+    ei = f.ei;
+  } else {
+    ei = d.courant ?? currentSet(exos, { ei: d.courant })?.ei;
+    if (ei == null || !exos[ei]) return fail("quel exercice ? demandez-le à Monsieur", { besoin: "exercice" });
+  }
+  const e = exos[ei];
+  const n = Math.round(num(p?.serie));
+  if (!Number.isFinite(n) || n < 1) return fail("numéro de série manquant (1, 2, 3…)", { besoin: "serie" });
+  let leg = null;
+  if (p?.jambe != null) {
+    if (p.jambe !== "G" && p.jambe !== "D") return fail("jambe : G ou D");
+    if (!e.perLeg) return fail("cet exercice ne se note pas jambe par jambe");
+    leg = p.jambe;
+  } else if (e.perLeg) {
+    return fail("quelle jambe ? demandez-le à Monsieur (G ou D)", { besoin: "jambe" });
+  }
+  const indexes = e.series.map((s, i) => i).filter((i) => (e.series[i].leg ?? null) === leg);
+  const si = indexes[n - 1];
+  if (si == null) return fail(`${e.nom} n'a que ${indexes.length} série${indexes.length > 1 ? "s" : ""}${leg ? ` ${SIDE[leg]}` : ""}`);
+  const before = e.series[si];
+  const after = { ...before };
+  const raw = isTime(e) ? (p?.secondes ?? p?.reps) : p?.reps;
+  if (raw == null && p?.kg == null && p?.cochee == null) return fail("rien à corriger : répétitions, secondes, kilos ou cochée", { besoin: "valeur" });
+  if (raw != null) {
+    const val = Math.round(num(raw));
+    if (isTime(e) && (!Number.isFinite(val) || val < 1 || val > 900)) return fail("durée hors de 1 à 900 secondes");
+    if (!isTime(e) && (!Number.isFinite(val) || val < 1 || val > 100)) return fail("répétitions hors de 1 à 100");
+    after.val = val;
+  }
+  if (p?.kg != null) {
+    if (isTime(e)) return fail(`${e.nom} se note en secondes, sans charge`);
+    const kg = Math.round(num(p.kg) * 10) / 10;
+    if (!Number.isFinite(kg) || kg < 0 || kg > 500) return fail("charge hors de 0 à 500 kg");
+    after.poids = kg;
+  }
+  if (p?.cochee != null) {
+    if (typeof p.cochee !== "boolean") return fail("cochee : true ou false");
+    after.fait = p.cochee;
+  }
+  if (after.fait && (after.val === "" || after.val == null)) return fail("il faut la valeur de cette série pour la cocher", { besoin: isTime(e) ? "secondes" : "reps" });
+  const values = !sameValue(after.val, before.val) || !sameValue(after.poids, before.poids);
+  const tick = !!after.fait !== !!before.fait;
+  if (!values && !tick) return fail(`rien ne change : ${setWords(e, before)}${before.fait ? ", cochée" : ", pas cochée"}`);
+  const label = `${cap(spokenName(e.nom))}, série ${n}${leg ? ` ${SIDE[leg]}` : ""}`;
+  const parts = [];
+  if (values) parts.push(`${setWords(e, after)} au lieu de ${setWords(e, before)}`);
+  if (tick) parts.push(after.fait ? "cochée" : "décochée");
+  const what = values ? parts.join(", ") : `${setWords(e, after)}, ${parts[0]}`;
+  const next = exos.map((x, i) => (i !== ei ? x : { ...x, series: x.series.map((s, j) => (j !== si ? s : after)) }));
+  const last = d.voix?.last;
+  const voix = last && last.ei === ei && last.si === si ? null : d.voix ?? null;
+  return {
+    ok: true, draft: { ...d, exos: next, voix },
+    resume: `Corriger ${label} : ${what}`,
+  };
+}
+

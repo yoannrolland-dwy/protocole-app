@@ -3,7 +3,7 @@ import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import {
   newSessionDraft, readSession, logSet, undoLastSet, goToExercise, nextExercise, restAction,
-  finishCheck, abandonCheck, findExercise, restText, kilos,
+  finishCheck, abandonCheck, findExercise, restText, kilos, editStartCheck, editSetCheck,
 } from "../src/session/voiceSession.js";
 import { fixClock, T0, d } from "./_helpers.mjs";
 
@@ -108,3 +108,47 @@ test("fin : rien de fait refusé ; résumé et question ; Basket demande durée 
   assert.match(ok.question, /75 min, effort 7 sur 10\.$/);
   assert.match(abandonCheck(done).question, /^Dois-je abandonner la séance Upper A sans l'enregistrer, Monsieur \? 1 série faite perdue\.$/);
 });
+
+// --- Modifier à la voix, lot 1 (25/11/2026) ---
+test("modifier : heure de début relue avant / après, jamais à venir", () => {
+  const at9 = new Date(2026, 9, 4, 9, 0);
+  const r = editStartCheck(draft(), { debut: "6h40" }, { now: at9 });
+  assert.equal(r.ok, true);
+  assert.equal(r.draft.start, "06:40");
+  assert.equal(r.resume, "Corriger l'heure de début de la séance Upper A : 06:40 au lieu de 07:00");
+  assert.equal(r.question, undefined, "JEFFREY fait sa question de la phrase « Corriger … »");
+  assert.equal(editStartCheck(draft(), { debut: "07:00" }, { now: at9 }).ok, false, "rien ne change");
+  assert.equal(editStartCheck(draft(), { debut: "10:15" }, { now: at9 }).ok, false, "heure à venir");
+  assert.equal(editStartCheck(draft(), { debut: "midi" }, { now: at9 }).besoin, "debut");
+  assert.equal(editStartCheck(null, { debut: "06:40" }, { now: at9 }).ok, false);
+});
+
+test("modifier : corriger une série cochée, avant / après, et « annule » ne la défait pas", () => {
+  const noted = logSet(draft(), { reps: 8, kg: 32 }, ctx()).draft;
+  const r = editSetCheck(noted, { exercice: "développé incliné", serie: 1, reps: 10, kg: 30 });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.draft.exos[0].series[0], { poids: 30, val: 10, fait: true, leg: null });
+  assert.equal(r.resume, "Corriger Développé incliné haltères, série 1 : 10 à 30 kilos au lieu de 8 à 32 kilos");
+  assert.equal(r.draft.voix, null, "« annule » ne vise plus la série corrigée");
+  assert.equal(undoLastSet(r.draft).ok, false);
+  // Sans exercice nommé : l'exercice en cours.
+  assert.equal(editSetCheck(noted, { serie: 1, kg: 31 }).ok, true);
+  // Décocher, puis recocher.
+  const off = editSetCheck(noted, { serie: 1, cochee: false });
+  assert.equal(off.draft.exos[0].series[0].fait, false);
+  assert.equal(off.resume, "Corriger Développé incliné haltères, série 1 : 8 à 32 kilos, décochée");
+  assert.equal(editSetCheck(off.draft, { serie: 1, cochee: true }).draft.exos[0].series[0].fait, true);
+});
+
+test("modifier : refus clairs (série absente, rien à corriger, rien ne change, valeurs)", () => {
+  const d0 = draft();
+  assert.match(editSetCheck(d0, { exercice: "développé incliné", serie: 9, reps: 8 }).raison, /n'a que \d séries?/);
+  assert.equal(editSetCheck(d0, { serie: 1 }).besoin, "valeur");
+  assert.equal(editSetCheck(d0, { reps: 8 }).besoin, "serie");
+  assert.equal(editSetCheck(d0, { serie: 1, reps: 300 }).ok, false);
+  assert.equal(editSetCheck(d0, { serie: 1, kg: 600 }).ok, false);
+  const prevu = d0.exos[0].series[0];
+  assert.match(editSetCheck(d0, { serie: 1, reps: prevu.val, kg: prevu.poids }).raison, /^rien ne change/);
+  assert.equal(editSetCheck(null, { serie: 1, reps: 8 }).ok, false);
+});
+
