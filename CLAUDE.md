@@ -6,7 +6,9 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 ## État courant (14/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.180.0, commit `718c3c8`, le 24/11/2026 à 11 h 48 (séance Mobilité
+- **Installé sur le S25** : v3.181.0, commit `19411fc`, le 25/11/2026 à 10 h 18 (modifier à la voix, lot 1 :
+  heure de début et séries de la séance en cours, relues avec l'avant et l'après ; contrat
+  `docs/suivi-jeffrey/2026-11-25-modifier-seance.md`). Avant : v3.180.0, commit `718c3c8`, le 24/11/2026 à 11 h 48 (séance Mobilité
   simplifiée : ni reps en réserve, ni records, ni JEFFREY au cochage, poids sur 4 exercices ; v3.179.0 :
   horaires des repas du Coach ; v3.178.0 : pont JEFFREY, repas détaillés, sujets `jour` et `periode`).
 - **Installé sur la montre (Galaxy Watch 7, SM-L310, Wear OS 6)** : appli `wear` v3.174.0, commit
