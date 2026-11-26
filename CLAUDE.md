@@ -6,7 +6,8 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 ## État courant (14/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.183.0, commit `a005207`, le 25/11/2026 à 10 h 39 (modifier à la voix, lot 4 :
+- **Installé sur le S25** : v3.184.0, commit `af08435`, le 26/11/2026 à 18 h 52 (recettes : scan d'un
+  ingrédient, favoris et habituels en deux listes, description). Avant : v3.183.0, commit `a005207`, le 25/11/2026 à 10 h 39 (modifier à la voix, lot 4 :
   séances passées ; les quatre lots du cadrage sont faits). Avant : v3.182.0, commit `842f7d9`, le 25/11/2026 à 10 h 31 (modifier à la voix, lots 2 et 3 :
   un aliment, les mesures d'un jour, sur 7 jours). Avant : v3.181.0, commit `19411fc`, le 25/11/2026 à 10 h 18 (modifier à la voix, lot 1 :
   heure de début et séries de la séance en cours, relues avec l'avant et l'après ; contrat
@@ -23,7 +24,7 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
   `avant-campagne-audit`, `apres-lot1-audit`, `apres-lot2-audit`, `avant-jetons-gestes`. APK
   précédents : `~/Documents/protocole-sauvegardes/` (hors Git).
-- **Tests** : 411 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
+- **Tests** : 425 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
 - **Chantiers** : tous ceux de `ROADMAP.md` sont livrés (V, R, S, T, U, J). La campagne d'audit du
   10/11/2026 est faite (lots 1 à 3). Ce qui reste ouvert est dans « Reportés à la fin de la
   campagne » (`docs/journal/2026-11.md`).
