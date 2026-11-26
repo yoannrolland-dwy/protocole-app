@@ -32,18 +32,25 @@ const PROT_ALT = "25003"; // Protéines, N x 6.25 — repli quand 25000 est abse
 const GLUC = "31000";
 const LIP = "40000";
 const FIB = "34100";
-// L'alcool n'est PAS stocké dans le JSON final (PROTOCOLE ne suit pas l'éthanol) : il ne
-// sert qu'à recalculer correctement l'énergie des boissons alcoolisées, dont l'ANSES ne
-// tabule souvent pas l'énergie (vin doux, sangria, kir…). Sans lui elles seraient
-// sous-estimées de moitié.
+// L'alcool sert à recalculer correctement l'énergie des boissons alcoolisées, dont l'ANSES ne
+// tabule souvent pas l'énergie (vin doux, sangria, kir…) : sans lui elles seraient
+// sous-estimées de moitié. Depuis le 26/11/2026 (demande de Yoann : voir les grammes d'alcool
+// d'une boisson dans le Journal), il est aussi stocké, en 10e colonne, SEULEMENT pour les
+// aliments qui en contiennent (les autres lignes gardent 9 colonnes, la table ne grossit pas).
 const ALC = "60000";
 const WANTED = new Set([KCAL, PROT, PROT_ALT, GLUC, LIP, FIB, ALC]);
 
 // --- Récupération -----------------------------------------------------------
+// Zip déjà téléchargé (26/11/2026, site ANSES en maintenance) : son chemin en argument, sinon
+// téléchargement depuis ZIP_URL.
 const dir = mkdtempSync(join(tmpdir(), "ciqual-"));
-console.log("→ téléchargement", ZIP_URL);
-execFileSync("curl", ["-sSL", "--max-time", "180", "-o", join(dir, "x.zip"), ZIP_URL]);
-execFileSync("unzip", ["-o", "-q", join(dir, "x.zip"), "-d", dir]);
+const localZip = process.argv[2];
+if (localZip) console.log("→ zip local", localZip);
+else {
+  console.log("→ téléchargement", ZIP_URL);
+  execFileSync("curl", ["-sSL", "--fail", "--max-time", "180", "-o", join(dir, "x.zip"), ZIP_URL]);
+}
+execFileSync("unzip", ["-o", "-q", localZip || join(dir, "x.zip"), "-d", dir]);
 
 // Les fichiers ANSES sont en windows-1252, pas en UTF-8.
 const read = (f) => new TextDecoder("windows-1252").decode(readFileSync(join(dir, f)));
@@ -156,9 +163,11 @@ for (const r of records(alimXml, "ALIM")) {
   const grpNom = ssgrpNom.get(tag(r, "alim_ssgrp_code")) || "";
   if (kcalCalc && /alcool/i.test(grpNom) && c[ALC] == null) alcoolCalc.push(nom);
 
+  const alc = c[ALC] ?? null;
   rows.push([
     Number(code), nom, alias, grpIdx(grpNom),
     Math.round(kcal), r1(prot), r1(gluc), r1(lip), r1(fib),
+    ...(r1(alc) > 0 ? [r1(alc)] : []),
   ]);
 }
 
@@ -173,7 +182,7 @@ if (alcoolCalc.length) {
 const out = {
   v: VERSION,
   src: "Table Ciqual 2020 — ANSES · Licence Ouverte 2.0 (Etalab)",
-  cols: ["code", "nom", "alias", "grp", "kcal", "prot", "gluc", "lip", "fib"],
+  cols: ["code", "nom", "alias", "grp", "kcal", "prot", "gluc", "lip", "fib", "alc"],
   grps,
   rows,
 };
@@ -186,3 +195,4 @@ console.log(`✓ kcal : ${rows.length - computed} tabulées ANSES, ${computed} r
 console.log(`✓ ${grps.length} sous-groupes`);
 console.log(`✓ ${OUT} — ${kb(JSON.stringify(out).length)}`);
 console.log(`  avec alias : ${rows.filter((r) => r[2]).length}`);
+console.log(`  avec alcool : ${rows.filter((r) => r.length > 9).length}`);

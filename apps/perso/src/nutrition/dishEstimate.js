@@ -30,14 +30,19 @@ préciser, ce qui n'a pas été mangé). Tâche :
    exactement la somme des lignes du détail.
 5. Donne un nom court et concret au plat (ex. "Poulet rôti, riz, brocolis"), pas une catégorie
    générique.
-6. Explique ton estimation ("explication") en 2 à 4 phrases courtes, en français, sans t'adresser
+6. Boisson alcoolisée (bière, vin, cocktail, alcool fort) : lis le degré sur l'étiquette si elle est
+   visible ("% vol", "° alc."), sinon prends un degré courant pour ce type de boisson et dis-le dans
+   l'explication. Donne pour sa ligne "alcool" = grammes d'éthanol = volume en ml × degré / 100 × 0,789,
+   et compte-les dans ses kcal (7 kcal par gramme). "alcool" du total = somme des lignes. Sans
+   boisson alcoolisée, mets "alcool" à 0 partout.
+7. Explique ton estimation ("explication") en 2 à 4 phrases courtes, en français, sans t'adresser
    à personne et sans retour à la ligne : le repère d'échelle utilisé (carte, assiette, couverts, ou
    aucun), tes hypothèses de cuisson et de matière grasse, ce que la note complémentaire a changé
    s'il y en a une, et le point le plus incertain. Ne répète pas les chiffres du détail.
 
 Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, sans balises markdown, exactement
 selon ce schéma :
-{"lisible":boolean,"nom":string,"kcal":number,"prot":number,"gluc":number,"lip":number,"fib":number,"detail":[{"aliment":string,"grammes":number,"kcal":number,"prot":number,"gluc":number,"lip":number,"fib":number}],"explication":string}
+{"lisible":boolean,"nom":string,"kcal":number,"prot":number,"gluc":number,"lip":number,"fib":number,"alcool":number,"detail":[{"aliment":string,"grammes":number,"kcal":number,"prot":number,"gluc":number,"lip":number,"fib":number,"alcool":number}],"explication":string}
 
 Si la ou les photos ne permettent pas d'identifier un plat exploitable (flou, hors-sujet, vide), mets
 "lisible" à false plutôt que d'inventer — les autres champs peuvent alors être à 0/vide.`;
@@ -84,6 +89,7 @@ export function readDishEstimate(parsed) {
       aliment: String(l.aliment ?? "").trim(),
       grammes: num(l.grammes),
       ...Object.fromEntries(MACROS.map((k) => [k, num(l[k])])),
+      alcool: num(l.alcool) ?? 0,
     }))
     .filter((l) => l.aliment && l.kcal !== null)
     .slice(0, DISH_MAX_LINES);
@@ -94,9 +100,14 @@ export function readDishEstimate(parsed) {
     k,
     complete ? round1(detail.reduce((sum, l) => sum + l[k], 0)) : (num(parsed[k]) ?? 0),
   ]));
+  // Alcool (26/11/2026) : grammes d'éthanol, facultatif (absent dans l'ancien format = 0). Jamais
+  // plus que ce que les kcal du plat permettent (7 kcal/g) : une valeur incohérente est écartée.
+  const alcRaw = complete ? round1(detail.reduce((sum, l) => sum + l.alcool, 0)) : (num(parsed.alcool) ?? 0);
+  const alcool = alcRaw > 0 && alcRaw * 7 <= total.kcal * 1.05 ? alcRaw : 0;
   return {
     nom: String(parsed.nom ?? "").trim() || "Plat",
     ...total,
+    alcool,
     detail,
     explication: String(parsed.explication ?? "").replace(/\s+/g, " ").trim().slice(0, EXPLANATION_MAX),
     fromDetail: complete,

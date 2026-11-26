@@ -37,7 +37,17 @@ test("détail complet : le total est la somme des lignes, l'explication tient su
   assert.deepEqual([e.kcal, e.prot, e.gluc, e.lip, e.fib], [614, 54.3, 56.5, 17.5, 3.8]);
   assert.equal(e.nom, "Poulet rôti, riz, brocolis");
   assert.equal(e.explication, "Carte de fidélité utilisée comme échelle. Assiette d'environ 26 cm. L'huile de cuisson est le point le plus incertain.");
-  assert.deepEqual(e.detail[1], { aliment: "Riz basmati cuit", grammes: 180, kcal: 234, prot: 4.9, gluc: 51.5, lip: 0.5, fib: 0.7 });
+  assert.deepEqual(e.detail[1], { aliment: "Riz basmati cuit", grammes: 180, kcal: 234, prot: 4.9, gluc: 51.5, lip: 0.5, fib: 0.7, alcool: 0 });
+  assert.equal(e.alcool, 0, "réponse sans alcool (ancien format) : 0");
+});
+
+test("alcool (26/11/2026) : somme des lignes ; écarté s'il dépasse les kcal du plat", () => {
+  const beer = { aliment: "Bière blonde 5 % (50 cl)", grammes: 500, kcal: 210, prot: 2.5, gluc: 18, lip: 0, fib: 0, alcool: 19.7 };
+  const e = readDishEstimate({ ...full, detail: [...full.detail, beer] });
+  assert.equal(e.fromDetail, true);
+  assert.equal(e.alcool, 19.7);
+  const absurd = readDishEstimate({ lisible: true, nom: "Bière", kcal: 50, prot: 0, gluc: 4, lip: 0, fib: 0, alcool: 20 });
+  assert.equal(absurd.alcool, 0, "20 g d'alcool = 140 kcal, impossible dans 50 kcal");
 });
 
 test("réponse à l'ancien format (sans détail) : total annoncé gardé, rien à afficher en plus", () => {

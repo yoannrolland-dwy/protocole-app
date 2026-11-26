@@ -107,7 +107,9 @@ export default function PhotoDish({ ai, onAdd, onBack }) {
     onAdd({
       ref: newQuickRef(),
       name: `${result.nom} (estimé IA)`,
-      per100: { kcal: result.kcal, prot: result.prot, gluc: result.gluc, lip: result.lip, fib: result.fib },
+      // Alcool estimé (26/11/2026) : la ligne vaut le plat entier (q = 100), donc g/100 g = g du plat.
+      per100: { kcal: result.kcal, prot: result.prot, gluc: result.gluc, lip: result.lip, fib: result.fib,
+        ...(result.alcool > 0 ? { alcool: result.alcool } : {}) },
     }, 100);
     setAdded(true);
   };
@@ -199,6 +201,7 @@ export default function PhotoDish({ ai, onAdd, onBack }) {
             <span>G{Math.round(result.gluc)}</span>
             <span>L{Math.round(result.lip)}</span>
             <span>Fib{Math.round(result.fib)}</span>
+            {result.alcool > 0 && <span>Alcool {result.alcool} g · {Math.round(result.alcool * 7)} kcal</span>}
           </div>
           {/* Détail de l'estimation (13/11/2026) : une ligne par composant, puis les hypothèses de l'IA.
               Affiché avant « Ajouter », pour le lire avant de valider. */}

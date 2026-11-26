@@ -20,7 +20,7 @@ import { progressColor, MACRO_KIND } from "../lib/progress.js";
 import { Panel, Eyebrow, Button, IconButton, Chip, NumberField } from "../design/primitives.jsx";
 import {
   MEALS, useFoodLog, makeEntry, amounts, entriesFor, totals, isQuickRef, newQuickRef,
-  copySourceCandidates, copyEntries, syncMacroLog, suggestions, pinsForMeal, mutedForMeal, allMealPins,
+  copySourceCandidates, copyEntries, syncMacroLog, suggestions, pinsForMeal, mutedForMeal, allMealPins, alcoholOf,
 } from "./foodStore.js";
 import FoodSearch from "./FoodSearch.jsx";
 import RecipesPanel from "./RecipesPanel.jsx";
@@ -58,6 +58,8 @@ function EntryRow({ e, onUpdate, onRemove, corrected = false }) {
   const [q, setQ] = useState(String(e.q));
   const [meal, setMeal] = useState(e.meal);
   const a = amounts(e);
+  // Alcool (26/11/2026, demande de Yoann) : grammes et kcal, seulement s'il y en a.
+  const alc = alcoholOf(e);
   // Une saisie libre stocke la portion telle quelle (q = 100) : proposer d'en changer les
   // grammes n'aurait aucun sens. Le repas, en revanche, reste modifiable dans tous les cas.
   const isQuick = isQuickRef(e.ref);
@@ -80,6 +82,7 @@ function EntryRow({ e, onUpdate, onRemove, corrected = false }) {
           <div style={{ ...mono, display: "flex", flexWrap: "wrap", columnGap: 10, marginTop: 3, fontSize: 13, color: T.c.text2 }}>
             <span>{isQuick ? "portion" : `${e.q} g`}</span>
             <span>P{a.prot ?? "—"}</span><span>G{a.gluc ?? "—"}</span><span>L{a.lip ?? "—"}</span><span>Fib{a.fib ?? "—"}</span>
+            {alc && <span>Alcool {alc.g} g · {alc.kcal} kcal</span>}
           </div>
         </div>
         <span style={{ ...mono, fontSize: 16, fontWeight: 700, color: T.c.accent }}>{a.kcal ?? "—"}</span>

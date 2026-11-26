@@ -55,9 +55,26 @@ async function get(url) {
 
 // energy-kcal_100g est le champ correct (kcal). Certains produits n'ont que energy_100g
 // (kJ) : repli avec la conversion standard 1 kcal = 4,184 kJ plutôt que de perdre l'info.
+/**
+ * Alcool en g/100 g d'un produit Open Food Facts (26/11/2026, demande de Yoann). OFF donne le degré
+ * (`alcohol_100g` en « % vol », vérifié sur Heineken 5, Leffe 6,6, Johnnie Walker 40) : grammes =
+ * degré × 0,789 (densité de l'éthanol, 100 ml comptés comme 100 g, comme les kcal des boissons).
+ * `null` quand rien n'est indiqué, quand l'unité est autre, ou quand les kcal de l'alcool
+ * dépasseraient celles de l'étiquette (+5 %) : une donnée incohérente n'est jamais affichée.
+ */
+export function offAlcohol(n, kcal) {
+  const deg = Number(n?.alcohol_100g);
+  if (!Number.isFinite(deg) || deg <= 0 || deg > 100) return null;
+  if (n.alcohol_unit && !/%/.test(n.alcohol_unit)) return null;
+  const g = Math.round(deg * 0.789 * 10) / 10;
+  if (kcal != null && g * 7 > kcal * 1.05) return null;
+  return g;
+}
+
 function toFood(p) {
   const n = p.nutriments || {};
   const kcalRaw = n["energy-kcal_100g"] ?? (n.energy_100g != null ? n.energy_100g / 4.184 : null);
+  const alcool = offAlcohol(n, kcalRaw);
   return {
     ref: `off:${p.code}`,
     name: p.product_name?.trim() || "(sans nom)",
@@ -69,6 +86,7 @@ function toFood(p) {
       gluc: n.carbohydrates_100g ?? null,
       lip: n.fat_100g ?? null,
       fib: n.fiber_100g ?? null,
+      ...(alcool ? { alcool } : {}),
     },
   };
 }

@@ -36,6 +36,8 @@ export function loadCiqual() {
         nom: r[1],
         grp: r[3] >= 0 ? d.grps[r[3]] : "",
         kcal: r[4], prot: r[5], gluc: r[6], lip: r[7], fib: r[8],
+        // Alcool g/100 g (26/11/2026) : 10e colonne, présente seulement pour les boissons alcoolisées.
+        alc: r[9] > 0 ? r[9] : null,
         _n: normalize(r[1]),
         _a: r[2] ? normalize(r[2]) : "",
       }));
@@ -172,6 +174,6 @@ function toFood(it) {
     grp: it.grp,
     // Valeurs pour 100 g. `null` = donnée absente de la table, à ne jamais confondre
     // avec un vrai 0 (voir build-ciqual.mjs).
-    per100: { kcal: it.kcal, prot: it.prot, gluc: it.gluc, lip: it.lip, fib: it.fib },
+    per100: { kcal: it.kcal, prot: it.prot, gluc: it.gluc, lip: it.lip, fib: it.fib, ...(it.alc ? { alcool: it.alc } : {}) },
   };
 }

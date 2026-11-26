@@ -95,8 +95,10 @@ export function makeEntry({ date, meal, food, q }) {
     per100: {
       kcal: food.per100.kcal, prot: food.per100.prot,
       gluc: food.per100.gluc, lip: food.per100.lip, fib: food.per100.fib,
-      // Alcool en g/100 g (T5, 04/10/2026) — optionnel, porté seulement par la saisie libre.
-      // Jamais une macro cible ni une colonne des totaux : sert au Coach IA (`alcool_g`).
+      // Alcool en g/100 g (T5, 04/10/2026) — optionnel. Porté par la saisie libre, et depuis le
+      // 26/11/2026 par un produit scanné (degré Open Food Facts), une photo (estimation IA) et la
+      // table CIQUAL une fois reconstruite. Jamais une macro cible ni une colonne des totaux : sert
+      // au Coach IA (`alcool_g`) et à la ligne « Alcool » d'une boisson dans le Journal.
       ...(food.per100.alcool != null && food.per100.alcool != 0 ? { alcool: food.per100.alcool } : {}),
     },
     // Correction (07/10/2026) : ligne NÉGATIVE saisie depuis « Macro rapide » pour retirer ce qui a
@@ -109,6 +111,17 @@ export function makeEntry({ date, meal, food, q }) {
 
 /** Ligne de correction (valeurs négatives, voir `makeEntry`). */
 export const isCorrection = (e) => !!e?.correction;
+
+/**
+ * Alcool d'une ligne du journal (26/11/2026, demande de Yoann) : { g, kcal } (7 kcal/g, déjà
+ * comprises dans les kcal de la ligne, jamais ajoutées), ou `null` sans alcool — rien à afficher.
+ */
+export function alcoholOf(e) {
+  const a = Number(e?.per100?.alcool);
+  if (!Number.isFinite(a) || a <= 0) return null;
+  const g = Math.round(((a * (Number(e.q) || 0)) / 100) * 10) / 10;
+  return g > 0 ? { g, kcal: Math.round(g * 7) } : null;
+}
 
 /** Grammes d'alcool loggés à une date (somme per100.alcool × q/100, 1 décimale), 0 si aucun. */
 export function alcoholGramsFor(log, date) {
