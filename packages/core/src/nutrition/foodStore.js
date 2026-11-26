@@ -333,7 +333,12 @@ export function portionsFor(portions, ref) {
 // `portions` (30/10/2026) : en combien de portions la recette se partage (« 800 g en 4 » →
 // 1 portion = 200 g). Absent : on garde celui de la recette modifiée, sinon 1 (recette entière,
 // comportement d'avant). Seule une quantité proposée en dépend, jamais les valeurs pour 100 g.
-export function compileRecipe(name, ingredients, existing, portions) {
+// `description` (26/11/2026, demande de Yoann) : texte libre facultatif (préparation, astuces).
+// Absent (`undefined`) : on garde celle de la recette modifiée. Vide : pas de champ du tout, une
+// recette sans description garde exactement sa forme d'avant. Jamais recopiée dans le journal
+// (`recipeAsFood` ne la reprend pas).
+export function compileRecipe(name, ingredients, existing, portions, description) {
+  const desc = String(description ?? existing?.description ?? "").trim();
   const totalWeight = ingredients.reduce((s, i) => s + i.q, 0);
   const per100 = {};
   for (const m of MACROS) {
@@ -354,6 +359,7 @@ export function compileRecipe(name, ingredients, existing, portions) {
     ingredients: ingredients.map((i) => ({ ref: i.ref, name: i.name, q: i.q, per100: i.per100 })),
     per100,
     portions: Math.max(1, Math.round(portions ?? existing?.portions ?? 1)),
+    ...(desc ? { description: desc } : {}),
     createdAt: existing?.createdAt ?? new Date().toISOString(),
   };
 }
@@ -532,6 +538,16 @@ export function allMealPins(byMeal) {
   const seen = new Map();
   for (const list of Object.values(byMeal || {})) for (const p of list) if (!seen.has(pinRef(p))) seen.set(pinRef(p), p);
   return [...seen.values()];
+}
+/**
+ * Ingrédients proposés dans une recette (26/11/2026, demande de Yoann) : deux listes, les favoris
+ * (étoiles de tous les repas) puis les habituels (le plus mangé), sans repas précis. `exclude` :
+ * la `ref` de la recette en cours de modification, qui ne se propose jamais comme son propre
+ * ingrédient.
+ */
+export function ingredientChoices(log, { pins = [], exclude = null, date } = {}) {
+  const all = suggestions(log || [], { pins, ...(date ? { date } : {}) }).filter((f) => f.ref !== exclude);
+  return { favoris: all.filter((f) => f.pinned), habituels: all.filter((f) => !f.pinned) };
 }
 /** Étoile d'un repas : ajoute la copie de l'aliment, ou la retire si elle y est déjà. */
 export function togglePinIn(byMeal, meal, food) {

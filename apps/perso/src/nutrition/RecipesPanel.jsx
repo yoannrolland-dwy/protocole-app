@@ -40,6 +40,10 @@ function RecipeSheet({ recipe, dayLabel, onAdd, onEdit, onDuplicate, onRemove, o
         <IconButton label="Retour aux recettes" size={44} style={{ border: "none" }} onClick={onBack}><ChevronLeft size={24} aria-hidden="true" /></IconButton>
         <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, flex: 1, minWidth: 0 }}>{recipe.name}</h2>
       </div>
+      {/* Description libre (26/11/2026), telle qu'écrite, retours à la ligne compris. */}
+      {recipe.description && (
+        <div style={{ fontSize: 15, lineHeight: 1.45, color: T.c.text2, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{recipe.description}</div>
+      )}
 
       <Panel>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
@@ -120,8 +124,8 @@ export default function RecipesPanel({ food, date, dayLabel, onAdded }) {
     return (
       <RecipeBuilder recipe={recipe} copy={copy} log={food.log} pins={allMealPins(food.mealPins)} muted={[]}
         onBack={() => setBuilding(null)}
-        onSave={(name, ingredients, portions) => {
-          const r = compileRecipe(name, ingredients, editing, portions);
+        onSave={(name, ingredients, portions, description) => {
+          const r = compileRecipe(name, ingredients, editing, portions, description);
           if (editing) food.updateRecipe(r); else food.addRecipe(r);
           setBuilding(null);
           setOpenId(r.id);

@@ -23,7 +23,7 @@ import { Eyebrow, Button, IconButton, Chip, NumberField, TextField } from "../de
 import { searchCiqual, normalize, getCiqual } from "@rawcare/core/nutrition/ciqual";
 import { searchOFF, getOFFByBarcode } from "@rawcare/core/nutrition/off";
 import { suggestions, searchBoost, MACROS, newQuickRef, portionsFor, compileRecipe, recipeAsFood, isRecipeRef,
-         applyOverride, recipePortionGrams } from "./foodStore.js";
+         applyOverride, recipePortionGrams, ingredientChoices } from "./foodStore.js";
 import { scanBarcode } from "@rawcare/core/nutrition/scan";
 import RestaurantMenu from "./RestaurantMenu.jsx";
 import PhotoDish from "./PhotoDish.jsx";
@@ -309,17 +309,49 @@ async function resolveIngredient(ing) {
    Même recherche CIQUAL + OFF que l'écran principal (via useFoodSearch) : les ingrédients
    d'une recette sont aussi souvent des produits de marque que des aliments bruts — Yoann
    mange surtout à code-barres (retour du 02/08/2026), pas de raison de s'en priver ici. */
-function IngredientPicker({ onAdd, onCancel, log, pins, muted }) {
+function IngredientPicker({ onAdd, onCancel, log, pins, exclude = null }) {
   const [q, setQ] = useState("");
   const [pick, setPick] = useState(null);
   const [grams, setGrams] = useState(100);
   const { results, offResults, offState } = useFoodSearch(q, { limit: 15 });
-  const showEmpty = q.trim().length >= 2 && results.length === 0;
   const showSugg = q.trim().length < 2;
-  // Favoris/aliments habituels (07/08/2026, retour de Yoann) : jusqu'ici IngredientPicker
-  // n'affichait QUE la recherche textuelle, contrairement à l'écran principal — pas de
-  // `meal` ici (un ingrédient de recette n'est pas lié à un repas précis).
-  const sugg = useMemo(() => suggestions(log || [], { pins, muted }), [log, pins, muted]);
+  // Favoris et habituels en deux listes (26/11/2026, demande de Yoann ; jusque-là une seule liste
+  // « Vos aliments habituels », favoris en tête sans marque, disparue dès 2 lettres tapées). Pas
+  // de `meal` ici : un ingrédient de recette n'est pas lié à un repas. En tapant, ceux dont le nom
+  // correspond restent en tête, comme dans la recherche d'un repas.
+  const choices = useMemo(() => ingredientChoices(log, { pins, exclude }), [log, pins, exclude]);
+  const nq = normalize(q.trim());
+  const keep = (list) => (showSugg ? list : list.filter((f) => normalize(f.name).includes(nq)));
+  const favoris = keep(choices.favoris);
+  const habituels = keep(choices.habituels);
+  const known = useMemo(() => new Set([...favoris, ...habituels].map((f) => f.ref)), [favoris, habituels]);
+  const found = showSugg ? [] : results.filter((f) => !known.has(f.ref) && f.ref !== exclude);
+  const showEmpty = !showSugg && found.length === 0 && favoris.length === 0 && habituels.length === 0;
+
+  // Scan d'un ingrédient (26/11/2026) : même chemin que la recherche d'un repas (Google Code
+  // Scanner puis Open Food Facts), natif seulement ; le produit trouvé passe au réglage des grammes.
+  const [scanState, setScanState] = useState("idle"); // idle | lookup | notfound | error
+  const [scanCode, setScanCode] = useState(null);
+  const scan = async () => {
+    setScanState("idle");
+    const { code, status } = await scanBarcode();
+    if (status !== "ok") { if (status === "error") setScanState("error"); return; }
+    setScanCode(code);
+    setScanState("lookup");
+    const { item, error } = await getOFFByBarcode(code);
+    if (item) { setScanState("idle"); setPick(item); setGrams(100); }
+    else setScanState(error ? "error" : "notfound");
+  };
+  const choose = (f) => { setPick(f); setGrams(100); };
+  const rows = (list) => list.map((f) => (
+    <button type="button" className="p-tap" key={f.ref} onClick={() => choose(f)} style={{
+      display: "block", width: "100%", minHeight: 56, padding: "8px 2px", background: "none", border: "none",
+      borderBottom: `1px solid ${C.divider}`, textAlign: "left", fontFamily: "inherit",
+    }}>
+      <div style={{ fontSize: 15, color: C.text, fontWeight: 600 }}>{f.name}</div>
+      <div style={{ fontFamily: C.mono, fontSize: 13, color: C.text2, marginTop: 2 }}>{val(f.per100?.kcal)} kcal /100 g</div>
+    </button>
+  ));
 
   if (pick) {
     return (
@@ -339,23 +371,41 @@ function IngredientPicker({ onAdd, onCancel, log, pins, muted }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", gap: 8 }}>
         <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher un ingrédient…" style={{ flex: 1 }} />
+        {Capacitor.isNativePlatform() && (
+          <IconButton label="Scanner un code-barres" tone="accent" size={52} onClick={scan} disabled={scanState === "lookup"}>
+            <ScanBarcode size={22} aria-hidden="true" />
+          </IconButton>
+        )}
         <Btn variant="ghost" onClick={onCancel} style={{ padding: "0 10px" }}>Annuler</Btn>
       </div>
-      {showSugg && sugg.length > 0 && (
-        <Label style={{ marginTop: 4, marginBottom: 2 }}>Vos aliments habituels</Label>
+      {scanState === "lookup" && <div className="p-sec">Recherche du produit scanné…</div>}
+      {scanState === "notfound" && (
+        <div className="p-sec">Code {scanCode} inconnu d'Open Food Facts. Cherchez-le à la main.</div>
+      )}
+      {scanState === "error" && <div className="p-sec">Scan indisponible pour le moment — réessayez.</div>}
+      {favoris.length > 0 && (
+        <>
+          <Label style={{ marginTop: 4, marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>
+            <Star size={13} aria-hidden="true" color={C.accent} fill={C.accent} />Favoris
+          </Label>
+          {rows(favoris)}
+        </>
+      )}
+      {habituels.length > 0 && (
+        <>
+          <Label style={{ marginTop: favoris.length ? 14 : 4, marginBottom: 2 }}>Habituels</Label>
+          {rows(habituels)}
+        </>
       )}
       {showEmpty && <Empty>{sayStable("noCiqual")}</Empty>}
-      {(showSugg ? sugg : results).map((f) => (
-        <button type="button" className="p-tap" key={f.ref} onClick={() => { setPick(f); setGrams(100); }} style={{
-          display: "block", width: "100%", minHeight: 56, padding: "8px 2px", background: "none", border: "none",
-          borderBottom: `1px solid ${C.divider}`, textAlign: "left", fontFamily: "inherit",
-        }}>
-          <div style={{ fontSize: 15, color: C.text, fontWeight: 600 }}>{f.name}</div>
-          <div style={{ fontFamily: C.mono, fontSize: 13, color: C.text2, marginTop: 2 }}>{val(f.per100.kcal)} kcal /100 g</div>
-        </button>
-      ))}
-      {!showSugg && q.trim().length >= 2 && (
-        <OffSection offState={offState} offResults={offResults} onPick={(f) => { setPick(f); setGrams(100); }} />
+      {found.length > 0 && (
+        <>
+          {(favoris.length > 0 || habituels.length > 0) && <Label style={{ marginTop: 14, marginBottom: 2 }}>Recherche</Label>}
+          {rows(found)}
+        </>
+      )}
+      {!showSugg && (
+        <OffSection offState={offState} offResults={offResults.filter((f) => !known.has(f.ref))} onPick={choose} />
       )}
     </div>
   );
@@ -371,6 +421,8 @@ export function RecipeBuilder({ recipe, copy = false, onSave, onBack, log, pins,
   const [ingredients, setIngredients] = useState(recipe?.ingredients ?? []);
   // Portions (30/10/2026) : en combien la recette se partage, pour proposer 1 portion à l'ajout.
   const [portions, setPortions] = useState(recipe?.portions ?? 1);
+  // Description libre (26/11/2026) : reprise en modification comme en duplication.
+  const [description, setDescription] = useState(recipe?.description ?? "");
   const [picking, setPicking] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
 
@@ -394,7 +446,10 @@ export function RecipeBuilder({ recipe, copy = false, onSave, onBack, log, pins,
   const portionG = recipePortionGrams(compiled);
 
   if (picking) {
-    return <IngredientPicker onCancel={() => setPicking(false)} log={log} pins={pins} muted={muted}
+    // Une recette modifiée ne se propose pas comme son propre ingrédient (une copie est une nouvelle
+    // recette : l'originale peut y entrer).
+    return <IngredientPicker onCancel={() => setPicking(false)} log={log} pins={pins}
+      exclude={recipe?.id && !copy ? `recipe:${recipe.id}` : null}
       onAdd={(ing) => { setIngredients([...ingredients, ing]); setPicking(false); }} />;
   }
 
@@ -422,6 +477,9 @@ export function RecipeBuilder({ recipe, copy = false, onSave, onBack, log, pins,
         <Label style={{ fontSize: 13 }}>{copy ? "Copie de la recette" : recipe ? "Modifier la recette" : "Nouvelle recette"}</Label>
       </div>
       <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom (ex. Mon shaker du matin)" />
+      <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} aria-label="Description de la recette"
+        placeholder="Description (facultatif) : préparation, cuisson, astuces…" className="p-field"
+        style={{ height: "auto", minHeight: 0, padding: "10px 12px", fontSize: 15, lineHeight: 1.45, fontFamily: "inherit", resize: "vertical" }} />
 
       {ingredients.map((ing, i) => (
         <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 4, borderBottom: `1px solid ${C.divider}` }}>
@@ -465,7 +523,7 @@ export function RecipeBuilder({ recipe, copy = false, onSave, onBack, log, pins,
         )}
       </div>
 
-      <Btn variant="primary" disabled={!ok} onClick={() => onSave(name.trim(), ingredients, portions)}>
+      <Btn variant="primary" disabled={!ok} onClick={() => onSave(name.trim(), ingredients, portions, description)}>
         {copy ? "Enregistrer la copie" : recipe ? "Enregistrer les modifications" : "Enregistrer la recette"}
       </Btn>
     </div>
@@ -776,8 +834,8 @@ export default function FoodSearch({
         {building ? (
           <RecipeBuilder recipe={editingRecipe} log={log} pins={allPins} muted={[]}
             onBack={() => { setBuilding(false); setEditingRecipe(null); }}
-            onSave={(name, ingredients, nPortions) => {
-              const r = compileRecipe(name, ingredients, editingRecipe, nPortions);
+            onSave={(name, ingredients, nPortions, description) => {
+              const r = compileRecipe(name, ingredients, editingRecipe, nPortions, description);
               if (editingRecipe) onUpdateRecipe(r); else onCreateRecipe(r);
               setBuilding(false);
               setEditingRecipe(null);
