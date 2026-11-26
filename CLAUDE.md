@@ -6,7 +6,8 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 ## État courant (14/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.186.0, commit `cc5e11e`, le 26/11/2026 à 23 h 28 (recette sans macros : fiche
+- **Installé sur le S25** : v3.187.0, commit `da43076`, le 26/11/2026 à 23 h 34 (recettes : une valeur
+  manquante compte pour 0, total signalé « +? » ; 5 recettes recalculées dans les données). Avant : v3.186.0, commit `cc5e11e`, le 26/11/2026 à 23 h 28 (recette sans macros : fiche
   Open Food Facts vide lue comme inconnue, ingrédient incomplet nommé ; Honey Cornbread corrigé dans les
   données). Avant : v3.185.0, commit `dc5ba7a`, le 26/11/2026 à 19 h 57 (alcool d'une boisson sur
   la ligne du Journal, degré lu au scan et en photo ; table CIQUAL avec alcool pas encore reconstruite,
@@ -28,7 +29,7 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 - **Repères de retour arrière** (étiquettes poussées) : `avant-refonte`, `rawcare-final`,
   `avant-campagne-audit`, `apres-lot1-audit`, `apres-lot2-audit`, `avant-jetons-gestes`. APK
   précédents : `~/Documents/protocole-sauvegardes/` (hors Git).
-- **Tests** : 432 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
+- **Tests** : 433 (`npm test`), plus les tests unitaires Android lancés par `release.mjs build`.
 - **Chantiers** : tous ceux de `ROADMAP.md` sont livrés (V, R, S, T, U, J). La campagne d'audit du
   10/11/2026 est faite (lots 1 à 3). Ce qui reste ouvert est dans « Reportés à la fin de la
   campagne » (`docs/journal/2026-11.md`).
