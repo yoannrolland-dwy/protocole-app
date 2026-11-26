@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { getOFFByBarcode } from "../src/nutrition/off.js";
-import { recipeMissing, compileRecipe } from "../src/nutrition/foodStore.js";
+import { recipeMissing, compileRecipe, recipeSheet } from "../src/nutrition/foodStore.js";
 
 async function scanned(code, nutriments) {
   const realFetch = globalThis.fetch;
@@ -34,7 +34,20 @@ test("recette : l'ingrédient qui vide une valeur est nommé", () => {
     { name: "Yaourt nature", macros: ["fib"] },
     { name: "Miel de fleurs", macros: ["kcal", "prot", "gluc", "lip", "fib"] },
   ]);
-  assert.equal(compileRecipe("Test", ing).per100.kcal, null, "kcal inconnues : plus de total sous-estimé");
+  // Règle du 26/11/2026 (Yoann) : une valeur absente compte pour 0, les autres s'additionnent.
+  // (107,5 + 336) kcal / 610 g ; protéines (10 + 30,48) / 610 g ; fibres : seul l'œuf en a (0).
+  assert.deepEqual(compileRecipe("Test", ing).per100, { kcal: 73, prot: 6.6, gluc: 1.8, lip: 4.3, fib: 0 });
+  // Aucune valeur connue pour une macro : « — », pas 0.
+  assert.equal(compileRecipe("Miel seul", [ing[1]]).per100.prot, null);
   assert.deepEqual(recipeMissing([ing[2]]), []);
   assert.deepEqual(recipeMissing(undefined), []);
+});
+
+test("fiche de recette : « +? » sur les seules valeurs incomplètes", () => {
+  const r = compileRecipe("Cornbread", [
+    { ref: "off:y", name: "Yaourt nature", q: 250, per100: { kcal: 43, prot: 4, gluc: 4.2, lip: 1.1, fib: null } },
+    { ref: "ciqual:22000", name: "Oeuf, cru", q: 240, per100: { kcal: 140, prot: 12.7, gluc: 0.3, lip: 9.8, fib: 0 } },
+  ], null, 4);
+  assert.deepEqual(recipeSheet(r).missing, { kcal: false, prot: false, gluc: false, lip: false, fib: true });
+  assert.equal(r.per100.fib, 0, "fibres de l'œuf seules : 0, et plus « — »");
 });

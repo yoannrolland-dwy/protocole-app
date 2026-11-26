@@ -449,6 +449,7 @@ export function RecipeBuilder({ recipe, copy = false, onSave, onBack, log, pins,
   // recette perd ses macros sans que rien ne dise lequel la vide.
   const missing = recipeMissing(ingredients);
   const missingOf = (ing) => recipeMissing([ing])[0]?.macros ?? [];
+  const plusQ = (m) => (missing.some((x) => x.macros.includes(m)) ? " +?" : "");
 
   if (picking) {
     // Une recette modifiée ne se propose pas comme son propre ingrédient (une copie est une nouvelle
@@ -517,18 +518,18 @@ export function RecipeBuilder({ recipe, copy = false, onSave, onBack, log, pins,
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
             <Label>Total ({compiled.totalWeight} g)</Label>
             <span style={{ fontFamily: C.mono, fontSize: 15, fontWeight: 800, color: C.accent }}>
-              {val(compiled.per100.kcal)} kcal<span style={{ color: C.muted, fontSize: 12 }}>/100g</span>
+              {val(compiled.per100.kcal)} kcal{plusQ("kcal")}<span style={{ color: C.muted, fontSize: 12 }}>/100g</span>
             </span>
           </div>
           <div style={{ fontFamily: C.mono, fontSize: 13, color: C.text2, display: "flex", flexWrap: "wrap", columnGap: 10, marginTop: 4 }}>
-            <span>P{val(compiled.per100.prot)}</span>
-            <span>G{val(compiled.per100.gluc)}</span>
-            <span>L{val(compiled.per100.lip)}</span>
-            <span>Fib{val(compiled.per100.fib)}</span>
+            <span>P{val(compiled.per100.prot)}{plusQ("prot")}</span>
+            <span>G{val(compiled.per100.gluc)}{plusQ("gluc")}</span>
+            <span>L{val(compiled.per100.lip)}{plusQ("lip")}</span>
+            <span>Fib{val(compiled.per100.fib)}{plusQ("fib")}</span>
           </div>
           {missing.length > 0 && (
             <div style={{ fontSize: 13, color: T.c.warn, marginTop: 6, lineHeight: 1.4 }}>
-              « — » : il manque des valeurs à {missing.map((x) => x.name).join(", ")}. {missing.length > 1 ? "Remplace-les par d'autres aliments" : "Remplace-le par un autre aliment"} : la recherche trouve souvent l'équivalent dans la table CIQUAL.
+              « +? » : il manque des valeurs à {missing.map((x) => x.name).join(", ")}, comptées pour 0. Pour un total exact, {missing.length > 1 ? "remplace-les par d'autres aliments" : "remplace-le par un autre aliment"} : la recherche trouve souvent l'équivalent dans la table CIQUAL.
             </div>
           )}
         </div>
@@ -539,7 +540,7 @@ export function RecipeBuilder({ recipe, copy = false, onSave, onBack, log, pins,
         <Stepper value={portions} step={1} min={1} int set={(v) => setPortions(Math.max(1, Math.round(v || 1)))} />
         {ingredients.length > 0 && (
           <div style={{ fontFamily: C.mono, fontSize: 13, color: C.text2 }}>
-            1 portion = {portionG} g · <span style={{ color: C.accent, fontWeight: 700 }}>{val(kcalFor(compiled.per100, portionG))} kcal</span>
+            1 portion = {portionG} g · <span style={{ color: C.accent, fontWeight: 700 }}>{val(kcalFor(compiled.per100, portionG))} kcal{plusQ("kcal")}</span>
           </div>
         )}
       </div>

@@ -14,11 +14,13 @@ import { say, sayStable } from "../lib/jeffrey.js";
 
 const mono = { fontFamily: T.f.num, fontVariantNumeric: "tabular-nums" };
 const v = (x, unit = "") => (x === null || x === undefined ? "—" : `${x}${unit}`);
+// Total incomplet (26/11/2026) : un ingrédient au moins n'a pas cette valeur, comptée pour 0.
+const plus = (miss) => (miss ? " +?" : "");
 
-function Macros({ m }) {
+function Macros({ m, miss = {} }) {
   return (
     <div style={{ ...mono, display: "flex", flexWrap: "wrap", columnGap: 12, fontSize: 13, color: T.c.text2 }}>
-      <span>P{v(m.prot)}</span><span>G{v(m.gluc)}</span><span>L{v(m.lip)}</span><span>Fib{v(m.fib)}</span>
+      <span>P{v(m.prot)}{plus(miss.prot)}</span><span>G{v(m.gluc)}{plus(miss.gluc)}</span><span>L{v(m.lip)}{plus(miss.lip)}</span><span>Fib{v(m.fib)}{plus(miss.fib)}</span>
     </div>
   );
 }
@@ -48,12 +50,12 @@ function RecipeSheet({ recipe, dayLabel, onAdd, onEdit, onDuplicate, onRemove, o
       <Panel>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
           <Eyebrow>{s.portions > 1 ? `1 portion · ${s.portionGrams} g` : `Recette · ${s.totalWeight} g`}</Eyebrow>
-          <span style={{ ...mono, fontSize: 22, fontWeight: 700, color: T.c.accent }}>{v(s.portion.kcal)} kcal</span>
+          <span style={{ ...mono, fontSize: 22, fontWeight: 700, color: T.c.accent }}>{v(s.portion.kcal)} kcal{plus(s.missing.kcal)}</span>
         </div>
-        <Macros m={s.portion} />
+        <Macros m={s.portion} miss={s.missing} />
         {s.portions > 1 && (
           <div className="p-sec" style={mono}>
-            Recette entière · {s.totalWeight} g · {s.portions} portions · {v(s.whole.kcal)} kcal
+            Recette entière · {s.totalWeight} g · {s.portions} portions · {v(s.whole.kcal)} kcal{plus(s.missing.kcal)}
           </div>
         )}
       </Panel>
@@ -167,7 +169,7 @@ export default function RecipesPanel({ food, date, dayLabel, onAdded }) {
                 <span style={{ flex: 1, minWidth: 0, display: "grid", gap: 3 }}>
                   <span style={{ fontSize: 16, fontWeight: 700 }}>{r.name}</span>
                   <span style={{ ...mono, fontSize: 13, color: T.c.text2 }}>
-                    {s.portions > 1 ? `${s.portions} portions · ${v(s.portion.kcal)} kcal la portion` : `${s.totalWeight} g · ${v(s.whole.kcal)} kcal`}
+                    {s.portions > 1 ? `${s.portions} portions · ${v(s.portion.kcal)} kcal${plus(s.missing.kcal)} la portion` : `${s.totalWeight} g · ${v(s.whole.kcal)} kcal${plus(s.missing.kcal)}`}
                     {u ? ` · ${fmt(u.date)}` : ""}
                   </span>
                 </span>

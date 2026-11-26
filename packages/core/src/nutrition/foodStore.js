@@ -335,9 +335,8 @@ export function portionsFor(portions, ref) {
 // M1 (per100 figé à la saisie, pas résolu à la lecture) : une recette n'est pas censée
 // changer de composition silencieusement si la table source est mise à jour.
 //
-// Une macro devient `null` sur toute la recette si NE SERAIT-CE QU'UN ingrédient avec
-// une quantité > 0 a cette macro absente — additionner un nombre et une inconnue ne
-// peut pas donner un vrai total, mieux vaut l'avouer que d'afficher un chiffre faux.
+// Valeur absente sur un ingrédient (26/11/2026) : comptée pour 0, signalée « +? » à l'écran
+// (voir `recipeMissing`). Jusque-là elle vidait la valeur de toute la recette.
 // `existing` (V8, 05/08/2026) : passé lors d'une MODIFICATION de recette déjà enregistrée —
 // on garde son `id`/`createdAt` d'origine (le `ref` `recipe:<id>` reste stable, comme un
 // aliment CIQUAL dont la fiche serait corrigée) plutôt que d'en générer une nouvelle. Les
@@ -355,13 +354,18 @@ export function compileRecipe(name, ingredients, existing, portions, description
   const totalWeight = ingredients.reduce((s, i) => s + i.q, 0);
   const per100 = {};
   for (const m of MACROS) {
-    let sum = 0, hasNull = false;
+    let sum = 0, known = false;
     for (const i of ingredients) {
       const v = i.per100?.[m];
-      if (v === null || v === undefined) { if (i.q > 0) hasNull = true; continue; }
+      if (v === null || v === undefined) continue;
       sum += v * (i.q / 100);
+      if (i.q > 0) known = true;
     }
-    per100[m] = hasNull || totalWeight === 0 ? null
+    // Règle changée le 26/11/2026 à la demande de Yoann (« c'est stupide ») : une valeur absente
+    // sur UN ingrédient ne vide plus la recette, elle compte pour 0 et les autres s'additionnent,
+    // comme le total du jour (`totals`, « +? »). L'écran signale le total incomplet avec
+    // `recipeMissing`. `null` seulement si aucun ingrédient n'a cette valeur.
+    per100[m] = !known || totalWeight === 0 ? null
       : m === "kcal" ? Math.round((sum / totalWeight) * 100)
       : Math.round((sum / totalWeight) * 100 * 10) / 10;
   }
@@ -423,6 +427,8 @@ export function recipeSheet(r) {
     whole: at(r.per100, r.totalWeight),
     portion: at(r.per100, portionGrams),
     ingredients: (r.ingredients || []).map((i) => ({ name: i.name, q: i.q, kcal: at(i.per100, i.q).kcal })),
+    // Valeurs dont le total est incomplet (un ingrédient au moins sans cette valeur) : « +? ».
+    missing: Object.fromEntries(MACROS.map((m) => [m, recipeMissing(r.ingredients).some((x) => x.macros.includes(m))])),
   };
 }
 
