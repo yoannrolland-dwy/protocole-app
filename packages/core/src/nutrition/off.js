@@ -73,7 +73,12 @@ export function offAlcohol(n, kcal) {
 
 function toFood(p) {
   const n = p.nutriments || {};
-  const kcalRaw = n["energy-kcal_100g"] ?? (n.energy_100g != null ? n.energy_100g / 4.184 : null);
+  const kcalAny = n["energy-kcal_100g"] ?? (n.energy_100g != null ? n.energy_100g / 4.184 : null);
+  // Fiche vide (26/11/2026, « Miel de fleurs » scanné dans le Honey Cornbread de Yoann) : énergie
+  // à 0 sans aucune macro, c'est une fiche jamais remplie, pas un aliment à 0 kcal. Le prendre
+  // pour un vrai zéro faisait passer une recette pour moins calorique qu'elle ne l'est.
+  const empty = [n.proteins_100g, n.carbohydrates_100g, n.fat_100g].every((v) => v == null);
+  const kcalRaw = empty && Number(kcalAny) === 0 ? null : kcalAny;
   const alcool = offAlcohol(n, kcalRaw);
   return {
     ref: `off:${p.code}`,

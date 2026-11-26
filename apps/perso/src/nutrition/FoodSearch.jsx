@@ -23,7 +23,7 @@ import { Eyebrow, Button, IconButton, Chip, NumberField, TextField } from "../de
 import { searchCiqual, normalize, getCiqual } from "@rawcare/core/nutrition/ciqual";
 import { searchOFF, getOFFByBarcode } from "@rawcare/core/nutrition/off";
 import { suggestions, searchBoost, MACROS, newQuickRef, portionsFor, compileRecipe, recipeAsFood, isRecipeRef,
-         applyOverride, recipePortionGrams, ingredientChoices } from "./foodStore.js";
+         applyOverride, recipePortionGrams, ingredientChoices, recipeMissing } from "./foodStore.js";
 import { scanBarcode } from "@rawcare/core/nutrition/scan";
 import RestaurantMenu from "./RestaurantMenu.jsx";
 import PhotoDish from "./PhotoDish.jsx";
@@ -32,6 +32,7 @@ import { sayStable } from "../lib/jeffrey.js";
 const OFF_DEBOUNCE_MS = 700;
 
 const MACRO_LABEL = { kcal: "kcal", prot: "P", gluc: "G", lip: "L", fib: "Fib" };
+const MACRO_NAMES = { kcal: "calories", prot: "protéines", gluc: "glucides", lip: "lipides", fib: "fibres" };
 
 /**
  * Recherche CIQUAL + Open Food Facts partagée entre la recherche principale d'un repas et
@@ -444,6 +445,10 @@ export function RecipeBuilder({ recipe, copy = false, onSave, onBack, log, pins,
   const compiled = useMemo(() => compileRecipe(name || "?", ingredients, null, portions), [name, ingredients, portions]);
   const ok = name.trim().length > 0 && ingredients.length > 0;
   const portionG = recipePortionGrams(compiled);
+  // Ingrédients sans valeurs (26/11/2026) : nommés sur leur ligne et sous le total, sinon une
+  // recette perd ses macros sans que rien ne dise lequel la vide.
+  const missing = recipeMissing(ingredients);
+  const missingOf = (ing) => recipeMissing([ing])[0]?.macros ?? [];
 
   if (picking) {
     // Une recette modifiée ne se propose pas comme son propre ingrédient (une copie est une nouvelle
@@ -490,6 +495,11 @@ export function RecipeBuilder({ recipe, copy = false, onSave, onBack, log, pins,
             <div style={{ fontFamily: C.mono, fontSize: 13, color: C.text2, marginTop: 2 }}>
               {ing.q}g · <span style={{ color: C.accent, fontWeight: 700 }}>{val(kcalFor(ing.per100, ing.q))} kcal</span>
             </div>
+            {ing.q > 0 && missingOf(ing).length > 0 && (
+              <div style={{ fontSize: 12, color: T.c.warn, marginTop: 2 }}>
+                Valeurs manquantes : {missingOf(ing).map((m) => MACRO_NAMES[m]).join(", ")}
+              </div>
+            )}
           </button>
           <button type="button" className="p-tap" onClick={() => setIngredients(ingredients.filter((_, j) => j !== i))} aria-label={`Retirer ${ing.name} de la recette`}
             style={{ width: 44, height: 44, display: "grid", placeItems: "center", background: "none", border: "none", color: C.text2, padding: 0, flexShrink: 0 }}>
@@ -510,6 +520,17 @@ export function RecipeBuilder({ recipe, copy = false, onSave, onBack, log, pins,
               {val(compiled.per100.kcal)} kcal<span style={{ color: C.muted, fontSize: 12 }}>/100g</span>
             </span>
           </div>
+          <div style={{ fontFamily: C.mono, fontSize: 13, color: C.text2, display: "flex", flexWrap: "wrap", columnGap: 10, marginTop: 4 }}>
+            <span>P{val(compiled.per100.prot)}</span>
+            <span>G{val(compiled.per100.gluc)}</span>
+            <span>L{val(compiled.per100.lip)}</span>
+            <span>Fib{val(compiled.per100.fib)}</span>
+          </div>
+          {missing.length > 0 && (
+            <div style={{ fontSize: 13, color: T.c.warn, marginTop: 6, lineHeight: 1.4 }}>
+              « — » : il manque des valeurs à {missing.map((x) => x.name).join(", ")}. {missing.length > 1 ? "Remplace-les par d'autres aliments" : "Remplace-le par un autre aliment"} : la recherche trouve souvent l'équivalent dans la table CIQUAL.
+            </div>
+          )}
         </div>
       )}
 

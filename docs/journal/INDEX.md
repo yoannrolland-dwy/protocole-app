@@ -160,3 +160,4 @@ Une ligne par section, dans l'ordre des dates. Chercher ici d'abord, puis ouvrir
 - Séance Mobilité simplifiée : ni reps en réserve, ni records, ni JEFFREY au cochage, poids sur 4 exercices (24/11/2026, apps/perso v3.180.0)
 - Recettes : scan d'un ingrédient, favoris et habituels en deux listes, description (26/11/2026, apps/perso v3.184.0)
 - Alcool d'une boisson : grammes et kcal sur la ligne du Journal, degré lu au scan et en photo (26/11/2026, apps/perso v3.185.0)
+- Recette sans macros : fiche Open Food Facts vide lue comme inconnue, ingrédient manquant nommé (26/11/2026, apps/perso v3.186.0)

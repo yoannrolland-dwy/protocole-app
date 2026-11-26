@@ -377,6 +377,16 @@ export function compileRecipe(name, ingredients, existing, portions, description
   };
 }
 
+/** Ingrédients (quantité > 0) qui vident une valeur de la recette : `[{ name, macros }]`, `macros`
+ * dans l'ordre de MACROS. Vide si tout est renseigné. (26/11/2026 : le Honey Cornbread de Yoann
+ * n'affichait que ses kcal à cause d'un miel Open Food Facts sans valeurs, sans dire lequel.) */
+export function recipeMissing(ingredients) {
+  return (ingredients || [])
+    .filter((i) => i.q > 0)
+    .map((i) => ({ name: i.name, macros: MACROS.filter((m) => i.per100?.[m] === null || i.per100?.[m] === undefined) }))
+    .filter((x) => x.macros.length > 0);
+}
+
 /** Nombre de portions d'une recette stockée (1 pour une recette d'avant le 30/10/2026). */
 export const recipePortions = (r) => Math.max(1, Math.round(r?.portions ?? 1));
 
