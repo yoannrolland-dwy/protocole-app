@@ -162,3 +162,4 @@ Une ligne par section, dans l'ordre des dates. Chercher ici d'abord, puis ouvrir
 - Alcool d'une boisson : grammes et kcal sur la ligne du Journal, degré lu au scan et en photo (26/11/2026, apps/perso v3.185.0)
 - Recette sans macros : fiche Open Food Facts vide lue comme inconnue, ingrédient manquant nommé (26/11/2026, apps/perso v3.186.0)
 - Recettes : une valeur manquante compte pour 0, total signalé « +? » (26/11/2026, apps/perso v3.187.0)
+- Machines à abducteurs, poulie et disque, dans « Ajouter un exercice » (27/11/2026, apps/perso v3.188.0)

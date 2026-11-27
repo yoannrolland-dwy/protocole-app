@@ -64,6 +64,14 @@ export const EXERCISE_LIBRARY = [
   { n: "Leg curl unilatéral (disque)", s: 3, r: "10-12", rest: 90, mode: "reps", c: "",
     groupe: "ischios", mouvement: "isolation", materiel: "disque", tendon: null, famille: "leg-curl-unilateral" },
 
+  // ---- Abducteurs de hanche (27/11/2026, demande de Yoann ; noms et consigne choisis par lui) ----
+  // Moyen fessier : rangés dans Fessiers. Hanche seule, genou immobile : rien pour le tendon
+  // quadricipital. Même `famille` : l'une remplace l'autre si la machine est prise.
+  { n: "Machine à abducteurs (poulie)", s: 3, r: "10-12", rest: 90, mode: "reps", c: "",
+    groupe: "fessiers", mouvement: "isolation", materiel: "poulie", tendon: null, famille: "abduction-hanche" },
+  { n: "Machine à abducteurs (disque)", s: 3, r: "10-12", rest: 90, mode: "reps", c: "",
+    groupe: "fessiers", mouvement: "isolation", materiel: "disque", tendon: null, famille: "abduction-hanche" },
+
   // ---- Mollets à la presse (dépend de la presse à cuisses utilisée ce jour-là) ----
   { n: "Mollets à la presse", s: 4, r: "10-12", rest: 90, mode: "reps", c: "enchaîné avec la presse",
     groupe: "mollets", mouvement: "isolation", materiel: "machine", tendon: null, famille: "mollets-presse" },

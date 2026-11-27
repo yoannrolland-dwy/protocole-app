@@ -35,3 +35,14 @@ test("groupes dans l'ordre des muscles, exclusions et recherche sans accents", (
   assert.ok(catalogGroups({ query: "mollets" }).some((g) => g.groupe === "mollets"), "recherche par muscle");
   assert.deepEqual(catalogGroups({ query: "zzz" }), []);
 });
+
+test("machines à abducteurs (27/11/2026, demande de Yoann) : dans Fessiers, l'une remplace l'autre", async () => {
+  const { substitutionCandidates } = await import("../src/session/engine.js");
+  const g = catalogGroups({ query: "abducteurs" });
+  assert.deepEqual(g.map((x) => x.groupe), ["fessiers"]);
+  assert.deepEqual(g[0].items.map((c) => c.n), ["Machine à abducteurs (poulie)", "Machine à abducteurs (disque)"]);
+  const poulie = catalogEntry("Machine à abducteurs (poulie)").ex;
+  assert.deepEqual([poulie.s, poulie.r, poulie.rest], [3, "10-12", 90]);
+  const e = { nom: poulie.n, famille: poulie.famille };
+  assert.deepEqual(substitutionCandidates(e, { exos: [] }).map((c) => c.n), ["Machine à abducteurs (disque)"]);
+});
