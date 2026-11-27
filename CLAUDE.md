@@ -6,7 +6,8 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 ## État courant (14/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.188.0, commit `da1b7d1`, le 27/11/2026 à 9 h 30 (machines à abducteurs,
+- **Installé sur le S25** : v3.189.0, commit `8954775`, le 27/11/2026 à 9 h 41 (démonstration 3D des
+  machines à abducteurs). Avant : v3.188.0, commit `da1b7d1`, le 27/11/2026 à 9 h 30 (machines à abducteurs,
   poulie et disque, dans « Ajouter un exercice »). Avant : v3.187.0, commit `da43076`, le 26/11/2026 à 23 h 34 (recettes : une valeur
   manquante compte pour 0, total signalé « +? » ; 5 recettes recalculées dans les données). Avant : v3.186.0, commit `cc5e11e`, le 26/11/2026 à 23 h 28 (recette sans macros : fiche
   Open Food Facts vide lue comme inconnue, ingrédient incomplet nommé ; Honey Cornbread corrigé dans les
@@ -39,7 +40,7 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
   littérature en v3.166.0, installée (« c'est mieux », Yoann) ; sources dans `docs/demos-3d/`.
   Étape 3 (poulies et machines) installée en v3.167.0 ; échauffement basket installé en v3.168.0.
   Tous les exercices des séances ont leur démonstration. Sans démonstration : curls poignets,
-  rowing machine à disques (hors séances). Reste : l'avis de Yoann sur les gestes.
+  rowing machine à disques (hors séances). Machines à abducteurs ajoutées le 27/11/2026. Reste : l'avis de Yoann sur les gestes.
 - **Chantier en cours : montre** (sections du 17/11/2026 de `docs/journal/2026-11.md`) : Bord, Journal et
   Dépense en lecture seule sur la Galaxy Watch 7 (module `android/wear`), en appli et en trois cartes
   à côté du cadran. Installé et vérifié par captures. Reste : l'avis de Yoann au poignet, et la
