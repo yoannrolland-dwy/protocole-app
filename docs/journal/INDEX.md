@@ -164,3 +164,4 @@ Une ligne par section, dans l'ordre des dates. Chercher ici d'abord, puis ouvrir
 - Recettes : une valeur manquante compte pour 0, total signalé « +? » (26/11/2026, apps/perso v3.187.0)
 - Machines à abducteurs, poulie et disque, dans « Ajouter un exercice » (27/11/2026, apps/perso v3.188.0)
 - Démonstration 3D des machines à abducteurs (27/11/2026, apps/perso v3.189.0)
+- Démonstration 3D du rowing machine à disques, assis avec plastron (27/11/2026, apps/perso v3.190.0)

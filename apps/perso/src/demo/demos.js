@@ -527,6 +527,27 @@ export const DEMOS = {
     };
   })(),
 
+  // Machine à disques avec plastron (27/11/2026, choisie par Yoann sur des images) : assis, poitrine
+  // contre le coussin, prise neutre (poignées verticales, coudes près du corps, ~10-20° d'écart),
+  // poignées au bas des pectoraux bras tendus ; en fin de tirage, coudes à ~90-100°, alignés avec le
+  // tronc ou un peu derrière (fiche « Machine à disques (plastron) », repères d'animation).
+  "Rowing machine à disques": (() => {
+    const pose = (z) => ({ root: [0, 0, 0], footL: [0.2, 0.085, 0.45], footR: [-0.2, 0.085, 0.45], kneePoleL: [0.2, 1, 0.6], kneePoleR: [-0.2, 1, 0.6],
+      gripL: [0, 1, 0], gripR: [0, 1, 0], handL: [0.2, 0.95, z], handR: [-0.2, 0.95, z], elbowL: [0.25, -0.4, -1], elbowR: [-0.25, -0.4, -1] });
+    return {
+      view: "profilG", active: ["torse", "brasL", "brasR", "epauleL", "epauleR"],
+      rest: { points: ["pelvis"], y: 0.45 }, pin: { p: "pelvis", z: 0 },
+      props: { handles: true, boxes: [[0, 0.225, -0.02, 0.35, 0.45, 0.4], [0, 0.97, 0.15, 0.3, 0.4, 0.06], [0, 0.5, 0.25, 0.08, 0.9, 0.08]] },
+      frames: [
+        { d: 1.2, hold: 0.4, cue: "Assis, poitrine contre le coussin, poignées au bas des pectoraux, bras tendus, prise neutre", pose: pose(0.58) },
+        { d: 1.3, hold: 0.6, cue: "Tirer les coudes en arrière le long du corps, jusqu'à les aligner avec le tronc, omoplates serrées", pose: pose(0.12) },
+        { d: 2, hold: 0.2, cue: "Rendre en contrôlant, bras tendus, la poitrine reste sur le coussin", pose: pose(0.58) },
+      ],
+      sentir: "Le milieu du dos, entre les omoplates, qui se serrent en fin de tirage.",
+      eviter: "Décoller la poitrine du coussin, hausser les épaules, ou tirer avec les bras sans bouger les omoplates.",
+    };
+  })(),
+
   // Coudes fixes à ~15-30°, les bras partent ~30-45° sous l'horizontale et finissent mains à hauteur
   // des épaules ou du menton.
   "Écarté poulie basse": {

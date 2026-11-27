@@ -36,10 +36,10 @@ test("chaque exercice de la séance Mobilité a sa démonstration, et chaque dé
     "Élévations latérales poulie", "Extension triceps poulie haute", "Face pull", "Rear delt machine (reverse pec deck)",
     "Iso leg extension @60° (si genou raide)", "Leg extension unilatérale", "Leg curl unilatéral", "Hip thrust",
     "Presse à cuisses", "Presse à cuisses (HSR)", "Mollets à la presse", "Développé couché (disque)", "Leg extension unilatérale (poulie)",
-    "Machine à abducteurs (poulie)", "Machine à abducteurs (disque)"]) assert.ok(hasDemo(nom), `pas de démonstration : ${nom}`);
-  // Restent sans démonstration : les curls poignets (pas de poignet articulé) et le rowing machine à
-  // disques (machine non précisée), et l'échauffement basket.
-  for (const nom of ["Curl poignets pronation", "Curl poignets supination", "Rowing machine à disques"]) assert.equal(hasDemo(nom), false, nom);
+    "Machine à abducteurs (poulie)", "Machine à abducteurs (disque)", "Rowing machine à disques"]) assert.ok(hasDemo(nom), `pas de démonstration : ${nom}`);
+  // Restent sans démonstration : les curls poignets (pas de poignet articulé). Le rowing machine à
+  // disques a la sienne depuis le 27/11/2026 (machine à plastron, choisie par Yoann).
+  for (const nom of ["Curl poignets pronation", "Curl poignets supination"]) assert.equal(hasDemo(nom), false, nom);
 });
 
 test("barre : les disques ne touchent jamais le sol ; au squat, la barre se pose sur les sécurités sans passer dessous", () => {

@@ -39,8 +39,8 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
   (Mobilité) et étape 2 (haltères, barre, bancs) installées. Gestes corrigés d'après la
   littérature en v3.166.0, installée (« c'est mieux », Yoann) ; sources dans `docs/demos-3d/`.
   Étape 3 (poulies et machines) installée en v3.167.0 ; échauffement basket installé en v3.168.0.
-  Tous les exercices des séances ont leur démonstration. Sans démonstration : curls poignets,
-  rowing machine à disques (hors séances). Machines à abducteurs ajoutées le 27/11/2026. Reste : l'avis de Yoann sur les gestes.
+  Tous les exercices des séances ont leur démonstration. Sans démonstration : curls poignets
+  (hors séances). Machines à abducteurs et rowing machine à disques ajoutés le 27/11/2026. Reste : l'avis de Yoann sur les gestes.
 - **Chantier en cours : montre** (sections du 17/11/2026 de `docs/journal/2026-11.md`) : Bord, Journal et
   Dépense en lecture seule sur la Galaxy Watch 7 (module `android/wear`), en appli et en trois cartes
   à côté du cadran. Installé et vérifié par captures. Reste : l'avis de Yoann au poignet, et la
