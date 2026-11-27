@@ -655,6 +655,29 @@ export const DEMOS = {
     eviter: "Décoller les fesses de l'assise ou laisser la charge retomber.",
   },
 
+  // Machine à abducteurs (27/11/2026, demande de Yoann) : assis, dos calé, cuisses à l'horizontale,
+  // genoux alignés sur l'axe de la machine, coussins contre l'extérieur des genoux, pieds sur les
+  // repose-pieds. Écarter dans une amplitude contrôlée (~35° par jambe : estimation pour l'animation,
+  // les sources disent « sans forcer l'écart »), marquer un temps, revenir sans lâcher la charge.
+  // Sources : docs/demos-3d/technique-machines-poulies.md, section 14.
+  "Machine à abducteurs (poulie)": (() => {
+    const pose = (a) => ({ ...LEG_EXT_BASE, hipL: [80, a, 0], hipR: [80, a, 0], ...LR("knee", 90) });
+    return {
+      view: { az: 20, el: 28 }, active: ["hancheL", "hancheR", "bassin"],
+      rest: LEG_SEAT, pin: { p: "pelvis", z: 0 },
+      props: { boxes: LEG_EXT_BOXES, pads: [
+        { joint: "knL", at: [0.09, 0.05, 0], r: 0.07, len: 0.04 }, { joint: "knR", at: [-0.09, 0.05, 0], r: 0.07, len: 0.04 },
+        { joint: "anL", at: [0, -0.06, 0.06], r: 0.02, len: 0.12 }, { joint: "anR", at: [0, -0.06, 0.06], r: 0.02, len: 0.12 }] },
+      frames: [
+        { d: 1.5, hold: 0.4, cue: "Assis, dos calé, genoux serrés contre les coussins, pieds sur les repose-pieds, mains sur les poignées", pose: pose(0) },
+        { d: 1.5, hold: 0.8, cue: "Écarter les genoux en poussant avec l'extérieur des cuisses, sans forcer l'écart, et marquer un temps", pose: pose(35) },
+        { d: 2.2, hold: 0.2, cue: "Revenir en freinant, sans laisser la charge retomber", pose: pose(0) },
+      ],
+      sentir: "Le côté des fessiers, sur le haut de la hanche.",
+      eviter: "Se pencher ou décoller le dos pour gagner de l'écart, ou lâcher la charge au retour.",
+    };
+  })(),
+
   // Machine de hip thrust (choix de Yoann) : haut du dos sur le coussin (pointe des omoplates), pieds
   // à plat ; en haut, genou à ~90°, tibia vertical, buste parallèle au sol, hanche neutre (NSCA).
   "Hip thrust": (() => {
@@ -858,6 +881,7 @@ const SAME = {
   "Leg extension unilatérale (disque)": DEMOS["Leg extension unilatérale"],
   "Leg curl unilatéral (poulie)": DEMOS["Leg curl unilatéral"],
   "Leg curl unilatéral (disque)": DEMOS["Leg curl unilatéral"],
+  "Machine à abducteurs (disque)": DEMOS["Machine à abducteurs (poulie)"],
   "Presse à cuisses (poulie)": DEMOS["Presse à cuisses"],
   "Presse à cuisses (disque)": DEMOS["Presse à cuisses"],
   "Mollets à la presse (poulie)": DEMOS["Mollets à la presse"],

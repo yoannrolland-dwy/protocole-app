@@ -687,6 +687,27 @@ reconstruits.
 **Sources** : Escamilla et coll. 2006, *JOSPT* (étude EMG, appareils abdominaux) ; StrengthLog, *Machine Crunch*
 (site, description sommaire).
 
+## 14. Machine à abducteurs (poulie ou disque), ajoutée le 27/11/2026
+
+Recherche courte du 27/11/2026 (demande de Yoann), en résumé de pages web seulement : aucune source
+n'a été lue en texte intégral.
+- **Réglage** : siège réglé pour que les genoux soient alignés sur l'axe de rotation de la machine
+  (StrengthLog, guides de salle) [consensus d'entraîneurs].
+- **Buste** : dos droit, calé contre le dossier [consensus]. Un seul guide commercial conseille de
+  se pencher de 10-15° vers l'avant pour viser le moyen fessier ; non confirmé ailleurs, donc pas
+  retenu dans l'animation.
+- **Amplitude** : contrôlée, « sans forcer l'écart », qui peut tirer sur la hanche et l'aine
+  [consensus]. ~35° par jambe dans l'animation : **[repère d'animation]**, aucune source ne le chiffre.
+- **Muscle** : moyen fessier. Une étude de 2022 (J Bodyw Mov Ther, PubMed 35500965, lue en résumé)
+  trouve la machine à abducteurs la meilleure pour solliciter le moyen fessier plutôt que le tenseur
+  du fascia lata. Une prépublication (Research Square, non relue par des pairs) situe la flexion de
+  hanche la plus favorable entre 45° et 90°.
+- Genou immobile : rien pour le tendon quadricipital de Yoann.
+
+Sources : https://www.strengthlog.com/?p=2529 · https://gravitus.com/guides/exercises/seated-hip-abduction ·
+https://puregym.com/exercises/legs/inner-outer-thigh/seated-hip-abduction · https://pubmed.ncbi.nlm.nih.gov/35500965/ ·
+https://www.researchsquare.com/article/rs-8523653/latest
+
 ---
 
 ## Ce que la recherche n'a pas pu établir
