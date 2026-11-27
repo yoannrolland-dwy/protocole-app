@@ -6,7 +6,8 @@ Le reste est rangé, voir « Où trouver le reste » en bas.
 ## État courant (14/11/2026) : à lire en premier dans une session neuve
 
 À tenir à jour à chaque installation.
-- **Installé sur le S25** : v3.189.0, commit `8954775`, le 27/11/2026 à 9 h 41 (démonstration 3D des
+- **Installé sur le S25** : v3.190.0, commit `9074b1f`, le 27/11/2026 à 9 h 51 (démonstration 3D du
+  rowing machine à disques, assis avec plastron). Avant : v3.189.0, commit `8954775`, le 27/11/2026 à 9 h 41 (démonstration 3D des
   machines à abducteurs). Avant : v3.188.0, commit `da1b7d1`, le 27/11/2026 à 9 h 30 (machines à abducteurs,
   poulie et disque, dans « Ajouter un exercice »). Avant : v3.187.0, commit `da43076`, le 26/11/2026 à 23 h 34 (recettes : une valeur
   manquante compte pour 0, total signalé « +? » ; 5 recettes recalculées dans les données). Avant : v3.186.0, commit `cc5e11e`, le 26/11/2026 à 23 h 28 (recette sans macros : fiche
